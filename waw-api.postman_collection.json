@@ -1,0 +1,133 @@
+{
+  "info": {
+    "name": "Waw (واو) Pakistan Marketplace API Collection",
+    "description": "Comprehensive Postman collection for Waw Multi-Vendor Marketplace (Auth, Products, Orders, Payments, Search, Admin)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Auth - Request WhatsApp OTP",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"+923001234567\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/whatsapp-otp/send",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "whatsapp-otp", "send"]
+        }
+      }
+    },
+    {
+      "name": "Auth - Verify WhatsApp OTP",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"+923001234567\",\n  \"code\": \"123456\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/whatsapp-otp/verify",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "whatsapp-otp", "verify"]
+        }
+      }
+    },
+    {
+      "name": "Products - List Catalog",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/products?page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products"],
+          "query": [
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Orders - Create Hybrid Order",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"buyerId\": \"user_123\",\n  \"buyerPhone\": \"+923001234567\",\n  \"shippingAddress\": \"House 42, Block C, Gulberg III, Lahore\",\n  \"city\": \"Lahore\",\n  \"paymentMethod\": \"RAAST_P2M_QR\",\n  \"items\": [\n    {\n      \"productId\": \"prod_m1\",\n      \"unitPricePkr\": 2499,\n      \"quantity\": 1,\n      \"sellerType\": \"FIRST_PARTY\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/orders",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "orders"]
+        }
+      }
+    },
+    {
+      "name": "Payments - Generate SBP Raast QR",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"ord_88492\",\n  \"amountPkr\": 5699\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payments/safepay/initiate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "payments", "safepay", "initiate"]
+        }
+      }
+    },
+    {
+      "name": "Search - Typesense & Roman Urdu",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/search?q=peshawari%20chappal",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "search"],
+          "query": [{ "key": "q", "value": "peshawari chappal" }]
+        }
+      }
+    },
+    {
+      "name": "Admin - Get Dashboard Stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/stats",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "stats"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3002",
+      "type": "string"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "waw-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Waw (واو) — Premium Hybrid Multi-Vendor E-Commerce Marketplace (Pakistan)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "npm run --prefix apps/api db:generate",
+    "db:migrate": "npm run --prefix apps/api db:migrate",
+    "db:push": "npm run --prefix apps/api db:push",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "packageManager": "npm@11.16.0"
+}

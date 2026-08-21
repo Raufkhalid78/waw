@@ -1,0 +1,11 @@
+{
+  "name": "@waw/config",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    "./tailwind": "./tailwind.config.js",
+    "./eslint": "./eslint-preset.js"
+  }
+}

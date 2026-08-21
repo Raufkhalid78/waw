@@ -1,0 +1,62 @@
+name: Waw CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Types & UI Packages
+        run: |
+          npm run build --workspace=@waw/types
+          npm run build --workspace=@waw/ui
+
+      - name: Typecheck Workspace Packages
+        run: |
+          npm run lint --if-present
+
+  build-and-test:
+    name: Build Next.js & Run API Tests
+    needs: lint-and-typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Types
+        run: npm run build --workspace=@waw/types
+
+      - name: Build Web Storefront (Next.js 14)
+        run: npm run build --workspace=@waw/web
+
+      - name: Build Admin Control Center (Next.js 14)
+        run: npm run build --workspace=@waw/admin
+
+      - name: Run Backend Tests
+        run: npm test --workspace=@waw/api --if-present

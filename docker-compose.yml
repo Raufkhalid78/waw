@@ -1,0 +1,44 @@
+services:
+  # Typesense Search Engine (Self-hosted, Open Source)
+  typesense:
+    image: typesense/typesense:27.1
+    container_name: waw-typesense
+    restart: unless-stopped
+    ports:
+      - "8108:8108"
+    environment:
+      - TYPESENSE_DATA_DIR=/data
+      - TYPESENSE_API_KEY=xyz123WawTypesenseSecretKey2026
+      - TYPESENSE_ENABLE_CORS=true
+    volumes:
+      - typesense_data:/data
+
+  # Redis for Queues (Bull), OTP caching & Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: waw-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+
+  # Local PostgreSQL instance (used if not connecting directly to Supabase Cloud)
+  postgres:
+    image: postgres:16-alpine
+    container_name: waw-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: waw_db
+      POSTGRES_USER: waw_user
+      POSTGRES_PASSWORD: waw_password_2026
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  typesense_data:
+  redis_data:
+  postgres_data:
