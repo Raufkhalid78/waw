@@ -1,117 +1,96 @@
-import { prisma } from '../../config/supabase.js';
+import { supabaseAdmin } from '../../config/supabase.js';
 import { typesenseClient } from '../../config/typesense.js';
 
 export class ProductService {
   /**
-   * Fetches paginated product catalog with category & store filters.
+   * Fetches paginated product catalog with category & store filters from Supabase.
    */
   static async listProducts(query: { categoryId?: string; storeId?: string; isFirstParty?: boolean; limit?: number; page?: number }) {
     const limit = query.limit || 20;
     const page = query.page || 1;
-    const skip = (page - 1) * limit;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    const where: any = {};
-    if (query.categoryId) where.categoryId = query.categoryId;
-    if (query.storeId) where.storeId = query.storeId;
-    if (query.isFirstParty !== undefined) where.isFirstParty = query.isFirstParty;
+    let dbQuery = supabaseAdmin
+      .from('products')
+      .select('*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)', { count: 'exact' });
 
-    const [items, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        include: {
-          variants: true,
-          store: {
-            select: { id: true, name: true, logoUrl: true, ratingAverage: true },
-          },
-          category: true,
-        },
-        skip,
-        take: limit,
-        orderBy: [{ isSponsored: 'desc' }, { soldCount: 'desc' }],
-      }),
-      prisma.product.count({ where }),
-    ]);
+    if (query.categoryId) dbQuery = dbQuery.eq('category_id', query.categoryId);
+    if (query.storeId) dbQuery = dbQuery.eq('store_id', query.storeId);
+    if (query.isFirstParty !== undefined) dbQuery = dbQuery.eq('is_first_party', query.isFirstParty);
 
-    return { items, total, page, totalPages: Math.ceil(total / limit) };
+    const { data: items, count, error } = await dbQuery
+      .order('is_sponsored', { ascending: false })
+      .order('sold_count', { ascending: false })
+      .range(from, to);
+
+    const total = count || 0;
+    return { items: items || [], total, page, totalPages: Math.ceil(total / limit) };
   }
 
   /**
-   * Fetches a product by slug or ID.
+   * Fetches a product by slug from Supabase.
    */
   static async getProductBySlug(slug: string) {
-    return prisma.product.findUnique({
-      where: { slug },
-      include: {
-        variants: true,
-        store: true,
-        category: true,
-        reviews: {
-          include: { buyer: { select: { fullName: true, avatarUrl: true } } },
-          take: 10,
-        },
-      },
-    });
+    const { data: product } = await supabaseAdmin
+      .from('products')
+      .select('*, variants:product_variants(*), store:stores(*), category:categories(*), reviews(*)')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    return product;
   }
 
   /**
-   * Creates a product (either 1P Waw item or 3P Marketplace vendor listing).
+   * Creates a product in Supabase.
    */
   static async createProduct(data: {
     storeId?: string | null;
-    categoryId: string;
     title: string;
     titleUrdu?: string;
     slug: string;
     description: string;
-    descriptionUrdu?: string;
-    basePricePkr: number;
+    pricePkr: number;
     compareAtPricePkr?: number;
-    costPricePkr?: number;
+    categoryId: string;
     images: string[];
     isFirstParty?: boolean;
-    variants?: { sku: string; title: string; pricePkr: number; stockQuantity: number; attributes: any }[];
+    variants?: { sku: string; title: string; pricePkr: number; stock: number }[];
   }) {
-    const product = await prisma.product.create({
-      data: {
-        storeId: data.storeId || null,
-        categoryId: data.categoryId,
+    const isFirstParty = data.isFirstParty ?? (data.storeId === null || data.storeId === undefined);
+
+    const { data: product, error } = await supabaseAdmin
+      .from('products')
+      .insert({
+        id: `prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        store_id: isFirstParty ? null : data.storeId,
         title: data.title,
-        titleUrdu: data.titleUrdu,
+        title_urdu: data.titleUrdu,
         slug: data.slug,
         description: data.description,
-        descriptionUrdu: data.descriptionUrdu,
-        basePricePkr: data.basePricePkr,
-        compareAtPricePkr: data.compareAtPricePkr,
-        costPricePkr: data.costPricePkr,
+        price_pkr: data.pricePkr,
+        compare_at_price_pkr: data.compareAtPricePkr,
+        category_id: data.categoryId,
         images: data.images,
-        isFirstParty: data.isFirstParty ?? !data.storeId,
-        variants: {
-          create: data.variants || [],
-        },
-      },
-      include: { variants: true },
-    });
+        is_first_party: isFirstParty,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
 
-    // Sync to Typesense
-    try {
-      await typesenseClient.collections('products').documents().upsert({
-        id: product.id,
-        title: product.title,
-        titleUrdu: product.titleUrdu || '',
-        description: product.description,
-        slug: product.slug,
-        categoryId: product.categoryId,
-        storeId: product.storeId || '',
-        isFirstParty: product.isFirstParty,
-        isFeatured: product.isFeatured,
-        isSponsored: product.isSponsored,
-        basePricePkr: product.basePricePkr,
-        ratingAverage: product.ratingAverage,
-        soldCount: product.soldCount,
-        createdAt: Math.floor(product.createdAt.getTime() / 1000),
-      });
-    } catch (err: any) {
-      console.warn('⚠️ Typesense sync deferred:', err.message);
+    if (error) throw new Error(`Supabase product creation failed: ${error.message}`);
+
+    // Insert variants if provided
+    if (data.variants && data.variants.length > 0) {
+      const variantInserts = data.variants.map((v) => ({
+        id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+        product_id: product.id,
+        sku: v.sku,
+        title: v.title,
+        price_pkr: v.pricePkr,
+        stock: v.stock,
+      }));
+      await supabaseAdmin.from('product_variants').insert(variantInserts);
     }
 
     return product;

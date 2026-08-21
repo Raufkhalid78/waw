@@ -58,5 +58,8 @@ jobs:
       - name: Build Admin Control Center (Next.js 14)
         run: npm run build --workspace=@waw/admin
 
-      - name: Run Backend Tests
-        run: npm test --workspace=@waw/api --if-present
+      - name: Build API Engine
+        run: npm run build --workspace=@waw/api
+
+      - name: Run Backend Test Suite (Raast, Pricing, HMAC, Auth)
+        run: npm test --workspace=@waw/api

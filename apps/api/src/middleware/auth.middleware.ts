@@ -1,0 +1,78 @@
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { ENV } from '../config/env.js';
+import { supabaseAdmin } from '../config/supabase.js';
+import { UserRole } from '@waw/types';
+
+export interface AuthenticatedUser {
+  id: string;
+  phone: string;
+  email?: string;
+  role: UserRole;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthenticatedUser;
+    }
+  }
+}
+
+/**
+ * Verifies Bearer JWT token issued by Waw or Supabase Auth.
+ */
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Unauthorized: Missing or invalid Authorization header' });
+    return;
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    // 1. First try verifying with JWT Secret
+    if (ENV.JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(token, ENV.JWT_SECRET) as any;
+        if (decoded && decoded.sub) {
+          req.user = {
+            id: decoded.sub,
+            phone: decoded.phone || '',
+            email: decoded.email,
+            role: decoded.role || UserRole.BUYER,
+          };
+          return next();
+        }
+      } catch {
+        // Fall back to Supabase Auth user verification
+      }
+    }
+
+    // 2. Verify with Supabase Auth API
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      res.status(401).json({ error: 'Unauthorized: Invalid or expired session token' });
+      return;
+    }
+
+    // Fetch user profile from Supabase Database
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role, phone, email')
+      .eq('id', user.id)
+      .single();
+
+    req.user = {
+      id: user.id,
+      phone: profile?.phone || user.phone || '',
+      email: profile?.email || user.email,
+      role: (profile?.role as UserRole) || UserRole.BUYER,
+    };
+
+    next();
+  } catch (err: any) {
+    res.status(401).json({ error: `Authentication failed: ${err.message}` });
+  }
+}

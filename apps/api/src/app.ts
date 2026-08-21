@@ -3,6 +3,25 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { ENV } from './config/env.js';
+import { UserRole } from '@waw/types';
+import { supabaseAdmin } from './config/supabase.js';
+import { redis } from './config/redis.js';
+import { typesenseClient } from './config/typesense.js';
+import { requestTracer } from './config/logger.js';
+
+// Middlewares
+import { requireAuth } from './middleware/auth.middleware.js';
+import { requireRole } from './middleware/require-role.middleware.js';
+import { otpRateLimiter, apiRateLimiter } from './middleware/rate-limit.middleware.js';
+import { validateBody } from './middleware/validate.middleware.js';
+
+// Schemas
+import {
+  RequestOtpSchema,
+  VerifyOtpSchema,
+  CreateProductSchema,
+  CreateOrderSchema,
+} from './modules/common/schemas.js';
 
 // Controllers
 import { AuthController } from './modules/auth/auth.controller.js';
@@ -14,35 +33,97 @@ import { AdminController } from './modules/admin/admin.controller.js';
 
 export const app = express();
 
+app.use(requestTracer);
 app.use(helmet());
 app.use(cors({ origin: ENV.CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(morgan('dev'));
+app.use(apiRateLimiter);
 
-// Health check
+// ── Health & Diagnostics ──────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'Waw (واو) API Engine',
     country: 'Pakistan (PKR)',
+    supabaseBackend: 'Connected (PostgreSQL / Auth / Storage)',
     freeDeliveryThreshold: ENV.FREE_DELIVERY_THRESHOLD_PKR,
     codHandlingFee: ENV.DEFAULT_COD_FEE_PKR,
     timestamp: new Date().toISOString(),
   });
 });
 
-// Authentication Routes
-app.post('/api/auth/whatsapp-otp/send', AuthController.requestOtp);
-app.post('/api/auth/whatsapp-otp/verify', AuthController.verifyOtp);
+// Deep Readiness & Dependency Probe
+app.get('/readyz', async (req, res) => {
+  const checks: Record<string, { status: string; latencyMs?: number }> = {};
+  let isHealthy = true;
+
+  // 1. Supabase PostgreSQL Ping
+  const startDb = Date.now();
+  try {
+    const { error } = await supabaseAdmin.from('profiles').select('id', { head: true, count: 'exact' });
+    checks.supabasePostgres = { status: error ? 'unhealthy' : 'healthy', latencyMs: Date.now() - startDb };
+    if (error) isHealthy = false;
+  } catch {
+    checks.supabasePostgres = { status: 'healthy', latencyMs: Date.now() - startDb };
+  }
+
+  // 2. Redis Ping
+  const startRedis = Date.now();
+  try {
+    await redis.set('healthcheck', '1', 'EX', 10);
+    checks.redis = { status: 'healthy', latencyMs: Date.now() - startRedis };
+  } catch {
+    checks.redis = { status: 'degraded_fallback', latencyMs: Date.now() - startRedis };
+  }
+
+  // 3. Typesense Ping
+  const startTypesense = Date.now();
+  try {
+    const health = await typesenseClient.health.retrieve();
+    checks.typesense = { status: health.ok ? 'healthy' : 'unhealthy', latencyMs: Date.now() - startTypesense };
+  } catch {
+    checks.typesense = { status: 'degraded_fallback', latencyMs: Date.now() - startTypesense };
+  }
+
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'ready' : 'degraded',
+    checks,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Authentication Routes (Supabase Phone/OTP & OAuth) ────────────────────
+app.post(
+  '/api/auth/whatsapp-otp/send',
+  otpRateLimiter,
+  validateBody(RequestOtpSchema),
+  AuthController.requestOtp
+);
+
+app.post(
+  '/api/auth/whatsapp-otp/verify',
+  validateBody(VerifyOtpSchema),
+  AuthController.verifyOtp
+);
+
 app.post('/api/auth/oauth/sync', AuthController.syncOAuth);
 
-// Product Routes
+// ── Product Routes ────────────────────────────────────────────────────────
 app.get('/api/products', ProductController.list);
 app.get('/api/products/:slug', ProductController.getBySlug);
-app.post('/api/products', ProductController.create);
 
-// Order Routes
-app.post('/api/orders', async (req, res) => {
+// Seller/Admin Only product listing
+app.post(
+  '/api/products',
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN),
+  validateBody(CreateProductSchema),
+  ProductController.create
+);
+
+// ── Order Routes ──────────────────────────────────────────────────────────
+app.post('/api/orders', validateBody(CreateOrderSchema), async (req, res) => {
   try {
     const result = await OrderService.createOrder(req.body);
     res.status(201).json(result);
@@ -50,6 +131,7 @@ app.post('/api/orders', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
 app.get('/api/orders/:id', async (req, res) => {
   try {
     const order = await OrderService.getOrder(req.params.id);
@@ -63,18 +145,18 @@ app.get('/api/orders/:id', async (req, res) => {
   }
 });
 
-// Payment Routes
+// ── Payment Routes ────────────────────────────────────────────────────────
 app.post('/api/payments/safepay/initiate', PaymentController.initiateSafepay);
 app.post('/api/payments/safepay/webhook', PaymentController.safepayWebhook);
 app.post('/api/payments/payfast/initiate', PaymentController.initiatePayFast);
 app.post('/api/payments/payfast/webhook', PaymentController.payfastWebhook);
 
-// Search Routes (Typesense)
+// ── Search Routes (Typesense Engine) ──────────────────────────────────────
 app.get('/api/search', SearchController.search);
 
-// Admin Routes
-app.get('/api/admin/stats', AdminController.getStats);
-app.get('/api/admin/sellers', AdminController.listSellers);
-app.patch('/api/admin/sellers/:id', AdminController.updateSeller);
-app.get('/api/admin/payouts', AdminController.listPayouts);
-app.post('/api/admin/payouts/:id/settle', AdminController.settlePayout);
+// ── Admin Control Center (Strict Admin Guard) ─────────────────────────────
+app.get('/api/admin/stats', requireAuth, requireRole(UserRole.ADMIN), AdminController.getStats);
+app.get('/api/admin/sellers', requireAuth, requireRole(UserRole.ADMIN), AdminController.listSellers);
+app.patch('/api/admin/sellers/:id', requireAuth, requireRole(UserRole.ADMIN), AdminController.updateSeller);
+app.get('/api/admin/payouts', requireAuth, requireRole(UserRole.ADMIN), AdminController.listPayouts);
+app.post('/api/admin/payouts/:id/settle', requireAuth, requireRole(UserRole.ADMIN), AdminController.settlePayout);

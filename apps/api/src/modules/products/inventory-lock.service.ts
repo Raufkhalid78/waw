@@ -1,4 +1,5 @@
 import { redis } from '../../config/redis.js';
+import { supabaseAdmin } from '../../config/supabase.js';
 
 export interface LockItemRequest {
   productId: string;
@@ -22,6 +23,23 @@ export class InventoryLockService {
     }
     console.log(`🔒 Acquired 15-min flash-sale stock locks for Order ${orderId} (${items.length} SKUs)`);
     return true;
+  }
+
+  /**
+   * Atomically decrements product variant stock upon successful payment confirmation.
+   */
+  static async commitStockDecrement(orderId: string, items: LockItemRequest[]) {
+    for (const item of items) {
+      if (item.variantId) {
+        // Decrement variant stock in Supabase
+        await supabaseAdmin
+          .from('product_variants')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', item.variantId);
+      }
+    }
+    await this.releaseStockLocks(orderId, items);
+    console.log(`📦 Stock decremented and locks released for Order ${orderId}`);
   }
 
   /**

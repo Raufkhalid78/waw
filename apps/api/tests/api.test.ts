@@ -1,8 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import jwt from 'jsonwebtoken';
 import { RaastService } from '../src/modules/payments/raast.service.js';
-import { calculateOrderSummary, PaymentMethod, SellerType } from '@waw/types';
+import { SafepayService } from '../src/modules/payments/safepay.service.js';
+import { calculateOrderSummary, PaymentMethod, SellerType, UserRole } from '@waw/types';
 import { expandRomanUrduQuery } from '../src/modules/search/roman-urdu-dict.js';
+import { ENV } from '../src/config/env.js';
+import crypto from 'crypto';
 
 describe('Waw Marketplace Core API Engine Tests', () => {
   it('should accurately calculate free delivery for orders >= PKR 5,000', () => {
@@ -68,5 +72,31 @@ describe('Waw Marketplace Core API Engine Tests', () => {
 
     const synonyms2 = expandRomanUrduQuery('chappal');
     assert.ok(synonyms2.includes('peshawari chappal'));
+  });
+
+  it('should accurately verify valid Safepay HMAC-SHA256 signatures and reject tampered payloads', () => {
+    const secret = ENV.SAFEPAY_WEBHOOK_SECRET || 'whsec_sandbox_test_key_2026';
+    const payload = JSON.stringify({ tracker: 'track_12345', amount: 5000, status: 'PAID' });
+    
+    // Generate valid HMAC
+    const validSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    assert.strictEqual(SafepayService.verifyWebhookSignature(payload, validSignature), true);
+
+    // Tampered payload with valid signature
+    const tamperedPayload = JSON.stringify({ tracker: 'track_12345', amount: 9999, status: 'PAID' });
+    assert.strictEqual(SafepayService.verifyWebhookSignature(tamperedPayload, validSignature), false);
+  });
+
+  it('should issue and verify valid JWT tokens with role claims', () => {
+    const secret = ENV.JWT_SECRET || 'waw_dev_jwt_secret_key_2026';
+    const token = jwt.sign(
+      { sub: 'usr_admin_1', phone: '+923001234567', role: UserRole.ADMIN },
+      secret,
+      { expiresIn: '1h' }
+    );
+
+    const decoded = jwt.verify(token, secret) as any;
+    assert.strictEqual(decoded.sub, 'usr_admin_1');
+    assert.strictEqual(decoded.role, UserRole.ADMIN);
   });
 });

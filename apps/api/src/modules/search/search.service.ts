@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { typesenseClient } from '../../config/typesense.js';
-import { prisma } from '../../config/supabase.js';
+import { supabaseAdmin } from '../../config/supabase.js';
 
 export class SearchService {
   /**
@@ -37,38 +37,39 @@ export class SearchService {
 
       const productIds = (searchResult.hits || []).map((h: any) => h.document.id);
 
-      // Hydrate with DB variants and store info
-      const products = await prisma.product.findMany({
-        where: { id: { in: productIds } },
-        include: {
-          variants: true,
-          store: { select: { id: true, name: true, logoUrl: true, ratingAverage: true } },
-          category: true,
-        },
-      });
+      // Hydrate with Supabase DB
+      const { data: products } = await supabaseAdmin
+        .from('products')
+        .select('*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)')
+        .in('id', productIds);
 
       return {
-        hits: products,
+        hits: products || [],
         found: searchResult.found,
         page,
         totalPages: Math.ceil(searchResult.found / perPage),
       };
     } catch (err: any) {
-      console.warn('⚠️ Typesense fallback to database search:', err.message);
-      // Fallback to PostgreSQL search if Typesense is still starting
-      const fallbackProducts = await prisma.product.findMany({
-        where: params.query
-          ? {
-              OR: [
-                { title: { contains: params.query, mode: 'insensitive' } },
-                { description: { contains: params.query, mode: 'insensitive' } },
-              ],
-            }
-          : {},
-        include: { variants: true, store: true, category: true },
-        take: perPage,
-      });
-      return { hits: fallbackProducts, found: fallbackProducts.length, page: 1, totalPages: 1 };
+      // Fallback to Supabase PostgreSQL full-text search
+      let dbQuery = supabaseAdmin
+        .from('products')
+        .select('*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)', { count: 'exact' });
+
+      if (params.query) {
+        dbQuery = dbQuery.or(`title.ilike.%${params.query}%,description.ilike.%${params.query}%`);
+      }
+      if (params.categoryId) dbQuery = dbQuery.eq('category_id', params.categoryId);
+      if (params.storeId) dbQuery = dbQuery.eq('store_id', params.storeId);
+
+      const { data: fallbackProducts, count } = await dbQuery
+        .range((page - 1) * perPage, page * perPage - 1);
+
+      return {
+        hits: fallbackProducts || [],
+        found: count || (fallbackProducts ? fallbackProducts.length : 0),
+        page,
+        totalPages: Math.ceil((count || 1) / perPage),
+      };
     }
   }
 }
@@ -77,16 +78,16 @@ export class SearchController {
   static async search(req: Request, res: Response): Promise<void> {
     try {
       const { q, categoryId, storeId, minPrice, maxPrice, page, limit } = req.query;
-      const result = await SearchService.search({
+      const results = await SearchService.search({
         query: q as string,
         categoryId: categoryId as string,
         storeId: storeId as string,
-        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
-        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+        minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
+        maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 20,
       });
-      res.json(result);
+      res.json(results);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

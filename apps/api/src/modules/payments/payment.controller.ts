@@ -20,8 +20,9 @@ export class PaymentController {
 
   static async safepayWebhook(req: Request, res: Response): Promise<void> {
     try {
-      await SafepayService.handleWebhook(req.body);
-      res.json({ received: true });
+      const signature = (req.headers['x-sfpy-signature'] || req.headers['x-safepay-signature']) as string | undefined;
+      const result = await SafepayService.handleWebhook(req.body, signature);
+      res.json({ received: true, ...result });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
@@ -42,8 +43,8 @@ export class PaymentController {
 
   static async payfastWebhook(req: Request, res: Response): Promise<void> {
     try {
-      await PayFastService.handleWebhook(req.body);
-      res.json({ received: true });
+      const result = await PayFastService.handleWebhook(req.body);
+      res.json({ received: true, ...result });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }

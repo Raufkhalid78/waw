@@ -370,10 +370,11 @@ export function Footer() {
             {/* Legal / Policy Links */}
             <div className="flex flex-wrap items-center justify-center gap-3.5 text-slate-500 font-medium text-[11px]">
               <Link href="/help" className="hover:text-slate-950 transition-colors">Help & FAQs</Link>
-              <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">SBP Escrow Guarantee</Link>
+              <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">SBP Escrow</Link>
               <Link href="/sell" className="hover:text-slate-950 font-bold text-amber-700 transition-colors">Sell on Waw</Link>
-              <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">7-Day Returns</Link>
-              <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">Privacy & Security</Link>
+              <Link href="/refund-policy" className="hover:text-slate-950 transition-colors">7-Day Returns</Link>
+              <Link href="/privacy" className="hover:text-slate-950 transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-slate-950 transition-colors">Terms of Service</Link>
             </div>
           </div>
 

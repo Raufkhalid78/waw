@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { PrismaClient } from '@prisma/client';
 import { ENV } from './env.js';
 
-// Supabase Admin Client (Service Role for backend privileges)
+// Supabase Admin Client (Service Role with elevated backend database privileges)
 export const supabaseAdmin = createClient(
   ENV.SUPABASE_URL,
   ENV.SUPABASE_SERVICE_ROLE_KEY,
@@ -14,5 +13,8 @@ export const supabaseAdmin = createClient(
   }
 );
 
-// Global Prisma Client
-export const prisma = new PrismaClient();
+// Supabase Public / Anon Client (respects Row Level Security RLS)
+export const supabasePublic = createClient(
+  ENV.SUPABASE_URL,
+  ENV.SUPABASE_ANON_KEY
+);
