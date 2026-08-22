@@ -3,7 +3,9 @@ import assert from 'node:assert';
 import jwt from 'jsonwebtoken';
 import { RaastService } from '../src/modules/payments/raast.service.js';
 import { SafepayService } from '../src/modules/payments/safepay.service.js';
-import { calculateOrderSummary, PaymentMethod, SellerType, UserRole } from '@waw/types';
+import { CourierService } from '../src/modules/logistics/courier.service.js';
+import { ProductService } from '../src/modules/products/product.service.js';
+import { calculateOrderSummary, PaymentMethod, ReturnReason, SellerType, UserRole } from '@waw/types';
 import { expandRomanUrduQuery } from '../src/modules/search/roman-urdu-dict.js';
 import { ENV } from '../src/config/env.js';
 import crypto from 'crypto';
@@ -77,7 +79,7 @@ describe('Waw Marketplace Core API Engine Tests', () => {
   it('should accurately verify valid Safepay HMAC-SHA256 signatures and reject tampered payloads', () => {
     const secret = ENV.SAFEPAY_WEBHOOK_SECRET || 'whsec_sandbox_test_key_2026';
     const payload = JSON.stringify({ tracker: 'track_12345', amount: 5000, status: 'PAID' });
-    
+
     // Generate valid HMAC
     const validSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     assert.strictEqual(SafepayService.verifyWebhookSignature(payload, validSignature), true);
@@ -98,5 +100,64 @@ describe('Waw Marketplace Core API Engine Tests', () => {
     const decoded = jwt.verify(token, secret) as any;
     assert.strictEqual(decoded.sub, 'usr_admin_1');
     assert.strictEqual(decoded.role, UserRole.ADMIN);
+  });
+
+  it('should generate printable 4x6 PostEx Air Waybill with Code128 barcode URL', () => {
+    const awb = CourierService.generatePostExAirWaybill('PTX-98213-441', 'WAW-88492', {
+      name: 'Ahmed Malik',
+      phone: '+923001234567',
+      address: 'House 42, Street 8, DHA Phase 5, Lahore',
+      city: 'Lahore',
+      codAmountPkr: 4200,
+    });
+
+    assert.strictEqual(awb.trackingNumber, 'PTX-98213-441');
+    assert.strictEqual(awb.orderNumber, 'WAW-88492');
+    assert.ok(awb.barcodeUrl.includes('bcid=code128'));
+    assert.strictEqual(awb.codAmountPkr, 4200);
+    assert.strictEqual(awb.city, 'Lahore');
+  });
+
+  it('should generate PostEx reverse pickup consignment for 7-day buyer return', async () => {
+    const reversePickup = await CourierService.bookPostExReversePickup({
+      orderId: 'ord_ret_1',
+      orderNumber: 'WAW-88492',
+      customerName: 'Usman Riaz',
+      customerPhone: '+923219876543',
+      pickupAddress: 'Flat 4B, Clifton Block 2, Karachi',
+      pickupCity: 'Karachi',
+      returnReason: ReturnReason.SIZE_OR_FIT_MISMATCH,
+      itemsDescription: 'Peshawari Chappal (Size 43)',
+    });
+
+    assert.strictEqual(reversePickup.success, true);
+    assert.ok(reversePickup.reverseTrackingNumber.startsWith('REV-PTX-'));
+    assert.strictEqual(reversePickup.pickupCity, 'Karachi');
+    assert.ok(reversePickup.trackingUrl.includes('postex.pk/tracking'));
+  });
+
+  it('should reject product creation when a seller attempts to list under an unowned store', async () => {
+    const unauthorizedSeller = { id: 'usr_seller_999', role: 'SELLER', phone: '+923009999999' };
+
+    await assert.rejects(
+      async () => {
+        await ProductService.createProduct(
+          {
+            storeId: 'store_other_vendor',
+            title: 'Unauthorized Item',
+            slug: 'unauthorized-item',
+            description: 'Item created by unauthorized vendor',
+            pricePkr: 1999,
+            categoryId: 'cat_tech',
+            images: ['https://example.com/item.jpg'],
+          },
+          unauthorizedSeller
+        );
+      },
+      (err: Error) => {
+        return err.message.includes('Seller does not have an active registered store') ||
+               err.message.includes('Unauthorized');
+      }
+    );
   });
 });

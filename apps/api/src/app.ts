@@ -27,6 +27,7 @@ import {
 import { AuthController } from './modules/auth/auth.controller.js';
 import { ProductController } from './modules/products/product.controller.js';
 import { OrderService } from './modules/orders/order.service.js';
+import { CourierService } from './modules/logistics/courier.service.js';
 import { PaymentController } from './modules/payments/payment.controller.js';
 import { SearchController } from './modules/search/search.service.js';
 import { AdminController } from './modules/admin/admin.controller.js';
@@ -142,6 +143,25 @@ app.get('/api/orders/:id', async (req, res) => {
     res.json(order);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/orders/:id/cancel', async (req, res) => {
+  try {
+    const order = await OrderService.cancelOrder(req.params.id, req.body.reason);
+    res.json(order);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Logistics Webhook (PostEx Live Milestone Updates) ────────────────────
+app.post('/api/logistics/postex/webhook', async (req, res) => {
+  try {
+    const result = await CourierService.handlePostExWebhook(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 });
 

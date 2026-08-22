@@ -5,6 +5,7 @@ import { supabaseAdmin } from '../../config/supabase.js';
 import { OrderStatus, PaymentMethod, PaymentStatus } from '@waw/types';
 import { WhatsAppService } from '../notifications/whatsapp.service.js';
 import { CourierService } from '../logistics/courier.service.js';
+import { InventoryLockService } from '../products/inventory-lock.service.js';
 
 export class SafepayService {
   private static baseUrl =
@@ -24,58 +25,69 @@ export class SafepayService {
 
     if (!order) throw new Error('Order not found');
 
-    const trackerToken = `track_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const checkoutUrl = `${this.baseUrl}/checkout?beacon=${trackerToken}&env=${ENV.SAFEPAY_ENVIRONMENT}`;
+    const trackerToken = `track_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const checkoutUrl = `${this.baseUrl}/checkout/pay?beacon=${trackerToken}&amount=${order.total_pkr}&currency=PKR`;
 
-    // Record initial pending payment in Supabase
+    // Record payment attempt
     await supabaseAdmin.from('payments').insert({
-      id: `pay_${Date.now()}`,
+      id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       order_id: order.id,
-      amount_pkr: order.total_pkr || order.totalPkr,
-      payment_method: PaymentMethod.SAFEPAY_CARD,
+      method: PaymentMethod.SAFEPAY_CARD,
       status: PaymentStatus.PENDING,
       gateway_reference: trackerToken,
+      amount_pkr: order.total_pkr,
       created_at: new Date().toISOString(),
     });
 
     return {
       trackerToken,
       checkoutUrl,
-      orderNumber: order.order_number || order.orderNumber,
-      totalPkr: order.total_pkr || order.totalPkr,
+      orderNumber: order.order_number,
+      amountPkr: order.total_pkr,
     };
   }
 
   /**
-   * Verifies Safepay HMAC-SHA256 webhook signature.
+   * Verifies the Safepay webhook signature using timing-safe HMAC-SHA256 comparison.
    */
   static verifyWebhookSignature(payload: any, signatureHeader?: string): boolean {
-    if (!ENV.SAFEPAY_WEBHOOK_SECRET) return true; // dev fallback
-    if (!signatureHeader) return false;
+    if (!signatureHeader || !ENV.SAFEPAY_WEBHOOK_SECRET) {
+      console.warn('⚠️ Safepay webhook signature header or secret missing.');
+      return false;
+    }
 
-    const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
-    const expectedSignature = crypto
-      .createHmac('sha256', ENV.SAFEPAY_WEBHOOK_SECRET)
-      .update(payloadString)
-      .digest('hex');
+    try {
+      const dataToSign = typeof payload === 'string' ? payload : JSON.stringify(payload);
+      const expectedSignature = crypto
+        .createHmac('sha256', ENV.SAFEPAY_WEBHOOK_SECRET)
+        .update(dataToSign)
+        .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, 'utf8'),
-      Buffer.from(signatureHeader, 'utf8')
-    );
+      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+      const receivedBuffer = Buffer.from(signatureHeader, 'hex');
+
+      if (expectedBuffer.length !== receivedBuffer.length) return false;
+      return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+    } catch (err: any) {
+      console.error('❌ Safepay signature verification failed with error:', err.message);
+      return false;
+    }
   }
 
   /**
-   * Idempotently processes Safepay Webhook confirmation event.
+   * Processes Safepay webhook events idempotently and transitions order to PAID/CONFIRMED.
    */
   static async handleWebhook(payload: any, signatureHeader?: string) {
-    // 1. Verify HMAC signature
-    if (signatureHeader && !this.verifyWebhookSignature(payload, signatureHeader)) {
-      throw new Error('Security Error: Invalid Safepay webhook HMAC signature');
+    // 1. Signature Verification
+    if (ENV.NODE_ENV === 'production' || ENV.SAFEPAY_WEBHOOK_SECRET !== 'dev_safepay_secret_32chars_key_pk') {
+      const isValid = this.verifyWebhookSignature(payload, signatureHeader);
+      if (!isValid) {
+        throw new Error('Invalid Safepay webhook signature.');
+      }
     }
 
-    const trackerToken = payload.data?.token || payload.tracker;
-    if (!trackerToken) throw new Error('Missing tracker token in webhook');
+    const { tracker, reference, order_id } = payload.data || payload;
+    const trackerToken = tracker?.token || reference || order_id;
 
     const { data: payment } = await supabaseAdmin
       .from('payments')
@@ -83,9 +95,11 @@ export class SafepayService {
       .eq('gateway_reference', trackerToken)
       .maybeSingle();
 
-    if (!payment) throw new Error('Payment reference not found');
+    if (!payment) {
+      throw new Error(`Payment record not found for Safepay tracker: ${trackerToken}`);
+    }
 
-    // 2. Idempotency Check: Short-circuit if already PAID
+    // 2. Idempotency Check
     if (payment.status === PaymentStatus.PAID) {
       console.log(`ℹ️ Webhook duplicate skipped: Payment ${payment.id} is already PAID.`);
       return { status: 'ALREADY_PROCESSED', paymentId: payment.id };
@@ -101,7 +115,7 @@ export class SafepayService {
       })
       .eq('id', payment.id);
 
-    // 4. Update order status to CONFIRMED
+    // 4. Update order status to CONFIRMED & PAID
     await supabaseAdmin
       .from('orders')
       .update({
@@ -111,7 +125,22 @@ export class SafepayService {
       })
       .eq('id', payment.order_id);
 
-    // 5. Book PostEx Courier dispatch
+    // 5. Commit Stock Decrement & Release Redis Locks
+    const { data: orderItems } = await supabaseAdmin
+      .from('order_items')
+      .select('*')
+      .eq('order_id', payment.order_id);
+
+    if (orderItems && orderItems.length > 0) {
+      const lockItems = orderItems.map((i: any) => ({
+        productId: i.product_id,
+        variantId: i.variant_id,
+        quantity: i.quantity,
+      }));
+      await InventoryLockService.commitStockDecrement(payment.order_id, lockItems);
+    }
+
+    // 6. Book PostEx Courier dispatch
     const orderData = payment.orders || payment;
     await CourierService.bookCourierShipment({
       orderId: orderData.id,
@@ -122,10 +151,10 @@ export class SafepayService {
       destinationCity: orderData.shipping_city || 'Lahore',
       codAmountPkr: 0,
       isCod: false,
-      itemsCount: 1,
+      itemsCount: orderItems?.length || 1,
     });
 
-    // 6. Dispatch WhatsApp confirmation
+    // 7. Dispatch WhatsApp confirmation
     if (orderData.buyer_phone) {
       await WhatsAppService.sendOrderConfirmed(
         orderData.buyer_phone,

@@ -2,10 +2,18 @@ import { Queue, Worker, Job } from 'bullmq';
 import { ENV } from '../config/env.js';
 import { WhatsAppService } from '../modules/notifications/whatsapp.service.js';
 import { typesenseClient } from '../config/typesense.js';
+import { supabaseAdmin } from '../config/supabase.js';
+import { InventoryLockService } from '../modules/products/inventory-lock.service.js';
+import { OrderStatus, PaymentStatus } from '@waw/types';
 
 export interface BackgroundJobPayload<T = any> {
   id?: string;
-  type: 'WHATSAPP_NOTIFICATION' | 'TYPESENSE_SYNC' | 'ESCROW_PAYOUT' | 'COD_RECONCILIATION';
+  type:
+    | 'WHATSAPP_NOTIFICATION'
+    | 'TYPESENSE_SYNC'
+    | 'ESCROW_PAYOUT'
+    | 'COD_RECONCILIATION'
+    | 'INVENTORY_LOCK_SWEEP';
   payload: T;
   createdAt?: string;
 }
@@ -60,6 +68,42 @@ try {
             }
           }
           break;
+
+        case 'INVENTORY_LOCK_SWEEP': {
+          console.log('🧹 [BullMQ Worker] Running scheduled inventory lock sweep...');
+          // Find pending unpaid orders older than 15 minutes
+          const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+          const { data: expiredOrders } = await supabaseAdmin
+            .from('orders')
+            .select('id, order_items(*)')
+            .eq('payment_status', PaymentStatus.PENDING)
+            .eq('order_status', OrderStatus.CONFIRMED)
+            .lt('created_at', fifteenMinutesAgo);
+
+          if (expiredOrders && expiredOrders.length > 0) {
+            for (const ord of expiredOrders) {
+              if (ord.order_items && ord.order_items.length > 0) {
+                const lockItems = ord.order_items.map((i: any) => ({
+                  productId: i.product_id,
+                  variantId: i.variant_id,
+                  quantity: i.quantity,
+                }));
+                await InventoryLockService.releaseStockLocks(ord.id, lockItems);
+              }
+              // Mark order as cancelled due to payment timeout
+              await supabaseAdmin
+                .from('orders')
+                .update({
+                  order_status: OrderStatus.CANCELLED,
+                  notes: 'Cancelled automatically due to 15-minute payment expiration.',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', ord.id);
+            }
+            console.log(`🧹 Cleaned up ${expiredOrders.length} expired reservations.`);
+          }
+          break;
+        }
 
         case 'ESCROW_PAYOUT':
           console.log(`🏦 [Escrow Payout Job] Reconciling SBP Escrow release for vendor ${payload.storeId}`);

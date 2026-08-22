@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../config/supabase.js';
 import { OrderStatus, PaymentMethod, PaymentStatus } from '@waw/types';
 import { CourierService } from '../logistics/courier.service.js';
 import { WhatsAppService } from '../notifications/whatsapp.service.js';
+import { InventoryLockService } from '../products/inventory-lock.service.js';
 
 export class PayFastService {
   /**
@@ -77,6 +78,21 @@ export class PayFastService {
       })
       .eq('id', payment.order_id);
 
+    // Commit stock decrement
+    const { data: orderItems } = await supabaseAdmin
+      .from('order_items')
+      .select('*')
+      .eq('order_id', payment.order_id);
+
+    if (orderItems && orderItems.length > 0) {
+      const lockItems = orderItems.map((i: any) => ({
+        productId: i.product_id,
+        variantId: i.variant_id,
+        quantity: i.quantity,
+      }));
+      await InventoryLockService.commitStockDecrement(payment.order_id, lockItems);
+    }
+
     const orderData = payment.orders || payment;
     await CourierService.bookCourierShipment({
       orderId: orderData.id,
@@ -87,7 +103,7 @@ export class PayFastService {
       destinationCity: orderData.shipping_city || 'Lahore',
       codAmountPkr: 0,
       isCod: false,
-      itemsCount: 1,
+      itemsCount: orderItems?.length || 1,
     });
 
     return { success: true, paymentId: payment.id };

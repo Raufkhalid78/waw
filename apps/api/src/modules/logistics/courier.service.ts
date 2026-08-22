@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { supabaseAdmin } from '../../config/supabase.js';
-import { CourierProvider, OrderStatus, ReturnReason, ReturnStatus } from '@waw/types';
+import { CourierProvider, OrderStatus, PaymentStatus, ReturnReason, ReturnStatus } from '@waw/types';
 import { ENV } from '../../config/env.js';
 
 export interface PostExShipmentInput {
@@ -100,14 +100,108 @@ export class CourierService {
   }
 
   /**
+   * Processes live PostEx Delivery Status Webhook events.
+   * Maps PostEx milestones (InTransit, OutForDelivery, Delivered, Returned) to internal OrderStatus.
+   */
+  static async handlePostExWebhook(payload: any) {
+    const trackingNumber = payload.trackingNumber || payload.distCode || payload.orderRefNumber;
+    const postexStatus = payload.orderStatus || payload.status || payload.transactionStatus;
+
+    if (!trackingNumber) {
+      throw new Error('Missing trackingNumber in PostEx webhook payload');
+    }
+
+    console.log(`🚚 [PostEx Webhook] Tracking #${trackingNumber} status update: ${postexStatus}`);
+
+    // Map PostEx status to internal OrderStatus
+    let targetOrderStatus: OrderStatus = OrderStatus.PROCESSING;
+    let targetPaymentStatus: PaymentStatus | undefined = undefined;
+
+    const normalized = (postexStatus || '').toUpperCase();
+    if (normalized.includes('DELIVERED') || normalized === 'COMPLETED') {
+      targetOrderStatus = OrderStatus.DELIVERED;
+      targetPaymentStatus = PaymentStatus.COD_COLLECTED;
+    } else if (normalized.includes('OUT') || normalized.includes('DISPATCHED')) {
+      targetOrderStatus = OrderStatus.OUT_FOR_DELIVERY;
+    } else if (normalized.includes('TRANSIT') || normalized.includes('PICKED')) {
+      targetOrderStatus = OrderStatus.SHIPPED;
+    } else if (normalized.includes('RETURN') || normalized.includes('FAILED')) {
+      targetOrderStatus = OrderStatus.RETURNED;
+    }
+
+    // 1. Update Shipment Record
+    const { data: shipment } = await supabaseAdmin
+      .from('shipments')
+      .update({
+        status: targetOrderStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tracking_number', trackingNumber)
+      .select()
+      .maybeSingle();
+
+    // 2. Update Associated Order Record
+    if (shipment && shipment.order_id) {
+      const orderUpdate: any = {
+        order_status: targetOrderStatus,
+        updated_at: new Date().toISOString(),
+      };
+      if (shipment.is_cod && targetPaymentStatus) {
+        orderUpdate.payment_status = targetPaymentStatus;
+      }
+
+      await supabaseAdmin
+        .from('orders')
+        .update(orderUpdate)
+        .eq('id', shipment.order_id);
+
+      console.log(`✅ Order ${shipment.order_id} updated to ${targetOrderStatus} via PostEx Webhook`);
+    }
+
+    return { success: true, trackingNumber, newStatus: targetOrderStatus };
+  }
+
+  /**
    * Books a PostEx reverse pickup consignment for 7-day buyer returns.
    */
   static async bookPostExReversePickup(input: PostExReversePickupInput) {
-    const reverseCn = `REV-PTX-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`;
-    const returnTrackingUrl = `https://postex.pk/tracking?cn=${reverseCn}`;
+    let reverseCn = `REV-PTX-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`;
+    let returnTrackingUrl = `https://postex.pk/tracking?cn=${reverseCn}`;
+
+    // Real PostEx Reverse Pickup API integration
+    if (ENV.POSTEX_API_TOKEN && ENV.POSTEX_API_TOKEN !== 'ptx_live_test_token_2026') {
+      try {
+        const response = await axios.post(
+          `${this.POSTEX_API_BASE}/order/v1/create-reverse-pickup`,
+          {
+            cityName: input.pickupCity,
+            customerName: input.customerName,
+            customerPhone: input.customerPhone,
+            pickupAddress: input.pickupAddress,
+            orderRefNumber: input.orderNumber,
+            reason: input.returnReason,
+            itemDetail: input.itemsDescription,
+          },
+          {
+            headers: {
+              token: ENV.POSTEX_API_TOKEN,
+              'Content-Type': 'application/json',
+            },
+            timeout: 8000,
+          }
+        );
+
+        if (response.data && response.data.distCode) {
+          reverseCn = response.data.distCode;
+          returnTrackingUrl = `https://postex.pk/tracking?cn=${reverseCn}`;
+        }
+      } catch (err: any) {
+        console.warn('⚠️ PostEx Reverse Pickup fallback to CN generator:', err.response?.data || err.message);
+      }
+    }
 
     console.log(
-      `🔄 PostEx Reverse Pickup generated: CN #${reverseCn} for Order ${input.orderNumber} (Reason: ${input.returnReason})`
+      `🔄 PostEx Reverse Pickup registered: CN #${reverseCn} for Order ${input.orderNumber} (Reason: ${input.returnReason})`
     );
 
     return {

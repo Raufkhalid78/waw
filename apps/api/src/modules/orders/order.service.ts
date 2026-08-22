@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../../config/supabase.js';
 import { calculateOrderSummary, OrderItemPricingInput, OrderStatus, PaymentMethod, PaymentStatus, SellerType } from '@waw/types';
 import { WhatsAppService } from '../notifications/whatsapp.service.js';
 import { CourierService } from '../logistics/courier.service.js';
+import { InventoryLockService } from '../products/inventory-lock.service.js';
 
 export interface CreateOrderInput {
   buyerId?: string;
@@ -23,10 +24,26 @@ export interface CreateOrderInput {
 
 export class OrderService {
   /**
-   * Places an order, calculates exact pricing (Free Shipping > 5000 PKR, COD fee +100 PKR),
+   * Places an order, acquires 15-minute flash-sale inventory reservation locks,
+   * calculates exact pricing (Free Shipping > 5000 PKR, COD fee +100 PKR),
    * records order in Supabase, and triggers WhatsApp confirmation.
    */
   static async createOrder(input: CreateOrderInput) {
+    if (!input.items || input.items.length === 0) {
+      throw new Error('Order must contain at least 1 item');
+    }
+
+    const orderNumber = `WAW-${Math.floor(100000 + Math.random() * 900000)}`;
+    const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const isCod = input.paymentMethod === PaymentMethod.COD;
+
+    // 1. Acquire Redis Inventory Reservation Locks (15-min TTL)
+    const lockAcquired = await InventoryLockService.acquireStockLocks(orderId, input.items);
+    if (!lockAcquired) {
+      throw new Error('Unable to reserve stock. One or more items are currently out of stock.');
+    }
+
+    // 2. Calculate Pricing
     const pricingItems: OrderItemPricingInput[] = input.items.map((item) => ({
       productId: item.productId,
       variantId: item.variantId,
@@ -38,11 +55,8 @@ export class OrderService {
     }));
 
     const summary = calculateOrderSummary(pricingItems, input.paymentMethod);
-    const orderNumber = `WAW-${Math.floor(100000 + Math.random() * 900000)}`;
-    const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const isCod = input.paymentMethod === PaymentMethod.COD;
 
-    // Insert order record into Supabase
+    // 3. Insert Order Record into Supabase
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -67,7 +81,32 @@ export class OrderService {
       .select()
       .single();
 
-    // Auto-book PostEx Courier
+    if (orderError) {
+      // Release acquired locks if order insertion fails
+      await InventoryLockService.releaseStockLocks(orderId, input.items);
+      throw new Error(`Failed to create order: ${orderError.message}`);
+    }
+
+    // 4. Insert Order Items Records
+    const itemInserts = input.items.map((item) => ({
+      id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      order_id: orderId,
+      product_id: item.productId,
+      variant_id: item.variantId || null,
+      quantity: item.quantity,
+      unit_price_pkr: item.unitPricePkr || 2499,
+      total_price_pkr: (item.unitPricePkr || 2499) * item.quantity,
+      created_at: new Date().toISOString(),
+    }));
+
+    await supabaseAdmin.from('order_items').insert(itemInserts);
+
+    // 5. For COD orders, auto-commit stock reservation
+    if (isCod) {
+      await InventoryLockService.commitStockDecrement(orderId, input.items);
+    }
+
+    // 6. Auto-book PostEx Courier
     const shipment = await CourierService.bookCourierShipment({
       orderId: order?.id || orderId,
       orderNumber,
@@ -80,7 +119,7 @@ export class OrderService {
       itemsCount: input.items.reduce((s, i) => s + i.quantity, 0),
     });
 
-    // WhatsApp Confirmation Dispatch
+    // 7. WhatsApp Confirmation Dispatch
     await WhatsAppService.sendOrderConfirmed(
       input.buyerPhone,
       orderNumber,
@@ -108,5 +147,41 @@ export class OrderService {
       .maybeSingle();
 
     return order;
+  }
+
+  /**
+   * Cancels an order and releases any active inventory locks.
+   */
+  static async cancelOrder(id: string, reason?: string) {
+    const { data: order } = await supabaseAdmin
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', id)
+      .single();
+
+    if (!order) throw new Error('Order not found');
+
+    const { data: updated } = await supabaseAdmin
+      .from('orders')
+      .update({
+        order_status: OrderStatus.CANCELLED,
+        notes: reason ? `Cancelled: ${reason}` : 'Cancelled by customer',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    // Release inventory reservation locks
+    if (order.order_items && order.order_items.length > 0) {
+      const lockItems = order.order_items.map((i: any) => ({
+        productId: i.product_id,
+        variantId: i.variant_id,
+        quantity: i.quantity,
+      }));
+      await InventoryLockService.releaseStockLocks(id, lockItems);
+    }
+
+    return updated;
   }
 }

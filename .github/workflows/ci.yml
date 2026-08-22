@@ -32,6 +32,9 @@ jobs:
         run: |
           npm run lint --if-present
 
+      - name: Security Vulnerability Audit
+        run: npm audit --audit-level=critical --if-present
+
   build-and-test:
     name: Build Next.js & Run API Tests
     needs: lint-and-typecheck
