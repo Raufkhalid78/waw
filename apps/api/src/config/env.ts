@@ -16,6 +16,8 @@ export const ENV = {
   ALLOW_TEST_OTP: process.env.ALLOW_TEST_OTP === 'true',
 
   // Redis for Queues & Concurrency Locks
+  UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL || '',
+  UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN || '',
   REDIS_HOST: process.env.REDIS_HOST || 'localhost',
   REDIS_PORT: parseInt(process.env.REDIS_PORT || '6379', 10),
   REDIS_PASSWORD: process.env.REDIS_PASSWORD || undefined,
@@ -26,18 +28,13 @@ export const ENV = {
   TYPESENSE_PROTOCOL: process.env.TYPESENSE_PROTOCOL || 'http',
   TYPESENSE_API_KEY: process.env.TYPESENSE_API_KEY || 'xyz123WawTypesenseSecretKey2026',
 
-  // Payments (Safepay & PayFast)
-  SAFEPAY_API_KEY: process.env.SAFEPAY_API_KEY || 'sec_sandbox_test',
-  SAFEPAY_SECRET_KEY: process.env.SAFEPAY_SECRET_KEY || 'sec_sandbox_secret',
-  SAFEPAY_WEBHOOK_SECRET: process.env.SAFEPAY_WEBHOOK_SECRET || 'whsec_sandbox_test_key_2026',
-  SAFEPAY_ENVIRONMENT: process.env.SAFEPAY_ENVIRONMENT || 'sandbox',
-
-  PAYFAST_MERCHANT_ID: process.env.PAYFAST_MERCHANT_ID || '1000',
-  PAYFAST_SECURED_KEY: process.env.PAYFAST_SECURED_KEY || 'test_key',
-
-  // PostEx Logistics
+  // PostEx Unified Logistics & XPay Fintech Engine
   POSTEX_API_BASE: process.env.POSTEX_API_BASE || 'https://api.postex.pk/services/integration/api',
   POSTEX_API_TOKEN: process.env.POSTEX_API_TOKEN || 'ptx_live_test_token_2026',
+  POSTEX_XPAY_BASE_URL: process.env.POSTEX_XPAY_BASE_URL || 'https://xpay.postexglobal.com/api',
+  POSTEX_XPAY_MERCHANT_ID: process.env.POSTEX_XPAY_MERCHANT_ID || 'WAW-POSTEX-001',
+  POSTEX_XPAY_TOKEN: process.env.POSTEX_XPAY_TOKEN || 'xpay_live_test_token_2026',
+  POSTEX_XPAY_SECRET_KEY: process.env.POSTEX_XPAY_SECRET_KEY || 'xpay_sec_test_secret_key_2026',
 
   // WhatsApp / Twilio
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',

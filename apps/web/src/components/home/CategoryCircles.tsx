@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCartStore } from '@/store/useCartStore';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 const CATEGORIES = [
   {
@@ -12,7 +12,7 @@ const CATEGORIES = [
     name: 'Smartphones & Tech',
     nameUrdu: 'موبائل اور ٹیکنالوجی',
     image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&auto=format&fit=crop&q=80',
-    tag: '340+ Shops',
+    tag: '340+ Verified Shops',
     discount: 'Up to 30% Off',
   },
   {
@@ -21,7 +21,7 @@ const CATEGORIES = [
     name: "Women's Lawn Suits",
     nameUrdu: 'خواتین کے ملبوسات',
     image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80',
-    tag: '520+ Shops',
+    tag: '520+ Fashion Shops',
     discount: 'Festive 2026',
   },
   {
@@ -39,7 +39,7 @@ const CATEGORIES = [
     name: 'Peshawari Chappal',
     nameUrdu: 'پشاوری چپل',
     image: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80',
-    tag: '120+ Makers',
+    tag: '120+ Master Makers',
     discount: 'Double Sole',
   },
   {
@@ -48,7 +48,7 @@ const CATEGORIES = [
     name: 'Wireless Earbuds',
     nameUrdu: 'ہیڈ فونز اور آڈیو',
     image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80',
-    tag: '290+ Shops',
+    tag: '290+ Audio Hubs',
     discount: 'Top Rated',
   },
   {
@@ -57,7 +57,7 @@ const CATEGORIES = [
     name: 'Smart Watches',
     nameUrdu: 'سمارٹ گھڑیاں',
     image: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=300&auto=format&fit=crop&q=80',
-    tag: '160+ Shops',
+    tag: '160+ Gadget Shops',
     discount: 'AMOLED 2026',
   },
   {
@@ -100,11 +100,12 @@ const CATEGORIES = [
 
 export function CategoryCircles() {
   const { language } = useCartStore();
+  const isUrdu = language === 'UR';
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
-  const checkScrollability = () => {
+  const checkScroll = () => {
     if (scrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
       setCanScrollLeft(scrollLeft > 10);
@@ -113,97 +114,110 @@ export function CategoryCircles() {
   };
 
   useEffect(() => {
-    checkScrollability();
+    checkScroll();
     const el = scrollRef.current;
     if (el) {
-      el.addEventListener('scroll', checkScrollability);
-      window.addEventListener('resize', checkScrollability);
+      el.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
       return () => {
-        el.removeEventListener('scroll', checkScrollability);
-        window.removeEventListener('resize', checkScrollability);
+        el.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
       };
     }
   }, []);
 
-  const scroll = (direction: 'left' | 'right') => {
+  const handleScroll = (dir: 'left' | 'right') => {
     if (scrollRef.current) {
-      const scrollAmount = direction === 'left' ? -260 : 260;
-      scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-      setTimeout(checkScrollability, 300);
+      const amount = dir === 'left' ? -380 : 380;
+      scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
     }
   };
 
   return (
     <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs relative">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-black text-slate-900 tracking-tight">
-              {language === 'UR' ? 'مشہور مارکیٹ کیٹیگریز' : 'Explore Popular Marketplace Categories'}
-            </h2>
-            <p className="text-xs text-slate-500 font-medium">
-              {language === 'UR'
-                ? 'پورے پاکستان کے ہزاروں تصدیق شدہ اسٹورز سے اشیاء دریافت کریں'
-                : 'Discover products across thousands of verified stores in Pakistan'}
-            </p>
+      <div className="bg-white border border-slate-200/90 rounded-[32px] p-5 sm:p-8 shadow-xs relative">
+        {/* Section Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-xs">
+              <Sparkles className="w-5 h-5 fill-slate-950" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-2xl font-black text-slate-950 tracking-tight">
+                {isUrdu ? 'مقبول پاکستانی کیٹیگریز' : 'Explore Top Marketplace Categories'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 font-semibold hidden sm:block">
+                {isUrdu
+                  ? 'مستند پاکستانی برانڈز اور ہنر مندوں کے منتخب کردہ مجموعے'
+                  : 'Curated Pakistani artisan crafts, Karachi fashion & tech hubs'}
+              </p>
+            </div>
           </div>
 
+          {/* Navigation Controls */}
           <div className="flex items-center gap-2">
-            {/* Scroll Buttons */}
             <button
-              onClick={() => scroll('left')}
+              onClick={() => handleScroll('left')}
               disabled={!canScrollLeft}
-              className={`p-1.5 rounded-full border border-slate-200 shadow-xs transition-all ${
-                canScrollLeft ? 'bg-white hover:bg-slate-50 text-slate-900 cursor-pointer' : 'opacity-40 text-slate-400 cursor-not-allowed'
-              }`}
-              aria-label="Previous categories"
+              className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center transition-all shadow-xs cursor-pointer"
+              aria-label="Scroll left"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
             <button
-              onClick={() => scroll('right')}
+              onClick={() => handleScroll('right')}
               disabled={!canScrollRight}
-              className={`p-1.5 rounded-full border border-slate-200 shadow-xs transition-all ${
-                canScrollRight ? 'bg-white hover:bg-slate-50 text-slate-900 cursor-pointer' : 'opacity-40 text-slate-400 cursor-not-allowed'
-              }`}
-              aria-label="Next categories"
+              className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center transition-all shadow-xs cursor-pointer"
+              aria-label="Scroll right"
             >
-              <ChevronRight className="w-4 h-4 font-bold" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Story Track with Chevron Navigation */}
+        {/* Categories Strip */}
         <div
           ref={scrollRef}
-          className="flex items-start gap-4 sm:gap-6 md:gap-7 overflow-x-auto scrollbar-none scroll-smooth pb-2 pt-1"
+          className="flex items-center gap-5 sm:gap-8 overflow-x-auto no-scrollbar scroll-smooth py-3 px-1"
         >
-          {CATEGORIES.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/category/${cat.slug}`}
-              className="group flex flex-col items-center gap-2 transition-transform hover:-translate-y-1 shrink-0 w-24 sm:w-28 text-center"
-            >
-              {/* Strict Square Image Thumbnail */}
-              <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-26 md:h-26 aspect-square rounded-2xl overflow-hidden border-2 border-slate-100 group-hover:border-amber-400 group-hover:shadow-md transition-all bg-slate-100 shrink-0">
-                <img
-                  src={cat.image}
-                  alt={cat.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
+          {CATEGORIES.map((cat) => {
+            const displayName = isUrdu && cat.nameUrdu ? cat.nameUrdu : cat.name;
 
-              {/* Title & Tag Pill */}
-              <div className="w-full flex flex-col items-center space-y-1">
-                <span className="text-[11px] sm:text-xs font-bold text-slate-900 group-hover:text-amber-600 block line-clamp-2 leading-snug h-8 flex items-center justify-center text-center px-0.5">
-                  {language === 'UR' ? cat.nameUrdu : cat.name}
+            return (
+              <Link
+                key={cat.id}
+                href={`/category/${cat.slug}`}
+                className="group flex flex-col items-center text-center shrink-0 w-26 sm:w-32 transition-transform duration-200 hover:-translate-y-1.5"
+              >
+                {/* Circular Image Frame with Gradient Ring */}
+                <div className="relative w-22 h-22 sm:w-28 sm:h-28 rounded-full p-1.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 shadow-md group-hover:shadow-xl transition-all group-hover:scale-105">
+                  <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5 border-2 border-white">
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
+                    />
+                  </div>
+
+                  {/* Top Floating Badge */}
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-slate-950 text-[#FFEB00] text-[9px] sm:text-xs font-black px-2.5 py-0.5 rounded-full shadow-md uppercase tracking-wider whitespace-nowrap border border-white/50">
+                    {cat.discount}
+                  </span>
+                </div>
+
+                {/* Category Label */}
+                <span className="mt-3 text-xs sm:text-sm font-black text-slate-900 group-hover:text-amber-700 line-clamp-1 transition-colors">
+                  {displayName}
                 </span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full inline-block whitespace-nowrap">
+
+                {/* Subtitle / Shop Count */}
+                <span className="text-[11px] sm:text-xs text-slate-500 font-semibold mt-0.5">
                   {cat.tag}
                 </span>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </section>

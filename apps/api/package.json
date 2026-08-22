@@ -15,6 +15,7 @@
   "dependencies": {
     "@prisma/client": "^5.19.1",
     "@supabase/supabase-js": "^2.45.4",
+    "@upstash/redis": "^1.38.2",
     "@waw/types": "file:../../packages/types",
     "axios": "^1.7.7",
     "bullmq": "^5.14.0",

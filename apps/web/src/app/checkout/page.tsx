@@ -234,10 +234,10 @@ export default function CheckoutPage() {
                 </div>
               </label>
 
-              {/* Option 2: Debit / Credit Card */}
+              {/* Option 2: PostEx XPay - Debit / Credit Cards */}
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  paymentMethod === PaymentMethod.SAFEPAY_CARD
+                  paymentMethod === PaymentMethod.XPAY_CARD
                     ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'
                     : 'border-slate-200 hover:bg-slate-50'
                 }`}
@@ -245,8 +245,8 @@ export default function CheckoutPage() {
                 <input
                   type="radio"
                   name="paymentMethod"
-                  checked={paymentMethod === PaymentMethod.SAFEPAY_CARD}
-                  onChange={() => setPaymentMethod(PaymentMethod.SAFEPAY_CARD)}
+                  checked={paymentMethod === PaymentMethod.XPAY_CARD}
+                  onChange={() => setPaymentMethod(PaymentMethod.XPAY_CARD)}
                   className="mt-1 accent-amber-500"
                 />
                 <div>
@@ -257,15 +257,15 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    SafePay encrypted card checkout with SBP Escrow protection.
+                    Powered by PostEx XPay 256-bit encrypted checkout with 100% SBP Escrow guarantee.
                   </p>
                 </div>
               </label>
 
-              {/* Option 3: JazzCash */}
+              {/* Option 3: PostEx XPay - JazzCash */}
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  paymentMethod === PaymentMethod.PAYFAST_WALLET_JAZZCASH
+                  paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH
                     ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'
                     : 'border-slate-200 hover:bg-slate-50'
                 }`}
@@ -273,22 +273,22 @@ export default function CheckoutPage() {
                 <input
                   type="radio"
                   name="paymentMethod"
-                  checked={paymentMethod === PaymentMethod.PAYFAST_WALLET_JAZZCASH}
-                  onChange={() => setPaymentMethod(PaymentMethod.PAYFAST_WALLET_JAZZCASH)}
+                  checked={paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH}
+                  onChange={() => setPaymentMethod(PaymentMethod.XPAY_WALLET_JAZZCASH)}
                   className="mt-1 accent-amber-500"
                 />
                 <div>
                   <div className="font-black text-sm text-slate-900">JazzCash Mobile Account</div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Authorize payment using your JazzCash Mobile Account PIN.
+                    Authorize instant payment via PostEx XPay using your JazzCash MPIN.
                   </p>
                 </div>
               </label>
 
-              {/* Option 4: Easypaisa */}
+              {/* Option 4: PostEx XPay - Easypaisa */}
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  paymentMethod === PaymentMethod.PAYFAST_WALLET_EASYPAISA
+                  paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA
                     ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'
                     : 'border-slate-200 hover:bg-slate-50'
                 }`}
@@ -296,14 +296,14 @@ export default function CheckoutPage() {
                 <input
                   type="radio"
                   name="paymentMethod"
-                  checked={paymentMethod === PaymentMethod.PAYFAST_WALLET_EASYPAISA}
-                  onChange={() => setPaymentMethod(PaymentMethod.PAYFAST_WALLET_EASYPAISA)}
+                  checked={paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA}
+                  onChange={() => setPaymentMethod(PaymentMethod.XPAY_WALLET_EASYPAISA)}
                   className="mt-1 accent-amber-500"
                 />
                 <div>
                   <div className="font-black text-sm text-slate-900">Easypaisa Mobile Wallet</div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Approve OTP prompt in your Easypaisa app.
+                    Approve instant OTP payment via PostEx XPay in your Easypaisa app.
                   </p>
                 </div>
               </label>

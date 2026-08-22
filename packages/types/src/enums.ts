@@ -18,13 +18,11 @@ export enum SellerType {
 }
 
 export enum PaymentMethod {
-  RAAST_P2M_QR = 'RAAST_P2M_QR', // State Bank of Pakistan Raast Instant QR
-  SAFEPAY_CARD = 'SAFEPAY_CARD',
-  SAFEPAY_RAAST = 'SAFEPAY_RAAST',
-  PAYFAST_WALLET_JAZZCASH = 'PAYFAST_WALLET_JAZZCASH',
-  PAYFAST_WALLET_EASYPAISA = 'PAYFAST_WALLET_EASYPAISA',
-  PAYFAST_CARD = 'PAYFAST_CARD',
-  COD = 'COD', // Cash on delivery
+  RAAST_P2M_QR = 'RAAST_P2M_QR', // State Bank of Pakistan Raast Instant QR (via PostEx XPay)
+  XPAY_CARD = 'XPAY_CARD', // Visa, Mastercard, PayPak (via PostEx XPay)
+  XPAY_WALLET_JAZZCASH = 'XPAY_WALLET_JAZZCASH', // JazzCash Mobile Account (via PostEx XPay)
+  XPAY_WALLET_EASYPAISA = 'XPAY_WALLET_EASYPAISA', // Easypaisa Mobile Wallet (via PostEx XPay)
+  COD = 'COD', // Cash on Delivery (PostEx Courier Collection)
 }
 
 export enum PaymentStatus {

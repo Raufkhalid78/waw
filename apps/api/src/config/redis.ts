@@ -2,6 +2,9 @@
  * Redis In-Memory Client & Fallback Concurrency Cache
  * Powers flash-sale distributed inventory mutex locks and session states.
  */
+import { Redis as UpstashRedis } from '@upstash/redis';
+import { ENV } from './env.js';
+import { logger } from './logger.js';
 
 class MemoryCacheFallback {
   private store = new Map<string, { value: string; expiresAt: number }>();
@@ -39,4 +42,22 @@ class MemoryCacheFallback {
   }
 }
 
-export const redis = new MemoryCacheFallback();
+// Instantiate live Upstash Redis client if configured
+let redisClient: any;
+
+if (ENV.UPSTASH_REDIS_REST_URL && ENV.UPSTASH_REDIS_REST_TOKEN) {
+  try {
+    redisClient = new UpstashRedis({
+      url: ENV.UPSTASH_REDIS_REST_URL,
+      token: ENV.UPSTASH_REDIS_REST_TOKEN,
+    });
+    logger.info('Connected to Upstash Serverless Redis cluster successfully.');
+  } catch (err) {
+    logger.warn('Failed to connect to Upstash Redis, using in-memory fallback cache.', err);
+    redisClient = new MemoryCacheFallback();
+  }
+} else {
+  redisClient = new MemoryCacheFallback();
+}
+
+export const redis = redisClient;

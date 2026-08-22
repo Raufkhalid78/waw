@@ -20,7 +20,7 @@ export function Logo({
 }: LogoProps) {
   const fontSize = {
     sm: 'text-2xl font-black',
-    md: 'text-3xl sm:text-[36px] font-black',
+    md: 'text-3xl sm:text-[38px] font-black',
     lg: 'text-4xl sm:text-5xl font-black',
     xl: 'text-5xl sm:text-6xl font-black',
   }[size];
@@ -45,7 +45,7 @@ export function Logo({
         </div>
       ) : (
         <span
-          className={`lowercase tracking-tighter leading-none ${fontSize} ${
+          className={`lowercase tracking-tighter leading-none italic font-black transform -rotate-2 inline-block transition-transform duration-200 group-hover:scale-105 group-hover:-rotate-1 ${fontSize} ${
             theme === 'light' ? 'text-white' : 'text-slate-950'
           }`}
           style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}

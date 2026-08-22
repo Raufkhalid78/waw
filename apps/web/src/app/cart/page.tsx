@@ -161,7 +161,7 @@ export default function CartPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod(PaymentMethod.SAFEPAY_CARD)}
+                    onClick={() => setPaymentMethod(PaymentMethod.XPAY_CARD)}
                     className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                       paymentMethod !== PaymentMethod.COD
                         ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'

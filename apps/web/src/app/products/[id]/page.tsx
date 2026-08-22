@@ -283,9 +283,9 @@ export default function ProductDetailPage() {
               <Truck className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <div className="text-xs font-black text-slate-900 flex items-center gap-2">
-                  <span>Nationwide Express Dispatch</span>
-                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[10px] font-bold">
-                    {product.isExpress ? `Get it Tomorrow in ${selectedCity}` : product.deliveryTime}
+                  <span>{product.isExpress ? '⚡ Waw Express Delivery' : '🚚 Standard Marketplace Delivery'}</span>
+                  <span className="text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded text-[10px] font-bold">
+                    {product.isExpress ? `4-5 Days in ${selectedCity}` : `7-9 Days in ${selectedCity}`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">

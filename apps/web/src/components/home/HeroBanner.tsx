@@ -2,63 +2,95 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChevronLeft, ChevronRight, Zap, Truck, ShieldCheck, Flame, Award, Store } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
+  Truck,
+  ShieldCheck,
+  Flame,
+  Star,
+  Sparkles,
+  ShoppingBag,
+  Clock,
+  Store,
+  Award,
+  CheckCircle2,
+} from 'lucide-react';
+import { useCartStore } from '@/store/useCartStore';
+import { SellerType } from '@waw/types';
 
 const HERO_SLIDES = [
   {
     id: 'slide_1',
-    badge: '🔥 SUPER SALE 2026',
-    badgeBg: 'bg-slate-950 text-amber-400',
-    title: "Online Shopping in Pakistan",
-    subtitle: 'Shop 50,000+ top products with 24h Waw Express dispatch and SBP Escrow buyer protection.',
-    primaryCta: 'SHOP TOP DEALS',
-    primaryHref: '/products/prod_m1',
-    bgGradient: 'from-amber-400 via-amber-500 to-amber-600',
+    badge: '🔥 MEGA FESTIVE SALE 2026',
+    badgeBg: 'bg-slate-950 text-amber-400 border border-amber-400/30',
+    title: 'Pakistan’s Biggest Online Marketplace',
+    highlightText: 'Up to 70% Off Across 50,000+ Products',
+    subtitle: 'Shop direct from authentic Karachi fashion houses, Lahore tech importers, Sialkot sports makers, and Peshawar leather craftsmen.',
+    primaryCta: 'SHOP MEGA DEALS',
+    primaryHref: '/category/mobiles-tech',
+    bgGradient: 'from-amber-400 via-amber-500 to-yellow-500',
     textColor: 'text-slate-950',
-    imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=800&auto=format&fit=crop&q=80',
-    tag: 'Up to 70% Off',
+    productImage: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80',
+    productTitle: 'Handcrafted Cow Leather Bifold Wallet',
+    productPrice: 'PKR 2,499',
+    productOriginalPrice: 'PKR 3,800',
+    productRating: '4.9 ★ (1.4k+)',
+    floatingBadge: '⚡ 4-5 Days Waw Express',
   },
   {
     id: 'slide_2',
-    badge: '🧵 SUMMER LAWN 2026',
-    badgeBg: 'bg-rose-950 text-rose-300',
-    title: "Designer Lawn & Unstitched Suits",
-    subtitle: 'Direct from top Karachi & Lahore textile fashion houses with free delivery above PKR 5,000.',
-    primaryCta: 'EXPLORE LAWN',
-    primaryHref: '/products/prod_m6',
+    badge: '👗 FESTIVE SUMMER LAWN 2026',
+    badgeBg: 'bg-slate-950 text-rose-400 border border-rose-400/30',
+    title: 'Designer Lawn & Luxury Festive Suits',
+    highlightText: 'Direct Textile Mill Prices',
+    subtitle: '100% Authentic embroidered lawn from top fashion houses in Karachi & Lahore with free nationwide delivery above PKR 5,000.',
+    primaryCta: 'EXPLORE LAWN COLLECTION',
+    primaryHref: '/category/womens-lawn',
     bgGradient: 'from-rose-500 via-rose-600 to-amber-500',
     textColor: 'text-white',
-    imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=800&auto=format&fit=crop&q=80',
-    tag: 'New 2026 Festive',
+    productImage: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80',
+    productTitle: 'Embroidered 3-Piece Festive Lawn Suit',
+    productPrice: 'PKR 4,499',
+    productOriginalPrice: 'PKR 6,500',
+    productRating: '4.8 ★ (640+)',
+    floatingBadge: '✨ Premium Cotton Lawn',
   },
   {
     id: 'slide_3',
-    badge: '⚡ SIALKOT EXPORT ZONE',
-    badgeBg: 'bg-emerald-950 text-emerald-300',
-    title: "Handmade Sialkot Sports & Gear",
-    subtitle: 'Official hand-stitched footballs, English willow bats & boxing gear exported to 50+ countries.',
-    primaryCta: 'SHOP SPORTS',
-    primaryHref: '/products/prod_m5',
-    bgGradient: 'from-emerald-600 via-teal-700 to-slate-900',
+    badge: '🏏 SIALKOT EXPORT HUB',
+    badgeBg: 'bg-slate-950 text-emerald-400 border border-emerald-400/30',
+    title: 'FIFA Grade Footballs & Sports Gear',
+    highlightText: 'World Famous Craftsmanship',
+    subtitle: 'Direct from certified Sialkot sports exporters to your doorstep with guaranteed State Bank of Pakistan escrow protection.',
+    primaryCta: 'SHOP SIALKOT SPORTS',
+    primaryHref: '/category/sialkot-sports',
+    bgGradient: 'from-emerald-700 via-teal-800 to-slate-950',
     textColor: 'text-white',
-    imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=800&auto=format&fit=crop&q=80',
-    tag: 'Export Certified',
+    productImage: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80',
+    productTitle: 'Pro Thermally Bonded Match Football',
+    productPrice: 'PKR 2,800',
+    productOriginalPrice: 'PKR 4,200',
+    productRating: '5.0 ★ (450+)',
+    floatingBadge: '🏆 FIFA Quality Spec',
   },
 ];
 
 export function HeroBanner() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [timeLeft, setTimeLeft] = useState({ hours: 8, minutes: 42, seconds: 15 });
+  const [timeLeft, setTimeLeft] = useState({ hours: 8, minutes: 34, seconds: 12 });
+  const { addItem } = useCartStore();
+  const [dealAdded, setDealAdded] = useState(false);
 
-  // Auto slide
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length);
-    }, 6000);
+    }, 6500);
     return () => clearInterval(timer);
   }, []);
 
-  // Countdown timer
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -73,54 +105,117 @@ export function HeroBanner() {
 
   const slide = HERO_SLIDES[currentSlide];
 
-  return (
-    <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 pt-4 pb-2">
-      {/* ── 1. Main Banner Grid ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-        {/* Main Slider Carousel (Noon / Amazon Style) */}
-        <div
-          className={`lg:col-span-8 rounded-3xl p-6 sm:p-10 ${slide.textColor} bg-gradient-to-br ${slide.bgGradient} relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[380px] sm:min-h-[420px] transition-all duration-700`}
-        >
-          {/* Background Image Watermark & Glow */}
-          <div className="absolute right-0 top-0 bottom-0 w-full sm:w-1/2 opacity-20 sm:opacity-30 mix-blend-overlay pointer-events-none">
-            <img src={slide.imageUrl} alt="" className="w-full h-full object-cover" />
-          </div>
-          <div className="absolute -right-16 -bottom-16 w-80 h-80 rounded-full bg-white/20 blur-3xl pointer-events-none" />
+  const handleQuickAdd = () => {
+    addItem({
+      productId: 'prod_m2',
+      title: 'Pro ANC Wireless Earbuds with Heavy Bass & 40h Battery',
+      imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80',
+      pricePkr: 3200,
+      quantity: 1,
+      sellerType: SellerType.THIRD_PARTY,
+      storeName: 'Lahore Tech Hub',
+    });
+    setDealAdded(true);
+    setTimeout(() => setDealAdded(false), 1600);
+  };
 
-          {/* Top Pill Row */}
-          <div className="flex flex-wrap items-center gap-2.5 z-10">
+  return (
+    <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 pt-2.5 pb-1">
+      {/* ── 1. Hero Grid Showcase (Sleek Compact Proportions) ─────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+        {/* Main 8-Col Slider Carousel */}
+        <div
+          className={`lg:col-span-8 rounded-3xl p-4.5 sm:p-6 lg:p-7 ${slide.textColor} bg-gradient-to-br ${slide.bgGradient} relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[320px] sm:min-h-[350px] transition-all duration-700`}
+        >
+          {/* Ambient Lighting */}
+          <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-white/20 blur-3xl pointer-events-none" />
+          <div className="absolute right-1/4 -bottom-20 w-64 h-64 rounded-full bg-black/10 blur-2xl pointer-events-none" />
+
+          {/* Top Pill Badges */}
+          <div className="flex flex-wrap items-center gap-2 z-10">
             <span
-              className={`inline-flex items-center gap-1.5 ${slide.badgeBg} text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-sm`}
+              className={`inline-flex items-center gap-1.5 ${slide.badgeBg} text-[11px] sm:text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-xs`}
             >
-              <Flame className="w-3.5 h-3.5" />
+              <Flame className="w-3.5 h-3.5 fill-current text-amber-400" />
               <span>{slide.badge}</span>
             </span>
 
-            <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur text-slate-950 text-xs font-black px-3.5 py-1.5 rounded-full shadow-sm">
+            <span className="inline-flex items-center gap-1 bg-white/95 backdrop-blur-md text-slate-950 text-[11px] sm:text-xs font-black px-3 py-1 rounded-full shadow-xs">
               <Truck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>FREE Delivery &gt; PKR 5,000</span>
+              <span>Free Delivery Above PKR 5,000</span>
             </span>
           </div>
 
-          {/* Titles & Copy */}
-          <div className="space-y-3 z-10 max-w-xl my-6">
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight drop-shadow-xs">
-              {slide.title}
-            </h1>
-            <p className="text-sm sm:text-base font-semibold leading-relaxed max-w-lg opacity-95">
-              {slide.subtitle}
-            </p>
+          {/* Main Hero Content & 3D Visual Cutout */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center my-3 z-10">
+            {/* Left Copy (7 Cols) */}
+            <div className="md:col-span-7 space-y-2.5">
+              <div className="inline-block bg-slate-950/15 backdrop-blur-sm text-slate-950 px-2.5 py-0.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider">
+                {slide.highlightText}
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight drop-shadow-xs">
+                {slide.title}
+              </h1>
+
+              <p className="text-xs sm:text-sm font-medium leading-relaxed opacity-95 max-w-lg line-clamp-2">
+                {slide.subtitle}
+              </p>
+            </div>
+
+            {/* Right 3D Product Float Showcase (Enlarged Luxury Glassmorphism) */}
+            <div className="md:col-span-5 relative flex items-center justify-center">
+              <div className="relative group w-52 sm:w-60 md:w-68">
+                {/* Ambient Halo Glow */}
+                <div className="absolute inset-0 bg-white/25 rounded-3xl blur-2xl scale-95 transition-transform group-hover:scale-110 pointer-events-none" />
+
+                {/* Blended Glassmorphic Product Card */}
+                <div className="relative w-full rounded-3xl p-3.5 bg-black/30 backdrop-blur-xl border border-white/30 shadow-2xl flex flex-col justify-between overflow-hidden transform group-hover:-translate-y-1.5 transition-all duration-300">
+                  {/* Product Image Frame */}
+                  <div className="relative w-full h-36 sm:h-42 md:h-46 rounded-2xl overflow-hidden bg-black/20 border border-white/15 shadow-inner">
+                    <img
+                      src={slide.productImage}
+                      alt={slide.productTitle}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <span className="absolute top-2.5 left-2.5 bg-slate-950/90 backdrop-blur-md text-amber-400 border border-amber-400/30 text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-lg shadow-sm">
+                      {slide.floatingBadge}
+                    </span>
+                  </div>
+
+                  {/* Blended Product Information */}
+                  <div className="pt-3 space-y-1.5 text-white">
+                    <div className="text-xs sm:text-sm font-bold text-white line-clamp-1 leading-snug drop-shadow-sm">
+                      {slide.productTitle}
+                    </div>
+                    <div className="flex items-center justify-between pt-0.5">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-base sm:text-lg lg:text-xl font-black text-amber-300 tracking-tight">
+                          {slide.productPrice}
+                        </span>
+                        <span className="text-xs text-white/60 line-through">
+                          {slide.productOriginalPrice}
+                        </span>
+                      </div>
+                      <span className="text-xs text-amber-300 font-black bg-white/20 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-white/20 shadow-xs">
+                        {slide.productRating}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Bottom Actions & Slider Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 z-10 pt-4 border-t border-black/10">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-row items-center justify-between gap-3 z-10 pt-3 border-t border-black/10">
+            <div className="flex items-center gap-3">
               <Link
                 href={slide.primaryHref}
-                className="bg-slate-950 hover:bg-slate-900 text-white font-black px-7 py-3.5 rounded-full text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-xl hover:scale-105 transition-all"
+                className="bg-slate-950 hover:bg-slate-900 text-white font-black px-6 py-2.5 rounded-xl text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-md hover:scale-105 transition-all"
               >
                 <span>{slide.primaryCta}</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
 
               {/* Slider Dots */}
@@ -129,26 +224,27 @@ export function HeroBanner() {
                   <button
                     key={idx}
                     onClick={() => setCurrentSlide(idx)}
-                    className={`h-2 rounded-full transition-all ${
-                      currentSlide === idx ? 'w-7 bg-slate-950' : 'w-2 bg-slate-950/30'
+                    className={`h-2 rounded-full transition-all cursor-pointer ${
+                      currentSlide === idx ? 'w-6 bg-slate-950' : 'w-2 bg-slate-950/30 hover:bg-slate-950/60'
                     }`}
+                    aria-label={`Go to slide ${idx + 1}`}
                   />
                 ))}
               </div>
             </div>
 
             {/* Slider Arrow Buttons */}
-            <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCurrentSlide((prev) => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
-                className="p-2.5 rounded-full bg-white/80 hover:bg-white text-slate-950 shadow-sm hover:scale-105 transition-all cursor-pointer"
+                className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
                 aria-label="Previous slide"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)}
-                className="p-2.5 rounded-full bg-white/80 hover:bg-white text-slate-950 shadow-sm hover:scale-105 transition-all cursor-pointer"
+                className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
                 aria-label="Next slide"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -157,114 +253,149 @@ export function HeroBanner() {
           </div>
         </div>
 
-        {/* Right Sidekick Promotional Cards (Noon Style) */}
-        <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-          {/* Card 1: Lightning Flash Deals Widget with Live Countdown */}
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-3xl p-5 border border-slate-800 flex flex-col justify-between relative overflow-hidden shadow-sm">
+        {/* ── 2. Right Side Showcase Cards (Compact Stack) ────────────────── */}
+        <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3.5">
+          {/* Card 1: Live Lightning Deal Product Showcase */}
+          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white rounded-3xl p-4 sm:p-5 border border-slate-800 flex flex-col justify-between shadow-md relative overflow-hidden group">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-400/20 flex items-center gap-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20 flex items-center gap-1">
                 <Zap className="w-3 h-3 fill-amber-400" />
-                <span>FLASH DEALS</span>
+                <span>DEAL OF THE DAY</span>
               </span>
 
               {/* Ticking countdown */}
-              <div className="flex items-center gap-1 font-mono font-black text-xs text-amber-400">
-                <span className="bg-slate-800 px-1.5 py-0.5 rounded">{String(timeLeft.hours).padStart(2, '0')}h</span>
-                <span>:</span>
-                <span className="bg-slate-800 px-1.5 py-0.5 rounded">{String(timeLeft.minutes).padStart(2, '0')}m</span>
-                <span>:</span>
-                <span className="bg-slate-800 px-1.5 py-0.5 rounded">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+              <div className="flex items-center gap-1 font-mono font-black text-xs text-amber-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-white/10">
+                <Clock className="w-3 h-3" />
+                <span>{String(timeLeft.hours).padStart(2, '0')}:</span>
+                <span>{String(timeLeft.minutes).padStart(2, '0')}:</span>
+                <span>{String(timeLeft.seconds).padStart(2, '0')}</span>
               </div>
             </div>
 
-            <div className="space-y-1.5 my-3">
-              <h3 className="text-base sm:text-lg font-black text-white leading-snug">
-                Today&apos;s Best Pakistani Deals (Up to 50% Off)
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Handpicked stock from verified Peshawar leather crafts, Lahore tech, and Karachi fashion.
-              </p>
+            {/* Featured Deal Product Visual Layout */}
+            <div className="flex items-center gap-3 my-2.5 bg-white/5 p-2.5 rounded-xl border border-white/10">
+              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 relative">
+                <img
+                  src="https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=200&auto=format&fit=crop&q=80"
+                  alt="Pro ANC Earbuds"
+                  className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                />
+                <span className="absolute top-0.5 left-0.5 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
+                  -33% OFF
+                </span>
+              </div>
+
+              <div className="min-w-0 space-y-0.5">
+                <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span>Lahore Tech Hub</span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 leading-snug">
+                  Pro ANC Wireless Earbuds (40h Playtime)
+                </h4>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-sm font-black text-amber-400">PKR 3,200</span>
+                  <span className="text-[10px] text-slate-500 line-through">PKR 4,800</span>
+                </div>
+              </div>
             </div>
 
-            <Link
-              href="/"
-              className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 group pt-2 border-t border-slate-800"
+            {/* 1-Click Buy Action */}
+            <button
+              onClick={handleQuickAdd}
+              className={`w-full py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer ${
+                dealAdded
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-amber-400 hover:bg-amber-500 text-slate-950'
+              }`}
             >
-              <span>Browse All Flash Deals</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </Link>
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>{dealAdded ? 'ADDED TO CART!' : 'CLAIM DEAL FOR PKR 3,200'}</span>
+            </button>
           </div>
 
-          {/* Card 2: Smart Payment & Free Delivery Promise */}
-          <div className="bg-gradient-to-br from-amber-50 to-amber-100 text-slate-900 rounded-3xl p-5 border-2 border-amber-300 flex flex-col justify-between shadow-sm">
+          {/* Card 2: 100% SBP Escrow Guarantee & Smart Savings */}
+          <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 text-slate-950 rounded-3xl p-4 sm:p-5 border border-amber-300 flex flex-col justify-between shadow-md relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-300 flex items-center gap-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                <span>SMART SAVINGS</span>
+                <span>STATE BANK ESCROW</span>
               </span>
-              <span className="text-xs font-black text-slate-900">PKR 100 SAVER</span>
+              <span className="text-[10px] font-black text-slate-950 bg-white/90 px-2 py-0.5 rounded-md border border-amber-200">
+                100% SAFE
+              </span>
             </div>
 
-            <div className="space-y-1.5 my-3">
-              <h3 className="text-base sm:text-lg font-black text-slate-950 leading-snug">
+            <div className="space-y-1 my-2">
+              <h3 className="text-sm sm:text-base font-black text-slate-950 leading-snug">
                 Save PKR 100 on Every Order!
               </h3>
-              <p className="text-xs text-slate-700 leading-relaxed">
-                Pay online using Debit / Credit Card, Raast, or JazzCash / Easypaisa to waive the COD surcharge.
+              <p className="text-xs text-slate-700 leading-snug font-medium line-clamp-2">
+                Pay online using Debit / Credit Card, Raast P2M QR, or JazzCash / Easypaisa to waive COD fee.
               </p>
             </div>
 
             <Link
-              href="/checkout"
-              className="text-xs font-bold text-slate-950 hover:text-amber-700 flex items-center gap-1 group pt-2 border-t border-amber-200"
+              href="/buyer-protection"
+              className="text-xs font-black text-slate-950 bg-white hover:bg-slate-950 hover:text-white px-3.5 py-2 rounded-xl border border-amber-300 shadow-2xs flex items-center justify-between transition-all group"
             >
-              <span>Learn how online checkout saves you money</span>
+              <span>Learn about SBP Escrow Guarantee</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </div>
       </div>
 
-      {/* ── 2. Marketplace Live Stats & Trust Ribbon ───────────────────────── */}
-      <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs">
+      {/* ── 3. Elevated Marketplace Trust & Regional Stats Ribbon ─────────── */}
+      <div className="mt-3.5 bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-xs">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center divide-y md:divide-y-0 md:divide-x divide-slate-100">
           <div className="flex items-center justify-center gap-2.5 py-1">
-            <Store className="w-5 h-5 text-amber-500 shrink-0" />
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/60">
+              <Store className="w-4.5 h-4.5" />
+            </div>
             <div className="text-left">
-              <div className="text-xs font-black text-slate-900">2,450+ Verified Shops</div>
-              <div className="text-[10px] text-slate-500 font-medium">Independent makers & brands</div>
+              <div className="text-xs sm:text-sm font-black text-slate-950">2,450+ Verified Sellers</div>
+              <div className="text-[11px] text-slate-500 font-medium">Karachi, Lahore & Peshawar</div>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-2.5 py-1">
-            <Zap className="w-5 h-5 text-amber-500 shrink-0" />
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/60">
+              <Zap className="w-4.5 h-4.5 fill-amber-500 text-amber-500" />
+            </div>
             <div className="text-left">
-              <div className="text-xs font-black text-slate-900">24-48h Waw Express</div>
-              <div className="text-[10px] text-slate-500 font-medium">Fast direct dispatch</div>
+              <div className="text-xs sm:text-sm font-black text-slate-950">4-5 Days Waw Express</div>
+              <div className="text-[11px] text-slate-500 font-medium">Fast priority dispatch</div>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-2.5 py-1">
-            <Truck className="w-5 h-5 text-emerald-500 shrink-0" />
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200/60">
+              <Truck className="w-4.5 h-4.5" />
+            </div>
             <div className="text-left">
-              <div className="text-xs font-black text-slate-900">Free Nationwide Shipping</div>
-              <div className="text-[10px] text-slate-500 font-medium">On orders &gt; PKR 5,000</div>
+              <div className="text-xs sm:text-sm font-black text-slate-950">Free Nationwide Shipping</div>
+              <div className="text-[11px] text-slate-500 font-medium">On orders &gt; PKR 5,000</div>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-2.5 py-1">
-            <ShieldCheck className="w-5 h-5 text-sky-500 shrink-0" />
+            <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-200/60">
+              <ShieldCheck className="w-4.5 h-4.5" />
+            </div>
             <div className="text-left">
-              <div className="text-xs font-black text-slate-900">100% Buyer Protection</div>
-              <div className="text-[10px] text-slate-500 font-medium">SBP Regulated Escrow</div>
+              <div className="text-xs sm:text-sm font-black text-slate-950">100% Escrow Protection</div>
+              <div className="text-[11px] text-slate-500 font-medium">SBP Regulated safety</div>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-2.5 py-1 col-span-2 md:col-span-1">
-            <Award className="w-5 h-5 text-rose-500 shrink-0" />
+            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200/60">
+              <Award className="w-4.5 h-4.5" />
+            </div>
             <div className="text-left">
-              <div className="text-xs font-black text-slate-900">14 Major Cities</div>
-              <div className="text-[10px] text-slate-500 font-medium">Lahore, Karachi, Isb & more</div>
+              <div className="text-xs sm:text-sm font-black text-slate-950">7-Day Free Returns</div>
+              <div className="text-[11px] text-slate-500 font-medium">Doorstep rider pickup</div>
             </div>
           </div>
         </div>

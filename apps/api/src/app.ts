@@ -165,11 +165,9 @@ app.post('/api/logistics/postex/webhook', async (req, res) => {
   }
 });
 
-// ── Payment Routes ────────────────────────────────────────────────────────
-app.post('/api/payments/safepay/initiate', PaymentController.initiateSafepay);
-app.post('/api/payments/safepay/webhook', PaymentController.safepayWebhook);
-app.post('/api/payments/payfast/initiate', PaymentController.initiatePayFast);
-app.post('/api/payments/payfast/webhook', PaymentController.payfastWebhook);
+// ── Payment Routes (PostEx XPay Unified Fintech Engine) ────────────────────
+app.post('/api/payments/xpay/initiate', PaymentController.initiateXPay);
+app.post('/api/payments/xpay/webhook', PaymentController.xpayWebhook);
 
 // ── Search Routes (Typesense Engine) ──────────────────────────────────────
 app.get('/api/search', SearchController.search);

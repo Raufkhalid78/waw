@@ -50,7 +50,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Waw Official Hub',
     storeSlug: 'waw-official-hub',
     sellerCity: 'Islamabad Hub',
-    deliveryTime: 'Get it by Tomorrow',
+    deliveryTime: '4-5 Days (Waw Express)',
     images: [
       'https://images.unsplash.com/photo-1627123424574-724758594e93?w=800&auto=format&fit=crop&q=80',
       'https://images.unsplash.com/photo-1554412933-514a83d2f3c8?w=800&auto=format&fit=crop&q=80',
@@ -85,7 +85,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
         city: 'Lahore',
         rating: 5,
         date: '3 days ago',
-        comment: 'Super fast Waw Express delivery in 24 hours! The leather aroma is 100% authentic and the stitching is superb.',
+        comment: 'Received smoothly with Waw Express in 4 days! The leather aroma is 100% authentic and the stitching is superb.',
         verifiedPurchase: true,
       },
       {
@@ -123,7 +123,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Lahore Tech Hub',
     storeSlug: 'lahore-tech-hub',
     sellerCity: 'Lahore',
-    deliveryTime: '24-48h Dispatch',
+    deliveryTime: '4-5 Days (Waw Express)',
     images: [
       'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800&auto=format&fit=crop&q=80',
       'https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?w=800&auto=format&fit=crop&q=80',
@@ -187,7 +187,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Khyber Artisans',
     storeSlug: 'khyber-artisans',
     sellerCity: 'Peshawar',
-    deliveryTime: '3-4 Days Express',
+    deliveryTime: '7-9 Days (Standard)',
     images: [
       'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=800&auto=format&fit=crop&q=80',
       'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800&auto=format&fit=crop&q=80',
@@ -249,7 +249,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Waw Electronics Hub',
     storeSlug: 'waw-electronics-hub',
     sellerCity: 'Lahore Hub',
-    deliveryTime: 'Get it by Tomorrow',
+    deliveryTime: '4-5 Days (Waw Express)',
     images: [
       'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=800&auto=format&fit=crop&q=80',
       'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=800&auto=format&fit=crop&q=80',
@@ -302,7 +302,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Sialkot Sports Direct',
     storeSlug: 'sialkot-sports-direct',
     sellerCity: 'Sialkot',
-    deliveryTime: '24-48h Dispatch',
+    deliveryTime: '4-5 Days (Waw Express)',
     images: [
       'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=800&auto=format&fit=crop&q=80',
       'https://images.unsplash.com/photo-1614632537423-1e6c2e7e0aab?w=800&auto=format&fit=crop&q=80',
@@ -353,7 +353,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Waw Fashion Mall',
     storeSlug: 'waw-fashion-mall',
     sellerCity: 'Karachi Hub',
-    deliveryTime: 'Get it by Tomorrow',
+    deliveryTime: '4-5 Days (Waw Express)',
     images: [
       'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=800&auto=format&fit=crop&q=80',
       'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=800&auto=format&fit=crop&q=80',
@@ -406,7 +406,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Lahore Tech Hub',
     storeSlug: 'lahore-tech-hub',
     sellerCity: 'Lahore',
-    deliveryTime: '24-48h Dispatch',
+    deliveryTime: '4-5 Days (Waw Express)',
     images: [
       'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80',
     ],
@@ -456,7 +456,7 @@ export const CATALOG_PRODUCTS: ProductDetail[] = [
     storeName: 'Royal Fragrances',
     storeSlug: 'royal-fragrances',
     sellerCity: 'Karachi',
-    deliveryTime: '2-3 Days Express',
+    deliveryTime: '7-9 Days (Standard)',
     images: [
       'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=800&auto=format&fit=crop&q=80',
     ],

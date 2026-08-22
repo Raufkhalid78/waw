@@ -9,7 +9,7 @@ import { StoreSpotlight } from '@/components/home/StoreSpotlight';
 import { WawExpressSection } from '@/components/home/WawExpressSection';
 import { FeaturedBrands } from '@/components/home/FeaturedBrands';
 import { ProductCard } from '@/components/ui/ProductCard';
-import { Flame, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, Truck, Award, Zap } from 'lucide-react';
 import { SellerType } from '@waw/types';
 
 const MARKETPLACE_TABS = [
@@ -99,51 +99,51 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     title: 'Amoled Bluetooth Calling Smart Watch (Waterproof IP68)',
     category: 'Smart Watches' as MarketTab,
     pricePkr: 4999,
-    originalPricePkr: 7499,
-    discountPercent: 33,
-    rating: 4.8,
+    originalPricePkr: 7999,
+    discountPercent: 37,
+    rating: 4.7,
     reviewsCount: 512,
-    soldCount: 1100,
+    soldCount: 780,
     isExpress: true,
     sellerType: SellerType.FIRST_PARTY,
-    storeName: 'Waw Electronics',
+    storeName: 'Waw Electronics Hub',
     sellerCity: 'Lahore Hub',
-    deliveryTime: 'Get it by Tomorrow',
+    deliveryTime: 'Get it in 24 Hours',
     imageUrl: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=600&auto=format&fit=crop&q=80',
   },
   {
     productId: 'prod_m6',
-    title: 'Natural Royal Ambergris & Oud Perfume Oil Attar (12ml Glass Vial)',
-    category: 'Fragrances & Attar' as MarketTab,
-    pricePkr: 2200,
-    originalPricePkr: 3200,
-    discountPercent: 31,
-    rating: 4.9,
-    reviewsCount: 430,
-    soldCount: 430,
-    isExpress: false,
+    title: 'Original Sialkot Professional Match Football (Hand-Stitched)',
+    category: 'Sialkot Sports' as MarketTab,
+    pricePkr: 2800,
+    originalPricePkr: 4200,
+    discountPercent: 33,
+    rating: 5.0,
+    reviewsCount: 210,
+    soldCount: 450,
+    isExpress: true,
     sellerType: SellerType.THIRD_PARTY,
-    storeName: 'Al-Haramain Fragrances',
-    sellerCity: 'Lahore',
-    deliveryTime: '2-3 Days Courier',
-    imageUrl: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=600&auto=format&fit=crop&q=80',
+    storeName: 'Sialkot Sports Direct',
+    sellerCity: 'Sialkot',
+    deliveryTime: '24-48h Dispatch',
+    imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80',
   },
   {
     productId: 'prod_m7',
-    title: 'Professional Tournament Hand-Stitched Match Football (Size 5)',
-    category: 'Sialkot Sports' as MarketTab,
-    pricePkr: 2999,
-    originalPricePkr: 4500,
-    discountPercent: 33,
-    rating: 5.0,
-    reviewsCount: 780,
-    soldCount: 780,
+    title: 'Royal Oud Al-Layl Concentrated Perfume Oil / Non-Alcoholic Attar (12ml)',
+    category: 'Fragrances & Attar' as MarketTab,
+    pricePkr: 1850,
+    originalPricePkr: 2800,
+    discountPercent: 34,
+    rating: 4.9,
+    reviewsCount: 820,
+    soldCount: 820,
     isExpress: true,
-    sellerType: SellerType.FIRST_PARTY,
-    storeName: 'Sialkot Sports World',
-    sellerCity: 'Sialkot',
-    deliveryTime: 'Get it by Tomorrow',
-    imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80',
+    sellerType: SellerType.THIRD_PARTY,
+    storeName: 'Arabian Oud PK',
+    sellerCity: 'Karachi',
+    deliveryTime: '24-48h Dispatch',
+    imageUrl: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=600&auto=format&fit=crop&q=80',
   },
   {
     productId: 'prod_m8',
@@ -201,7 +201,7 @@ export default function HomePage() {
       : TRENDING_MARKETPLACE_PRODUCTS.filter((p) => p.category === activeTab);
 
   return (
-    <div className="space-y-2 pb-16">
+    <div className="space-y-3 pb-20">
       {/* 1. Dynamic Hero Carousel + Sidekicks + Live Confidence Ticker */}
       <HeroBanner />
 
@@ -221,45 +221,47 @@ export default function HomePage() {
       <FeaturedBrands />
 
       {/* 7. Trending Marketplace Catalog with Multi-Tab Filtering */}
-      <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-6">
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-6">
+      <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
+        <div className="bg-white border border-slate-200/90 rounded-[36px] p-6 sm:p-9 shadow-xs space-y-7">
           {/* Section Heading & Category Tabs with Scroll Chevrons */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-slate-100 pb-6">
             <div>
-              <div className="flex items-center gap-2">
-                <Flame className="w-5 h-5 text-amber-500 fill-amber-400" />
-                <h2 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-xs">
+                  <Flame className="w-5 h-5 fill-slate-950" />
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
                   Trending in Pakistan
                 </h2>
               </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
                 Top rated products with verified buyer reviews and fast nationwide shipping from 2,000+ local sellers.
               </p>
             </div>
 
-            {/* Filter Tabs with Noon-style Left & Right Chevrons */}
-            <div className="flex items-center gap-1.5 max-w-full md:max-w-md relative">
+            {/* Filter Tabs with Left & Right Chevrons */}
+            <div className="flex items-center gap-2 max-w-full md:max-w-md relative">
               {canScrollLeft && (
                 <button
                   onClick={() => scrollTabs('left')}
-                  className="p-1 rounded-full bg-white border border-slate-300 shadow-xs text-slate-700 hover:text-amber-600 shrink-0"
+                  className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
                   aria-label="Scroll left"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
               )}
 
               <div
                 ref={tabScrollRef}
-                className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-smooth pb-1"
+                className="flex items-center gap-2.5 overflow-x-auto no-scrollbar scroll-smooth py-1"
               >
                 {MARKETPLACE_TABS.map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all whitespace-nowrap shrink-0 ${
+                    className={`px-4.5 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                       activeTab === tab
-                        ? 'bg-slate-950 text-amber-400 shadow-sm'
+                        ? 'bg-slate-950 text-amber-400 shadow-md scale-102'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -271,30 +273,82 @@ export default function HomePage() {
               {canScrollRight && (
                 <button
                   onClick={() => scrollTabs('right')}
-                  className="p-1 rounded-full bg-white border border-slate-300 shadow-xs text-slate-700 hover:text-amber-600 shrink-0"
+                  className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
                   aria-label="Scroll right"
                 >
-                  <ChevronRight className="w-3.5 h-3.5 font-bold" />
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
 
           {/* Product Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {filteredProducts.map((prod) => (
-              <ProductCard key={prod.productId} {...prod} />
+              <ProductCard
+                key={prod.productId}
+                productId={prod.productId}
+                title={prod.title}
+                storeName={prod.storeName}
+                sellerCity={prod.sellerCity}
+                pricePkr={prod.pricePkr}
+                originalPricePkr={prod.originalPricePkr}
+                discountPercent={prod.discountPercent}
+                rating={prod.rating}
+                reviewsCount={prod.reviewsCount}
+                soldCount={prod.soldCount}
+                imageUrl={prod.imageUrl}
+                isExpress={prod.isExpress}
+                sellerType={prod.sellerType}
+                deliveryTime={prod.deliveryTime}
+              />
             ))}
           </div>
 
-          {/* Load More Button */}
-          <div className="pt-4 text-center">
+          {/* View More Button */}
+          <div className="text-center pt-5">
             <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-8 py-3.5 bg-slate-100 hover:bg-amber-400 hover:text-slate-950 text-slate-800 text-xs font-black rounded-full transition-all shadow-xs"
+              href="/category/mobiles-tech"
+              className="inline-flex items-center gap-2.5 bg-slate-950 hover:bg-slate-900 text-amber-400 px-9 py-4 rounded-2xl text-sm sm:text-base font-black shadow-lg hover:scale-105 transition-all cursor-pointer"
             >
-              <span>Explore All 50,000+ Marketplace Items</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>EXPLORE ALL 50,000+ PRODUCTS</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 8. VIP Perks & Buyer Protection Banner */}
+      <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white rounded-[36px] p-7 sm:p-12 border border-slate-800 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-8 relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="space-y-3 relative z-10 max-w-2xl">
+            <div className="flex items-center gap-2 text-amber-400 text-xs sm:text-sm font-black uppercase tracking-wider">
+              <ShieldCheck className="w-5 h-5" />
+              <span>State Bank Regulated Escrow Guarantee</span>
+            </div>
+            <h3 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+              Shop with 100% Peace of Mind on Waw
+            </h3>
+            <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
+              Your money stays in secure escrow until you inspect your parcel. Enjoy hassle-free 7-day doorstep returns with free PostEx rider pickups nationwide.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 relative z-10">
+            <Link
+              href="/buyer-protection"
+              className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black px-7 py-4 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xl hover:scale-105 transition-all"
+            >
+              <span>Learn About Escrow</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <Link
+              href="/help"
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-black px-7 py-4 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all"
+            >
+              <span>24/7 Support Desk</span>
             </Link>
           </div>
         </div>
