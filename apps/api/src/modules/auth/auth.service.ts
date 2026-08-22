@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../../config/supabase.js';
 import { redis } from '../../config/redis.js';
 import { WhatsAppService } from '../notifications/whatsapp.service.js';
 import { ENV } from '../../config/env.js';
-import { UserRole } from '@waw/types';
+import { UserRole } from '../../types/index.js';
 
 export class AuthService {
   /**

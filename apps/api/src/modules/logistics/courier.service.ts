@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { supabaseAdmin } from '../../config/supabase.js';
-import { CourierProvider, OrderStatus, PaymentStatus, ReturnReason, ReturnStatus } from '@waw/types';
+import { CourierProvider, OrderStatus, PaymentStatus, ReturnReason, ReturnStatus } from '../../types/index.js';
 import { ENV } from '../../config/env.js';
 
 export interface PostExShipmentInput {

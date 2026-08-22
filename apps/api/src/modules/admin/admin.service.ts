@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../../config/supabase.js';
-import { PayoutStatus, StoreStatus } from '@waw/types';
+import { PayoutStatus, StoreStatus } from '../../types/index.js';
 
 export class AdminService {
   /**

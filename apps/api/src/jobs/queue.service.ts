@@ -4,7 +4,7 @@ import { WhatsAppService } from '../modules/notifications/whatsapp.service.js';
 import { typesenseClient } from '../config/typesense.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { InventoryLockService } from '../modules/products/inventory-lock.service.js';
-import { OrderStatus, PaymentStatus } from '@waw/types';
+import { OrderStatus, PaymentStatus } from '../types/index.js';
 
 export interface BackgroundJobPayload<T = any> {
   id?: string;

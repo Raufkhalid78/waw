@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { PostExXPayService } from './xpay.service.js';
-import { PaymentMethod } from '@waw/types';
+import { PaymentMethod } from '../../types/index.js';
 
 export class PaymentController {
   /**

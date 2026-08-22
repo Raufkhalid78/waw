@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { ENV } from '../../config/env.js';
 import { supabaseAdmin } from '../../config/supabase.js';
-import { OrderStatus, PaymentMethod, PaymentStatus } from '@waw/types';
+import { OrderStatus, PaymentMethod, PaymentStatus } from '../../types/index.js';
 import { WhatsAppService } from '../notifications/whatsapp.service.js';
 import { CourierService } from '../logistics/courier.service.js';
 import { InventoryLockService } from '../products/inventory-lock.service.js';

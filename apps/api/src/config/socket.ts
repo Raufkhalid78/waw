@@ -1,5 +1,5 @@
 import { io } from '../server.js';
-import { OrderStatus } from '@waw/types';
+import { OrderStatus } from '../types/index.js';
 
 export class RealtimeLogisticsService {
   /**

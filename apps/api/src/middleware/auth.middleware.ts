@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { ENV } from '../config/env.js';
 import { supabaseAdmin } from '../config/supabase.js';
-import { UserRole } from '@waw/types';
+import { UserRole } from '../types/index.js';
 
 export interface AuthenticatedUser {
   id: string;

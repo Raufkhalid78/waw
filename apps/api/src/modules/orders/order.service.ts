@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../../config/supabase.js';
-import { calculateOrderSummary, OrderItemPricingInput, OrderStatus, PaymentMethod, PaymentStatus, SellerType } from '@waw/types';
+import { calculateOrderSummary, OrderItemPricingInput, OrderStatus, PaymentMethod, PaymentStatus, SellerType } from '../../types/index.js';
 import { WhatsAppService } from '../notifications/whatsapp.service.js';
 import { CourierService } from '../logistics/courier.service.js';
 import { InventoryLockService } from '../products/inventory-lock.service.js';

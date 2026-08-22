@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { ENV } from './config/env.js';
-import { UserRole } from '@waw/types';
+import { UserRole } from './types/index.js';
 import { supabaseAdmin } from './config/supabase.js';
 import { redis } from './config/redis.js';
 import { typesenseClient } from './config/typesense.js';

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { UserRole } from '@waw/types';
+import { UserRole } from '../types/index.js';
 
 /**
  * Role-Based Access Control (RBAC) middleware.

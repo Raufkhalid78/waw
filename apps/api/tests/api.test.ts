@@ -5,7 +5,7 @@ import { RaastService } from '../src/modules/payments/raast.service.js';
 import { PostExXPayService } from '../src/modules/payments/xpay.service.js';
 import { CourierService } from '../src/modules/logistics/courier.service.js';
 import { ProductService } from '../src/modules/products/product.service.js';
-import { calculateOrderSummary, PaymentMethod, ReturnReason, SellerType, UserRole } from '@waw/types';
+import { calculateOrderSummary, PaymentMethod, ReturnReason, SellerType, UserRole } from '../src/types/index.js';
 import { expandRomanUrduQuery } from '../src/modules/search/roman-urdu-dict.js';
 import { ENV } from '../src/config/env.js';
 import crypto from 'crypto';
