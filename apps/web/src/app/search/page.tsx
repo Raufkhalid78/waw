@@ -386,7 +386,7 @@ function SearchContent() {
               <div className="space-y-1">
                 <h3 className="text-xl font-black text-slate-950">No matching items found</h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Try adjusting your price range, clearing active filters, or searching for broader terms like "leather", "lawn", or "earbuds".
+                  Try adjusting your price range, clearing active filters, or searching for broader terms like &quot;leather&quot;, &quot;lawn&quot;, or &quot;earbuds&quot;.
                 </p>
               </div>
               <button
