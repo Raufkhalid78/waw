@@ -11,6 +11,7 @@ coverage/
 out/
 build/
 dist/
+!packages/types/dist/
 
 # Flutter / Android / iOS
 .dart_tool/
