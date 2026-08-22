@@ -50,7 +50,7 @@ export class WhatsAppService {
    */
   static async sendOrderConfirmed(phone: string, orderNumber: string, totalPkr: number, isCod: boolean): Promise<void> {
     const paymentText = isCod ? 'Cash on Delivery (COD)' : 'Prepaid Online';
-    const message = `✨ *Waw (واو) Order Confirmed!*\n\nOrder Number: *${orderNumber}*\nTotal Amount: *PKR ${totalPkr.toLocaleString()}*\nPayment: *${paymentText}*\n\nTrack your order anytime at: https://waw.pk/orders/${orderNumber}\n\nThank you for shopping on Waw!`;
+    const message = `✨ *Waw (واو) Order Confirmed!*\n\nOrder Number: *${orderNumber}*\nTotal Amount: *PKR ${totalPkr.toLocaleString()}*\nPayment: *${paymentText}*\n\nTrack your order anytime at: https://waw.com.pk/orders/${orderNumber}\n\nThank you for shopping on Waw!`;
     console.log(`📱 [WhatsApp Notification to ${phone}]:\n${message}`);
   }
 

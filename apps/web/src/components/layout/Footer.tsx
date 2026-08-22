@@ -33,13 +33,13 @@ export function Footer() {
               </div>
               <div className="leading-tight">
                 <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">HELP CENTER</div>
-                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">help.waw.pk</div>
+                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">help.waw.com.pk</div>
               </div>
             </Link>
 
             {/* Email Support */}
             <a
-              href="mailto:care@waw.pk"
+              href="mailto:care@waw.com.pk"
               className="flex items-center gap-3.5 group text-left hover:text-amber-600 transition-colors"
             >
               <div className="w-11 h-11 rounded-full border border-slate-300 bg-white flex items-center justify-center text-slate-700 group-hover:border-amber-400 group-hover:text-amber-600 transition-all shadow-xs group-hover:scale-105">
@@ -47,7 +47,7 @@ export function Footer() {
               </div>
               <div className="leading-tight">
                 <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">EMAIL SUPPORT</div>
-                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">care@waw.pk</div>
+                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">care@waw.com.pk</div>
               </div>
             </a>
 

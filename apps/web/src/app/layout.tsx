@@ -7,16 +7,17 @@ import { Providers } from './providers';
 export const metadata: Metadata = {
   title: 'Waw — Online Shopping in Pakistan | Fast Delivery & Best Prices',
   description:
-    'Online Shopping in Pakistan at Waw.pk. Shop 50,000+ products with 24h Waw Express delivery and 100% State Bank Escrow buyer protection.',
-  keywords: 'online shopping pakistan, waw pk, waw online shopping, noon pakistan, fashion lawn, peshawari chappal, sialkot sports',
+    'Online Shopping in Pakistan at Waw.com.pk. Shop 50,000+ products with 24h Waw Express delivery and 100% State Bank Escrow buyer protection.',
+  keywords: 'online shopping pakistan, waw com pk, waw pakistan, waw online shopping, noon pakistan, fashion lawn, peshawari chappal, sialkot sports',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
     apple: '/favicon.svg',
   },
   openGraph: {
-    title: 'Waw — Online Shopping PK',
-    description: 'Online Shopping in Pakistan at Waw.pk. 24h Waw Express fast delivery nationwide.',
+    title: 'Waw.com.pk — Online Shopping PK',
+    description: 'Online Shopping in Pakistan at Waw.com.pk. 24h Waw Express fast delivery nationwide.',
+    url: 'https://waw.com.pk',
     locale: 'en_PK',
     type: 'website',
   },

@@ -14,12 +14,22 @@ export interface CartItem {
   storeName?: string;
 }
 
+export interface UserProfile {
+  id?: string;
+  name: string;
+  emailOrPhone: string;
+  avatarUrl?: string;
+}
+
 interface CartStore {
+  user: UserProfile | null;
   items: CartItem[];
   wishlist: CartItem[];
   paymentMethod: PaymentMethod;
   selectedCity: string;
   language: 'EN' | 'UR';
+  login: (user: UserProfile) => void;
+  logout: () => void;
   setSelectedCity: (city: string) => void;
   setLanguage: (lang: 'EN' | 'UR') => void;
   addItem: (item: CartItem) => void;
@@ -33,8 +43,8 @@ interface CartStore {
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
+  user: null, // Initial unauthenticated state
   items: [
-    // Pre-loaded realistic demo items for quick preview
     {
       productId: 'prod_1',
       title: 'Waw Signature Premium Leather Wallet',
@@ -60,28 +70,26 @@ export const useCartStore = create<CartStore>((set, get) => ({
   ],
   wishlist: [
     {
-      productId: 'prod_m3',
-      title: 'Handmade Traditional Norozi Peshawari Chappal (Pure Mustard Leather)',
-      titleUrdu: 'اصلی چمڑے کی روایتی پشاوری چپل',
+      productId: 'prod_wish_1',
+      title: 'Khyber Master Artisan Peshawari Norozi Chappal',
+      titleUrdu: 'خیبر دستکار نوروزی پشاوری چپل',
       imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=600&auto=format&fit=crop&q=80',
       pricePkr: 3800,
       quantity: 1,
+      storeId: 'store_khyber_leather',
       sellerType: SellerType.THIRD_PARTY,
-      storeName: 'Khyber Artisans',
+      storeName: 'Khyber Leather Craft',
     },
   ],
-  paymentMethod: PaymentMethod.SAFEPAY_CARD,
+  paymentMethod: PaymentMethod.RAAST_P2M_QR,
   selectedCity: 'Lahore',
   language: 'EN',
 
-  setSelectedCity: (city) => set({ selectedCity: city }),
-  setLanguage: (language) => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.dir = language === 'UR' ? 'rtl' : 'ltr';
-      document.documentElement.lang = language === 'UR' ? 'ur' : 'en';
-    }
-    set({ language });
-  },
+  login: (user) => set({ user }),
+  logout: () => set({ user: null }),
+
+  setSelectedCity: (selectedCity) => set({ selectedCity }),
+  setLanguage: (language) => set({ language }),
 
   toggleWishlist: (item) =>
     set((state) => {
@@ -92,9 +100,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       return { wishlist: [...state.wishlist, item] };
     }),
 
-  isInWishlist: (productId) => {
-    return get().wishlist.some((w) => w.productId === productId);
-  },
+  isInWishlist: (productId) => get().wishlist.some((w) => w.productId === productId),
 
   addItem: (item) =>
     set((state) => {

@@ -31,6 +31,7 @@ import {
   Megaphone,
   Mic,
   MicOff,
+  LogOut,
 } from 'lucide-react';
 
 const PAKISTAN_CITIES = [
@@ -166,12 +167,13 @@ const TRANSLATIONS = {
 
 export function Header() {
   const router = useRouter();
-  const { items, selectedCity, setSelectedCity, wishlist, language, setLanguage } = useCartStore();
+  const { items, selectedCity, setSelectedCity, wishlist, language, setLanguage, user, logout } = useCartStore();
   const cartCount = items.reduce((s, i) => s + i.quantity, 0);
   const wishlistCount = wishlist.length;
 
   const [activePromoIndex, setActivePromoIndex] = useState(0);
   const [showCityModal, setShowCityModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [selectedSearchCat, setSelectedSearchCat] = useState('All Categories');
   const [searchFocused, setSearchFocused] = useState(false);
   const [query, setQuery] = useState('');
@@ -179,6 +181,7 @@ export function Header() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.EN;
   const categoryLinks = language === 'UR' ? CATEGORY_LINKS_UR : CATEGORY_LINKS_EN;
@@ -265,6 +268,9 @@ export function Header() {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setSearchFocused(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -446,14 +452,95 @@ export function Header() {
 
               <span className="text-slate-900/20 hidden lg:inline font-light">|</span>
 
-              {/* Account / User Sign In */}
-              <button
-                onClick={() => setAuthModalOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
-              >
-                <User className="w-4 h-4 text-slate-900" />
-                <span className="hidden md:inline">{t.accountHello} ▾</span>
-              </button>
+              {/* Account / User Sign In or User Dropdown */}
+              {user ? (
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer font-black text-slate-900"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-slate-950 text-amber-300 flex items-center justify-center text-[10px] font-black shrink-0">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="hidden md:inline truncate max-w-[95px]">
+                      {user.name}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-800" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserMenu && (
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 text-slate-900 overflow-hidden animate-fade-up">
+                      <div className="p-3 bg-slate-50 border-b border-slate-100">
+                        <p className="text-xs font-black text-slate-900 truncate">{user.name}</p>
+                        <p className="text-[10px] text-slate-500 font-medium truncate">{user.emailOrPhone}</p>
+                        <span className="inline-block mt-1 bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded">
+                          Verified Customer
+                        </span>
+                      </div>
+
+                      <div className="p-1.5 space-y-0.5 text-xs font-bold text-slate-700">
+                        <Link
+                          href="/account"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 hover:text-slate-950 transition-colors"
+                        >
+                          <User className="w-4 h-4 text-slate-500" />
+                          <span>My Profile & Addresses</span>
+                        </Link>
+
+                        <Link
+                          href="/orders/WAW-PK-88492"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 hover:text-slate-950 transition-colors"
+                        >
+                          <Package className="w-4 h-4 text-slate-500" />
+                          <span>My Orders & Tracking</span>
+                        </Link>
+
+                        <Link
+                          href="/wishlist"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 hover:text-slate-950 transition-colors"
+                        >
+                          <Heart className="w-4 h-4 text-rose-500" />
+                          <span>Saved Wishlist ({wishlistCount})</span>
+                        </Link>
+
+                        <Link
+                          href="/buyer-protection"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 hover:text-slate-950 transition-colors"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                          <span>SBP Escrow Guarantee</span>
+                        </Link>
+
+                        <div className="border-t border-slate-100 my-1" />
+
+                        <button
+                          onClick={() => {
+                            logout();
+                            setShowUserMenu(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-black transition-colors text-left cursor-pointer"
+                        >
+                          <LogOut className="w-4 h-4 text-rose-600" />
+                          <span>{language === 'UR' ? 'لاگ آؤٹ کریں' : 'Sign Out'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAuthModalOpen(true)}
+                  className="flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <User className="w-4 h-4 text-slate-900" />
+                  <span className="hidden md:inline">{t.accountHello} ▾</span>
+                </button>
+              )}
 
               <span className="text-slate-900/20 hidden md:inline font-light">|</span>
 

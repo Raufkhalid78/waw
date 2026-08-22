@@ -34,7 +34,8 @@ export class ProductController {
 
   static async create(req: Request, res: Response): Promise<void> {
     try {
-      const product = await ProductService.createProduct(req.body);
+      const user = (req as any).user;
+      const product = await ProductService.createProduct(req.body, user);
       res.status(201).json(product);
     } catch (err: any) {
       res.status(400).json({ error: err.message });

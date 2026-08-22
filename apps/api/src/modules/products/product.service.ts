@@ -44,19 +44,40 @@ export class ProductService {
   /**
    * Creates a product in Supabase.
    */
-  static async createProduct(data: {
-    storeId?: string | null;
-    title: string;
-    titleUrdu?: string;
-    slug: string;
-    description: string;
-    pricePkr: number;
-    compareAtPricePkr?: number;
-    categoryId: string;
-    images: string[];
-    isFirstParty?: boolean;
-    variants?: { sku: string; title: string; pricePkr: number; stock: number }[];
-  }) {
+  static async createProduct(
+    data: {
+      storeId?: string | null;
+      title: string;
+      titleUrdu?: string;
+      slug: string;
+      description: string;
+      pricePkr: number;
+      compareAtPricePkr?: number;
+      categoryId: string;
+      images: string[];
+      isFirstParty?: boolean;
+      variants?: { sku: string; title: string; pricePkr: number; stock: number }[];
+    },
+    user?: { id: string; role: string; phone?: string }
+  ) {
+    // Enforce store ownership check for sellers
+    if (user && user.role === 'SELLER') {
+      const { data: store } = await supabaseAdmin
+        .from('stores')
+        .select('id')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (!store) {
+        throw new Error('Seller does not have an active registered store');
+      }
+      if (data.storeId && store.id !== data.storeId) {
+        throw new Error('Unauthorized: Sellers can only create products under their own store');
+      }
+      data.storeId = store.id;
+      data.isFirstParty = false;
+    }
+
     const isFirstParty = data.isFirstParty ?? (data.storeId === null || data.storeId === undefined);
 
     const { data: product, error } = await supabaseAdmin
