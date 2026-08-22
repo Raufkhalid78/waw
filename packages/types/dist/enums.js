@@ -59,23 +59,27 @@ export var PayoutStatus;
 (function (PayoutStatus) {
     PayoutStatus["SCHEDULED"] = "SCHEDULED";
     PayoutStatus["PROCESSING"] = "PROCESSING";
+    PayoutStatus["PAID"] = "PAID";
     PayoutStatus["COMPLETED"] = "COMPLETED";
-    PayoutStatus["ON_HOLD"] = "ON_HOLD";
+    PayoutStatus["HELD"] = "HELD";
+    PayoutStatus["FAILED"] = "FAILED";
 })(PayoutStatus || (PayoutStatus = {}));
-export var ReturnStatus;
-(function (ReturnStatus) {
-    ReturnStatus["REQUESTED"] = "REQUESTED";
-    ReturnStatus["APPROVED"] = "APPROVED";
-    ReturnStatus["PICKUP_SCHEDULED"] = "PICKUP_SCHEDULED";
-    ReturnStatus["IN_TRANSIT"] = "IN_TRANSIT";
-    ReturnStatus["INSPECTED"] = "INSPECTED";
-    ReturnStatus["REFUNDED"] = "REFUNDED";
-    ReturnStatus["REJECTED"] = "REJECTED";
-})(ReturnStatus || (ReturnStatus = {}));
 export var ReturnReason;
 (function (ReturnReason) {
-    ReturnReason["DAMAGED_OR_DEFECTIVE"] = "DAMAGED_OR_DEFECTIVE";
-    ReturnReason["SIZE_OR_FIT_MISMATCH"] = "SIZE_OR_FIT_MISMATCH";
+    ReturnReason["DAMAGED_ITEM"] = "DAMAGED_ITEM";
+    ReturnReason["DEFECTIVE_OR_NOT_WORKING"] = "DEFECTIVE_OR_NOT_WORKING";
+    ReturnReason["WRONG_ITEM_SENT"] = "WRONG_ITEM_SENT";
     ReturnReason["ITEM_NOT_AS_DESCRIBED"] = "ITEM_NOT_AS_DESCRIBED";
+    ReturnReason["SIZE_OR_FIT_MISMATCH"] = "SIZE_OR_FIT_MISMATCH";
     ReturnReason["CHANGED_MIND"] = "CHANGED_MIND";
 })(ReturnReason || (ReturnReason = {}));
+export var ReturnStatus;
+(function (ReturnStatus) {
+    ReturnStatus["PENDING_REVIEW"] = "PENDING_REVIEW";
+    ReturnStatus["APPROVED"] = "APPROVED";
+    ReturnStatus["PICKUP_SCHEDULED"] = "PICKUP_SCHEDULED";
+    ReturnStatus["REVERSE_PICKUP_BOOKED"] = "REVERSE_PICKUP_BOOKED";
+    ReturnStatus["RECEIVED_AT_HUB"] = "RECEIVED_AT_HUB";
+    ReturnStatus["REFUND_APPROVED"] = "REFUND_APPROVED";
+    ReturnStatus["REJECTED"] = "REJECTED";
+})(ReturnStatus || (ReturnStatus = {}));
