@@ -2,7 +2,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY package*.json turbo.json ./
+COPY package*.json ./
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
 

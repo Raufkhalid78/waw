@@ -142,22 +142,28 @@ export class PostExXPayService {
 
     // 2. Finalize Inventory stock deductions
     if (order.items && order.items.length > 0) {
-      for (const item of order.items) {
-        await InventoryLockService.confirmDeduction(item.productId, item.quantity);
-      }
+      await InventoryLockService.commitStockDecrement(
+        order.id,
+        order.items.map((it: any) => ({
+          productId: it.productId,
+          variantId: it.variantId,
+          quantity: it.quantity,
+        }))
+      );
     }
 
     // 3. Automatically book PostEx courier pickup and generate Air Waybill
     try {
-      await CourierService.createPostExConsignment({
+      await CourierService.bookCourierShipment({
         orderId: order.id,
         orderNumber: order.orderNumber,
-        buyerName: order.buyerName,
-        buyerPhone: order.buyerPhone,
-        address: order.shippingAddress,
-        city: order.shippingCity,
-        amountPkr: 0, // 0 for prepaid XPay orders
+        customerName: order.buyerName,
+        customerPhone: order.buyerPhone,
+        deliveryAddress: order.shippingAddress,
+        destinationCity: order.shippingCity,
+        codAmountPkr: 0,
         isCod: false,
+        itemsCount: order.items?.length || 1,
       });
     } catch (courierErr) {
       console.warn('PostEx automatic consignment booking notice:', courierErr);
@@ -165,13 +171,12 @@ export class PostExXPayService {
 
     // 4. Send instant WhatsApp confirmation to Pakistani buyer
     try {
-      await WhatsAppService.sendOrderConfirmation({
-        phone: order.buyerPhone,
-        orderNumber: order.orderNumber,
-        buyerName: order.buyerName,
-        totalPkr: order.totalPkr,
-        paymentMethod: 'PostEx XPay (Paid)',
-      });
+      await WhatsAppService.sendOrderConfirmed(
+        order.buyerPhone,
+        order.orderNumber,
+        order.totalPkr,
+        false
+      );
     } catch (notifErr) {
       console.warn('WhatsApp alert dispatch notice:', notifErr);
     }
