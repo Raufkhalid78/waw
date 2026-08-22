@@ -1,5 +1,5 @@
 # Stage 1: Build API & Prisma Client
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -12,7 +12,7 @@ RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
 RUN npm run build --workspace=@waw/api
 
 # Stage 2: Production Runner
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
