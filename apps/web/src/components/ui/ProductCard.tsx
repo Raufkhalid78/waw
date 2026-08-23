@@ -192,10 +192,10 @@ export function ProductCard({
         </div>
 
         {/* BNPL Badge */}
-        {pricePkr >= 10000 && (
+        {pricePkr >= 15000 && pricePkr <= 70000 && (
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2 py-1 font-bold w-fit">
             <Sparkles className="w-3 h-3" />
-            3 Easy Installments of PKR {Math.ceil(pricePkr / 3).toLocaleString()}
+            Bank Installments Available
           </div>
         )}
 
