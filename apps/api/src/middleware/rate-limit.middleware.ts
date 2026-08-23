@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { ENV } from '../config/env.js';
 
 // Setup ioredis client using the Upstash URL if available
@@ -17,7 +17,7 @@ export const otpRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   store: redisClient ? new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args),
+    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
     prefix: 'rl_otp:',
   }) : undefined,
   message: {
@@ -34,7 +34,7 @@ export const apiRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   store: redisClient ? new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args),
+    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
     prefix: 'rl_api:',
   }) : undefined,
   message: {
