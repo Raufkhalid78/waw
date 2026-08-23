@@ -31,10 +31,23 @@ export class InventoryLockService {
   static async commitStockDecrement(orderId: string, items: LockItemRequest[]) {
     for (const item of items) {
       if (item.variantId) {
+        // Fetch current variant stock
+        const { data: variant } = await supabaseAdmin
+          .from('product_variants')
+          .select('stock_quantity')
+          .eq('id', item.variantId)
+          .single();
+
+        const currentStock = variant?.stock_quantity ?? 0;
+        const newStock = Math.max(0, currentStock - item.quantity);
+
         // Decrement variant stock in Supabase
         await supabaseAdmin
           .from('product_variants')
-          .update({ updated_at: new Date().toISOString() })
+          .update({
+            stock_quantity: newStock,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', item.variantId);
       }
     }
