@@ -11,7 +11,7 @@ waw/
 ├── apps/
 │   ├── web/          ← Next.js 14 Buyer Storefront (SSR, Urdu/EN, Free Delivery tracker)
 │   ├── admin/        ← Next.js 14 Custom Admin Control Center (KYC, GMV, COD Remittance)
-│   ├── api/          ← Express.js Core Backend (Supabase, Safepay, PayFast, WhatsApp, Typesense)
+│   ├── api/          ← Express.js Core Backend (Supabase, PostEx XPay, WhatsApp, Typesense)
 │   └── mobile/       ← Flutter iOS & Android App (BLoC, Urdu RTL, Offline Cart)
 ├── packages/
 │   ├── types/        ← Shared TypeScript Types, Enums & Pricing Calculation Engine
@@ -26,8 +26,8 @@ waw/
 
 | Channel | Method | Policy & Pricing |
 |---|---|---|
-| **Safepay** | Cards (Visa/Mastercard/PayPak) + Raast | Standard checkout. **Save PKR 100 on checkout** |
-| **PayFast** | JazzCash & Easypaisa Mobile Wallets | Aggregated wallet checkout. **Save PKR 100 on checkout** |
+| **PostEx XPay** | Cards (Visa/Mastercard/PayPak) + Raast | Standard checkout. **Save PKR 100 on checkout** |
+| **PostEx XPay Wallets** | JazzCash & Easypaisa Mobile Wallets | Aggregated wallet checkout. **Save PKR 100 on checkout** |
 | **Cash on Delivery (COD)** | PostEx / TCS Express | **+PKR 100 Handling Surcharge** (offsets courier return risk) |
 | **Delivery Promotion** | Nationwide Delivery | **FREE Delivery on all orders over PKR 5,000** |
 
@@ -79,6 +79,6 @@ flutter run
 ---
 
 ## 🔒 Security & SBP Compliance
-- **SBP PSP Regulation:** Safepay & PayFast handle all cardholder and wallet data securely.
+- **SBP PSP Regulation:** PostEx XPay handles all cardholder and wallet data securely.
 - **WhatsApp Direct Receipt:** Transaction receipts and courier live tracking are dispatched via WhatsApp.
 - **Data Integrity:** Supabase PostgreSQL with Row Level Security (RLS) ensures sellers only access their respective inventory and payout ledgers.
