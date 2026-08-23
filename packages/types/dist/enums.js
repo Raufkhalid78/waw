@@ -67,6 +67,7 @@ export var PayoutStatus;
 export var ReturnReason;
 (function (ReturnReason) {
     ReturnReason["DAMAGED_ITEM"] = "DAMAGED_ITEM";
+    ReturnReason["DAMAGED_OR_DEFECTIVE"] = "DAMAGED_ITEM";
     ReturnReason["DEFECTIVE_OR_NOT_WORKING"] = "DEFECTIVE_OR_NOT_WORKING";
     ReturnReason["WRONG_ITEM_SENT"] = "WRONG_ITEM_SENT";
     ReturnReason["ITEM_NOT_AS_DESCRIBED"] = "ITEM_NOT_AS_DESCRIBED";
