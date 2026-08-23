@@ -251,7 +251,26 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 13. Enable RLS
+-- 13. Webhooks Idempotency Table (Phase 3)
+CREATE TABLE IF NOT EXISTS xpay_webhooks_log (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  transaction_id TEXT UNIQUE NOT NULL,
+  event_type TEXT NOT NULL,
+  processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 14. Atomic Inventory Deduction Function (Phase 2)
+CREATE OR REPLACE FUNCTION deduct_inventory(p_variant_id TEXT, qty INT) 
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE product_variants 
+  SET stock_quantity = stock_quantity - qty 
+  WHERE id = p_variant_id AND stock_quantity >= qty;
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 15. Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
@@ -260,6 +279,57 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE xpay_webhooks_log ENABLE ROW LEVEL SECURITY;
 
--- Note: In MVP, backend uses service_role key to bypass RLS.
--- Add proper RLS policies here before allowing direct client-side Supabase access.
+-- 16. RLS Policies (Phase 2)
+
+-- PROFILES: Users can read and update their own profile
+CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (id = auth.uid()::TEXT);
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (id = auth.uid()::TEXT);
+
+-- STORES: Public read, owners can mutate
+CREATE POLICY "Stores are publicly readable" ON stores FOR SELECT USING (true);
+CREATE POLICY "Store owners can update their store" ON stores FOR UPDATE USING (owner_id = auth.uid()::TEXT);
+
+-- PRODUCTS: Public read, store owners can mutate
+CREATE POLICY "Products are publicly readable" ON products FOR SELECT USING (true);
+CREATE POLICY "Store owners can insert products" ON products FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM stores WHERE stores.id = store_id AND stores.owner_id = auth.uid()::TEXT)
+);
+CREATE POLICY "Store owners can update products" ON products FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM stores WHERE stores.id = store_id AND stores.owner_id = auth.uid()::TEXT)
+);
+CREATE POLICY "Store owners can delete products" ON products FOR DELETE USING (
+  EXISTS (SELECT 1 FROM stores WHERE stores.id = store_id AND stores.owner_id = auth.uid()::TEXT)
+);
+
+-- PRODUCT VARIANTS: Public read, store owners can mutate
+CREATE POLICY "Variants are publicly readable" ON product_variants FOR SELECT USING (true);
+CREATE POLICY "Store owners can manage variants" ON product_variants FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM products 
+    JOIN stores ON stores.id = products.store_id 
+    WHERE products.id = product_variants.product_id AND stores.owner_id = auth.uid()::TEXT
+  )
+);
+
+-- ORDERS & PAYMENTS: Buyers can see their own
+CREATE POLICY "Buyers can view own orders" ON orders FOR SELECT USING (buyer_id = auth.uid()::TEXT);
+CREATE POLICY "Buyers can view own order items" ON order_items FOR SELECT USING (
+  EXISTS (SELECT 1 FROM orders WHERE orders.id = order_items.order_id AND orders.buyer_id = auth.uid()::TEXT)
+);
+CREATE POLICY "Buyers can view own payments" ON payments FOR SELECT USING (
+  EXISTS (SELECT 1 FROM orders WHERE orders.id = payments.order_id AND orders.buyer_id = auth.uid()::TEXT)
+);
+
+-- Note: The Express Backend (Node.js) currently uses the 'service_role' key to bypass RLS for systemic operations 
+-- like webhook processing and automated fulfillment. The policies above apply to direct client-side Supabase access.
+
+-- 17. Performance Indexing (Phase 2)
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id, base_price_pkr, is_active);
+CREATE INDEX IF NOT EXISTS idx_products_store ON products(store_id);
+CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(order_status, created_at);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+

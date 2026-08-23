@@ -120,7 +120,25 @@ export class PostExXPayService {
     }
 
     const orderRef = data.orderNumber || data.orderId;
+    const txId = data.transactionId || orderRef; // Use orderRef if txId is missing
+    
     if (!orderRef) throw new Error('Missing order reference in PostEx XPay webhook payload');
+
+    // Idempotency Check
+    const { data: existingLog } = await supabaseAdmin
+      .from('xpay_webhooks_log')
+      .select('id')
+      .eq('transaction_id', txId)
+      .single();
+
+    if (existingLog) {
+      return { success: true, message: `Webhook for tx ${txId} already processed (Idempotency Guard)` };
+    }
+
+    // Insert idempotency lock immediately
+    await supabaseAdmin
+      .from('xpay_webhooks_log')
+      .insert({ transaction_id: txId, event_type: eventType });
 
     const { data: order } = await supabaseAdmin
       .from('orders')
