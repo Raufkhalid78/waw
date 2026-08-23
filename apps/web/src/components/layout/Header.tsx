@@ -173,6 +173,7 @@ export function Header() {
 
   const [activePromoIndex, setActivePromoIndex] = useState(0);
   const [showCityModal, setShowCityModal] = useState(false);
+  const [megaMenuOpen, setMegaMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [selectedSearchCat, setSelectedSearchCat] = useState('All Categories');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -615,10 +616,46 @@ export function Header() {
         <div className="bg-white border-b border-slate-200/80 hidden sm:block relative shadow-xs">
           <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 flex items-center justify-between gap-3 py-0.5">
             {/* Left: Mega Categories Button */}
-            <button className="flex items-center gap-1.5 bg-slate-950 text-amber-400 px-3.5 py-1.5 rounded-xl text-xs font-black shrink-0 hover:bg-slate-900 transition-all shadow-xs cursor-pointer my-1">
-              <Menu className="w-3.5 h-3.5" />
-              <span>{t.allCategoriesBtn}</span>
-            </button>
+            <div 
+              className="relative group"
+              onMouseEnter={() => setMegaMenuOpen(true)}
+              onMouseLeave={() => setMegaMenuOpen(false)}
+            >
+              <button className="flex items-center gap-1.5 bg-slate-950 text-amber-400 px-3.5 py-1.5 rounded-xl text-xs font-black shrink-0 hover:bg-slate-900 transition-all shadow-xs cursor-pointer my-1">
+                <Menu className="w-3.5 h-3.5" />
+                <span>{t.allCategoriesBtn}</span>
+              </button>
+
+              {/* Mega Menu Dropdown */}
+              {megaMenuOpen && (
+                <div className="absolute top-full left-0 mt-1 w-[600px] bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 z-50 animate-fade-up grid grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-black text-slate-900 mb-3 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      Top Categories
+                    </h4>
+                    <ul className="space-y-2">
+                      {SEARCH_CATEGORIES.slice(1).map((cat) => (
+                        <li key={cat} className="group/item">
+                          <Link href={`/category/${cat.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} className="text-sm font-bold text-slate-600 hover:text-amber-600 flex items-center gap-2 transition-colors">
+                            <ArrowRight className="w-3 h-3 text-slate-300 group-hover/item:text-amber-500 transition-colors" />
+                            {cat}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="bg-amber-50 rounded-xl p-4 flex flex-col justify-between border border-amber-100">
+                    <div>
+                      <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm mb-2 inline-block">Flash Deals</span>
+                      <h5 className="font-black text-slate-900 text-lg leading-tight mb-2">Save up to 50% on Electronics</h5>
+                      <p className="text-xs font-medium text-slate-600 mb-4">Limited time offer on smartphones and wearables.</p>
+                    </div>
+                    <Link href="/category/mobiles-tech" className="text-xs font-black bg-slate-900 text-white py-2 px-4 rounded-lg text-center hover:bg-slate-800 transition-colors">Shop Now</Link>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Middle: Scrollable Category Links Container */}
             <div className="relative flex-1 min-w-0 flex items-center">

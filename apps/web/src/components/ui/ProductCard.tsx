@@ -74,11 +74,11 @@ export function ProductCard({
     <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="product-card group relative bg-white border border-slate-200 hover:border-amber-400 rounded-3xl p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_16px_35px_rgba(0,0,0,0.09)] hover:-translate-y-1.5"
+      className="product-card group relative bg-white border border-slate-200 hover:border-amber-400 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_16px_35px_rgba(0,0,0,0.09)] hover:-translate-y-1.5"
     >
       <div>
         {/* ── 1. Image Container with Badges ───────────────────────────── */}
-        <Link href={`/products/${productId}`} className="block relative aspect-square rounded-2xl overflow-hidden bg-slate-50 mb-3.5">
+        <Link href={`/products/${productId}`} className="block relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-3">
           <img
             src={imageUrl}
             alt={title}
@@ -87,11 +87,16 @@ export function ProductCard({
           />
 
           {/* Top Badges Row */}
-          <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
+          <div className="absolute top-2 left-2 flex flex-col gap-1.5 z-10">
             {discountPercent && (
-              <span className="bg-rose-600 text-white text-xs font-black px-2.5 py-1 rounded-lg shadow-sm">
-                -{discountPercent}% OFF
-              </span>
+              <>
+                <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm w-fit animate-pulse">
+                  FLASH SALE - Ends in 2h
+                </span>
+                <span className="bg-amber-400 text-slate-950 text-xs font-black px-2 py-1 rounded-md shadow-sm w-fit">
+                  -{discountPercent}% OFF
+                </span>
+              </>
             )}
             {isExpress && (
               <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-xs w-fit">
@@ -185,6 +190,14 @@ export function ProductCard({
             </span>
           )}
         </div>
+
+        {/* BNPL Badge */}
+        {pricePkr >= 10000 && (
+          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2 py-1 font-bold w-fit">
+            <Sparkles className="w-3 h-3" />
+            3 Easy Installments of PKR {Math.ceil(pricePkr / 3).toLocaleString()}
+          </div>
+        )}
 
         {/* 1-Click Add Button */}
         <button

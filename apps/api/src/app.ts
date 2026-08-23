@@ -37,7 +37,11 @@ export const app = express();
 app.use(requestTracer);
 app.use(helmet());
 app.use(cors({ origin: ENV.CORS_ORIGIN, credentials: true }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 app.use(morgan('dev'));
 app.use(apiRateLimiter);
 
@@ -124,7 +128,7 @@ app.post(
 );
 
 // ── Order Routes ──────────────────────────────────────────────────────────
-app.post('/api/orders', validateBody(CreateOrderSchema), async (req, res) => {
+app.post('/api/orders', requireAuth, validateBody(CreateOrderSchema), async (req, res) => {
   try {
     const result = await OrderService.createOrder(req.body);
     res.status(201).json(result);
@@ -133,7 +137,7 @@ app.post('/api/orders', validateBody(CreateOrderSchema), async (req, res) => {
   }
 });
 
-app.get('/api/orders/:id', async (req, res) => {
+app.get('/api/orders/:id', requireAuth, async (req, res) => {
   try {
     const order = await OrderService.getOrder(req.params.id);
     if (!order) {
@@ -146,7 +150,7 @@ app.get('/api/orders/:id', async (req, res) => {
   }
 });
 
-app.post('/api/orders/:id/cancel', async (req, res) => {
+app.post('/api/orders/:id/cancel', requireAuth, async (req, res) => {
   try {
     const order = await OrderService.cancelOrder(req.params.id, req.body.reason);
     res.json(order);
@@ -166,7 +170,7 @@ app.post('/api/logistics/postex/webhook', async (req, res) => {
 });
 
 // ── Payment Routes (PostEx XPay Unified Fintech Engine) ────────────────────
-app.post('/api/payments/xpay/initiate', PaymentController.initiateXPay);
+app.post('/api/payments/xpay/initiate', requireAuth, PaymentController.initiateXPay);
 app.post('/api/payments/xpay/webhook', PaymentController.xpayWebhook);
 
 // ── Search Routes (Typesense Engine) ──────────────────────────────────────

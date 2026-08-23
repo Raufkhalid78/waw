@@ -48,6 +48,12 @@ export const ENV = {
   DEFAULT_COMMISSION_PERCENTAGE: parseInt(process.env.DEFAULT_COMMISSION_PERCENTAGE || '10', 10),
 };
 
-if (ENV.NODE_ENV === 'production' && ENV.JWT_SECRET === 'waw_sec_jwt_signing_key_2026_pk_enterprise') {
-  console.warn('⚠️ Notice: Using default production JWT key. Set custom JWT_SECRET in Railway Variables for enhanced security.');
+if (ENV.NODE_ENV === 'production') {
+  if (ENV.JWT_SECRET === 'waw_sec_jwt_signing_key_2026_pk_enterprise' || !process.env.JWT_SECRET) {
+    throw new Error('FATAL: A custom JWT_SECRET environment variable is required in production mode. Using the default key is a critical security vulnerability.');
+  }
+  
+  if (!ENV.UPSTASH_REDIS_REST_URL || !ENV.UPSTASH_REDIS_REST_TOKEN) {
+    throw new Error('FATAL: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production mode for reliable OTP and concurrency locking.');
+  }
 }

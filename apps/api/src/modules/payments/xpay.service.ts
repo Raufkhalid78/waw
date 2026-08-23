@@ -26,7 +26,7 @@ export class PostExXPayService {
     method: PaymentMethod = PaymentMethod.XPAY_CARD
   ): Promise<XPayIntentResponse> {
     const { data: order, error } = await supabaseAdmin
-      .from('Order')
+      .from('orders')
       .select('*')
       .eq('id', orderId)
       .single();
@@ -36,36 +36,36 @@ export class PostExXPayService {
     }
 
     const intentId = `xpay_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    let checkoutUrl = `${this.baseUrl}/checkout/${intentId}?amount=${order.totalPkr}&currency=PKR&orderRef=${order.orderNumber}`;
+    let checkoutUrl = `${this.baseUrl}/checkout/${intentId}?amount=${order.total_pkr}&currency=PKR&orderRef=${order.order_number}`;
     let qrPayload: string | undefined;
 
     // If Raast P2M QR requested, generate standardized EMVCo payload
     if (method === PaymentMethod.RAAST_P2M_QR) {
       qrPayload = this.generateRaastQrPayload({
-        orderNumber: order.orderNumber,
-        amountPkr: order.totalPkr,
+        orderNumber: order.order_number,
+        amountPkr: order.total_pkr,
         merchantTitle: 'Waw Marketplace by PostEx',
         merchantId: ENV.POSTEX_XPAY_MERCHANT_ID || 'WAW-POSTEX-001',
       });
     }
 
     // Record payment intent in database
-    await supabaseAdmin.from('Payment').insert({
+    await supabaseAdmin.from('payments').insert({
       id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      orderId: order.id,
-      paymentMethod: method,
+      order_id: order.id,
+      payment_method: method,
       status: PaymentStatus.PENDING,
-      gatewayReference: intentId,
-      amountPkr: order.totalPkr,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      gateway_reference: intentId,
+      amount_pkr: order.total_pkr,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
 
     return {
       intentId,
       checkoutUrl,
-      orderNumber: order.orderNumber,
-      amountPkr: order.totalPkr,
+      orderNumber: order.order_number,
+      amountPkr: order.total_pkr,
       qrPayload,
     };
   }
@@ -123,20 +123,20 @@ export class PostExXPayService {
     if (!orderRef) throw new Error('Missing order reference in PostEx XPay webhook payload');
 
     const { data: order } = await supabaseAdmin
-      .from('Order')
-      .select('*, items:OrderItem(*)')
-      .or(`orderNumber.eq.${orderRef},id.eq.${orderRef}`)
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .or(`order_number.eq.${orderRef},id.eq.${orderRef}`)
       .single();
 
     if (!order) throw new Error(`Order ${orderRef} not found in database`);
 
     // 1. Transition Order to Confirmed and Paid
     await supabaseAdmin
-      .from('Order')
+      .from('orders')
       .update({
-        paymentStatus: PaymentStatus.PAID,
-        orderStatus: OrderStatus.CONFIRMED,
-        updatedAt: new Date().toISOString(),
+        payment_status: PaymentStatus.PAID,
+        order_status: OrderStatus.CONFIRMED,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', order.id);
 
@@ -145,8 +145,8 @@ export class PostExXPayService {
       await InventoryLockService.commitStockDecrement(
         order.id,
         order.items.map((it: any) => ({
-          productId: it.productId,
-          variantId: it.variantId,
+          productId: it.product_id,
+          variantId: it.variant_id,
           quantity: it.quantity,
         }))
       );
@@ -156,11 +156,11 @@ export class PostExXPayService {
     try {
       await CourierService.bookCourierShipment({
         orderId: order.id,
-        orderNumber: order.orderNumber,
-        customerName: order.buyerName,
-        customerPhone: order.buyerPhone,
-        deliveryAddress: order.shippingAddress,
-        destinationCity: order.shippingCity,
+        orderNumber: order.order_number,
+        customerName: order.buyer_name,
+        customerPhone: order.buyer_phone,
+        deliveryAddress: order.shipping_address,
+        destinationCity: order.shipping_city,
         codAmountPkr: 0,
         isCod: false,
         itemsCount: order.items?.length || 1,
@@ -172,9 +172,9 @@ export class PostExXPayService {
     // 4. Send instant WhatsApp confirmation to Pakistani buyer
     try {
       await WhatsAppService.sendOrderConfirmed(
-        order.buyerPhone,
-        order.orderNumber,
-        order.totalPkr,
+        order.buyer_phone,
+        order.order_number,
+        order.total_pkr,
         false
       );
     } catch (notifErr) {

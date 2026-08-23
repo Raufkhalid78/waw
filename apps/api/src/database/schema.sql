@@ -32,6 +32,10 @@ DO $$ BEGIN
     'PAYFAST_WALLET_JAZZCASH',
     'PAYFAST_WALLET_EASYPAISA',
     'PAYFAST_CARD',
+    'XPAY_CARD',
+    'XPAY_WALLET_JAZZCASH',
+    'XPAY_WALLET_EASYPAISA',
+    'RAAST_P2M_QR',
     'COD'
   );
 EXCEPTION
@@ -74,202 +78,192 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE "PayoutStatus" AS ENUM ('SCHEDULED', 'PROCESSING', 'PAID', 'HELD', 'FAILED');
+  CREATE TYPE "PayoutStatus" AS ENUM ('SCHEDULED', 'PROCESSING', 'COMPLETED', 'PAID', 'HELD', 'FAILED');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
--- 2. Profiles Table (Integrates with Supabase Auth)
-CREATE TABLE IF NOT EXISTS "Profile" (
-  "id" TEXT PRIMARY KEY,
-  "fullName" TEXT NOT NULL,
-  "phone" TEXT UNIQUE NOT NULL,
-  "email" TEXT UNIQUE,
-  "role" "UserRole" NOT NULL DEFAULT 'BUYER',
-  "avatarUrl" TEXT,
-  "isWhatsAppVerified" BOOLEAN NOT NULL DEFAULT false,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- 2. Profiles Table
+CREATE TABLE IF NOT EXISTS profiles (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  phone TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE,
+  role "UserRole" NOT NULL DEFAULT 'BUYER',
+  avatar_url TEXT,
+  is_whatsapp_verified BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 3. Stores Table (1P Hubs & 3P Verified Merchants)
-CREATE TABLE IF NOT EXISTS "Store" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "ownerId" TEXT NOT NULL REFERENCES "Profile"("id") ON DELETE CASCADE,
-  "name" TEXT NOT NULL,
-  "slug" TEXT UNIQUE NOT NULL,
-  "description" TEXT,
-  "logoUrl" TEXT,
-  "bannerUrl" TEXT,
-  "sellerType" "SellerType" NOT NULL DEFAULT 'THIRD_PARTY',
-  "status" "StoreStatus" NOT NULL DEFAULT 'PENDING_KYC',
-  "commissionRatePercentage" INTEGER NOT NULL DEFAULT 10,
-  "cnicNumber" TEXT,
-  "bankAccountTitle" TEXT,
-  "bankAccountNumber" TEXT,
-  "bankName" TEXT,
-  "city" TEXT NOT NULL,
-  "address" TEXT NOT NULL,
-  "ratingAverage" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-  "ratingCount" INTEGER NOT NULL DEFAULT 0,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- 3. Stores Table
+CREATE TABLE IF NOT EXISTS stores (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  owner_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT,
+  logo_url TEXT,
+  seller_type "SellerType" NOT NULL DEFAULT 'THIRD_PARTY',
+  status "StoreStatus" NOT NULL DEFAULT 'PENDING_KYC',
+  commission_rate_percentage NUMERIC(5,2) NOT NULL DEFAULT 10.00,
+  cnic_number TEXT,
+  bank_account_title TEXT,
+  bank_account_number TEXT,
+  bank_name TEXT,
+  city TEXT NOT NULL,
+  address TEXT NOT NULL,
+  is_verified BOOLEAN NOT NULL DEFAULT false,
+  rating_average NUMERIC(3,2) NOT NULL DEFAULT 0.0,
+  rating_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- 4. Categories Table
-CREATE TABLE IF NOT EXISTS "Category" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "name" TEXT NOT NULL,
-  "nameUrdu" TEXT,
-  "slug" TEXT UNIQUE NOT NULL,
-  "iconUrl" TEXT,
-  "parentId" TEXT REFERENCES "Category"("id") ON DELETE SET NULL,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  parent_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+  image_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- 5. Products Table
-CREATE TABLE IF NOT EXISTS "Product" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "storeId" TEXT REFERENCES "Store"("id") ON DELETE SET NULL,
-  "categoryId" TEXT NOT NULL REFERENCES "Category"("id") ON DELETE RESTRICT,
-  "title" TEXT NOT NULL,
-  "titleUrdu" TEXT,
-  "slug" TEXT UNIQUE NOT NULL,
-  "description" TEXT NOT NULL,
-  "descriptionUrdu" TEXT,
-  "isFirstParty" BOOLEAN NOT NULL DEFAULT false,
-  "isFeatured" BOOLEAN NOT NULL DEFAULT false,
-  "isSponsored" BOOLEAN NOT NULL DEFAULT false,
-  "basePricePkr" INTEGER NOT NULL,
-  "compareAtPricePkr" INTEGER,
-  "costPricePkr" INTEGER,
-  "images" TEXT[] NOT NULL DEFAULT '{}',
-  "ratingAverage" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-  "ratingCount" INTEGER NOT NULL DEFAULT 0,
-  "soldCount" INTEGER NOT NULL DEFAULT 0,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  store_id TEXT REFERENCES stores(id) ON DELETE CASCADE,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+  title TEXT NOT NULL,
+  title_urdu TEXT,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT,
+  base_price_pkr INTEGER NOT NULL,
+  compare_at_price_pkr INTEGER,
+  cost_price_pkr INTEGER,
+  images TEXT[] NOT NULL DEFAULT '{}',
+  thumbnail TEXT,
+  seller_type "SellerType" NOT NULL DEFAULT 'THIRD_PARTY',
+  rating_average NUMERIC(3,2) NOT NULL DEFAULT 0.0,
+  rating_count INTEGER NOT NULL DEFAULT 0,
+  sold_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 6. Product Variants (SKU, Size, Color, Stock)
-CREATE TABLE IF NOT EXISTS "ProductVariant" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "productId" TEXT NOT NULL REFERENCES "Product"("id") ON DELETE CASCADE,
-  "sku" TEXT UNIQUE NOT NULL,
-  "title" TEXT NOT NULL,
-  "pricePkr" INTEGER NOT NULL,
-  "compareAtPricePkr" INTEGER,
-  "stockQuantity" INTEGER NOT NULL DEFAULT 0,
-  "attributes" JSONB NOT NULL DEFAULT '{}'::JSONB,
-  "imageUrl" TEXT,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- 6. Product Variants Table
+CREATE TABLE IF NOT EXISTS product_variants (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  sku TEXT UNIQUE NOT NULL,
+  size TEXT,
+  color TEXT,
+  price_adjustment_pkr INTEGER NOT NULL DEFAULT 0,
+  stock_quantity INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- 7. Orders Table
-CREATE TABLE IF NOT EXISTS "Order" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "orderNumber" TEXT UNIQUE NOT NULL,
-  "buyerId" TEXT NOT NULL REFERENCES "Profile"("id"),
-  "buyerName" TEXT NOT NULL,
-  "buyerPhone" TEXT NOT NULL,
-  "shippingAddress" TEXT NOT NULL,
-  "shippingCity" TEXT NOT NULL,
-  "shippingProvince" TEXT NOT NULL,
-  "subtotalPkr" INTEGER NOT NULL,
-  "shippingFeePkr" INTEGER NOT NULL DEFAULT 200,
-  "codFeePkr" INTEGER NOT NULL DEFAULT 0,
-  "discountPkr" INTEGER NOT NULL DEFAULT 0,
-  "totalPkr" INTEGER NOT NULL,
-  "paymentMethod" "PaymentMethod" NOT NULL,
-  "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
-  "orderStatus" "OrderStatus" NOT NULL DEFAULT 'PENDING',
-  "notes" TEXT,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS orders (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  order_number TEXT UNIQUE NOT NULL,
+  buyer_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
+  buyer_name TEXT NOT NULL,
+  buyer_phone TEXT NOT NULL,
+  shipping_address TEXT NOT NULL,
+  shipping_city TEXT NOT NULL,
+  shipping_province TEXT NOT NULL,
+  subtotal_pkr INTEGER NOT NULL,
+  shipping_fee_pkr INTEGER NOT NULL,
+  cod_fee_pkr INTEGER NOT NULL DEFAULT 0,
+  total_pkr INTEGER NOT NULL,
+  payment_method "PaymentMethod" NOT NULL,
+  payment_status "PaymentStatus" NOT NULL DEFAULT 'PENDING',
+  order_status "OrderStatus" NOT NULL DEFAULT 'PENDING',
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 8. Shipments Table (PostEx Courier Consignments & Tracking)
-CREATE TABLE IF NOT EXISTS "Shipment" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "orderId" TEXT NOT NULL REFERENCES "Order"("id") ON DELETE CASCADE,
-  "courier" "CourierProvider" NOT NULL DEFAULT 'POSTEX',
-  "trackingNumber" TEXT UNIQUE NOT NULL,
-  "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
-  "isCod" BOOLEAN NOT NULL DEFAULT false,
-  "codAmountPkr" INTEGER NOT NULL DEFAULT 0,
-  "courierCostPkr" INTEGER NOT NULL DEFAULT 0,
-  "estimatedDeliveryDate" TIMESTAMP WITH TIME ZONE,
-  "trackingUrl" TEXT,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- 8. Order Items Table
+CREATE TABLE IF NOT EXISTS order_items (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  variant_id TEXT REFERENCES product_variants(id) ON DELETE SET NULL,
+  quantity INTEGER NOT NULL,
+  unit_price_pkr INTEGER NOT NULL,
+  total_price_pkr INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 9. Order Items Table (Multi-Vendor Splitting)
-CREATE TABLE IF NOT EXISTS "OrderItem" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "orderId" TEXT NOT NULL REFERENCES "Order"("id") ON DELETE CASCADE,
-  "productId" TEXT NOT NULL REFERENCES "Product"("id"),
-  "variantId" TEXT REFERENCES "ProductVariant"("id"),
-  "storeId" TEXT REFERENCES "Store"("id"),
-  "sellerType" "SellerType" NOT NULL DEFAULT 'THIRD_PARTY',
-  "unitPricePkr" INTEGER NOT NULL,
-  "quantity" INTEGER NOT NULL,
-  "totalPricePkr" INTEGER NOT NULL,
-  "wawCommissionPkr" INTEGER NOT NULL DEFAULT 0,
-  "sellerPayoutPkr" INTEGER NOT NULL,
-  "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
-  "shipmentId" TEXT REFERENCES "Shipment"("id"),
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- 9. Payments Table
+CREATE TABLE IF NOT EXISTS payments (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  payment_method "PaymentMethod" NOT NULL,
+  status "PaymentStatus" NOT NULL,
+  amount_pkr INTEGER NOT NULL,
+  gateway_reference TEXT,
+  gateway_response JSONB,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 10. Payments Table (Safepay & PayFast Audit Log)
-CREATE TABLE IF NOT EXISTS "Payment" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "orderId" TEXT NOT NULL REFERENCES "Order"("id") ON DELETE CASCADE,
-  "amountPkr" INTEGER NOT NULL,
-  "paymentMethod" "PaymentMethod" NOT NULL,
-  "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
-  "gatewayReference" TEXT,
-  "rawResponse" JSONB,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- 10. Shipments Table
+CREATE TABLE IF NOT EXISTS shipments (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  courier_provider "CourierProvider" NOT NULL,
+  tracking_number TEXT,
+  label_url TEXT,
+  status TEXT NOT NULL,
+  estimated_delivery_date TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 11. Payouts Table (Merchant Bank Settlements)
-CREATE TABLE IF NOT EXISTS "Payout" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "storeId" TEXT NOT NULL REFERENCES "Store"("id") ON DELETE CASCADE,
-  "amountPkr" INTEGER NOT NULL,
-  "status" "PayoutStatus" NOT NULL DEFAULT 'SCHEDULED',
-  "bankReference" TEXT,
-  "scheduledFor" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  "settledAt" TIMESTAMP WITH TIME ZONE,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- 11. Payouts Table (SBP Escrow)
+CREATE TABLE IF NOT EXISTS payouts (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  amount_pkr INTEGER NOT NULL,
+  commission_pkr INTEGER NOT NULL,
+  status "PayoutStatus" NOT NULL DEFAULT 'SCHEDULED',
+  bank_reference TEXT,
+  scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL,
+  processed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- 12. Reviews Table
-CREATE TABLE IF NOT EXISTS "Review" (
-  "id" TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-  "productId" TEXT NOT NULL REFERENCES "Product"("id") ON DELETE CASCADE,
-  "buyerId" TEXT NOT NULL REFERENCES "Profile"("id") ON DELETE CASCADE,
-  "rating" INTEGER NOT NULL CHECK ("rating" >= 1 AND "rating" <= 5),
-  "comment" TEXT,
-  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS reviews (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  buyer_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  images TEXT[] DEFAULT '{}',
+  is_verified_purchase BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 13. Platform Settings Table
-CREATE TABLE IF NOT EXISTS "PlatformSetting" (
-  "key" TEXT PRIMARY KEY,
-  "value" TEXT NOT NULL,
-  "description" TEXT,
-  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
+-- 13. Enable RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_variants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payouts ENABLE ROW LEVEL SECURITY;
 
--- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_products_category ON "Product"("categoryId");
-CREATE INDEX IF NOT EXISTS idx_products_store ON "Product"("storeId");
-CREATE INDEX IF NOT EXISTS idx_orders_buyer ON "Order"("buyerId");
-CREATE INDEX IF NOT EXISTS idx_orders_status ON "Order"("orderStatus");
-CREATE INDEX IF NOT EXISTS idx_order_items_order ON "OrderItem"("orderId");
-CREATE INDEX IF NOT EXISTS idx_shipments_tracking ON "Shipment"("trackingNumber");
+-- Note: In MVP, backend uses service_role key to bypass RLS.
+-- Add proper RLS policies here before allowing direct client-side Supabase access.

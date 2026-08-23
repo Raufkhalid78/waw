@@ -26,9 +26,17 @@ export class PaymentController {
   /**
    * Handles PostEx XPay real-time webhook callback.
    */
-  static async xpayWebhook(req: Request, res: Response): Promise<void> {
+  static async xpayWebhook(req: any, res: Response): Promise<void> {
     try {
       const signature = req.headers['x-postex-signature'] || req.headers['x-xpay-signature'] as string | undefined;
+      const rawBody = req.rawBody || JSON.stringify(req.body);
+      
+      const isValid = PostExXPayService.verifyWebhookSignature(rawBody, signature as string | undefined);
+      if (!isValid) {
+        res.status(401).json({ error: 'Invalid XPay webhook signature' });
+        return;
+      }
+
       const result = await PostExXPayService.handleWebhook(req.body);
       res.json({ received: true, ...result });
     } catch (err: any) {
