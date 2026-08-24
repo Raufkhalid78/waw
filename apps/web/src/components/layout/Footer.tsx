@@ -318,7 +318,7 @@ export function Footer() {
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 text-[11px] text-slate-600">
             {/* Copyright */}
             <div className="font-medium text-slate-500">
-              © 2026 Waw Marketplace. All Rights Reserved
+              © {new Date().getFullYear()} WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED. All Rights Reserved.
             </div>
 
             {/* Payment Badges — fully inline SVG, no external images */}
@@ -381,7 +381,7 @@ export function Footer() {
           {/* Row 2: Regulatory Company Registration Details */}
           <div className="pt-3 border-t border-slate-200 text-[10px] text-slate-400 text-center lg:text-left flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
-              Waw Technologies Pakistan (Pvt) Ltd. • NTN: 8945201-3 • SBP Regulated Digital Payment Escrow • SECP Reg. # 0192847
+              WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED • NTN: 8945201-3 • SBP Regulated Digital Payment Escrow • SECP Reg. # 0192847
             </div>
             <div className="flex items-center gap-2 text-slate-500 font-medium">
               <span>National Courier Logistics: PostEx, TCS Express, Leopards, Trax</span>
