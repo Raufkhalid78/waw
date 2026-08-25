@@ -43,45 +43,10 @@ interface CartStore {
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
-  user: null, // Initial unauthenticated state
-  items: [
-    {
-      productId: 'prod_1',
-      title: 'Waw Signature Premium Leather Wallet',
-      titleUrdu: 'واو پریمیم چمڑے کا بٹوا',
-      imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80',
-      pricePkr: 2499,
-      quantity: 1,
-      storeId: null,
-      sellerType: SellerType.FIRST_PARTY,
-      storeName: 'Waw Official Retail',
-    },
-    {
-      productId: 'prod_2',
-      title: 'Wireless Noise Cancelling Earbuds (Active Bass)',
-      titleUrdu: 'وائرلیس نائز کینسلیشن ائیربڈز',
-      imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80',
-      pricePkr: 3200,
-      quantity: 1,
-      storeId: 'store_lahore_tech',
-      sellerType: SellerType.THIRD_PARTY,
-      storeName: 'Lahore Tech Hub',
-    },
-  ],
-  wishlist: [
-    {
-      productId: 'prod_wish_1',
-      title: 'Khyber Master Artisan Peshawari Norozi Chappal',
-      titleUrdu: 'خیبر دستکار نوروزی پشاوری چپل',
-      imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=600&auto=format&fit=crop&q=80',
-      pricePkr: 3800,
-      quantity: 1,
-      storeId: 'store_khyber_leather',
-      sellerType: SellerType.THIRD_PARTY,
-      storeName: 'Khyber Leather Craft',
-    },
-  ],
-  paymentMethod: PaymentMethod.RAAST_P2M_QR,
+  user: null,
+  items: [],
+  wishlist: [],
+  paymentMethod: PaymentMethod.COD,
   selectedCity: 'Lahore',
   language: 'EN',
 

@@ -16,14 +16,33 @@ import {
   Phone,
   Store,
   ChevronRight,
+  Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchOrderById } from '@/lib/api';
 
 export default function OrderTrackingPage() {
   const params = useParams();
   const router = useRouter();
   const orderId = (params.id as string) || 'WAW-PK-88492';
   const [copied, setCopied] = useState(false);
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadOrder() {
+      try {
+        setLoading(true);
+        const data = await fetchOrderById(orderId);
+        setOrder(data);
+      } catch (err) {
+        console.warn('Could not load order details:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (orderId) loadOrder();
+  }, [orderId]);
 
   const handleCopyOrderId = () => {
     if (navigator.clipboard) {
@@ -33,36 +52,38 @@ export default function OrderTrackingPage() {
     }
   };
 
+  const currentStatus = order?.order_status || order?.orderStatus || 'CONFIRMED';
+
   const steps = [
     {
       title: 'Order Confirmed',
       desc: 'Payment authorized & order logged into SBP Escrow',
-      time: 'Just now',
+      time: order?.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
       status: 'completed',
     },
     {
       title: 'Packed & Quality Verified',
       desc: 'Merchant inspected & sealed with Waw tamper-proof tape',
-      time: 'In Progress (Est. 2 hours)',
-      status: 'active',
+      time: currentStatus === 'CONFIRMED' ? 'In Progress' : 'Completed',
+      status: currentStatus === 'CONFIRMED' ? 'active' : 'completed',
     },
     {
       title: 'Handed to Courier',
-      desc: 'Dispatched via TCS / PostEx Express Logistics',
-      time: 'Pending',
-      status: 'upcoming',
+      desc: 'Dispatched via PostEx Express Logistics',
+      time: order?.store_orders?.[0]?.shipments?.[0]?.tracking_number ? `CN: ${order.store_orders[0].shipments[0].tracking_number}` : 'Pending',
+      status: ['SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentStatus) ? 'completed' : 'upcoming',
     },
     {
       title: 'Out for Delivery',
       desc: 'Local courier rider assigned for final doorstep drop',
-      time: 'Tomorrow by 4:00 PM',
-      status: 'upcoming',
+      time: 'Pending dispatch',
+      status: ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentStatus) ? 'active' : 'upcoming',
     },
     {
       title: 'Delivered & Completed',
       desc: 'Package handed over to recipient',
-      time: 'Est. 24-48h',
-      status: 'upcoming',
+      time: currentStatus === 'DELIVERED' ? 'Completed' : 'Est. 24-48h',
+      status: currentStatus === 'DELIVERED' ? 'completed' : 'upcoming',
     },
   ];
 

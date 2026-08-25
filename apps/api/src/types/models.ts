@@ -60,7 +60,6 @@ export interface Product {
   isSponsored: boolean; // Boosted in Typesense
   basePricePkr: number;
   compareAtPricePkr?: number;
-  costPricePkr?: number;
   images: string[];
   variants: ProductVariant[];
   ratingAverage: number;
@@ -73,10 +72,10 @@ export interface OrderItem {
   id: string;
   orderId: string;
   productId: string;
-  productTitle: string;
-  productImage?: string;
   variantId?: string;
+  productTitle: string;
   variantTitle?: string;
+  productImage?: string;
   storeId?: string | null;
   sellerType: SellerType;
   unitPricePkr: number;
@@ -90,7 +89,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  orderNumber: string; // e.g. WAW-PK-2026-0881
+  orderNumber: string; // e.g. "WAW-2026-98124"
   buyerId: string;
   buyerName: string;
   buyerPhone: string;
@@ -106,38 +105,126 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   orderStatus: OrderStatus;
-  escrowReleaseDate?: string;
-  trackingNumber?: string;
-  courier: CourierProvider;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface PayoutRecord {
+export interface Shipment {
+  id: string;
+  orderId: string;
+  orderItemId?: string;
+  courier: CourierProvider;
+  trackingNumber: string;
+  status: OrderStatus;
+  isCod: boolean;
+  codAmountPkr: number;
+  estimatedDeliveryDate?: string;
+  trackingUrl?: string;
+  createdAt: string;
+}
+
+export interface Payout {
   id: string;
   storeId: string;
   amountPkr: number;
   status: PayoutStatus;
   bankReference?: string;
-  scheduledFor: string;
   settledAt?: string;
   createdAt: string;
 }
 
-export interface TypesenseProductDocument {
+export interface StoreOrder {
   id: string;
-  title: string;
-  titleUrdu?: string;
-  slug: string;
-  description: string;
-  category: string;
-  brand?: string;
-  city?: string;
-  sellerType: string;
-  pricePkr: number;
-  isExpress: boolean;
-  rating: number;
-  soldCount: number;
-  inStock: boolean;
-  createdAtTimestamp: number;
+  orderId: string;
+  storeId: string;
+  subtotalPkr: number;
+  shippingFeePkr: number;
+  commissionPkr: number;
+  sellerPayoutPkr: number;
+  orderStatus: OrderStatus;
+  packedAt?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  items?: OrderItem[];
+  shipments?: Shipment[];
 }
+
+export interface Coupon {
+  id: string;
+  code: string;
+  storeId?: string | null; // null = platform-wide
+  discountType: 'PERCENTAGE' | 'FIXED_PKR' | 'FREE_SHIPPING';
+  discountValue: number;
+  minSpendPkr: number;
+  maxDiscountPkr?: number;
+  expiresAt?: string;
+  maxUses?: number;
+  currentUses: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CheckoutQuoteItemInput {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+}
+
+export interface CheckoutQuoteRequest {
+  items: CheckoutQuoteItemInput[];
+  shippingCity: string;
+  paymentMethod: PaymentMethod;
+  couponCode?: string;
+}
+
+export interface CheckoutQuoteResponse {
+  quoteToken: string;
+  expiresAt: string; // ISO timestamp (15 mins)
+  subtotalPkr: number;
+  shippingFeePkr: number;
+  codFeePkr: number;
+  couponDiscountPkr: number;
+  totalPkr: number;
+  items: {
+    productId: string;
+    variantId?: string;
+    title: string;
+    storeId: string;
+    unitPricePkr: number;
+    quantity: number;
+    totalPricePkr: number;
+  }[];
+}
+
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  storeOrderId?: string;
+  buyerId?: string;
+  reason: string;
+  evidenceImages: string[];
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REVERSE_PICKUP_BOOKED' | 'RECEIVED' | 'REFUNDED' | 'REJECTED';
+  reverseCourierCn?: string;
+  refundAmountPkr: number;
+  staffNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  actorId?: string;
+  actorRole: string;
+  action: string;
+  targetResourceType: string;
+  targetResourceId: string;
+  previousState?: any;
+  newState?: any;
+  reason?: string;
+  ipAddress?: string;
+  createdAt: string;
+}
+

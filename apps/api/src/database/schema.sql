@@ -142,6 +142,8 @@ CREATE TABLE IF NOT EXISTS products (
   images TEXT[] NOT NULL DEFAULT '{}',
   thumbnail TEXT,
   seller_type "SellerType" NOT NULL DEFAULT 'THIRD_PARTY',
+  is_first_party BOOLEAN NOT NULL DEFAULT false,
+  is_active BOOLEAN NOT NULL DEFAULT true,
   rating_average NUMERIC(3,2) NOT NULL DEFAULT 0.0,
   rating_count INTEGER NOT NULL DEFAULT 0,
   sold_count INTEGER NOT NULL DEFAULT 0,
@@ -330,7 +332,80 @@ CREATE TABLE IF NOT EXISTS flash_sale_items (
   UNIQUE(flash_sale_id, variant_id)
 );
 
--- 13. Webhooks Idempotency Table (Phase 3)
+-- 17. User Addresses Table
+CREATE TABLE IF NOT EXISTS addresses (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  user_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  street_address TEXT NOT NULL,
+  city TEXT NOT NULL,
+  province TEXT NOT NULL,
+  postal_code TEXT,
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 18. Server-Backed Carts & Cart Items Tables
+CREATE TABLE IF NOT EXISTS carts (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  user_id TEXT REFERENCES profiles(id) ON DELETE CASCADE,
+  guest_token TEXT UNIQUE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS cart_items (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  cart_id TEXT NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  variant_id TEXT REFERENCES product_variants(id) ON DELETE SET NULL,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 19. Return Requests (RMA) & Return Items Tables
+CREATE TABLE IF NOT EXISTS return_requests (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  store_order_id TEXT REFERENCES store_orders(id) ON DELETE SET NULL,
+  buyer_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
+  reason TEXT NOT NULL,
+  evidence_images TEXT[] NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW', -- PENDING_REVIEW, APPROVED, REVERSE_PICKUP_BOOKED, RECEIVED, REFUNDED, REJECTED
+  reverse_courier_cn TEXT,
+  refund_amount_pkr INTEGER NOT NULL DEFAULT 0,
+  staff_notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS return_items (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  return_request_id TEXT NOT NULL REFERENCES return_requests(id) ON DELETE CASCADE,
+  order_item_id TEXT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 20. Platform Audit Logs Table (Immutable Staff & Operational Trail)
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  actor_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
+  actor_role TEXT NOT NULL DEFAULT 'SYSTEM',
+  action TEXT NOT NULL, -- KYC_APPROVED, KYC_REJECTED, ORDER_CANCELLED, MANUAL_PRICE_OVERRIDE, PAYOUT_SETTLED
+  target_resource_type TEXT NOT NULL,
+  target_resource_id TEXT NOT NULL,
+  previous_state JSONB,
+  new_state JSONB,
+  reason TEXT,
+  ip_address TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 21. Webhooks Idempotency Table
 CREATE TABLE IF NOT EXISTS xpay_webhooks_log (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   transaction_id TEXT UNIQUE NOT NULL,

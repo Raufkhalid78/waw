@@ -14,9 +14,6 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "clean": "turbo run clean && rm -rf node_modules",
-    "db:generate": "npm run --prefix apps/api db:generate",
-    "db:migrate": "npm run --prefix apps/api db:migrate",
-    "db:push": "npm run --prefix apps/api db:push",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },

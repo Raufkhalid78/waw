@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/useCartStore';
-import { PaymentMethod } from '@waw/types';
-import { ShieldCheck, Truck, MessageSquare, CheckCircle2, Lock, ArrowLeft, QrCode, Sparkles, Smartphone } from 'lucide-react';
+import { PaymentMethod, CheckoutQuoteResponse } from '@waw/types';
+import { ShieldCheck, Truck, MessageSquare, CheckCircle2, Lock, ArrowLeft, QrCode, Sparkles, Smartphone, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { fetchCheckoutQuote, createOrderApi, initiatePaymentApi } from '@/lib/api';
 
 const PK_CITIES = [
   'Lahore',
@@ -23,8 +24,7 @@ const PK_CITIES = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, paymentMethod, setPaymentMethod, getSummary, clearCart, selectedCity } = useCartStore();
-  const summary = getSummary();
+  const { items, paymentMethod, setPaymentMethod, clearCart, selectedCity } = useCartStore();
 
   const [formData, setFormData] = useState({
     fullName: 'Ali Khan',
@@ -36,51 +36,131 @@ export default function CheckoutPage() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quoteData, setQuoteData] = useState<CheckoutQuoteResponse | null>(null);
   const [showRaastQrModal, setShowRaastQrModal] = useState(false);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [raastQrPayload, setRaastQrPayload] = useState<string | null>(null);
   const [voucherInput, setVoucherInput] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discountPkr: number; description: string } | null>(null);
   const [voucherError, setVoucherError] = useState('');
+
+  // 1. Fetch Server-Authoritative Quote on Cart / Form change
+  useEffect(() => {
+    if (items.length === 0) return;
+
+    let isMounted = true;
+    async function loadQuote() {
+      try {
+        setQuoteLoading(true);
+        setQuoteError(null);
+        const quote = await fetchCheckoutQuote({
+          items: items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
+          shippingCity: formData.city,
+          paymentMethod,
+          couponCode: appliedVoucher?.code,
+        });
+        if (isMounted) {
+          setQuoteData(quote);
+          if (quote.couponDiscountPkr > 0 && appliedVoucher) {
+            setAppliedVoucher((prev) => prev ? { ...prev, discountPkr: quote.couponDiscountPkr } : null);
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) setQuoteError(err.message || 'Unable to calculate live pricing');
+      } finally {
+        if (isMounted) setQuoteLoading(false);
+      }
+    }
+
+    loadQuote();
+    return () => { isMounted = false; };
+  }, [items, formData.city, paymentMethod, appliedVoucher?.code]);
 
   const handleApplyVoucher = (e: React.FormEvent) => {
     e.preventDefault();
     setVoucherError('');
     const code = voucherInput.trim().toUpperCase();
 
-    if (code === 'AZADI2026' || code === 'WAWFIRST') {
-      setAppliedVoucher({ code, discountPkr: 500, description: 'PKR 500 Promo Discount Applied' });
-      setVoucherInput('');
-    } else {
-      setVoucherError('Invalid promo code. Try AZADI2026');
-    }
+    if (!code) return;
+    setAppliedVoucher({ code, discountPkr: 0, description: `Promo Code ${code}` });
+    setVoucherInput('');
   };
 
-  const discountAmount = appliedVoucher ? appliedVoucher.discountPkr : 0;
-  const finalTotalPkr = Math.max(0, summary.totalPkr - discountAmount);
+  const finalTotalPkr = quoteData?.totalPkr || 0;
+  const subtotalPkr = quoteData?.subtotalPkr || 0;
+  const shippingFeePkr = quoteData?.shippingFeePkr || 0;
+  const codFeePkr = quoteData?.codFeePkr || 0;
+  const discountAmount = quoteData?.couponDiscountPkr || 0;
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
-    if (paymentMethod === PaymentMethod.RAAST_P2M_QR) {
-      setTimeout(() => {
-        setIsSubmitting(false);
-        setShowRaastQrModal(true);
-      }, 600);
+    if (!quoteData?.quoteToken) {
+      setQuoteError('Please wait for the live price quote to finish calculating.');
       return;
     }
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setIsSubmitting(true);
+    setQuoteError(null);
+
+    try {
+      const orderResult = await createOrderApi({
+        quoteToken: quoteData.quoteToken,
+        buyerName: formData.fullName,
+        buyerPhone: formData.phone,
+        shippingAddress: formData.address,
+        shippingCity: formData.city,
+        shippingProvince: formData.province,
+        paymentMethod,
+        notes: formData.notes,
+      });
+
+      const orderId = orderResult.orderId;
+
+      if (paymentMethod === PaymentMethod.RAAST_P2M_QR) {
+        setActiveOrderId(orderId);
+        setRaastQrPayload(`pk.gov.sbp.raast:WAW-PAY-PKR-${finalTotalPkr}-ORD-${orderId}`);
+        setIsSubmitting(false);
+        setShowRaastQrModal(true);
+        return;
+      }
+
+      if (
+        paymentMethod === PaymentMethod.XPAY_CARD ||
+        paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH ||
+        paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA
+      ) {
+        const paymentSession = await initiatePaymentApi({
+          orderId,
+          paymentMethod,
+          customerPhone: formData.phone,
+          returnUrl: `${window.location.origin}/orders/${orderId}`,
+        });
+
+        if (paymentSession.checkoutUrl) {
+          clearCart();
+          window.location.href = paymentSession.checkoutUrl;
+          return;
+        }
+      }
+
+      // COD or default success
       clearCart();
-      const generatedOrderId = `WAW-PK-${Math.floor(10000 + Math.random() * 90000)}`;
-      router.push(`/orders/${generatedOrderId}`);
-    }, 1200);
+      router.push(`/orders/${orderId}`);
+    } catch (err: any) {
+      setQuoteError(err.message || 'Failed to complete order placement. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   const handleRaastPaid = () => {
     clearCart();
-    const generatedOrderId = `WAW-PK-${Math.floor(10000 + Math.random() * 90000)}`;
-    router.push(`/orders/${generatedOrderId}`);
+    if (activeOrderId) {
+      router.push(`/orders/${activeOrderId}`);
+    } else {
+      router.push('/');
+    }
   };
 
   if (items.length === 0) {
@@ -411,40 +491,55 @@ export default function CheckoutPage() {
 
             {/* Breakdown */}
             <div className="border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
-              <div className="flex justify-between">
-                <span>Items Subtotal</span>
-                <span className="font-bold text-slate-900">PKR {summary.subtotalPkr.toLocaleString()}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span>PostEx Express Delivery</span>
-                {summary.isFreeDelivery ? (
-                  <span className="font-black text-emerald-600">FREE (Orders &gt; 5,000)</span>
-                ) : (
-                  <span className="font-bold text-slate-900">PKR {summary.shippingPkr}</span>
-                )}
-              </div>
-
-              {summary.codFeePkr > 0 && (
-                <div className="flex justify-between text-amber-800">
-                  <span>COD Handling Surcharge</span>
-                  <span className="font-bold">+PKR {summary.codFeePkr}</span>
+              {quoteLoading ? (
+                <div className="py-4 text-center text-slate-400 animate-pulse text-xs">
+                  Calculating live server quote & PostEx delivery fees...
                 </div>
-              )}
+              ) : (
+                <>
+                  {quoteError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{quoteError}</span>
+                    </div>
+                  )}
 
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-emerald-700 font-bold">
-                  <span>Voucher Discount</span>
-                  <span>-PKR {discountAmount.toLocaleString()}</span>
-                </div>
-              )}
+                  <div className="flex justify-between">
+                    <span>Items Subtotal</span>
+                    <span className="font-bold text-slate-900">PKR {subtotalPkr.toLocaleString()}</span>
+                  </div>
 
-              <div className="border-t border-slate-200 pt-3 flex justify-between items-baseline text-sm">
-                <span className="font-black text-slate-950">Total Payable</span>
-                <span className="text-xl font-black text-slate-950">
-                  PKR {finalTotalPkr.toLocaleString()}
-                </span>
-              </div>
+                  <div className="flex justify-between">
+                    <span>PostEx Express Delivery</span>
+                    {shippingFeePkr === 0 ? (
+                      <span className="font-black text-emerald-600">FREE (Orders &gt; 5,000)</span>
+                    ) : (
+                      <span className="font-bold text-slate-900">PKR {shippingFeePkr}</span>
+                    )}
+                  </div>
+
+                  {codFeePkr > 0 && (
+                    <div className="flex justify-between text-amber-800">
+                      <span>COD Handling Surcharge</span>
+                      <span className="font-bold">+PKR {codFeePkr}</span>
+                    </div>
+                  )}
+
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span>Voucher Discount</span>
+                      <span>-PKR {discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  <div className="border-t border-slate-200 pt-3 flex justify-between items-baseline text-sm">
+                    <span className="font-black text-slate-950">Total Payable</span>
+                    <span className="text-xl font-black text-slate-950">
+                      PKR {finalTotalPkr.toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Guarantee Badge */}
@@ -486,13 +581,13 @@ export default function CheckoutPage() {
             <div className="bg-[#FEF600] p-4 rounded-3xl max-w-xs mx-auto border-2 border-slate-950 shadow-md">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
-                  `pk.gov.sbp.raast:WAW-PAY-PKR-${finalTotalPkr}-REF`
+                  raastQrPayload || `pk.gov.sbp.raast:WAW-PAY-PKR-${finalTotalPkr}-REF`
                 )}&color=0f172a&bgcolor=fef600&margin=2`}
                 alt="State Bank Raast QR"
                 className="w-56 h-56 mx-auto rounded-xl shadow-xs"
               />
-              <div className="text-[11px] font-black text-slate-950 mt-2 tracking-wider uppercase">
-                Merchant: waw.market@hbl
+              <div className="text-[11px] font-black text-slate-950 mt-2 tracking-wider uppercase font-mono">
+                {activeOrderId ? `Order Ref: ${activeOrderId}` : 'Merchant: waw.market@hbl'}
               </div>
             </div>
 

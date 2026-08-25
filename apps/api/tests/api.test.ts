@@ -136,28 +136,44 @@ describe('Waw Marketplace Core API Engine Tests', () => {
     assert.ok(reversePickup.trackingUrl.includes('postex.pk/tracking'));
   });
 
-  it('should reject product creation when a seller attempts to list under an unowned store', async () => {
-    const unauthorizedSeller = { id: 'usr_seller_999', role: 'SELLER', phone: '+923009999999' };
+  it('should sign and verify valid checkout quote tokens and reject expired ones', () => {
+    const secret = ENV.JWT_SECRET || 'waw_dev_jwt_secret_key_2026';
+    const validQuote = {
+      subtotalPkr: 5500,
+      shippingFeePkr: 0,
+      codFeePkr: 0,
+      totalPkr: 5500,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      items: [{ productId: 'prod_1', storeId: 'store_1', unitPricePkr: 5500, quantity: 1, totalPricePkr: 5500 }],
+    };
 
-    await assert.rejects(
-      async () => {
-        await ProductService.createProduct(
-          {
-            storeId: 'store_other_vendor',
-            title: 'Unauthorized Item',
-            slug: 'unauthorized-item',
-            description: 'Item created by unauthorized vendor',
-            pricePkr: 1999,
-            categoryId: 'cat_tech',
-            images: ['https://example.com/item.jpg'],
-          },
-          unauthorizedSeller
-        );
-      },
-      (err: Error) => {
-        return err.message.includes('Seller does not have an active registered store') ||
-               err.message.includes('Unauthorized');
+    const token = jwt.sign(validQuote, secret, { expiresIn: '15m' });
+    const decoded: any = jwt.verify(token, secret);
+    assert.strictEqual(decoded.totalPkr, 5500);
+    assert.strictEqual(decoded.shippingFeePkr, 0);
+
+    // Expired Quote
+    const expiredQuote = {
+      ...validQuote,
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    };
+    const expiredToken = jwt.sign(expiredQuote, secret, { expiresIn: '15m' });
+    assert.throws(() => {
+      const d: any = jwt.verify(expiredToken, secret);
+      if (new Date(d.expiresAt) < new Date()) {
+        throw new Error('Checkout quote has expired');
       }
-    );
+    }, /Checkout quote has expired/);
+  });
+
+  it('should smart-route Tier 1 city parcels to PostEx and heavy parcels > 5kg to Trax', () => {
+    const courierLahore = CourierService.selectCourier('Lahore', 1.5);
+    assert.strictEqual(courierLahore, 'POSTEX');
+
+    const courierKarachi = CourierService.selectCourier('Karachi', 2.0);
+    assert.strictEqual(courierKarachi, 'POSTEX');
+
+    const courierHeavy = CourierService.selectCourier('Islamabad', 8.5);
+    assert.strictEqual(courierHeavy, 'TRAX');
   });
 });

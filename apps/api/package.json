@@ -7,13 +7,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
     "test": "tsx --test tests/api.test.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.19.1",
     "@supabase/supabase-js": "^2.45.4",
     "@upstash/redis": "^1.38.2",
     "@waw/types": "file:../../packages/types",
@@ -39,7 +35,6 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.5.5",
-    "prisma": "^5.19.1",
     "tsx": "^4.19.1",
     "typescript": "^5.8.2"
   }

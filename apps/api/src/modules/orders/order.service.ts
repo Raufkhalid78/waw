@@ -3,20 +3,18 @@ import { calculateOrderSummary, OrderItemPricingInput, OrderStatus, PaymentMetho
 import { WhatsAppService } from '../notifications/whatsapp.service.js';
 import { CourierService } from '../logistics/courier.service.js';
 import { InventoryLockService } from '../products/inventory-lock.service.js';
+import { QuoteService } from './quote.service.js';
 
 export interface CartItem {
   productId: string;
   variantId?: string;
-  storeId: string;  // Required for multi-vendor split-order
-  storeName?: string;
-  storeCity?: string;
   quantity: number;
-  unitPricePkr: number;
-  sellerType?: SellerType;
-  commissionRatePercentage?: number;
+  storeId?: string;
+  unitPricePkr?: number;
 }
 
 export interface CreateOrderInput {
+  quoteToken?: string;
   buyerId?: string;
   buyerName: string;
   buyerPhone: string;
@@ -26,83 +24,67 @@ export interface CreateOrderInput {
   paymentMethod: PaymentMethod;
   couponCode?: string;
   notes?: string;
-  items: CartItem[];
+  items?: CartItem[];
 }
 
 export class OrderService {
   /**
-   * Places a multi-vendor order. Groups cart items by store_id, creates a parent
-   * order, then spawns one store_order + PostEx shipment per distinct seller.
+   * Places a multi-vendor order using server-authoritative pricing and inventory checks.
+   * Groups cart items by store_id, creates a parent order, then spawns one store_order
+   * + PostEx shipment per distinct seller.
    */
-  static async createOrder(input: CreateOrderInput) {
-    if (!input.items || input.items.length === 0) {
-      throw new Error('Order must contain at least 1 item');
+  static async createOrder(input: CreateOrderInput, authenticatedUser?: any) {
+    let quote: any;
+
+    if (input.quoteToken) {
+      quote = QuoteService.verifyQuoteToken(input.quoteToken);
+    } else if (input.items && input.items.length > 0) {
+      // Derive server-authoritative quote on the fly
+      quote = await QuoteService.generateQuote({
+        items: input.items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
+        shippingCity: input.shippingCity,
+        paymentMethod: input.paymentMethod,
+        couponCode: input.couponCode,
+      });
+    } else {
+      throw new Error('Order must contain a valid quoteToken or items list');
     }
 
     const orderNumber = `WAW-${Math.floor(100000 + Math.random() * 900000)}`;
     const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const isCod = input.paymentMethod === PaymentMethod.COD;
+    const buyerId = authenticatedUser?.id || input.buyerId || null;
+
+    const lockItems = quote.items.map((i: any) => ({
+      productId: i.productId,
+      variantId: i.variantId,
+      quantity: i.quantity,
+    }));
 
     // 1. Acquire Redis Inventory Reservation Locks (15-min TTL)
-    const lockAcquired = await InventoryLockService.acquireStockLocks(orderId, input.items);
+    const lockAcquired = await InventoryLockService.acquireStockLocks(orderId, lockItems);
     if (!lockAcquired) {
       throw new Error('Unable to reserve stock. One or more items are currently out of stock.');
     }
 
-    // 2. Apply coupon if provided
-    let couponDiscount = 0;
-    let appliedCoupon: any = null;
-    if (input.couponCode) {
-      const { data: coupon } = await supabaseAdmin
-        .from('coupons')
-        .select('*')
-        .eq('code', input.couponCode.toUpperCase())
-        .eq('is_active', true)
-        .single();
+    const finalTotal = quote.totalPkr;
+    const couponDiscount = quote.couponDiscountPkr || 0;
 
-      if (coupon) {
-        const cartTotal = input.items.reduce((s, i) => s + i.unitPricePkr * i.quantity, 0);
-        if (cartTotal >= coupon.min_spend_pkr) {
-          if (coupon.discount_type === 'PERCENTAGE') {
-            couponDiscount = Math.round(cartTotal * (coupon.discount_value / 100));
-            if (coupon.max_discount_pkr) couponDiscount = Math.min(couponDiscount, coupon.max_discount_pkr);
-          } else if (coupon.discount_type === 'FIXED_PKR') {
-            couponDiscount = coupon.discount_value;
-          }
-          appliedCoupon = coupon;
-        }
-      }
-    }
-
-    // 3. Calculate overall order pricing
-    const pricingItems: OrderItemPricingInput[] = input.items.map((item) => ({
-      productId: item.productId,
-      variantId: item.variantId,
-      sellerId: item.storeId,
-      sellerType: item.sellerType || SellerType.THIRD_PARTY,
-      commissionRatePercentage: item.commissionRatePercentage || 10,
-      unitPricePkr: item.unitPricePkr,
-      quantity: item.quantity,
-    }));
-
-    const summary = calculateOrderSummary(pricingItems, input.paymentMethod);
-    const finalTotal = Math.max(0, summary.totalPkr - couponDiscount);
-
-    // 4. Insert Parent Order Record
+    // 2. Insert Parent Order Record into Supabase
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
         id: orderId,
         order_number: orderNumber,
-        buyer_id: input.buyerId || null,
+        buyer_id: buyerId,
         buyer_name: input.buyerName,
         buyer_phone: input.buyerPhone,
         shipping_address: input.shippingAddress,
         shipping_city: input.shippingCity,
         shipping_province: input.shippingProvince,
-        subtotal_pkr: summary.subtotalPkr,
-        shipping_fee_pkr: summary.shippingPkr,
-        cod_fee_pkr: summary.codFeePkr,
+        subtotal_pkr: quote.subtotalPkr,
+        shipping_fee_pkr: quote.shippingFeePkr,
+        cod_fee_pkr: quote.codFeePkr,
         total_pkr: finalTotal,
         payment_method: input.paymentMethod,
         payment_status: isCod ? PaymentStatus.COD_PENDING : PaymentStatus.PENDING,
@@ -114,25 +96,25 @@ export class OrderService {
       .single();
 
     if (orderError) {
-      await InventoryLockService.releaseStockLocks(orderId, input.items);
+      await InventoryLockService.releaseStockLocks(orderId, lockItems);
       throw new Error(`Failed to create order: ${orderError.message}`);
     }
 
-    // 5. Group items by store_id for split-order creation
-    const itemsByStore = input.items.reduce<Record<string, CartItem[]>>((acc, item) => {
-      if (!acc[item.storeId]) acc[item.storeId] = [];
-      acc[item.storeId].push(item);
-      return acc;
-    }, {});
+    // 3. Group items by store_id for split-order creation
+    const itemsByStore: Record<string, any[]> = {};
+    for (const item of quote.items) {
+      if (!itemsByStore[item.storeId]) itemsByStore[item.storeId] = [];
+      itemsByStore[item.storeId].push(item);
+    }
 
     const storeOrders: any[] = [];
     const shipments: any[] = [];
 
-    // 6. For each seller — create a store_order + order_items + PostEx shipment
+    // 4. For each seller — create a store_order + order_items + PostEx shipment
     for (const [storeId, storeItems] of Object.entries(itemsByStore)) {
-      const storeSubtotal = storeItems.reduce((s, i) => s + i.unitPricePkr * i.quantity, 0);
-      const storeShippingFee = 200; // PostEx flat rate
-      const commissionRate = storeItems[0].commissionRatePercentage || 10;
+      const storeSubtotal = (storeItems as any[]).reduce((s, i) => s + i.totalPricePkr, 0);
+      const storeShippingFee = quote.shippingFeePkr === 0 ? 0 : 200;
+      const commissionRate = (storeItems as any[])[0].commissionRatePercentage || 10;
       const commissionPkr = Math.round(storeSubtotal * (commissionRate / 100));
       const sellerPayoutPkr = storeSubtotal - commissionPkr;
 
@@ -156,8 +138,8 @@ export class OrderService {
 
       storeOrders.push(storeOrder);
 
-      // 7. Insert order_items linked to this store_order
-      const storeItemInserts = storeItems.map((item) => ({
+      // 5. Insert order_items linked to this store_order
+      const storeItemInserts = (storeItems as any[]).map((item) => ({
         id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         order_id: orderId,
         store_order_id: storeOrderId,
@@ -165,15 +147,15 @@ export class OrderService {
         variant_id: item.variantId || null,
         quantity: item.quantity,
         unit_price_pkr: item.unitPricePkr,
-        total_price_pkr: item.unitPricePkr * item.quantity,
+        total_price_pkr: item.totalPricePkr,
         created_at: new Date().toISOString(),
       }));
 
       await supabaseAdmin.from('order_items').insert(storeItemInserts);
 
-      // 8. Book a distinct PostEx shipment per seller (COD or Prepaid)
+      // 6. Book a distinct PostEx shipment per seller (COD or Prepaid)
       const shipment = await CourierService.bookCourierShipment({
-        orderId: storeOrderId,         // each sub-order gets its own tracking
+        orderId: storeOrderId,
         orderNumber: `${orderNumber}-${storeId.slice(-4).toUpperCase()}`,
         customerName: input.buyerName,
         customerPhone: input.buyerPhone,
@@ -181,11 +163,11 @@ export class OrderService {
         destinationCity: input.shippingCity,
         codAmountPkr: isCod ? storeSubtotal : 0,
         isCod,
-        itemsCount: storeItems.reduce((s, i) => s + i.quantity, 0),
+        itemsCount: (storeItems as any[]).reduce((s, i) => s + i.quantity, 0),
       });
       shipments.push(shipment);
 
-      // 9. Create payout record for seller
+      // 7. Create payout record for seller
       await supabaseAdmin.from('payouts').insert({
         id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         store_id: storeId,
@@ -194,25 +176,32 @@ export class OrderService {
         amount_pkr: sellerPayoutPkr,
         commission_pkr: commissionPkr,
         status: 'SCHEDULED',
-        scheduled_for: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // T+7 days escrow
+        scheduled_for: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
       });
     }
 
-    // 10. Decrement coupon usage if applied
-    if (appliedCoupon) {
-      await supabaseAdmin
+    // 8. Decrement coupon usage if applied
+    if (quote.appliedCoupon?.code) {
+      const { data: c } = await supabaseAdmin
         .from('coupons')
-        .update({ current_uses: appliedCoupon.current_uses + 1 })
-        .eq('id', appliedCoupon.id);
+        .select('id, current_uses')
+        .eq('code', quote.appliedCoupon.code)
+        .single();
+      if (c) {
+        await supabaseAdmin
+          .from('coupons')
+          .update({ current_uses: c.current_uses + 1 })
+          .eq('id', c.id);
+      }
     }
 
-    // 11. For COD orders, commit inventory deductions immediately
+    // 9. For COD orders, commit inventory deductions immediately
     if (isCod) {
-      await InventoryLockService.commitStockDecrement(orderId, input.items);
+      await InventoryLockService.commitStockDecrement(orderId, lockItems);
     }
 
-    // 12. WhatsApp Order Confirmation
+    // 10. WhatsApp Order Confirmation
     await WhatsAppService.sendOrderConfirmed(
       input.buyerPhone,
       orderNumber,
@@ -223,7 +212,13 @@ export class OrderService {
     return {
       orderId,
       orderNumber,
-      summary: { ...summary, totalPkr: finalTotal, couponDiscount },
+      summary: {
+        subtotalPkr: quote.subtotalPkr,
+        shippingPkr: quote.shippingFeePkr,
+        codFeePkr: quote.codFeePkr,
+        couponDiscountPkr: couponDiscount,
+        totalPkr: finalTotal,
+      },
       storeOrders,
       shipments,
       status: OrderStatus.CONFIRMED,
@@ -291,7 +286,7 @@ export class OrderService {
    * Returns the discount amount and final total.
    */
   static async applyCoupon(couponCode: string, cartItems: CartItem[]) {
-    const cartTotal = cartItems.reduce((s, i) => s + i.unitPricePkr * i.quantity, 0);
+    const cartTotal = cartItems.reduce((s, i) => s + (i.unitPricePkr || 0) * i.quantity, 0);
 
     const { data: coupon, error } = await supabaseAdmin
       .from('coupons')
@@ -310,7 +305,7 @@ export class OrderService {
     if (coupon.store_id) {
       eligibleTotal = cartItems
         .filter((i) => i.storeId === coupon.store_id)
-        .reduce((s, i) => s + i.unitPricePkr * i.quantity, 0);
+        .reduce((s, i) => s + (i.unitPricePkr || 0) * i.quantity, 0);
       if (eligibleTotal === 0) throw new Error('This coupon only applies to items from a specific seller not in your cart');
     }
 

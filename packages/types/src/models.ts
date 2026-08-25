@@ -133,3 +133,98 @@ export interface Payout {
   settledAt?: string;
   createdAt: string;
 }
+
+export interface StoreOrder {
+  id: string;
+  orderId: string;
+  storeId: string;
+  subtotalPkr: number;
+  shippingFeePkr: number;
+  commissionPkr: number;
+  sellerPayoutPkr: number;
+  orderStatus: OrderStatus;
+  packedAt?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  items?: OrderItem[];
+  shipments?: Shipment[];
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  storeId?: string | null; // null = platform-wide
+  discountType: 'PERCENTAGE' | 'FIXED_PKR' | 'FREE_SHIPPING';
+  discountValue: number;
+  minSpendPkr: number;
+  maxDiscountPkr?: number;
+  expiresAt?: string;
+  maxUses?: number;
+  currentUses: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CheckoutQuoteItemInput {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+}
+
+export interface CheckoutQuoteRequest {
+  items: CheckoutQuoteItemInput[];
+  shippingCity: string;
+  paymentMethod: PaymentMethod;
+  couponCode?: string;
+}
+
+export interface CheckoutQuoteResponse {
+  quoteToken: string;
+  expiresAt: string; // ISO timestamp (15 mins)
+  subtotalPkr: number;
+  shippingFeePkr: number;
+  codFeePkr: number;
+  couponDiscountPkr: number;
+  totalPkr: number;
+  items: {
+    productId: string;
+    variantId?: string;
+    title: string;
+    storeId: string;
+    unitPricePkr: number;
+    quantity: number;
+    totalPricePkr: number;
+  }[];
+}
+
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  storeOrderId?: string;
+  buyerId?: string;
+  reason: string;
+  evidenceImages: string[];
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REVERSE_PICKUP_BOOKED' | 'RECEIVED' | 'REFUNDED' | 'REJECTED';
+  reverseCourierCn?: string;
+  refundAmountPkr: number;
+  staffNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  actorId?: string;
+  actorRole: string;
+  action: string;
+  targetResourceType: string;
+  targetResourceId: string;
+  previousState?: any;
+  newState?: any;
+  reason?: string;
+  ipAddress?: string;
+  createdAt: string;
+}
+

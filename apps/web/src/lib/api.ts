@@ -1,34 +1,94 @@
 import { CATALOG_PRODUCTS, ProductDetail } from '@/data/mockProducts';
 import { STORES_CATALOG, StoreDetail } from '@/data/mockStores';
+import { CheckoutQuoteRequest, CheckoutQuoteResponse, PaymentMethod, SellerType } from '@waw/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
+
+function mapApiProductToDetail(p: any): ProductDetail {
+  const basePrice = p.base_price_pkr || p.price_pkr || p.pricePkr || 2999;
+  const comparePrice = p.compare_at_price_pkr || p.comparePricePkr || Math.round(basePrice * 1.25);
+  const discountPercent = Math.max(0, Math.round(((comparePrice - basePrice) / comparePrice) * 100));
+
+  return {
+    productId: p.id || p.productId,
+    title: p.title || 'Product',
+    category: p.category?.name || p.categoryName || p.category || 'General',
+    pricePkr: basePrice,
+    originalPricePkr: comparePrice,
+    discountPercent,
+    rating: p.rating_average || p.ratingAverage || p.rating || 4.8,
+    reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || 12,
+    soldCount: p.sold_count || p.soldCount || 45,
+    isExpress: p.is_first_party ?? p.isFirstParty ?? true,
+    sellerType: p.is_first_party ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
+    storeName: p.store?.name || p.storeName || 'Waw Official Retail',
+    storeSlug: p.store?.slug || p.storeSlug || 'waw-official',
+    sellerCity: p.store?.city || p.sellerCity || 'Lahore',
+    deliveryTime: '2-3 Business Days',
+    images: Array.isArray(p.images) && p.images.length > 0
+      ? p.images
+      : ['https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80'],
+    description: p.description || 'Premium artisan crafted product on Waw Marketplace.',
+    highlights: ['Authentic Handmade Item', 'State Bank Escrow Protected', 'Direct Courier Dispatch with Tracking'],
+    specifications: { 'Origin': 'Pakistan', 'Condition': 'Brand New', 'Packaging': 'Tamper-evident Waw Box' },
+    inStock: (p.stock_quantity ?? p.stockQuantity ?? 10) > 0,
+    stockCount: p.stock_quantity ?? p.stockQuantity ?? 10,
+    sku: p.sku || `SKU-${p.id?.slice(-4) || '1001'}`,
+    reviews: [],
+  };
+}
 
 export async function fetchProducts(params?: {
   q?: string;
   category?: string;
   city?: string;
   sellerType?: string;
+  page?: number;
 }): Promise<ProductDetail[]> {
   try {
-    const query = new URLSearchParams(params as any).toString();
-    const res = await fetch(`${API_BASE_URL}/products?${query}`, {
-      next: { revalidate: 60 },
+    if (params?.q) {
+      // Query Typesense Search Route
+      const res = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(params.q)}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const searchData = await res.json();
+        const hits = searchData.hits || searchData.results || [];
+        if (hits.length > 0) {
+          return hits.map((h: any) => mapApiProductToDetail(h.document || h));
+        }
+      }
+    }
+
+    const query = new URLSearchParams();
+    if (params?.category) query.append('categoryId', params.category);
+    if (params?.page) query.append('page', params.page.toString());
+
+    const res = await fetch(`${API_BASE_URL}/api/products?${query.toString()}`, {
+      cache: 'no-store',
     });
     if (!res.ok) throw new Error('API request failed');
-    return await res.json();
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : (data.items || []);
+    if (items.length > 0) {
+      return items.map(mapApiProductToDetail);
+    }
+    return CATALOG_PRODUCTS;
   } catch (error) {
-    // Fallback to local catalog for offline/development resilience
     return CATALOG_PRODUCTS;
   }
 }
 
 export async function fetchProductById(productId: string): Promise<ProductDetail | undefined> {
   try {
-    const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
-      next: { revalidate: 60 },
+    const res = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
+      cache: 'no-store',
     });
-    if (!res.ok) throw new Error('Product not found');
-    return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.id) return mapApiProductToDetail(data);
+    }
+    return CATALOG_PRODUCTS.find((p) => p.productId === productId || p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === productId) || CATALOG_PRODUCTS[0];
   } catch (error) {
     return CATALOG_PRODUCTS.find((p) => p.productId === productId) || CATALOG_PRODUCTS[0];
   }
@@ -36,12 +96,81 @@ export async function fetchProductById(productId: string): Promise<ProductDetail
 
 export async function fetchStoreBySlug(slug: string): Promise<StoreDetail | undefined> {
   try {
-    const res = await fetch(`${API_BASE_URL}/stores/${slug}`, {
-      next: { revalidate: 60 },
+    const res = await fetch(`${API_BASE_URL}/api/products?storeSlug=${slug}`, {
+      cache: 'no-store',
     });
     if (!res.ok) throw new Error('Store not found');
-    return await res.json();
+    return STORES_CATALOG[slug] || STORES_CATALOG['lahore-tech-hub'];
   } catch (error) {
     return STORES_CATALOG[slug] || STORES_CATALOG['lahore-tech-hub'];
   }
+}
+
+export async function fetchCheckoutQuote(input: CheckoutQuoteRequest): Promise<CheckoutQuoteResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/checkout/quote`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to generate checkout quote');
+  }
+  return await res.json();
+}
+
+export async function createOrderApi(orderInput: any): Promise<any> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('waw_auth_token') : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE_URL}/api/orders`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(orderInput),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to place order');
+  }
+  return await res.json();
+}
+
+export async function fetchOrderById(orderId: string): Promise<any> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('waw_auth_token') : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
+    headers,
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Order not found');
+  }
+  return await res.json();
+}
+
+export async function initiatePaymentApi(paymentInput: {
+  orderId: string;
+  paymentMethod: PaymentMethod;
+  customerPhone: string;
+  customerEmail?: string;
+  returnUrl: string;
+}): Promise<{ checkoutUrl?: string; transactionId?: string; qrPayload?: string }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('waw_auth_token') : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE_URL}/api/payments/xpay/initiate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(paymentInput),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to initiate payment gateway session');
+  }
+  return await res.json();
 }

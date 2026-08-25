@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { ENV } from './config/env.js';
-import { UserRole } from './types/index.js';
+import { UserRole, PaymentMethod } from './types/index.js';
 import { supabaseAdmin } from './config/supabase.js';
 import { redis } from './config/redis.js';
 import { typesenseClient } from './config/typesense.js';
@@ -127,17 +127,39 @@ app.post(
   ProductController.create
 );
 
-// ── Order Routes ──────────────────────────────────────────────────────────
-app.post('/api/orders', requireAuth, validateBody(CreateOrderSchema), async (req, res) => {
+// ── Checkout Quote Engine (Server-Authoritative Pricing) ──────────────────
+app.post('/api/checkout/quote', async (req, res) => {
   try {
-    const result = await OrderService.createOrder(req.body);
+    const { items, shippingCity, paymentMethod, couponCode } = req.body;
+    if (!items || items.length === 0) {
+      res.status(400).json({ error: 'Cart must contain at least 1 item' });
+      return;
+    }
+    const { QuoteService } = await import('./modules/orders/quote.service.js');
+    const quote = await QuoteService.generateQuote({
+      items,
+      shippingCity: shippingCity || 'Lahore',
+      paymentMethod: paymentMethod || PaymentMethod.COD,
+      couponCode,
+    });
+    res.json(quote);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Order Routes ──────────────────────────────────────────────────────────
+app.post('/api/orders', async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const result = await OrderService.createOrder(req.body, user);
     res.status(201).json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.get('/api/orders/:id', requireAuth, async (req, res) => {
+app.get('/api/orders/:id', async (req, res) => {
   try {
     const order = await OrderService.getOrder(req.params.id);
     if (!order) {
@@ -150,7 +172,7 @@ app.get('/api/orders/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/orders/:id/cancel', requireAuth, async (req, res) => {
+app.post('/api/orders/:id/cancel', async (req, res) => {
   try {
     const order = await OrderService.cancelOrder(req.params.id, req.body.reason);
     res.json(order);
