@@ -3,10 +3,22 @@ import RedisStore from 'rate-limit-redis';
 import { Redis } from 'ioredis';
 import { ENV } from '../config/env.js';
 
-// Setup ioredis client using the Upstash URL if available
-const redisClient = ENV.UPSTASH_REDIS_REST_URL 
-  ? new Redis(ENV.UPSTASH_REDIS_REST_URL.replace('https://', 'rediss://')) 
+// Setup ioredis client using the Upstash URL + Token with authenticated TLS
+const redisPassword = ENV.UPSTASH_REDIS_REST_TOKEN || ENV.REDIS_PASSWORD;
+const redisClient = (ENV.UPSTASH_REDIS_REST_URL && redisPassword)
+  ? new Redis(ENV.UPSTASH_REDIS_REST_URL.replace('https://', 'rediss://'), {
+      password: redisPassword,
+      tls: { rejectUnauthorized: false },
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+    })
   : undefined;
+
+if (redisClient) {
+  redisClient.connect().catch((err) => {
+    console.warn('⚠️ Rate limiter Redis connection error, will use in-memory fallback:', err.message);
+  });
+}
 
 /**
  * Strict rate limiter for WhatsApp OTP requests (5 requests per 15 minutes per IP/Phone)

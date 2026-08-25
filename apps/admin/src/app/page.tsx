@@ -240,7 +240,12 @@ export default function AdminDashboardPage() {
   };
 
   // Filtered views
-  const filteredOrders = orders.filter((o) => {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeSellers = Array.isArray(sellers) ? sellers : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safePayouts = Array.isArray(payouts) ? payouts : [];
+
+  const filteredOrders = safeOrders.filter((o) => {
     if (orderFilter !== 'ALL' && o.orderStatus !== orderFilter) return false;
     if (
       searchQuery &&
@@ -253,7 +258,7 @@ export default function AdminDashboardPage() {
     return true;
   });
 
-  const filteredSellers = sellers.filter((s) => {
+  const filteredSellers = safeSellers.filter((s) => {
     if (sellerStatusFilter !== 'ALL' && s.status !== sellerStatusFilter) return false;
     if (
       searchQuery &&
@@ -266,10 +271,10 @@ export default function AdminDashboardPage() {
     return true;
   });
 
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = safeProducts.filter((p) => {
     if (
       searchQuery &&
-      !p.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !p.title?.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !p.titleUrdu?.toLowerCase().includes(searchQuery.toLowerCase())
     ) {
       return false;
@@ -1004,7 +1009,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="space-y-3">
-                {payouts.map((payout) => (
+                {safePayouts.map((payout) => (
                   <div
                     key={payout.id}
                     className="p-5 bg-slate-900/80 border border-slate-800 rounded-3xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-slate-700 transition-all"

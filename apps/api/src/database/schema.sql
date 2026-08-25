@@ -251,6 +251,85 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================
+-- PHASE 1: SPLIT-ORDER MULTI-VENDOR FULFILLMENT
+-- ============================================================
+
+-- 13. Store Orders (Sub-Orders per Seller)
+-- A single parent order splits into one store_order per distinct seller
+CREATE TABLE IF NOT EXISTS store_orders (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE RESTRICT,
+  subtotal_pkr INTEGER NOT NULL,
+  shipping_fee_pkr INTEGER NOT NULL DEFAULT 200,
+  commission_pkr INTEGER NOT NULL DEFAULT 0,
+  seller_payout_pkr INTEGER NOT NULL DEFAULT 0,
+  order_status "OrderStatus" NOT NULL DEFAULT 'PENDING',
+  packed_at TIMESTAMP WITH TIME ZONE,
+  shipped_at TIMESTAMP WITH TIME ZONE,
+  delivered_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Migrate order_items to reference store_orders instead of orders directly
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS store_order_id TEXT REFERENCES store_orders(id) ON DELETE CASCADE;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS store_order_id TEXT REFERENCES store_orders(id) ON DELETE CASCADE;
+ALTER TABLE payouts ADD COLUMN IF NOT EXISTS store_order_id TEXT REFERENCES store_orders(id) ON DELETE SET NULL;
+
+-- ============================================================
+-- PHASE 2: PROMOTIONS & FLASH SALES ENGINE
+-- ============================================================
+
+-- New Enum for Discount Types
+DO $$ BEGIN
+  CREATE TYPE "DiscountType" AS ENUM ('PERCENTAGE', 'FIXED_PKR', 'FREE_SHIPPING');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+-- 14. Coupons Table
+-- store_id = NULL means platform-wide (Waw pays). store_id = X means seller-scoped (Seller pays).
+CREATE TABLE IF NOT EXISTS coupons (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  code TEXT UNIQUE NOT NULL,
+  store_id TEXT REFERENCES stores(id) ON DELETE CASCADE, -- NULL = platform-wide
+  discount_type "DiscountType" NOT NULL DEFAULT 'PERCENTAGE',
+  discount_value NUMERIC(10,2) NOT NULL, -- e.g. 10 = 10%, or 500 = PKR 500 off
+  min_spend_pkr INTEGER NOT NULL DEFAULT 0,
+  max_discount_pkr INTEGER, -- cap for percentage discounts
+  expires_at TIMESTAMP WITH TIME ZONE,
+  max_uses INTEGER,
+  current_uses INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 15. Flash Sales Table
+CREATE TABLE IF NOT EXISTS flash_sales (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  title TEXT NOT NULL,
+  title_urdu TEXT,
+  banner_url TEXT,
+  start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 16. Flash Sale Items Table
+CREATE TABLE IF NOT EXISTS flash_sale_items (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  flash_sale_id TEXT NOT NULL REFERENCES flash_sales(id) ON DELETE CASCADE,
+  variant_id TEXT NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE,
+  promotional_price_pkr INTEGER NOT NULL,
+  allocated_stock INTEGER NOT NULL DEFAULT 0,
+  sold_count INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(flash_sale_id, variant_id)
+);
+
 -- 13. Webhooks Idempotency Table (Phase 3)
 CREATE TABLE IF NOT EXISTS xpay_webhooks_log (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,

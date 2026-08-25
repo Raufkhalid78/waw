@@ -159,6 +159,100 @@ app.post('/api/orders/:id/cancel', requireAuth, async (req, res) => {
   }
 });
 
+// ── Coupon Validation (Phase 2: Promo Engine) ────────────────────────────
+app.post('/api/checkout/apply-coupon', requireAuth, async (req, res) => {
+  try {
+    const { couponCode, items } = req.body;
+    if (!couponCode || !items) {
+      res.status(400).json({ error: 'couponCode and items are required' });
+      return;
+    }
+    const result = await OrderService.applyCoupon(couponCode, items);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Seller Portal Routes (RBAC: SELLER or ADMIN) ─────────────────────────
+app.get('/api/seller/store', requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { data: store } = await import('./config/supabase.js').then(({ supabaseAdmin }) =>
+      supabaseAdmin.from('stores').select('*').eq('owner_id', user.id).maybeSingle()
+    );
+    res.json(store || { message: 'No store found for this seller' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/seller/orders', requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { supabaseAdmin } = await import('./config/supabase.js');
+    // Find store owned by this seller
+    const { data: store } = await supabaseAdmin.from('stores').select('id').eq('owner_id', user.id).maybeSingle();
+    if (!store) { res.json([]); return; }
+
+    const { data: storeOrders } = await supabaseAdmin
+      .from('store_orders')
+      .select('*, order_id, order_items(*), shipments(*), orders(buyer_name, buyer_phone, shipping_city)')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false });
+
+    res.json(storeOrders || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/seller/payouts', requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { supabaseAdmin } = await import('./config/supabase.js');
+    const { data: store } = await supabaseAdmin.from('stores').select('id').eq('owner_id', user.id).maybeSingle();
+    if (!store) { res.json([]); return; }
+
+    const { data: payouts } = await supabaseAdmin
+      .from('payouts')
+      .select('*')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false });
+
+    res.json(payouts || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Coupon Management for Sellers
+app.post('/api/seller/coupons', requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { supabaseAdmin } = await import('./config/supabase.js');
+    const { data: store } = await supabaseAdmin.from('stores').select('id').eq('owner_id', user.id).maybeSingle();
+    if (!store) { res.status(403).json({ error: 'No store found' }); return; }
+
+    const { code, discountType, discountValue, minSpendPkr, maxDiscountPkr, expiresAt, maxUses } = req.body;
+    const { data: coupon, error } = await supabaseAdmin.from('coupons').insert({
+      code: code.toUpperCase(),
+      store_id: store.id, // Seller-scoped by default
+      discount_type: discountType || 'PERCENTAGE',
+      discount_value: discountValue,
+      min_spend_pkr: minSpendPkr || 0,
+      max_discount_pkr: maxDiscountPkr || null,
+      expires_at: expiresAt || null,
+      max_uses: maxUses || null,
+    }).select().single();
+
+    if (error) { res.status(400).json({ error: error.message }); return; }
+    res.status(201).json(coupon);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Logistics Webhook (PostEx Live Milestone Updates) ────────────────────
 app.post('/api/logistics/postex/webhook', async (req, res) => {
   try {
@@ -182,3 +276,39 @@ app.get('/api/admin/sellers', requireAuth, requireRole(UserRole.ADMIN), AdminCon
 app.patch('/api/admin/sellers/:id', requireAuth, requireRole(UserRole.ADMIN), AdminController.updateSeller);
 app.get('/api/admin/payouts', requireAuth, requireRole(UserRole.ADMIN), AdminController.listPayouts);
 app.post('/api/admin/payouts/:id/settle', requireAuth, requireRole(UserRole.ADMIN), AdminController.settlePayout);
+
+// ── Admin KYC Approval Routes (Phase 5) ──────────────────────────────────
+app.get('/api/admin/kyc/pending', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  try {
+    const { supabaseAdmin } = await import('./config/supabase.js');
+    const { data } = await supabaseAdmin
+      .from('stores')
+      .select('*, profiles(full_name, phone, email)')
+      .eq('status', 'PENDING_KYC')
+      .order('created_at', { ascending: true });
+    res.json(data || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/admin/kyc/:storeId/approve', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  try {
+    const { supabaseAdmin } = await import('./config/supabase.js');
+    await supabaseAdmin.from('stores').update({ status: 'ACTIVE', is_verified: true, updated_at: new Date().toISOString() }).eq('id', req.params.storeId);
+    res.json({ success: true, message: 'Store approved and activated' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/admin/kyc/:storeId/reject', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  try {
+    const { supabaseAdmin } = await import('./config/supabase.js');
+    await supabaseAdmin.from('stores').update({ status: 'REJECTED', updated_at: new Date().toISOString() }).eq('id', req.params.storeId);
+    res.json({ success: true, message: 'Store application rejected' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+

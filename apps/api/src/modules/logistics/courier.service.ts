@@ -31,11 +31,31 @@ export class CourierService {
   private static readonly POSTEX_API_BASE = ENV.POSTEX_API_BASE || 'https://api.postex.pk/services/integration/api';
 
   /**
-   * Automatically books PostEx courier dispatch for an order (both COD & Prepaid Waw Express).
+   * Smart Courier Routing Engine
+   * Tier 1 major cities -> PostEx (Speed & dense hub coverage)
+   * Heavy parcels (> 5kg) -> Trax Logistics (Better bulk weight rates)
+   */
+  static selectCourier(destinationCity: string, weightKg: number = 0.5): CourierProvider {
+    const TIER_1_CITIES = ['karachi', 'lahore', 'islamabad', 'rawalpindi', 'faisalabad', 'multan', 'peshawar'];
+    const normalizedCity = (destinationCity || '').trim().toLowerCase();
+
+    if (weightKg > 5.0) {
+      return CourierProvider.TRAX;
+    }
+    if (TIER_1_CITIES.includes(normalizedCity)) {
+      return CourierProvider.POSTEX;
+    }
+    return CourierProvider.POSTEX;
+  }
+
+  /**
+   * Automatically books courier dispatch for an order (both COD & Prepaid Waw Express).
    */
   static async bookCourierShipment(input: PostExShipmentInput) {
+    const selectedProvider = this.selectCourier(input.destinationCity);
     let trackingNumber = `PTX-${input.orderNumber.replace(/[^0-9]/g, '').slice(-6) || Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     let trackingUrl = `https://postex.pk/tracking?cn=${trackingNumber}`;
+    console.log(`🚚 Smart Logistics Route: Selected ${selectedProvider} for delivery to ${input.destinationCity}`);
 
     // 1. Call PostEx Production / Sandbox API if token is configured
     if (ENV.POSTEX_API_TOKEN && ENV.POSTEX_API_TOKEN !== 'ptx_live_test_token_2026') {

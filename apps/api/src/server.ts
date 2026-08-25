@@ -3,6 +3,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { app } from './app.js';
 import { ENV } from './config/env.js';
 import { initTypesenseCollections } from './config/typesense.js';
+import { startReconciliationCron } from './jobs/reconciliation.cron.js';
 
 const server = http.createServer(app);
 
@@ -28,6 +29,7 @@ io.on('connection', (socket) => {
 
 async function bootstrap() {
   await initTypesenseCollections();
+  startReconciliationCron();
 
   server.listen(ENV.PORT, () => {
     console.log(`
