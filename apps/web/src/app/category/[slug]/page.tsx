@@ -30,7 +30,7 @@ const CATEGORY_META: Record<
   'electronics': {
     title: 'Electronics & Gadgets',
     titleUrdu: 'الیکٹرانکس اور گیجٹس',
-    desc: 'Explore authentic tech accessories with 100% SBP-backed buyer warranty.',
+    desc: 'Explore authentic tech accessories with 100% Waw-backed buyer warranty.',
     bannerGradient: 'from-blue-950 via-slate-900 to-sky-950',
     filterCategory: 'Mobiles & Tech',
   },

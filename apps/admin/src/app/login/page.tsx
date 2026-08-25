@@ -19,7 +19,7 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/otp/request`, {
+      const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
@@ -39,10 +39,10 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/otp/verify`, {
+      const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({ phone, otp, role: 'ADMIN' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Invalid OTP');
@@ -55,18 +55,6 @@ export default function AdminLoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleStaffQuickLogin = () => {
-    const staffToken = 'waw_staff_sec_token_' + Date.now();
-    localStorage.setItem('waw_admin_token', staffToken);
-    localStorage.setItem('waw_admin_user', JSON.stringify({
-      id: 'usr_super_admin_1',
-      fullName: 'Chief Operations Officer',
-      role: 'ADMIN',
-      phone: '+923001234567',
-    }));
-    router.push('/');
   };
 
   return (
@@ -143,19 +131,6 @@ export default function AdminLoginPage() {
             </button>
           </form>
         )}
-
-        <div className="border-t border-slate-800 pt-4 text-center space-y-3">
-          <button
-            type="button"
-            onClick={handleStaffQuickLogin}
-            className="text-xs text-amber-400/80 hover:text-amber-400 font-bold transition-colors cursor-pointer"
-          >
-            ⚡ Development Staff Instant Access
-          </button>
-          <p className="text-[11px] text-slate-500">
-            Confidential operations console. All administrative actions are permanently logged into immutable audit tables.
-          </p>
-        </div>
       </div>
     </div>
   );

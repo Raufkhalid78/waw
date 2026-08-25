@@ -67,7 +67,7 @@ export default function CartPage() {
           </div>
           <h2 className="text-lg font-bold text-slate-900">Your cart is empty</h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Discover products from 2,000+ verified Pakistani shops and add them to your cart.
+            Discover products from verified Pakistani shops and add them to your cart.
           </p>
           <Link
             href="/"

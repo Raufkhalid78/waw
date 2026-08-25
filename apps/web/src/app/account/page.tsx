@@ -28,7 +28,7 @@ const PAST_ORDERS = [
     statusLabel: 'In Transit with TCS',
     statusColor: 'bg-amber-50 text-amber-900 border-amber-200',
     totalPkr: 5699,
-    paymentMethod: 'SBP Raast / Online',
+    paymentMethod: 'Card / Online',
     deliveryCity: 'Lahore',
     items: [
       {

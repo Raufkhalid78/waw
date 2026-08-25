@@ -269,7 +269,7 @@ export default function HomePage() {
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
-                Top rated products with verified buyer reviews and fast nationwide shipping from 2,000+ local sellers.
+                Top rated products with verified buyer reviews and fast nationwide shipping from local sellers.
               </p>
             </div>
 
@@ -345,7 +345,7 @@ export default function HomePage() {
               href="/category/mobiles-tech"
               className="inline-flex items-center gap-2.5 bg-slate-950 hover:bg-slate-900 text-amber-400 px-9 py-4 rounded-2xl text-sm sm:text-base font-black shadow-lg hover:scale-105 transition-all cursor-pointer"
             >
-              <span>EXPLORE ALL 50,000+ PRODUCTS</span>
+              <span>EXPLORE ALL PRODUCTS</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
           </div>

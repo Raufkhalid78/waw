@@ -23,7 +23,7 @@ const FAQS = [
   },
   {
     q: 'How does State Bank Escrow Protection safeguard my money?',
-    a: 'When you prepay via SBP Raast or Card, your payment is locked in a regulated escrow account. The funds are only remitted to the seller after the courier confirms successful delivery to your address.',
+    a: 'When you prepay via Card or Wallet, your payment is locked in a regulated escrow account. The funds are only remitted to the seller after the courier confirms successful delivery to your address.',
     category: 'Payments',
   },
   {
@@ -73,7 +73,7 @@ export default function HelpCenterPage() {
             How can we help you today?
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 font-medium max-w-md mx-auto">
-            Search answers on deliveries, SBP escrow payments, returns, and seller onboarding.
+            Search answers on deliveries, secure payments, returns, and seller onboarding.
           </p>
         </div>
 
@@ -139,7 +139,7 @@ export default function HelpCenterPage() {
           <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center">
             <ShieldCheck className="w-5 h-5" />
           </div>
-          <h3 className="font-black text-sm text-sky-950">SBP Escrow Buyer Protection</h3>
+          <h3 className="font-black text-sm text-sky-950">Buyer Protection</h3>
           <p className="text-xs text-sky-800 font-medium">
             Learn more about our State Bank-regulated escrow vault and dispute guarantee.
           </p>

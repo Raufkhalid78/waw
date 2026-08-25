@@ -73,7 +73,7 @@ export default function StoreProfilePage() {
                   {store.kycVerified && (
                     <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" />
-                      SBP KYC Verified
+                      Identity Verified
                     </span>
                   )}
                 </div>
@@ -142,7 +142,7 @@ export default function StoreProfilePage() {
               <span>Products from {store.name}</span>
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Browse authentic items directly backed by store warranty and SBP regulated escrow
+              Browse authentic items directly backed by store warranty and secure payments
             </p>
           </div>
           <span className="text-xs font-bold text-slate-500">{displayProducts.length} Items Available</span>

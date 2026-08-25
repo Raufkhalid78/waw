@@ -75,7 +75,7 @@ export default function OrderReturnPage() {
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
         <Link href={`/orders/${orderId}`} className="hover:text-amber-600 transition-colors">Order {orderId}</Link>
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <span className="text-slate-900 font-bold">7-Day SBP Escrow Return</span>
+        <span className="text-slate-900 font-bold">7-Day Return</span>
       </nav>
 
       {/* ── Top Guarantee Header ────────────────────────────────────────────── */}
@@ -314,7 +314,7 @@ export default function OrderReturnPage() {
             <div className="text-xs font-black uppercase tracking-widest text-emerald-600">Return Request Confirmed</div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-950">PostEx Doorstep Pickup Scheduled!</h2>
             <p className="text-xs text-slate-500 max-w-lg mx-auto font-medium">
-              Your 7-day return request has been registered in the SBP Escrow ledger. A PostEx pickup rider has been dispatched.
+              Your 7-day return request has been registered in the Return ledger. A PostEx pickup rider has been dispatched.
             </p>
           </div>
 

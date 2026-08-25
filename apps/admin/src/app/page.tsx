@@ -581,7 +581,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                   <div className="text-2xl font-black text-white">
-                    PKR {(stats?.gmvPkr || 5699000).toLocaleString()}
+                    PKR {(stats?.gmvPkr || 0).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-emerald-400 font-extrabold flex items-center gap-1">
                     <TrendingUp className="w-3 h-3" />
@@ -597,7 +597,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                   <div className="text-2xl font-black text-white">
-                    {(stats?.totalOrders || 1240).toLocaleString()}
+                    {(stats?.totalOrders || 0).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-amber-400 font-extrabold">
                     {orders.filter((o) => o.orderStatus === OrderStatus.CONFIRMED).length} awaiting PostEx pickup
@@ -627,7 +627,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                   <div className="text-2xl font-black text-amber-300">
-                    PKR {(stats?.netPlatformRevenuePkr || 693900).toLocaleString()}
+                    PKR {(stats?.netPlatformRevenuePkr || 0).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-slate-400 font-extrabold">
                     10% Comm + COD Fees

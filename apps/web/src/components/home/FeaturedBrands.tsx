@@ -387,7 +387,7 @@ export function FeaturedBrands() {
             <span className="font-bold">
               {isUrdu
                 ? '100% اسٹیٹ بینک آف پاکستان ایسکرو پروٹیکشن — ہر برانڈ پر 7 دن واپسی کی سہولت'
-                : '100% SBP Regulated Escrow — 7-Day Hassle-Free Returns on All Verified Malls'}
+                : '100% Secure Checkout — 7-Day Hassle-Free Returns on All Verified Malls'}
             </span>
           </div>
 

@@ -7,7 +7,7 @@ import { Providers } from './providers';
 export const metadata: Metadata = {
   title: 'Waw — Online Shopping in Pakistan | Fast Delivery & Best Prices',
   description:
-    'Online Shopping in Pakistan at Waw.com.pk. Shop 50,000+ products with 24h Waw Express delivery and 100% State Bank Escrow buyer protection.',
+    'Online Shopping in Pakistan at Waw.com.pk. Shop local products with fast nationwide delivery and verified checkout.',
   keywords: 'online shopping pakistan, waw com pk, waw pakistan, waw online shopping, noon pakistan, fashion lawn, peshawari chappal, sialkot sports',
   icons: {
     icon: '/favicon.svg',

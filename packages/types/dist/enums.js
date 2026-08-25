@@ -19,7 +19,6 @@ export var SellerType;
 })(SellerType || (SellerType = {}));
 export var PaymentMethod;
 (function (PaymentMethod) {
-    PaymentMethod["RAAST_P2M_QR"] = "RAAST_P2M_QR";
     PaymentMethod["XPAY_CARD"] = "XPAY_CARD";
     PaymentMethod["XPAY_WALLET_JAZZCASH"] = "XPAY_WALLET_JAZZCASH";
     PaymentMethod["XPAY_WALLET_EASYPAISA"] = "XPAY_WALLET_EASYPAISA";

@@ -21,7 +21,7 @@ export default function PrivacyPolicyPage() {
       <div className="space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
           <ShieldCheck className="w-4 h-4" />
-          <span>{isUrdu ? 'اسٹیٹ بینک آف پاکستان کنزیومر پروٹیکشن' : 'SBP & PECA 2016 Compliant'}</span>
+          <span>{isUrdu ? 'اسٹیٹ بینک آف پاکستان کنزیومر پروٹیکشن' : 'PECA 2016 Compliant'}</span>
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">
@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm text-slate-600">
             <li><strong>Personal Identity:</strong> Full Name, WhatsApp Mobile Number, Delivery Address, City, and Province.</li>
             <li><strong>Order History:</strong> SKUs purchased, order numbers, dispatch tracking links, and returns.</li>
-            <li><strong>Payment Identifiers:</strong> SBP Raast transaction IDs, tokenized card hashes (we never store raw 16-digit card PANs or CVVs).</li>
+            <li><strong>Payment Identifiers:</strong> Raast transaction IDs, tokenized card hashes (we never store raw 16-digit card PANs or CVVs).</li>
           </ul>
         </section>
 
@@ -64,7 +64,7 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-black text-slate-950 flex items-center gap-2">
             <FileText className="w-5 h-5 text-amber-500" />
-            <span>3. State Bank of Pakistan (SBP) Escrow Vault</span>
+            <span>3. Secure Payment Vault</span>
           </h2>
           <p>
             All online prepayments (Raast P2M, Visa, Mastercard, PayPak) are deposited directly into our State Bank of Pakistan regulated escrow accounts until you receive, inspect, and approve your delivery.

@@ -21,7 +21,7 @@ export default function RefundPolicyPage() {
       <div className="space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
           <RotateCcw className="w-4 h-4 text-emerald-600" />
-          <span>{isUrdu ? '7 دن گارنٹی شدہ واپسی کی سہولت' : '7-Day SBP Escrow Return Policy'}</span>
+          <span>{isUrdu ? '7 دن گارنٹی شدہ واپسی کی سہولت' : '7-Day Return Policy'}</span>
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">
@@ -75,7 +75,7 @@ export default function RefundPolicyPage() {
             <span>4. Refund Processing Time</span>
           </h2>
           <p>
-            Refunds are released from SBP Escrow directly back to your original payment method (Bank Account, Raast, JazzCash, Easypaisa) within <strong>24 to 48 hours</strong> of receipt verification.
+            Refunds are released from secure payments directly back to your original payment method (Bank Account, Raast, JazzCash, Easypaisa) within <strong>24 to 48 hours</strong> of receipt verification.
           </p>
         </section>
       </div>

@@ -123,7 +123,7 @@ export default function SellOnWawPage() {
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs font-black text-white">SBP Escrow Protection</div>
+              <div className="text-xs font-black text-white">Waw Seller Protection</div>
               <div className="text-[11px] text-slate-400 mt-0.5">Guaranteed payouts direct to your IBAN</div>
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function SellOnWawPage() {
                     <span>State Bank Regulated Direct Settlements</span>
                   </div>
                   <p className="text-[11px] text-emerald-700">
-                    Your sales revenue is deposited directly into your verified Pakistani bank account via SBP Raast / 1Link within 48 hours of customer delivery.
+                    Your sales revenue is deposited directly into your verified Pakistani bank account via Raast / 1Link within 48 hours of customer delivery.
                   </p>
                 </div>
 

@@ -121,16 +121,7 @@ export async function fetchPlatformStats(): Promise<PlatformStats> {
     if (!res.ok) throw new Error(`Failed to fetch stats: ${res.statusText}`);
     return await res.json();
   } catch (err) {
-    console.warn('Using baseline stats fallback:', err);
-    return {
-      gmvPkr: 5699000,
-      totalOrders: 1240,
-      totalSellers: 84,
-      totalProducts: 420,
-      totalCommissionsPkr: 569900,
-      codFeesCollectedPkr: 124000,
-      netPlatformRevenuePkr: 693900,
-    };
+    throw err;
   }
 }
 
@@ -319,7 +310,7 @@ export async function fetchOrders(status?: OrderStatus): Promise<AdminOrder[]> {
         shippingFeePkr: 0,
         codFeePkr: 0,
         totalPkr: 7600,
-        paymentMethod: PaymentMethod.RAAST_P2M_QR,
+        paymentMethod: PaymentMethod.XPAY_CARD,
         paymentStatus: PaymentStatus.PAID,
         orderStatus: OrderStatus.SHIPPED,
         courier: 'PostEx',
@@ -494,8 +485,7 @@ export async function fetchProducts(query?: { categoryId?: string; storeId?: str
       createdAt: p.created_at || p.createdAt || new Date().toISOString(),
     }));
   } catch (err) {
-    console.warn('Using demo products fallback:', err);
-    return fallbackProducts;
+    throw err;
   }
 }
 
@@ -530,50 +520,7 @@ export async function fetchPayouts(): Promise<AdminPayout[]> {
     if (!res.ok) throw new Error('Failed to fetch payouts');
     return await res.json();
   } catch (err) {
-    console.warn('Using demo payouts fallback:', err);
-    return [
-      {
-        id: 'pay_1',
-        storeId: 'store_2',
-        storeName: 'Lahore Tech & Audio Hub',
-        city: 'Lahore',
-        bankName: 'Habib Bank Limited (HBL)',
-        accountTitle: 'Lahore Tech Hub SMC-Pvt',
-        iban: 'PK44HABB0009876543210987',
-        amountPkr: 89400,
-        status: PayoutStatus.PROCESSING,
-        scheduledFor: '2026-08-25T00:00:00Z',
-        createdAt: '2026-08-20T10:00:00Z',
-      },
-      {
-        id: 'pay_2',
-        storeId: 'store_3',
-        storeName: 'Peshawar Master Chappal Craft',
-        city: 'Peshawar',
-        bankName: 'Bank of Khyber',
-        accountTitle: 'Zubair Artisan Footwear',
-        iban: 'PK12BOK0004561237890456',
-        amountPkr: 142500,
-        status: PayoutStatus.PAID,
-        bankReference: 'RAAST-FT-992014-PK',
-        scheduledFor: '2026-08-21T00:00:00Z',
-        settledAt: '2026-08-21T11:45:00Z',
-        createdAt: '2026-08-18T09:00:00Z',
-      },
-      {
-        id: 'pay_3',
-        storeId: 'store_1',
-        storeName: 'Karachi Leather Goods',
-        city: 'Karachi',
-        bankName: 'Meezan Bank',
-        accountTitle: 'Karachi Leather Enterprise',
-        iban: 'PK36MEZN0001234567890123',
-        amountPkr: 64200,
-        status: PayoutStatus.HELD,
-        scheduledFor: '2026-08-26T00:00:00Z',
-        createdAt: '2026-08-22T14:00:00Z',
-      },
-    ];
+    throw err;
   }
 }
 

@@ -71,7 +71,7 @@ export default function TermsOfServicePage() {
           <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-slate-600">
             <li>Dispatch ordered inventory within 24–48 hours via contracted PostEx logistics.</li>
             <li>List genuine products with authentic imagery and honest descriptions. Counterfeit items result in immediate suspension and forfeiture of escrow funds.</li>
-            <li>Honor the mandatory 7-Day SBP Escrow Return Guarantee.</li>
+            <li>Honor the mandatory 7-Day Return Guarantee.</li>
           </ul>
         </section>
       </div>

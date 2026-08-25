@@ -57,7 +57,7 @@ export default function OrderTrackingPage() {
   const steps = [
     {
       title: 'Order Confirmed',
-      desc: 'Payment authorized & order logged into SBP Escrow',
+      desc: 'Payment authorized & order logged into Waw Secure Payments',
       time: order?.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
       status: 'completed',
     },
@@ -274,7 +274,7 @@ export default function OrderTrackingPage() {
               </div>
               <div className="flex justify-between">
                 <span>Payment Mode</span>
-                <span className="font-bold text-slate-900">SBP Raast / Online Prepaid</span>
+                <span className="font-bold text-slate-900">Online Prepaid</span>
               </div>
               <div className="flex justify-between border-t border-slate-100 pt-3 text-sm font-black text-slate-950">
                 <span>Total Paid</span>
@@ -285,7 +285,7 @@ export default function OrderTrackingPage() {
             {/* Escrow Protected Guarantee */}
             <div className="flex items-center gap-2 p-3 bg-sky-50 text-sky-900 rounded-2xl text-[11px] font-bold border border-sky-200">
               <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
-              <span>Protected by SBP Regulated Escrow until delivery is confirmed.</span>
+              <span>Protected by Waw Buyer Protection until delivery is confirmed.</span>
             </div>
 
             {/* Buttons */}

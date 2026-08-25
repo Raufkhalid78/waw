@@ -149,7 +149,7 @@ app.post('/api/checkout/quote', async (req, res) => {
 });
 
 // ── Order Routes ──────────────────────────────────────────────────────────
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const result = await OrderService.createOrder(req.body, user);
@@ -159,11 +159,17 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-app.get('/api/orders/:id', async (req, res) => {
+app.get('/api/orders/:id', requireAuth, async (req, res) => {
   try {
     const order = await OrderService.getOrder(req.params.id);
     if (!order) {
       res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+    // Authorization check
+    const user = (req as any).user;
+    if (user.role !== 'ADMIN' && order.buyer_id !== user.id) {
+      res.status(403).json({ error: 'Forbidden' });
       return;
     }
     res.json(order);
@@ -172,9 +178,10 @@ app.get('/api/orders/:id', async (req, res) => {
   }
 });
 
-app.post('/api/orders/:id/cancel', async (req, res) => {
+app.post('/api/orders/:id/cancel', requireAuth, async (req, res) => {
   try {
-    const order = await OrderService.cancelOrder(req.params.id, req.body.reason);
+    const user = (req as any).user;
+    const order = await OrderService.cancelOrder(req.params.id, req.body.reason, user);
     res.json(order);
   } catch (err: any) {
     res.status(400).json({ error: err.message });

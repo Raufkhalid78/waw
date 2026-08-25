@@ -22,7 +22,7 @@ export default function SellerLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/otp/request`, {
+      const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
@@ -42,10 +42,10 @@ export default function SellerLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/otp/verify`, {
+      const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({ phone, otp, role: 'SELLER', storeName, city }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Invalid OTP');
@@ -61,21 +61,6 @@ export default function SellerLoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMerchantQuickLogin = (demoStore: string, demoStoreId: string, demoCity: string) => {
-    const sellerToken = 'waw_merchant_token_' + Date.now();
-    localStorage.setItem('waw_seller_token', sellerToken);
-    localStorage.setItem('waw_store_id', demoStoreId);
-    localStorage.setItem('waw_seller_user', JSON.stringify({
-      id: 'usr_seller_' + demoStoreId,
-      fullName: demoStore + ' Manager',
-      role: 'SELLER',
-      phone: '+923219876543',
-      storeName: demoStore,
-      city: demoCity,
-    }));
-    router.push('/');
   };
 
   return (
@@ -204,25 +189,6 @@ export default function SellerLoginPage() {
           </form>
         )}
 
-        <div className="border-t border-slate-800 pt-4 text-center space-y-2">
-          <div className="text-[11px] font-bold text-slate-400">Quick Test Merchant Accounts:</div>
-          <div className="flex gap-2 justify-center">
-            <button
-              type="button"
-              onClick={() => handleMerchantQuickLogin('Lahore Silk Studio', 'store_lahore_tech', 'Lahore')}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-[10px] font-bold"
-            >
-              Lahore Silk (Active)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleMerchantQuickLogin('Khyber Artisan Chappal', 'store_khyber_leather', 'Peshawar')}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-[10px] font-bold"
-            >
-              Khyber Craft (Active)
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -198,7 +198,7 @@ export function StoreSpotlight() {
             </h2>
           </div>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Shop directly from 2,000+ authentic craftsmen, workshops, and flagship brands across Pakistan.
+            Shop directly from authentic craftsmen, workshops, and flagship brands across Pakistan.
           </p>
         </div>
 
@@ -206,7 +206,7 @@ export function StoreSpotlight() {
           href="/"
           className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1.5 self-start sm:self-auto"
         >
-          <span>Explore All 2,000+ Stores</span>
+          <span>Explore All Stores</span>
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>

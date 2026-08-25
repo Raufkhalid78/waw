@@ -4,6 +4,7 @@ import { WhatsAppService } from '../notifications/whatsapp.service.js';
 import { CourierService } from '../logistics/courier.service.js';
 import { InventoryLockService } from '../products/inventory-lock.service.js';
 import { QuoteService } from './quote.service.js';
+import { redis } from '../../config/redis.js';
 
 export interface CartItem {
   productId: string;
@@ -37,7 +38,16 @@ export class OrderService {
     let quote: any;
 
     if (input.quoteToken) {
+      // Idempotency check: Ensure quoteToken is only used once
+      const isUsed = await redis.get(`quote_used:${input.quoteToken}`);
+      if (isUsed) {
+        throw new Error('This checkout session has already been processed. Please return to your cart.');
+      }
+      
       quote = QuoteService.verifyQuoteToken(input.quoteToken);
+      
+      // Mark as used (expires in 24 hours to keep Redis clean)
+      await redis.set(`quote_used:${input.quoteToken}`, '1', 'EX', 86400);
     } else if (input.items && input.items.length > 0) {
       // Derive server-authoritative quote on the fly
       quote = await QuoteService.generateQuote({
@@ -53,7 +63,11 @@ export class OrderService {
     const orderNumber = `WAW-${Math.floor(100000 + Math.random() * 900000)}`;
     const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const isCod = input.paymentMethod === PaymentMethod.COD;
-    const buyerId = authenticatedUser?.id || input.buyerId || null;
+    const buyerId = authenticatedUser?.id;
+
+    if (!buyerId) {
+      throw new Error('Unauthorized: buyer ID required');
+    }
 
     const lockItems = quote.items.map((i: any) => ({
       productId: i.productId,
@@ -241,7 +255,7 @@ export class OrderService {
   /**
    * Cancels an order (and all child store_orders) and releases inventory locks.
    */
-  static async cancelOrder(id: string, reason?: string) {
+  static async cancelOrder(id: string, reason?: string, authenticatedUser?: any) {
     const { data: order } = await supabaseAdmin
       .from('orders')
       .select('*, order_items(*), store_orders(*)')
@@ -249,6 +263,10 @@ export class OrderService {
       .single();
 
     if (!order) throw new Error('Order not found');
+
+    if (authenticatedUser && authenticatedUser.role !== 'ADMIN' && order.buyer_id !== authenticatedUser.id) {
+      throw new Error('Forbidden');
+    }
 
     // Cancel parent order
     await supabaseAdmin

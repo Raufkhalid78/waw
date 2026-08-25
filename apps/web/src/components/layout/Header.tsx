@@ -514,7 +514,7 @@ export function Header() {
                           className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 hover:text-slate-950 transition-colors"
                         >
                           <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                          <span>SBP Escrow Guarantee</span>
+                          <span>Buyer Protection Guarantee</span>
                         </Link>
 
                         <div className="border-t border-slate-100 my-1" />

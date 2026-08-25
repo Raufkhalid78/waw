@@ -15,7 +15,6 @@ export declare enum SellerType {
     THIRD_PARTY = "THIRD_PARTY"
 }
 export declare enum PaymentMethod {
-    RAAST_P2M_QR = "RAAST_P2M_QR",// State Bank of Pakistan Raast Instant QR (via PostEx XPay)
     XPAY_CARD = "XPAY_CARD",// Visa, Mastercard, PayPak (via PostEx XPay)
     XPAY_WALLET_JAZZCASH = "XPAY_WALLET_JAZZCASH",// JazzCash Mobile Account (via PostEx XPay)
     XPAY_WALLET_EASYPAISA = "XPAY_WALLET_EASYPAISA",// Easypaisa Mobile Wallet (via PostEx XPay)

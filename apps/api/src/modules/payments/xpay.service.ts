@@ -39,16 +39,6 @@ export class PostExXPayService {
     let checkoutUrl = `${this.baseUrl}/checkout/${intentId}?amount=${order.total_pkr}&currency=PKR&orderRef=${order.order_number}`;
     let qrPayload: string | undefined;
 
-    // If Raast P2M QR requested, generate standardized EMVCo payload
-    if (method === PaymentMethod.RAAST_P2M_QR) {
-      qrPayload = this.generateRaastQrPayload({
-        orderNumber: order.order_number,
-        amountPkr: order.total_pkr,
-        merchantTitle: 'Waw Marketplace by PostEx',
-        merchantId: ENV.POSTEX_XPAY_MERCHANT_ID || 'WAW-POSTEX-001',
-      });
-    }
-
     // Record payment intent in database
     await supabaseAdmin.from('payments').insert({
       id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,

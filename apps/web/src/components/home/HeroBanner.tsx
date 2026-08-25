@@ -27,7 +27,7 @@ const HERO_SLIDES = [
     badge: '🔥 MEGA FESTIVE SALE 2026',
     badgeBg: 'bg-slate-950 text-amber-400 border border-amber-400/30',
     title: 'Pakistan’s Biggest Online Marketplace',
-    highlightText: 'Up to 70% Off Across 50,000+ Products',
+    highlightText: 'Up to 70% Off Across Thousands of Products',
     subtitle: 'Shop direct from authentic Karachi fashion houses, Lahore tech importers, Sialkot sports makers, and Peshawar leather craftsmen.',
     primaryCta: 'SHOP MEGA DEALS',
     primaryHref: '/category/mobiles-tech',
@@ -314,7 +314,7 @@ export function HeroBanner() {
             </button>
           </div>
 
-          {/* Card 2: 100% SBP Escrow Guarantee & Smart Savings */}
+          {/* Card 2: 100% Buyer Protection & Smart Savings */}
           <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 text-slate-950 rounded-3xl p-4 sm:p-5 border border-amber-300 flex flex-col justify-between shadow-md relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
