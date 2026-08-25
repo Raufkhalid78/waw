@@ -86,8 +86,8 @@ const PROMOTIONAL_ANNOUNCEMENTS = [
   },
   {
     id: 3,
-    tag: '🛡️ SBP ESCROW',
-    text: '100% Safe Prepayments & 7-Day Hassle-Free Returns with State Bank Escrow Protection.',
+    tag: '🛡️ SECURE CHECKOUT',
+    text: '100% Safe Prepayments & 7-Day Hassle-Free Returns with Escrow Buyer Protection.',
     link: '/buyer-protection',
     linkText: 'View Guarantee',
   },

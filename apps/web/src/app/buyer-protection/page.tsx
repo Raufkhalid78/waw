@@ -21,7 +21,7 @@ export default function BuyerProtectionPage() {
       <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500">
         <Link href="/" className="hover:text-amber-600 transition-colors">Home</Link>
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <span className="text-slate-900 font-bold">SBP Escrow Buyer Protection</span>
+        <span className="text-slate-900 font-bold">100% Secure Checkout & Buyer Protection</span>
       </nav>
 
       {/* ── Hero Banner ──────────────────────────────────────────────────── */}
@@ -29,13 +29,13 @@ export default function BuyerProtectionPage() {
         <div className="max-w-2xl space-y-4">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-black uppercase tracking-wider">
             <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-            State Bank Regulated Security
+            100% Secure Checkout & Escrow
           </span>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight">
             Shop with Complete Confidence on <span className="text-amber-400">Waw</span>
           </h1>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
-            Every transaction on Waw is safeguarded under our State Bank-regulated Escrow Trust mechanism. Your money is never released to the seller until your order is delivered, inspected, and confirmed.
+            Every transaction on Waw is safeguarded under our Institutional Escrow Trust mechanism. Your money is never released to the seller until your order is delivered, inspected, and confirmed.
           </p>
         </div>
       </div>
@@ -46,9 +46,9 @@ export default function BuyerProtectionPage() {
           <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
             <Lock className="w-6 h-6" />
           </div>
-          <h3 className="font-black text-base text-slate-950">1. SBP Escrow Vault</h3>
+          <h3 className="font-black text-base text-slate-950">1. Escrow Protection Vault</h3>
           <p className="text-xs text-slate-600 leading-relaxed font-medium">
-            Whether you pay via SBP Raast, Credit/Debit card, or JazzCash, funds remain safely in an institutional escrow account until delivery.
+            Whether you pay online via Card, Instant QR, or Mobile Wallets, funds remain safely in an institutional escrow account until delivery.
           </p>
         </div>
 
@@ -58,7 +58,7 @@ export default function BuyerProtectionPage() {
           </div>
           <h3 className="font-black text-base text-slate-950">2. 100% Genuine Guarantee</h3>
           <p className="text-xs text-slate-600 leading-relaxed font-medium">
-            All 3P sellers undergo mandatory National CNIC and FBR NTN verification. Zero tolerance for counterfeits or imitation goods.
+            All 3P sellers undergo mandatory National CNIC and Business registration verification. Zero tolerance for counterfeits.
           </p>
         </div>
 
@@ -76,7 +76,7 @@ export default function BuyerProtectionPage() {
           <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
             <Truck className="w-6 h-6" />
           </div>
-          <h3 className="font-black text-base text-slate-950">4. TCS / PostEx Doorstep COD</h3>
+          <h3 className="font-black text-base text-slate-950">4. Doorstep COD Inspection</h3>
           <p className="text-xs text-slate-600 leading-relaxed font-medium">
             For Cash on Delivery orders, inspect parcel seal and tracking details before remitting payment to the verified delivery rider.
           </p>
@@ -95,7 +95,7 @@ export default function BuyerProtectionPage() {
             <div className="font-black text-amber-600 text-xs uppercase tracking-wider">Step 1</div>
             <div className="font-black text-sm text-slate-950">You Place Your Order</div>
             <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              Your payment is placed into State Bank-regulated escrow. The seller is notified to pack and prepare the parcel for TCS pickup.
+              Your payment is placed into secure institutional escrow. The seller is notified to pack and prepare the parcel for courier pickup.
             </p>
           </div>
 

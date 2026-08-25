@@ -11,6 +11,7 @@ import { FeaturedBrands } from '@/components/home/FeaturedBrands';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, Truck, Award, Zap } from 'lucide-react';
 import { SellerType } from '@waw/types';
+import { fetchProducts } from '@/lib/api';
 
 const MARKETPLACE_TABS = [
   'All Products',
@@ -169,6 +170,7 @@ export default function HomePage() {
   const tabScrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [liveProducts, setLiveProducts] = useState<any[]>([]);
 
   const checkTabScroll = () => {
     if (tabScrollRef.current) {
@@ -187,6 +189,36 @@ export default function HomePage() {
     }
   }, []);
 
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const data = await fetchProducts();
+        if (Array.isArray(data) && data.length > 0) {
+          setLiveProducts(data.map((p: any) => ({
+            productId: p.id,
+            title: p.title,
+            category: (p.categoryName || 'Mobiles & Tech') as MarketTab,
+            pricePkr: p.pricePkr || 2999,
+            originalPricePkr: p.compareAtPricePkr || (p.pricePkr ? Math.round(p.pricePkr * 1.3) : 3999),
+            discountPercent: p.compareAtPricePkr ? Math.round(((p.compareAtPricePkr - p.pricePkr) / p.compareAtPricePkr) * 100) : 25,
+            rating: p.ratingAverage || 4.9,
+            reviewsCount: p.reviewsCount || 88,
+            soldCount: p.soldCount || 240,
+            isExpress: p.isFirstParty ?? true,
+            sellerType: p.isFirstParty ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
+            storeName: p.storeName || 'Waw Official Hub',
+            sellerCity: 'Pakistan',
+            deliveryTime: '2-3 Days Fast Dispatch',
+            imageUrl: p.imageUrl || p.images?.[0] || 'https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80',
+          })));
+        }
+      } catch (err) {
+        console.warn('Using baseline catalog for buyer homepage:', err);
+      }
+    }
+    loadCatalog();
+  }, []);
+
   const scrollTabs = (direction: 'left' | 'right') => {
     if (tabScrollRef.current) {
       const amount = direction === 'left' ? -220 : 220;
@@ -195,10 +227,12 @@ export default function HomePage() {
     }
   };
 
+  const allProductsList = liveProducts.length > 0 ? liveProducts : TRENDING_MARKETPLACE_PRODUCTS;
+
   const filteredProducts =
     activeTab === 'All Products'
-      ? TRENDING_MARKETPLACE_PRODUCTS
-      : TRENDING_MARKETPLACE_PRODUCTS.filter((p) => p.category === activeTab);
+      ? allProductsList
+      : allProductsList.filter((p) => p.category === activeTab);
 
   return (
     <div className="space-y-3 pb-20">

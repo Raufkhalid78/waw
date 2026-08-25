@@ -45,7 +45,7 @@ export default function SellerOrdersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Store Fulfillment & Sub-Orders</h1>
         <p className="text-xs text-slate-400 mt-1">

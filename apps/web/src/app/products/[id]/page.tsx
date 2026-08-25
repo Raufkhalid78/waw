@@ -170,12 +170,12 @@ export default function ProductDetailPage() {
             <div className="p-3 bg-white border border-slate-200 rounded-2xl text-center space-y-1 shadow-2xs">
               <RotateCcw className="w-5 h-5 text-amber-500 mx-auto" />
               <div className="text-[11px] font-black text-slate-900">7 Days Return</div>
-              <div className="text-[10px] text-slate-500 font-medium">Hassle Free</div>
+              <div className="text-[10px] text-slate-500 font-medium">Doorstep Inspection</div>
             </div>
             <div className="p-3 bg-white border border-slate-200 rounded-2xl text-center space-y-1 shadow-2xs">
               <Award className="w-5 h-5 text-sky-600 mx-auto" />
-              <div className="text-[11px] font-black text-slate-900">Buyer Protection</div>
-              <div className="text-[10px] text-slate-500 font-medium">Escrow Regulated</div>
+              <div className="text-[11px] font-black text-slate-900">Secure Checkout</div>
+              <div className="text-[10px] text-slate-500 font-medium">Escrow Protected</div>
             </div>
           </div>
         </div>

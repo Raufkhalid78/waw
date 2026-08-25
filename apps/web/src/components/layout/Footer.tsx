@@ -370,7 +370,7 @@ export function Footer() {
             {/* Legal / Policy Links */}
             <div className="flex flex-wrap items-center justify-center gap-3.5 text-slate-500 font-medium text-[11px]">
               <Link href="/help" className="hover:text-slate-950 transition-colors">Help & FAQs</Link>
-              <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">SBP Escrow</Link>
+              <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">Buyer Protection</Link>
               <Link href="/sell" className="hover:text-slate-950 font-bold text-amber-700 transition-colors">Sell on Waw</Link>
               <Link href="/refund-policy" className="hover:text-slate-950 transition-colors">7-Day Returns</Link>
               <Link href="/privacy" className="hover:text-slate-950 transition-colors">Privacy Policy</Link>
@@ -381,7 +381,7 @@ export function Footer() {
           {/* Row 2: Regulatory Company Registration Details */}
           <div className="pt-3 border-t border-slate-200 text-[10px] text-slate-400 text-center lg:text-left flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
-              WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED • NTN: 8945201-3 • SBP Regulated Digital Payment Escrow • SECP Reg. # 0192847
+              WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED • NTN: 8945201-3 • 100% Secure Checkout & Escrow Protection • SECP Reg. # 0192847
             </div>
             <div className="flex items-center gap-2 text-slate-500 font-medium">
               <span>National Courier Logistics: PostEx, TCS Express, Leopards, Trax</span>

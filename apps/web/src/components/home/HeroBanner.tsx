@@ -319,7 +319,7 @@ export function HeroBanner() {
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                <span>STATE BANK ESCROW</span>
+                <span>SECURE CHECKOUT</span>
               </span>
               <span className="text-[10px] font-black text-slate-950 bg-white/90 px-2 py-0.5 rounded-md border border-amber-200">
                 100% SAFE
@@ -331,7 +331,7 @@ export function HeroBanner() {
                 Save PKR 100 on Every Order!
               </h3>
               <p className="text-xs text-slate-700 leading-snug font-medium line-clamp-2">
-                Pay online using Debit / Credit Card, Raast P2M QR, or JazzCash / Easypaisa to waive COD fee.
+                Pay online using Debit / Credit Card or Instant QR to waive the standard COD handling fee.
               </p>
             </div>
 
@@ -339,7 +339,7 @@ export function HeroBanner() {
               href="/buyer-protection"
               className="text-xs font-black text-slate-950 bg-white hover:bg-slate-950 hover:text-white px-3.5 py-2 rounded-xl border border-amber-300 shadow-2xs flex items-center justify-between transition-all group"
             >
-              <span>Learn about SBP Escrow Guarantee</span>
+              <span>Learn about Buyer Protection & Escrow</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
@@ -384,8 +384,8 @@ export function HeroBanner() {
               <ShieldCheck className="w-4.5 h-4.5" />
             </div>
             <div className="text-left">
-              <div className="text-xs sm:text-sm font-black text-slate-950">100% Escrow Protection</div>
-              <div className="text-[11px] text-slate-500 font-medium">SBP Regulated safety</div>
+              <div className="text-xs sm:text-sm font-black text-slate-950">100% Secure Checkout</div>
+              <div className="text-[11px] text-slate-500 font-medium">Escrow payment protection</div>
             </div>
           </div>
 

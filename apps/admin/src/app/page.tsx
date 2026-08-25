@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -33,6 +34,7 @@ import {
   QrCode,
   Lock,
   Boxes,
+  LogOut,
 } from 'lucide-react';
 import {
   fetchPlatformStats,
@@ -53,6 +55,9 @@ import {
 import { OrderStatus, PaymentMethod, PaymentStatus, PayoutStatus, SellerType, StoreStatus } from '@waw/types';
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+
   // Navigation & Role Modes
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'sellers' | 'inventory' | 'payouts' | 'returns'>('overview');
   const [viewRole, setViewRole] = useState<'SUPER_ADMIN' | 'SELLER'>('SUPER_ADMIN');
@@ -123,8 +128,20 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('waw_admin_token') : null;
+    if (!token) {
+      router.push('/login');
+    } else {
+      setAuthenticated(true);
+      loadDashboardData();
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('waw_admin_token');
+    localStorage.removeItem('waw_admin_user');
+    router.push('/login');
+  };
 
   const triggerToast = (msg: string) => {
     setActionSuccessMsg(msg);
@@ -489,6 +506,16 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Sign Out Action */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-slate-950/80 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/30 text-xs font-bold transition-all cursor-pointer mt-3"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Sign Out</span>
+        </button>
       </aside>
 
       {/* ── MAIN VIEWPORT ── */}
