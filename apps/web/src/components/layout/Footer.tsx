@@ -1,9 +1,6 @@
-import Link from 'next/link';
-import {
-  HelpCircle,
-  Mail,
-} from 'lucide-react';
-import { WhatsAppIcon } from '@/components/ui/WhatsAppIcon';
+import Link from "next/link";
+import { HelpCircle, Mail } from "lucide-react";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 
 export function Footer() {
   return (
@@ -17,7 +14,8 @@ export function Footer() {
               We&apos;re Always Here To Help
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              Reach out to us through any of these verified customer support channels
+              Reach out to us through any of these verified customer support
+              channels
             </p>
           </div>
 
@@ -32,8 +30,12 @@ export function Footer() {
                 <HelpCircle className="w-5 h-5" />
               </div>
               <div className="leading-tight">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">HELP CENTER</div>
-                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">help.waw.com.pk</div>
+                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  HELP CENTER
+                </div>
+                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">
+                  help.waw.com.pk
+                </div>
               </div>
             </Link>
 
@@ -46,8 +48,12 @@ export function Footer() {
                 <Mail className="w-5 h-5" />
               </div>
               <div className="leading-tight">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">EMAIL SUPPORT</div>
-                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">care@waw.com.pk</div>
+                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  EMAIL SUPPORT
+                </div>
+                <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">
+                  care@waw.com.pk
+                </div>
               </div>
             </a>
 
@@ -62,8 +68,12 @@ export function Footer() {
                 <WhatsAppIcon className="w-8 h-8 drop-shadow-xs" />
               </div>
               <div className="leading-tight">
-                <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">WHATSAPP 24/7</div>
-                <div className="text-xs font-black text-slate-900 group-hover:text-emerald-600 mt-0.5">+92 (042) 111-WAW</div>
+                <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">
+                  WHATSAPP 24/7
+                </div>
+                <div className="text-xs font-black text-slate-900 group-hover:text-emerald-600 mt-0.5">
+                  +92 (042) 111-WAW
+                </div>
               </div>
             </a>
           </div>
@@ -75,106 +85,418 @@ export function Footer() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-7 sm:gap-5 text-[11px]">
           {/* Column 1: Electronics */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Electronics</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Electronics
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/category/mobiles-tech" className="hover:text-slate-950 transition-colors">Mobiles & Tablets</Link></li>
-              <li><Link href="/category/mobiles-tech" className="hover:text-slate-950 transition-colors">Wireless Earbuds</Link></li>
-              <li><Link href="/category/mobiles-tech" className="hover:text-slate-950 transition-colors">Smart Watches</Link></li>
-              <li><Link href="/category/mobiles-tech" className="hover:text-slate-950 transition-colors">Power Banks</Link></li>
-              <li><Link href="/category/mobiles-tech" className="hover:text-slate-950 transition-colors">Fast Chargers & Cables</Link></li>
+              <li>
+                <Link
+                  href="/category/mobiles-tech"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Mobiles & Tablets
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/mobiles-tech"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Wireless Earbuds
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/mobiles-tech"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Smart Watches
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/mobiles-tech"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Power Banks
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/mobiles-tech"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Fast Chargers & Cables
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 2: Women's Fashion */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Women&apos;s Fashion</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Women&apos;s Fashion
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/category/womens-lawn" className="hover:text-slate-950 transition-colors">Unstitched Lawn</Link></li>
-              <li><Link href="/category/womens-lawn" className="hover:text-slate-950 transition-colors">Ready-to-Wear Kurtis</Link></li>
-              <li><Link href="/category/womens-lawn" className="hover:text-slate-950 transition-colors">Festive 3-Piece</Link></li>
-              <li><Link href="/category/womens-lawn" className="hover:text-slate-950 transition-colors">Luxury Chiffon Dupattas</Link></li>
+              <li>
+                <Link
+                  href="/category/womens-lawn"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Unstitched Lawn
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/womens-lawn"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Ready-to-Wear Kurtis
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/womens-lawn"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Festive 3-Piece
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/womens-lawn"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Luxury Chiffon Dupattas
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 3: Men's Fashion */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Men&apos;s Heritage</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Men&apos;s Heritage
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/category/peshawari-chappal" className="hover:text-slate-950 transition-colors">Peshawari Chappals</Link></li>
-              <li><Link href="/category/leather-craft" className="hover:text-slate-950 transition-colors">Pure Leather Wallets</Link></li>
-              <li><Link href="/category/leather-craft" className="hover:text-slate-950 transition-colors">Handmade Leather Belts</Link></li>
+              <li>
+                <Link
+                  href="/category/peshawari-chappal"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Peshawari Chappals
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/leather-craft"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Pure Leather Wallets
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/leather-craft"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Handmade Leather Belts
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 4: Beauty & Fragrance */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Beauty & Attar</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Beauty & Attar
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/category/home-heritage" className="hover:text-slate-950 transition-colors">Pure Royal Oud & Attar</Link></li>
-              <li><Link href="/category/home-heritage" className="hover:text-slate-950 transition-colors">Natural Fragrances</Link></li>
+              <li>
+                <Link
+                  href="/category/home-heritage"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Pure Royal Oud & Attar
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/home-heritage"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Natural Fragrances
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 5: Sports & Sialkot */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Sialkot Sports</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Sialkot Sports
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/category/sialkot-sports" className="hover:text-slate-950 transition-colors">Match Footballs (FIFA Grade)</Link></li>
-              <li><Link href="/category/sialkot-sports" className="hover:text-slate-950 transition-colors">English Willow Cricket Bats</Link></li>
-              <li><Link href="/category/sialkot-sports" className="hover:text-slate-950 transition-colors">Pro Boxing & Training Gloves</Link></li>
+              <li>
+                <Link
+                  href="/category/sialkot-sports"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Match Footballs (FIFA Grade)
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/sialkot-sports"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  English Willow Cricket Bats
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/sialkot-sports"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Pro Boxing & Training Gloves
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 6: Home & Living */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Home & Heritage</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Home & Heritage
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/category/home-heritage" className="hover:text-slate-950 transition-colors">Multani Blue Pottery</Link></li>
-              <li><Link href="/category/home-heritage" className="hover:text-slate-950 transition-colors">Handmade Cultural Décor</Link></li>
+              <li>
+                <Link
+                  href="/category/home-heritage"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Multani Blue Pottery
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/category/home-heritage"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Handmade Cultural Décor
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 7: Top Brands */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Top Brands</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Top Brands
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/" className="hover:text-amber-600 transition-colors font-bold text-slate-900">Waw Signature 1P</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Khyber Artisans</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Lahore Tech Hub</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Sindh Silk & Lawn</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Sialkot Sports Co.</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Khaadi & J.</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Sapphire Lawn</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Al-Haramain PKR</Link></li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-amber-600 transition-colors font-bold text-slate-900"
+                >
+                  Waw Signature 1P
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Khyber Artisans
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Lahore Tech Hub
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Sindh Silk & Lawn
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Sialkot Sports Co.
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Khaadi & J.
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Sapphire Lawn
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Al-Haramain PKR
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 8: Discover Now */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Discover Waw</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Discover Waw
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/" className="text-amber-600 font-bold hover:underline">⚡ Waw Express</Link></li>
-              <li><Link href="/" className="text-rose-600 font-bold hover:underline">🔥 Flash Deals</Link></li>
-              <li><Link href="/" className="text-sky-700 font-bold hover:underline">🏬 Verified Shops</Link></li>
-              <li><Link href="/checkout" className="hover:text-slate-950 transition-colors">Sell on Waw</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Seller KYC Policy</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Affiliate Program</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Free Delivery Policy</Link></li>
+              <li>
+                <Link
+                  href="/"
+                  className="text-amber-600 font-bold hover:underline"
+                >
+                  ⚡ Waw Express
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="text-rose-600 font-bold hover:underline"
+                >
+                  🔥 Flash Deals
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="text-sky-700 font-bold hover:underline"
+                >
+                  🏬 Verified Shops
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/checkout"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Sell on Waw
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Seller KYC Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Affiliate Program
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Free Delivery Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 9: Delivery Hubs */}
           <div className="space-y-3">
-            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">Delivery Hubs</h4>
+            <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
+              Delivery Hubs
+            </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Lahore (Central)</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Karachi (South)</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Islamabad (Capital)</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Rawalpindi</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Faisalabad</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Peshawar</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Sialkot</Link></li>
-              <li><Link href="/" className="hover:text-slate-950 transition-colors">Quetta & Multan</Link></li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Lahore (Central)
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Karachi (South)
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Islamabad (Capital)
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Rawalpindi
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Faisalabad
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Peshawar
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Sialkot
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-slate-950 transition-colors"
+                >
+                  Quetta & Multan
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
@@ -198,8 +520,12 @@ export function Footer() {
                   <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.62-.75 1.04-1.8 0.92-2.84-.9.04-2 .6-2.65 1.34-.58.65-1.09 1.72-.95 2.73.99.08 2.06-.48 2.68-1.23z" />
                 </svg>
                 <div className="text-left leading-none">
-                  <div className="text-[8px] text-slate-300 font-medium">Download on the</div>
-                  <div className="text-xs font-bold text-white mt-0.5">App Store</div>
+                  <div className="text-[8px] text-slate-300 font-medium">
+                    Download on the
+                  </div>
+                  <div className="text-xs font-bold text-white mt-0.5">
+                    App Store
+                  </div>
                 </div>
               </a>
 
@@ -209,14 +535,30 @@ export function Footer() {
                 className="bg-black hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg flex items-center gap-2 shadow-xs transition-all hover:scale-105"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M3.6 1.4L13.7 11.5 3.6 21.6c-.3-.3-.6-.8-.6-1.4V2.8c0-.6.3-1.1.6-1.4z" />
-                  <path fill="#FBBC04" d="M17.1 8.1l-3.4 3.4 3.4 3.4 3.9-2.2c1.1-.6 1.1-1.7 0-2.3l-3.9-2.3z" />
-                  <path fill="#EA4335" d="M13.7 11.5L3.6 1.4C4.2.8 5.2.8 6.1 1.3l11 6.8-3.4 3.4z" />
-                  <path fill="#34A853" d="M13.7 11.5l3.4 3.4-11 6.8c-.9.5-1.9.5-2.5-.1l10.1-10.1z" />
+                  <path
+                    fill="#4285F4"
+                    d="M3.6 1.4L13.7 11.5 3.6 21.6c-.3-.3-.6-.8-.6-1.4V2.8c0-.6.3-1.1.6-1.4z"
+                  />
+                  <path
+                    fill="#FBBC04"
+                    d="M17.1 8.1l-3.4 3.4 3.4 3.4 3.9-2.2c1.1-.6 1.1-1.7 0-2.3l-3.9-2.3z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M13.7 11.5L3.6 1.4C4.2.8 5.2.8 6.1 1.3l11 6.8-3.4 3.4z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M13.7 11.5l3.4 3.4-11 6.8c-.9.5-1.9.5-2.5-.1l10.1-10.1z"
+                  />
                 </svg>
                 <div className="text-left leading-none">
-                  <div className="text-[8px] text-slate-300 font-medium">GET IT ON</div>
-                  <div className="text-xs font-bold text-white mt-0.5">Google Play</div>
+                  <div className="text-[8px] text-slate-300 font-medium">
+                    GET IT ON
+                  </div>
+                  <div className="text-xs font-bold text-white mt-0.5">
+                    Google Play
+                  </div>
                 </div>
               </a>
 
@@ -229,8 +571,12 @@ export function Footer() {
                   <span className="text-[9px] font-black text-white">H</span>
                 </div>
                 <div className="text-left leading-none">
-                  <div className="text-[8px] text-slate-300 font-medium">EXPLORE IT ON</div>
-                  <div className="text-xs font-bold text-white mt-0.5">AppGallery</div>
+                  <div className="text-[8px] text-slate-300 font-medium">
+                    EXPLORE IT ON
+                  </div>
+                  <div className="text-xs font-bold text-white mt-0.5">
+                    AppGallery
+                  </div>
                 </div>
               </a>
             </div>
@@ -318,73 +664,145 @@ export function Footer() {
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 text-[11px] text-slate-600">
             {/* Copyright */}
             <div className="font-medium text-slate-500">
-              © {new Date().getFullYear()} WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED. All Rights Reserved.
+              © {new Date().getFullYear()} WAW TECHNOLOGIES (SMC-PRIVATE)
+              LIMITED. All Rights Reserved.
             </div>
 
             {/* Payment Badges — fully inline SVG, no external images */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-
               {/* ── Mastercard ── */}
               <div className="w-[54px] h-7 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-xs hover:border-slate-300 transition-colors overflow-hidden">
-                <svg viewBox="0 0 38 24" className="h-5 w-auto" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="14" cy="12" r="10" fill="#EB001B"/>
-                  <circle cx="24" cy="12" r="10" fill="#F79E1B"/>
-                  <path d="M19 4.8a10 10 0 0 1 0 14.4A10 10 0 0 1 19 4.8z" fill="#FF5F00"/>
+                <svg
+                  viewBox="0 0 38 24"
+                  className="h-5 w-auto"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle cx="14" cy="12" r="10" fill="#EB001B" />
+                  <circle cx="24" cy="12" r="10" fill="#F79E1B" />
+                  <path
+                    d="M19 4.8a10 10 0 0 1 0 14.4A10 10 0 0 1 19 4.8z"
+                    fill="#FF5F00"
+                  />
                 </svg>
               </div>
 
               {/* ── VISA ── */}
               <div className="w-[54px] h-7 bg-[#1A1F71] rounded-lg flex items-center justify-center shadow-xs hover:bg-[#151a5e] transition-colors overflow-hidden px-2">
-                <svg viewBox="0 0 80 26" className="h-4 w-auto" xmlns="http://www.w3.org/2000/svg">
-                  <text x="2" y="22" fontFamily="Arial,sans-serif" fontWeight="900" fontStyle="italic" fontSize="26" fill="white" letterSpacing="-1">VISA</text>
+                <svg
+                  viewBox="0 0 80 26"
+                  className="h-4 w-auto"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <text
+                    x="2"
+                    y="22"
+                    fontFamily="Arial,sans-serif"
+                    fontWeight="900"
+                    fontStyle="italic"
+                    fontSize="26"
+                    fill="white"
+                    letterSpacing="-1"
+                  >
+                    VISA
+                  </text>
                 </svg>
               </div>
 
               {/* ── Raast ── */}
               <div className="w-[54px] h-7 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-xs hover:border-slate-300 transition-colors overflow-hidden p-0.5">
-                <img src="/images/payments/raast.svg" alt="Raast" className="h-[23px] w-auto object-contain" />
+                <img
+                  src="/images/payments/raast.svg"
+                  alt="Raast"
+                  className="h-[23px] w-auto object-contain"
+                />
               </div>
 
               {/* ── JazzCash ── */}
               <div className="w-[54px] h-7 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-xs hover:border-slate-300 transition-colors overflow-hidden p-0.5">
-                <img src="/images/payments/jazzcash.svg" alt="JazzCash" className="h-[20px] w-auto object-contain" />
+                <img
+                  src="/images/payments/jazzcash.svg"
+                  alt="JazzCash"
+                  className="h-[20px] w-auto object-contain"
+                />
               </div>
 
               {/* ── Easypaisa ── */}
               <div className="w-[54px] h-7 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-xs hover:border-slate-300 transition-colors overflow-hidden p-0.5">
-                <img src="/images/payments/easypaisa.svg" alt="Easypaisa" className="h-[20px] w-auto object-contain" />
+                <img
+                  src="/images/payments/easypaisa.svg"
+                  alt="Easypaisa"
+                  className="h-[20px] w-auto object-contain"
+                />
               </div>
 
               {/* ── PayPak ── */}
               <div className="w-[54px] h-7 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-xs hover:border-slate-300 transition-colors overflow-hidden p-0.5">
-                <img src="/images/payments/paypak.svg" alt="PayPak" className="h-[24px] w-auto object-contain" />
+                <img
+                  src="/images/payments/paypak.svg"
+                  alt="PayPak"
+                  className="h-[24px] w-auto object-contain"
+                />
               </div>
 
               {/* ── CASH / COD ── */}
               <div className="w-[54px] h-7 bg-white border-2 border-[#2E7D32] rounded-lg flex items-center justify-center shadow-xs hover:bg-emerald-50 transition-colors overflow-hidden">
-                <span className="text-[#2E7D32] font-black text-[11px] tracking-wider leading-none">CASH</span>
+                <span className="text-[#2E7D32] font-black text-[11px] tracking-wider leading-none">
+                  CASH
+                </span>
               </div>
-
             </div>
 
             {/* Legal / Policy Links */}
             <div className="flex flex-wrap items-center justify-center gap-3.5 text-slate-500 font-medium text-[11px]">
-              <Link href="/help" className="hover:text-slate-950 transition-colors">Help & FAQs</Link>
-              <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">Buyer Protection</Link>
-              <Link href="/sell" className="hover:text-slate-950 font-bold text-amber-700 transition-colors">Sell on Waw</Link>
-              <Link href="/refund-policy" className="hover:text-slate-950 transition-colors">7-Day Returns</Link>
-              <Link href="/privacy" className="hover:text-slate-950 transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="hover:text-slate-950 transition-colors">Terms of Service</Link>
+              <Link
+                href="/help"
+                className="hover:text-slate-950 transition-colors"
+              >
+                Help & FAQs
+              </Link>
+              <Link
+                href="/buyer-protection"
+                className="hover:text-slate-950 transition-colors"
+              >
+                Buyer Protection
+              </Link>
+              <Link
+                href="/sell"
+                className="hover:text-slate-950 font-bold text-amber-700 transition-colors"
+              >
+                Sell on Waw
+              </Link>
+              <Link
+                href="/refund-policy"
+                className="hover:text-slate-950 transition-colors"
+              >
+                7-Day Returns
+              </Link>
+              <Link
+                href="/privacy"
+                className="hover:text-slate-950 transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href="/terms"
+                className="hover:text-slate-950 transition-colors"
+              >
+                Terms of Service
+              </Link>
             </div>
           </div>
 
           {/* Row 2: Regulatory Company Registration Details */}
           <div className="pt-3 border-t border-slate-200 text-[10px] text-slate-400 text-center lg:text-left flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
-              WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED • NTN: 8945201-3 • 100% Secure Checkout & Escrow Protection • SECP Reg. # 0192847
+              WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED • NTN: 8945201-3 • 100%
+              Secure Checkout & Escrow Protection • SECP Reg. # 0192847
             </div>
             <div className="flex items-center gap-2 text-slate-500 font-medium">
-              <span>National Courier Logistics: PostEx, TCS Express, Leopards, Trax</span>
+              <span>
+                National Courier Logistics: PostEx, TCS Express, Leopards, Trax
+              </span>
             </div>
           </div>
         </div>

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -13,26 +13,26 @@ import {
   Truck,
   ShieldCheck,
   LogOut,
-} from 'lucide-react';
+} from "lucide-react";
 
 export function SellerNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [storeName, setStoreName] = useState('My Store');
-  const [city, setCity] = useState('Pakistan');
+  const [storeName, setStoreName] = useState("My Store");
+  const [city, setCity] = useState("Pakistan");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    if (pathname === '/login') return;
+    if (pathname === "/login") return;
 
-    const token = localStorage.getItem('waw_seller_token');
+    const token = localStorage.getItem("waw_seller_token");
     if (!token) {
-      router.push('/login');
+      router.push("/login");
       return;
     }
 
-    const userRaw = localStorage.getItem('waw_seller_user');
+    const userRaw = localStorage.getItem("waw_seller_user");
     if (userRaw) {
       try {
         const u = JSON.parse(userRaw);
@@ -43,13 +43,13 @@ export function SellerNav() {
   }, [pathname, router]);
 
   const handleLogout = () => {
-    localStorage.removeItem('waw_seller_token');
-    localStorage.removeItem('waw_store_id');
-    localStorage.removeItem('waw_seller_user');
-    router.push('/login');
+    localStorage.removeItem("waw_seller_token");
+    localStorage.removeItem("waw_store_id");
+    localStorage.removeItem("waw_seller_user");
+    router.push("/login");
   };
 
-  if (pathname === '/login') {
+  if (pathname === "/login") {
     return null;
   }
 
@@ -64,9 +64,13 @@ export function SellerNav() {
           <div>
             <div className="text-xs font-black text-white tracking-tight flex items-center gap-1.5">
               WAW SELLER
-              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-amber-400/10 text-amber-400 rounded border border-amber-400/20">PORTAL</span>
+              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-amber-400/10 text-amber-400 rounded border border-amber-400/20">
+                PORTAL
+              </span>
             </div>
-            <div className="text-[11px] text-slate-400 font-medium truncate max-w-[130px]">{storeName}</div>
+            <div className="text-[11px] text-slate-400 font-medium truncate max-w-[130px]">
+              {storeName}
+            </div>
           </div>
         </div>
       </div>
@@ -82,9 +86,9 @@ export function SellerNav() {
         <Link
           href="/"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/'
-              ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            pathname === "/"
+              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
+              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
           }`}
         >
           <LayoutDashboard className="w-4 h-4 text-amber-400" />
@@ -94,22 +98,24 @@ export function SellerNav() {
         <Link
           href="/orders"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/orders'
-              ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            pathname === "/orders"
+              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
+              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
           }`}
         >
           <ShoppingBag className="w-4 h-4 text-emerald-400" />
           <span>Store Orders</span>
-          <span className="ml-auto bg-amber-400/20 text-amber-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">Live</span>
+          <span className="ml-auto bg-amber-400/20 text-amber-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+            Live
+          </span>
         </Link>
 
         <Link
           href="/products"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/products'
-              ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            pathname === "/products"
+              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
+              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
           }`}
         >
           <Package className="w-4 h-4 text-blue-400" />
@@ -119,9 +125,9 @@ export function SellerNav() {
         <Link
           href="/products/bulk-upload"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/products/bulk-upload'
-              ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            pathname === "/products/bulk-upload"
+              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
+              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
           }`}
         >
           <FileSpreadsheet className="w-4 h-4 text-purple-400" />
@@ -131,9 +137,9 @@ export function SellerNav() {
         <Link
           href="/coupons"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/coupons'
-              ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            pathname === "/coupons"
+              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
+              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
           }`}
         >
           <Tag className="w-4 h-4 text-pink-400" />
@@ -143,9 +149,9 @@ export function SellerNav() {
         <Link
           href="/payouts"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === '/payouts'
-              ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            pathname === "/payouts"
+              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
+              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
           }`}
         >
           <CreditCard className="w-4 h-4 text-amber-500" />
@@ -156,10 +162,14 @@ export function SellerNav() {
       {/* Courier Integration Status */}
       <div className="p-4 m-3 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] space-y-2">
         <div className="flex items-center justify-between text-slate-400">
-          <span className="flex items-center gap-1.5"><Truck className="w-3.5 h-3.5 text-amber-400" /> Courier Service</span>
+          <span className="flex items-center gap-1.5">
+            <Truck className="w-3.5 h-3.5 text-amber-400" /> Courier Service
+          </span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         </div>
-        <p className="text-[10px] text-slate-400">Auto-manifesting PostEx & Trax airway bills on order confirmation.</p>
+        <p className="text-[10px] text-slate-400">
+          Auto-manifesting PostEx & Trax airway bills on order confirmation.
+        </p>
       </div>
 
       {/* Bottom Sign Out Link */}

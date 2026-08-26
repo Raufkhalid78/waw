@@ -1,10 +1,18 @@
-import { supabaseAdmin } from '../../config/supabase.js';
-import { calculateOrderSummary, OrderItemPricingInput, OrderStatus, PaymentMethod, PaymentStatus, SellerType } from '../../types/index.js';
-import { WhatsAppService } from '../notifications/whatsapp.service.js';
-import { CourierService } from '../logistics/courier.service.js';
-import { InventoryLockService } from '../products/inventory-lock.service.js';
-import { QuoteService } from './quote.service.js';
-import { redis } from '../../config/redis.js';
+import { supabaseAdmin } from "../../config/supabase.js";
+import {
+  calculateOrderSummary,
+  OrderItemPricingInput,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  ReturnReason,
+  SellerType,
+} from "../../types/index.js";
+import { WhatsAppService } from "../notifications/whatsapp.service.js";
+import { CourierService } from "../logistics/courier.service.js";
+import { InventoryLockService } from "../products/inventory-lock.service.js";
+import { QuoteService } from "./quote.service.js";
+import { redis } from "../../config/redis.js";
 
 export interface CartItem {
   productId: string;
@@ -41,23 +49,29 @@ export class OrderService {
       // Idempotency check: Ensure quoteToken is only used once
       const isUsed = await redis.get(`quote_used:${input.quoteToken}`);
       if (isUsed) {
-        throw new Error('This checkout session has already been processed. Please return to your cart.');
+        throw new Error(
+          "This checkout session has already been processed. Please return to your cart.",
+        );
       }
-      
+
       quote = QuoteService.verifyQuoteToken(input.quoteToken);
-      
+
       // Mark as used (expires in 24 hours to keep Redis clean)
-      await redis.set(`quote_used:${input.quoteToken}`, '1', 'EX', 86400);
+      await redis.set(`quote_used:${input.quoteToken}`, "1", "EX", 86400);
     } else if (input.items && input.items.length > 0) {
       // Derive server-authoritative quote on the fly
       quote = await QuoteService.generateQuote({
-        items: input.items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
+        items: input.items.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })),
         shippingCity: input.shippingCity,
         paymentMethod: input.paymentMethod,
         couponCode: input.couponCode,
       });
     } else {
-      throw new Error('Order must contain a valid quoteToken or items list');
+      throw new Error("Order must contain a valid quoteToken or items list");
     }
 
     const orderNumber = `WAW-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -66,7 +80,7 @@ export class OrderService {
     const buyerId = authenticatedUser?.id;
 
     if (!buyerId) {
-      throw new Error('Unauthorized: buyer ID required');
+      throw new Error("Unauthorized: buyer ID required");
     }
 
     const lockItems = quote.items.map((i: any) => ({
@@ -76,9 +90,14 @@ export class OrderService {
     }));
 
     // 1. Acquire Redis Inventory Reservation Locks (15-min TTL)
-    const lockAcquired = await InventoryLockService.acquireStockLocks(orderId, lockItems);
+    const lockAcquired = await InventoryLockService.acquireStockLocks(
+      orderId,
+      lockItems,
+    );
     if (!lockAcquired) {
-      throw new Error('Unable to reserve stock. One or more items are currently out of stock.');
+      throw new Error(
+        "Unable to reserve stock. One or more items are currently out of stock.",
+      );
     }
 
     const finalTotal = quote.totalPkr;
@@ -86,7 +105,7 @@ export class OrderService {
 
     // 2. Insert Parent Order Record into Supabase
     const { data: order, error: orderError } = await supabaseAdmin
-      .from('orders')
+      .from("orders")
       .insert({
         id: orderId,
         order_number: orderNumber,
@@ -101,7 +120,9 @@ export class OrderService {
         cod_fee_pkr: quote.codFeePkr,
         total_pkr: finalTotal,
         payment_method: input.paymentMethod,
-        payment_status: isCod ? PaymentStatus.COD_PENDING : PaymentStatus.PENDING,
+        payment_status: isCod
+          ? PaymentStatus.COD_PENDING
+          : PaymentStatus.PENDING,
         order_status: OrderStatus.CONFIRMED,
         notes: input.notes,
         created_at: new Date().toISOString(),
@@ -126,16 +147,20 @@ export class OrderService {
 
     // 4. For each seller — create a store_order + order_items + PostEx shipment
     for (const [storeId, storeItems] of Object.entries(itemsByStore)) {
-      const storeSubtotal = (storeItems as any[]).reduce((s, i) => s + i.totalPricePkr, 0);
+      const storeSubtotal = (storeItems as any[]).reduce(
+        (s, i) => s + i.totalPricePkr,
+        0,
+      );
       const storeShippingFee = quote.shippingFeePkr === 0 ? 0 : 200;
-      const commissionRate = (storeItems as any[])[0].commissionRatePercentage || 10;
+      const commissionRate =
+        (storeItems as any[])[0].commissionRatePercentage || 10;
       const commissionPkr = Math.round(storeSubtotal * (commissionRate / 100));
       const sellerPayoutPkr = storeSubtotal - commissionPkr;
 
       const storeOrderId = `sord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
       const { data: storeOrder } = await supabaseAdmin
-        .from('store_orders')
+        .from("store_orders")
         .insert({
           id: storeOrderId,
           order_id: orderId,
@@ -165,7 +190,7 @@ export class OrderService {
         created_at: new Date().toISOString(),
       }));
 
-      await supabaseAdmin.from('order_items').insert(storeItemInserts);
+      await supabaseAdmin.from("order_items").insert(storeItemInserts);
 
       // 6. Book shipment and create payout only if COD. For prepaid, wait for XPay webhook.
       if (isCod) {
@@ -183,15 +208,17 @@ export class OrderService {
         shipments.push(shipment);
 
         // 7. Create payout record for seller
-        await supabaseAdmin.from('payouts').insert({
+        await supabaseAdmin.from("payouts").insert({
           id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           store_id: storeId,
           order_id: orderId,
           store_order_id: storeOrderId,
           amount_pkr: sellerPayoutPkr,
           commission_pkr: commissionPkr,
-          status: 'SCHEDULED',
-          scheduled_for: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          status: "SCHEDULED",
+          scheduled_for: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
           created_at: new Date().toISOString(),
         });
       }
@@ -200,15 +227,15 @@ export class OrderService {
     // 8. Decrement coupon usage if applied
     if (quote.appliedCoupon?.code) {
       const { data: c } = await supabaseAdmin
-        .from('coupons')
-        .select('id, current_uses')
-        .eq('code', quote.appliedCoupon.code)
+        .from("coupons")
+        .select("id, current_uses")
+        .eq("code", quote.appliedCoupon.code)
         .single();
       if (c) {
         await supabaseAdmin
-          .from('coupons')
+          .from("coupons")
           .update({ current_uses: c.current_uses + 1 })
-          .eq('id', c.id);
+          .eq("id", c.id);
       }
     }
 
@@ -222,7 +249,7 @@ export class OrderService {
       input.buyerPhone,
       orderNumber,
       finalTotal,
-      isCod
+      isCod,
     );
 
     return {
@@ -246,46 +273,173 @@ export class OrderService {
    */
   static async getOrder(id: string) {
     const { data: order } = await supabaseAdmin
-      .from('orders')
-      .select('*, store_orders(*, order_items(*), shipments(*)), payments(*)')
-      .eq('id', id)
+      .from("orders")
+      .select("*, order_items(*), store_orders(*, order_items(*), shipments(*)), payments(*)")
+      .eq("id", id)
       .maybeSingle();
 
     return order;
   }
 
   /**
-   * Cancels an order (and all child store_orders) and releases inventory locks.
+   * Fetches all orders placed by a specific buyer.
    */
-  static async cancelOrder(id: string, reason?: string, authenticatedUser?: any) {
-    const { data: order } = await supabaseAdmin
-      .from('orders')
-      .select('*, order_items(*), store_orders(*)')
-      .eq('id', id)
+  static async getUserOrders(buyerId: string) {
+    const { data: orders, error } = await supabaseAdmin
+      .from("orders")
+      .select("*, order_items(*), store_orders(*, order_items(*), shipments(*)), payments(*)")
+      .eq("buyer_id", buyerId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return orders || [];
+  }
+
+  /**
+   * Submits a return request for an order, books PostEx reverse pickup, and logs audit event.
+   */
+  static async createReturnRequest(
+    orderId: string,
+    buyerId: string,
+    input: {
+      reason: string;
+      comments?: string;
+      refundPreference?: string;
+      pickupAddress?: string;
+      pickupCity?: string;
+      items?: { orderItemId: string; quantity: number }[];
+    },
+  ) {
+    // 1. Fetch order and verify ownership
+    const { data: order, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .select("*, order_items(*), store_orders(*)")
+      .eq("id", orderId)
       .single();
 
-    if (!order) throw new Error('Order not found');
+    if (orderErr || !order) throw new Error("Order not found");
+    if (order.buyer_id && order.buyer_id !== buyerId) {
+      throw new Error("Unauthorized to return this order");
+    }
 
-    if (authenticatedUser && authenticatedUser.role !== 'ADMIN' && order.buyer_id !== authenticatedUser.id) {
-      throw new Error('Forbidden');
+    // 2. Book reverse pickup via CourierService
+    const reversePickupResult = await CourierService.bookPostExReversePickup({
+      orderId: order.id,
+      orderNumber: order.order_number || order.id,
+      customerName: order.buyer_name,
+      customerPhone: order.buyer_phone,
+      pickupAddress: input.pickupAddress || order.shipping_address,
+      pickupCity: input.pickupCity || order.shipping_city,
+      returnReason: input.reason as ReturnReason,
+      itemsDescription: input.comments || "Customer Return",
+    });
+
+    // 3. Create return_requests record
+    const { data: returnReq, error: retErr } = await supabaseAdmin
+      .from("return_requests")
+      .insert({
+        order_id: order.id,
+        store_order_id: order.store_orders?.[0]?.id || null,
+        buyer_id: buyerId,
+        reason: input.reason,
+        status: "REVERSE_PICKUP_BOOKED",
+        reverse_courier_cn: reversePickupResult.reverseTrackingNumber,
+        refund_amount_pkr: order.total_pkr,
+        staff_notes: input.comments
+          ? `Buyer notes: ${input.comments}. Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`
+          : `Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`,
+      })
+      .select()
+      .single();
+
+    if (retErr) throw retErr;
+
+    // 4. If specific items, insert into return_items
+    if (input.items && input.items.length > 0) {
+      const returnItemsData = input.items.map((i) => ({
+        return_request_id: returnReq.id,
+        order_item_id: i.orderItemId,
+        quantity: i.quantity || 1,
+      }));
+      await supabaseAdmin.from("return_items").insert(returnItemsData);
+    }
+
+    // 5. Update order status
+    await supabaseAdmin
+      .from("orders")
+      .update({
+        order_status: OrderStatus.RETURN_REQUESTED,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.id);
+
+    // 6. Immutable Audit Log
+    const { AuditService } = await import("../audit/audit.service.js");
+    await AuditService.logAction({
+      actorId: buyerId,
+      actorRole: "BUYER",
+      action: "RETURN_REQUESTED",
+      targetResourceType: "order",
+      targetResourceId: order.id,
+      previousState: { orderStatus: order.order_status },
+      newState: {
+        orderStatus: OrderStatus.RETURN_REQUESTED,
+        returnRequestId: returnReq.id,
+        reverseCn: reversePickupResult.reverseTrackingNumber,
+      },
+      reason: `Buyer returned order: ${input.reason}`,
+    });
+
+    return {
+      success: true,
+      returnRequest: returnReq,
+      reverseShipment: reversePickupResult,
+    };
+  }
+
+  /**
+   * Cancels an order (and all child store_orders) and releases inventory locks.
+   */
+  static async cancelOrder(
+    id: string,
+    reason?: string,
+    authenticatedUser?: any,
+  ) {
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("*, order_items(*), store_orders(*)")
+      .eq("id", id)
+      .single();
+
+    if (!order) throw new Error("Order not found");
+
+    if (
+      authenticatedUser &&
+      authenticatedUser.role !== "ADMIN" &&
+      order.buyer_id !== authenticatedUser.id
+    ) {
+      throw new Error("Forbidden");
     }
 
     // Cancel parent order
     await supabaseAdmin
-      .from('orders')
+      .from("orders")
       .update({
         order_status: OrderStatus.CANCELLED,
-        notes: reason ? `Cancelled: ${reason}` : 'Cancelled by customer',
+        notes: reason ? `Cancelled: ${reason}` : "Cancelled by customer",
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq("id", id);
 
     // Cancel all child store_orders
     if (order.store_orders?.length > 0) {
       await supabaseAdmin
-        .from('store_orders')
-        .update({ order_status: OrderStatus.CANCELLED, updated_at: new Date().toISOString() })
-        .eq('order_id', id);
+        .from("store_orders")
+        .update({
+          order_status: OrderStatus.CANCELLED,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("order_id", id);
     }
 
     // Release inventory reservation locks
@@ -306,19 +460,27 @@ export class OrderService {
    * Returns the discount amount and final total.
    */
   static async applyCoupon(couponCode: string, cartItems: CartItem[]) {
-    const cartTotal = cartItems.reduce((s, i) => s + (i.unitPricePkr || 0) * i.quantity, 0);
+    const cartTotal = cartItems.reduce(
+      (s, i) => s + (i.unitPricePkr || 0) * i.quantity,
+      0,
+    );
 
     const { data: coupon, error } = await supabaseAdmin
-      .from('coupons')
-      .select('*')
-      .eq('code', couponCode.toUpperCase())
-      .eq('is_active', true)
+      .from("coupons")
+      .select("*")
+      .eq("code", couponCode.toUpperCase())
+      .eq("is_active", true)
       .single();
 
-    if (error || !coupon) throw new Error('Invalid or expired coupon code');
-    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) throw new Error('This coupon has expired');
-    if (coupon.max_uses && coupon.current_uses >= coupon.max_uses) throw new Error('Coupon usage limit reached');
-    if (cartTotal < coupon.min_spend_pkr) throw new Error(`Minimum spend of PKR ${coupon.min_spend_pkr} required for this coupon`);
+    if (error || !coupon) throw new Error("Invalid or expired coupon code");
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date())
+      throw new Error("This coupon has expired");
+    if (coupon.max_uses && coupon.current_uses >= coupon.max_uses)
+      throw new Error("Coupon usage limit reached");
+    if (cartTotal < coupon.min_spend_pkr)
+      throw new Error(
+        `Minimum spend of PKR ${coupon.min_spend_pkr} required for this coupon`,
+      );
 
     // If seller-scoped coupon, only apply to that seller's items
     let eligibleTotal = cartTotal;
@@ -326,24 +488,31 @@ export class OrderService {
       eligibleTotal = cartItems
         .filter((i) => i.storeId === coupon.store_id)
         .reduce((s, i) => s + (i.unitPricePkr || 0) * i.quantity, 0);
-      if (eligibleTotal === 0) throw new Error('This coupon only applies to items from a specific seller not in your cart');
+      if (eligibleTotal === 0)
+        throw new Error(
+          "This coupon only applies to items from a specific seller not in your cart",
+        );
     }
 
     let discount = 0;
-    if (coupon.discount_type === 'PERCENTAGE') {
+    if (coupon.discount_type === "PERCENTAGE") {
       discount = Math.round(eligibleTotal * (coupon.discount_value / 100));
-      if (coupon.max_discount_pkr) discount = Math.min(discount, coupon.max_discount_pkr);
-    } else if (coupon.discount_type === 'FIXED_PKR') {
+      if (coupon.max_discount_pkr)
+        discount = Math.min(discount, coupon.max_discount_pkr);
+    } else if (coupon.discount_type === "FIXED_PKR") {
       discount = Math.min(coupon.discount_value, eligibleTotal);
-    } else if (coupon.discount_type === 'FREE_SHIPPING') {
+    } else if (coupon.discount_type === "FREE_SHIPPING") {
       discount = 200; // Standard shipping fee waived
     }
 
     return {
-      coupon: { code: coupon.code, discountType: coupon.discount_type, discountValue: coupon.discount_value },
+      coupon: {
+        code: coupon.code,
+        discountType: coupon.discount_type,
+        discountValue: coupon.discount_value,
+      },
       discountPkr: discount,
       finalTotal: Math.max(0, cartTotal - discount),
     };
   }
 }
-

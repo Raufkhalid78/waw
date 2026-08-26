@@ -1,18 +1,29 @@
-import { ProductDetail } from '@/data/mockProducts';
-import { STORES_CATALOG, StoreDetail } from '@/data/mockStores';
-import { CheckoutQuoteRequest, CheckoutQuoteResponse, PaymentMethod, SellerType } from '@waw/types';
+import { ProductDetail } from "@/data/mockProducts";
+import { STORES_CATALOG, StoreDetail } from "@/data/mockStores";
+import {
+  CheckoutQuoteRequest,
+  CheckoutQuoteResponse,
+  PaymentMethod,
+  SellerType,
+} from "@waw/types";
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+).replace(/\/+$/, "");
 
 function mapApiProductToDetail(p: any): ProductDetail {
   const basePrice = p.base_price_pkr || p.price_pkr || p.pricePkr || 2999;
-  const comparePrice = p.compare_at_price_pkr || p.comparePricePkr || Math.round(basePrice * 1.25);
-  const discountPercent = Math.max(0, Math.round(((comparePrice - basePrice) / comparePrice) * 100));
+  const comparePrice =
+    p.compare_at_price_pkr || p.comparePricePkr || Math.round(basePrice * 1.25);
+  const discountPercent = Math.max(
+    0,
+    Math.round(((comparePrice - basePrice) / comparePrice) * 100),
+  );
 
   return {
     productId: p.id || p.productId,
-    title: p.title || 'Product',
-    category: p.category?.name || p.categoryName || p.category || 'General',
+    title: p.title || "Product",
+    category: p.category?.name || p.categoryName || p.category || "General",
     pricePkr: basePrice,
     originalPricePkr: comparePrice,
     discountPercent,
@@ -20,21 +31,35 @@ function mapApiProductToDetail(p: any): ProductDetail {
     reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || 0,
     soldCount: p.sold_count || p.soldCount || 0,
     isExpress: p.is_first_party ?? p.isFirstParty ?? true,
-    sellerType: p.is_first_party ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
-    storeName: p.store?.name || p.storeName || 'Waw Official Retail',
-    storeSlug: p.store?.slug || p.storeSlug || 'waw-official',
-    sellerCity: p.store?.city || p.sellerCity || 'Lahore',
-    deliveryTime: 'Standard Delivery',
-    images: Array.isArray(p.images) && p.images.length > 0
-      ? p.images
-      : ['https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80'],
-    description: p.description || 'Premium artisan crafted product on Waw Marketplace.',
-    highlights: ['Authentic Handmade Item', 'State Bank Escrow Protected', 'Direct Courier Dispatch with Tracking'],
-    specifications: { 'Origin': 'Pakistan', 'Condition': 'Brand New', 'Packaging': 'Tamper-evident Waw Box' },
+    sellerType: p.is_first_party
+      ? SellerType.FIRST_PARTY
+      : SellerType.THIRD_PARTY,
+    storeName: p.store?.name || p.storeName || "Waw Official Retail",
+    storeSlug: p.store?.slug || p.storeSlug || "waw-official",
+    sellerCity: p.store?.city || p.sellerCity || "Lahore",
+    deliveryTime: "Standard Delivery",
+    images:
+      Array.isArray(p.images) && p.images.length > 0
+        ? p.images
+        : [
+            "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80",
+          ],
+    description:
+      p.description || "Premium artisan crafted product on Waw Marketplace.",
+    highlights: [
+      "Authentic Handmade Item",
+      "State Bank Escrow Protected",
+      "Direct Courier Dispatch with Tracking",
+    ],
+    specifications: {
+      Origin: "Pakistan",
+      Condition: "Brand New",
+      Packaging: "Tamper-evident Waw Box",
+    },
     inStock: (p.stock_quantity ?? p.stockQuantity ?? 10) > 0,
     stockCount: p.stock_quantity ?? p.stockQuantity ?? 10,
-    sku: p.sku || `SKU-${p.id?.slice(-4) || '1001'}`,
-    reviews: [],
+    sku: p.sku || `SKU-${p.id?.slice(-4) || "1001"}`,
+    reviews: Array.isArray(p.reviews) ? p.reviews.map((r: any) => ({ id: r.id, author: r.buyer?.full_name || 'Waw Customer', city: 'Pakistan', rating: r.rating, date: new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), comment: r.comment || '', verifiedPurchase: r.is_verified_purchase ?? true })) : [],
   };
 }
 
@@ -48,9 +73,12 @@ export async function fetchProducts(params?: {
   try {
     if (params?.q) {
       // Query Typesense Search Route
-      const res = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(params.q)}`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(
+        `${API_BASE_URL}/api/search?q=${encodeURIComponent(params.q)}`,
+        {
+          cache: "no-store",
+        },
+      );
       if (res.ok) {
         const searchData = await res.json();
         const hits = searchData.hits || searchData.results || [];
@@ -61,15 +89,18 @@ export async function fetchProducts(params?: {
     }
 
     const query = new URLSearchParams();
-    if (params?.category) query.append('categoryId', params.category);
-    if (params?.page) query.append('page', params.page.toString());
+    if (params?.category) query.append("categoryId", params.category);
+    if (params?.page) query.append("page", params.page.toString());
 
-    const res = await fetch(`${API_BASE_URL}/api/products?${query.toString()}`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error('API request failed');
+    const res = await fetch(
+      `${API_BASE_URL}/api/products?${query.toString()}`,
+      {
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) throw new Error("API request failed");
     const data = await res.json();
-    const items = Array.isArray(data) ? data : (data.items || []);
+    const items = Array.isArray(data) ? data : data.items || [];
     if (items.length > 0) {
       return items.map(mapApiProductToDetail);
     }
@@ -79,10 +110,12 @@ export async function fetchProducts(params?: {
   }
 }
 
-export async function fetchProductById(productId: string): Promise<ProductDetail | undefined> {
+export async function fetchProductById(
+  productId: string,
+): Promise<ProductDetail | undefined> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
-      cache: 'no-store',
+      cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
@@ -94,60 +127,131 @@ export async function fetchProductById(productId: string): Promise<ProductDetail
   }
 }
 
-export async function fetchStoreBySlug(slug: string): Promise<StoreDetail | undefined> {
+export async function fetchStoreBySlug(
+  slug: string,
+): Promise<StoreDetail | undefined> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/products?storeSlug=${slug}`, {
-      cache: 'no-store',
+      cache: "no-store",
     });
-    if (!res.ok) throw new Error('Store not found');
-    return STORES_CATALOG[slug] || STORES_CATALOG['lahore-tech-hub'];
+    if (!res.ok) throw new Error("Store not found");
+    return STORES_CATALOG[slug] || STORES_CATALOG["lahore-tech-hub"];
   } catch (error) {
-    return STORES_CATALOG[slug] || STORES_CATALOG['lahore-tech-hub'];
+    return STORES_CATALOG[slug] || STORES_CATALOG["lahore-tech-hub"];
   }
 }
 
-export async function fetchCheckoutQuote(input: CheckoutQuoteRequest): Promise<CheckoutQuoteResponse> {
+export async function fetchCheckoutQuote(
+  input: CheckoutQuoteRequest,
+): Promise<CheckoutQuoteResponse> {
   const res = await fetch(`${API_BASE_URL}/api/checkout/quote`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(err.error || 'Failed to generate checkout quote');
+    throw new Error(err.error || "Failed to generate checkout quote");
   }
   return await res.json();
 }
 
 export async function createOrderApi(orderInput: any): Promise<any> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('waw_auth_token') : null;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("waw_auth_token")
+      : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE_URL}/api/orders`, {
-    method: 'POST',
+    method: "POST",
     headers,
     body: JSON.stringify(orderInput),
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(err.error || 'Failed to place order');
+    throw new Error(err.error || "Failed to place order");
   }
   return await res.json();
 }
 
 export async function fetchOrderById(orderId: string): Promise<any> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('waw_auth_token') : null;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("waw_auth_token")
+      : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
     headers,
-    cache: 'no-store',
+    cache: "no-store",
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(err.error || 'Order not found');
+    throw new Error(err.error || "Order not found");
+  }
+  return await res.json();
+}
+
+export async function fetchUserOrders(): Promise<any[]> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("waw_auth_token")
+      : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/orders`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Failed to fetch user orders:", err);
+    return [];
+  }
+}
+
+export async function submitOrderReturn(
+  orderId: string,
+  returnInput: {
+    reason: string;
+    comments?: string;
+    refundPreference?: string;
+    pickupAddress?: string;
+    pickupCity?: string;
+  },
+): Promise<any> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("waw_auth_token")
+      : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/return`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(returnInput),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Failed to submit return request");
   }
   return await res.json();
 }
@@ -158,19 +262,28 @@ export async function initiatePaymentApi(paymentInput: {
   customerPhone: string;
   customerEmail?: string;
   returnUrl: string;
-}): Promise<{ checkoutUrl?: string; transactionId?: string; qrPayload?: string }> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('waw_auth_token') : null;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+}): Promise<{
+  checkoutUrl?: string;
+  transactionId?: string;
+  qrPayload?: string;
+}> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("waw_auth_token")
+      : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE_URL}/api/payments/xpay/initiate`, {
-    method: 'POST',
+    method: "POST",
     headers,
     body: JSON.stringify(paymentInput),
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(err.error || 'Failed to initiate payment gateway session');
+    throw new Error(err.error || "Failed to initiate payment gateway session");
   }
   return await res.json();
 }

@@ -1,33 +1,35 @@
-'use client';
+"use client";
 
-import React from 'react';
-import Link from 'next/link';
+import React from "react";
+import Link from "next/link";
 
 interface LogoProps {
-  variant?: 'wordmark' | 'icon' | 'full';
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  theme?: 'dark' | 'light';
+  variant?: "wordmark" | "icon" | "full";
+  size?: "sm" | "md" | "lg" | "xl";
+  theme?: "dark" | "light";
   className?: string;
   href?: string;
 }
 
 export function Logo({
-  variant = 'wordmark',
-  size = 'md',
-  theme = 'dark',
-  className = '',
-  href = '/',
+  variant = "wordmark",
+  size = "md",
+  theme = "dark",
+  className = "",
+  href = "/",
 }: LogoProps) {
   const fontSize = {
-    sm: 'text-2xl font-black',
-    md: 'text-3xl sm:text-[38px] font-black',
-    lg: 'text-4xl sm:text-5xl font-black',
-    xl: 'text-5xl sm:text-6xl font-black',
+    sm: "text-2xl font-black",
+    md: "text-3xl sm:text-[38px] font-black",
+    lg: "text-4xl sm:text-5xl font-black",
+    xl: "text-5xl sm:text-6xl font-black",
   }[size];
 
   const content = (
-    <div className={`inline-flex items-center gap-2.5 group select-none ${className}`}>
-      {variant === 'icon' ? (
+    <div
+      className={`inline-flex items-center gap-2.5 group select-none ${className}`}
+    >
+      {variant === "icon" ? (
         <div className="relative shrink-0 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 w-10 h-10">
           <svg
             viewBox="0 0 1024 1024"
@@ -35,7 +37,14 @@ export function Logo({
             xmlns="http://www.w3.org/2000/svg"
             className="w-full h-full drop-shadow-xs"
           >
-            <rect x="100" y="100" width="824" height="824" rx="240" fill="#FEF600" />
+            <rect
+              x="100"
+              y="100"
+              width="824"
+              height="824"
+              rx="240"
+              fill="#FEF600"
+            />
             <path
               d="M 547.395 196.544 C 466.720 208.319, 400.481 266.221, 377.560 345 C 371.174 366.950, 368.854 388.738, 370.159 414.524 C 373.721 484.909, 414.776 549.536, 478.355 584.837 C 505.927 600.146, 536.387 608.501, 569 609.699 C 610.619 611.229, 646.891 601.758, 684 579.671 C 688.125 577.216, 691.628 575.545, 691.785 575.958 C 692.150 576.921, 686.255 593.068, 681.624 603.788 C 667.662 636.107, 646.313 667.439, 624.256 687.980 C 592.873 717.206, 555.735 735.651, 516.558 741.468 C 504.127 743.314, 475.783 743.572, 463 741.955 C 449.261 740.217, 434.857 737.183, 422.369 733.397 C 381.070 720.878, 338.609 695.017, 303.913 661.254 L 296.326 653.871 L 262.114 688.185 L 227.903 722.500 L 236.821 731.095 C 271.777 764.785, 321.647 794.723, 371.500 811.943 C 411.126 825.631, 444.353 831.352, 484.500 831.399 C 534.694 831.457, 577.350 821.377, 621.644 798.989 C 672.988 773.038, 716.300 733.842, 746.499 686 C 755.133 672.321, 768.731 644.709, 774.426 629.290 C 800.627 558.350, 803.610 467.496, 782.859 372.500 C 771.934 322.487, 753.705 286.839, 723.500 256.417 C 690.236 222.914, 650.887 203.052, 604.804 196.501 C 591.980 194.678, 560.012 194.702, 547.395 196.544 M 565.636 293.096 C 523.819 297.508, 488.170 326.047, 473.632 366.750 C 464.538 392.213, 466.603 424.310, 478.965 449.619 C 508.534 510.157, 582.122 530.369, 637.331 493.114 C 665.418 474.161, 682.759 443.902, 685.538 409 C 687.279 387.122, 679.842 359.911, 666.921 340.883 C 660.790 331.855, 647.173 318.061, 638.417 312.008 C 622.972 301.331, 605.827 295.018, 586.836 293.018 C 576.494 291.929, 576.705 291.928, 565.636 293.096"
               fill="#383838"
@@ -46,9 +55,9 @@ export function Logo({
       ) : (
         <span
           className={`lowercase tracking-tighter leading-none italic font-black transform -rotate-2 inline-block transition-transform duration-200 group-hover:scale-105 group-hover:-rotate-1 ${fontSize} ${
-            theme === 'light' ? 'text-white' : 'text-slate-950'
+            theme === "light" ? "text-white" : "text-slate-950"
           }`}
-          style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}
+          style={{ fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}
         >
           waw
         </span>

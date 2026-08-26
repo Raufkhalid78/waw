@@ -1,5 +1,5 @@
-import { Request, Response } from 'express';
-import { AdminService } from './admin.service.js';
+import { Request, Response } from "express";
+import { AdminService } from "./admin.service.js";
 
 export class AdminController {
   static async getStats(req: Request, res: Response): Promise<void> {
@@ -25,7 +25,11 @@ export class AdminController {
     try {
       const { id } = req.params;
       const { status, commissionRatePercentage } = req.body;
-      const updated = await AdminService.updateSellerStatus(id, status, commissionRatePercentage);
+      const updated = await AdminService.updateSellerStatus(
+        id,
+        status,
+        commissionRatePercentage,
+      );
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ error: err.message });

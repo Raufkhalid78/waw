@@ -1,5 +1,12 @@
-import { create } from 'zustand';
-import { calculateOrderSummary, MARKETPLACE_CONFIG, OrderCalculationResult, OrderItemPricingInput, PaymentMethod, SellerType } from '@waw/types';
+import { create } from "zustand";
+import {
+  calculateOrderSummary,
+  MARKETPLACE_CONFIG,
+  OrderCalculationResult,
+  OrderItemPricingInput,
+  PaymentMethod,
+  SellerType,
+} from "@waw/types";
 
 export interface CartItem {
   productId: string;
@@ -27,14 +34,18 @@ interface CartStore {
   wishlist: CartItem[];
   paymentMethod: PaymentMethod;
   selectedCity: string;
-  language: 'EN' | 'UR';
+  language: "EN" | "UR";
   login: (user: UserProfile) => void;
   logout: () => void;
   setSelectedCity: (city: string) => void;
-  setLanguage: (lang: 'EN' | 'UR') => void;
+  setLanguage: (lang: "EN" | "UR") => void;
   addItem: (item: CartItem) => void;
   removeItem: (productId: string, variantId?: string) => void;
-  updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
+  updateQuantity: (
+    productId: string,
+    quantity: number,
+    variantId?: string,
+  ) => void;
   clearCart: () => void;
   toggleWishlist: (item: CartItem) => void;
   isInWishlist: (productId: string) => boolean;
@@ -47,8 +58,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
   items: [],
   wishlist: [],
   paymentMethod: PaymentMethod.COD,
-  selectedCity: 'Lahore',
-  language: 'EN',
+  selectedCity: "Lahore",
+  language: "EN",
 
   login: (user) => set({ user }),
   logout: () => set({ user: null }),
@@ -60,24 +71,29 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set((state) => {
       const exists = state.wishlist.some((w) => w.productId === item.productId);
       if (exists) {
-        return { wishlist: state.wishlist.filter((w) => w.productId !== item.productId) };
+        return {
+          wishlist: state.wishlist.filter(
+            (w) => w.productId !== item.productId,
+          ),
+        };
       }
       return { wishlist: [...state.wishlist, item] };
     }),
 
-  isInWishlist: (productId) => get().wishlist.some((w) => w.productId === productId),
+  isInWishlist: (productId) =>
+    get().wishlist.some((w) => w.productId === productId),
 
   addItem: (item) =>
     set((state) => {
       const existing = state.items.find(
-        (i) => i.productId === item.productId && i.variantId === item.variantId
+        (i) => i.productId === item.productId && i.variantId === item.variantId,
       );
       if (existing) {
         return {
           items: state.items.map((i) =>
             i.productId === item.productId && i.variantId === item.variantId
               ? { ...i, quantity: i.quantity + item.quantity }
-              : i
+              : i,
           ),
         };
       }
@@ -87,7 +103,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   removeItem: (productId, variantId) =>
     set((state) => ({
       items: state.items.filter(
-        (i) => !(i.productId === productId && i.variantId === variantId)
+        (i) => !(i.productId === productId && i.variantId === variantId),
       ),
     })),
 
@@ -95,11 +111,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set((state) => ({
       items:
         quantity <= 0
-          ? state.items.filter((i) => !(i.productId === productId && i.variantId === variantId))
+          ? state.items.filter(
+              (i) => !(i.productId === productId && i.variantId === variantId),
+            )
           : state.items.map((i) =>
               i.productId === productId && i.variantId === variantId
                 ? { ...i, quantity }
-                : i
+                : i,
             ),
     })),
 

@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
-import { PostExXPayService } from './xpay.service.js';
-import { PaymentMethod } from '../../types/index.js';
+import { Request, Response } from "express";
+import { PostExXPayService } from "./xpay.service.js";
+import { PaymentMethod } from "../../types/index.js";
 
 export class PaymentController {
   /**
@@ -10,12 +10,12 @@ export class PaymentController {
     try {
       const { orderId, method } = req.body;
       if (!orderId) {
-        res.status(400).json({ error: 'orderId is required' });
+        res.status(400).json({ error: "orderId is required" });
         return;
       }
       const session = await PostExXPayService.createPaymentIntent(
         orderId,
-        method || PaymentMethod.XPAY_CARD
+        method || PaymentMethod.XPAY_CARD,
       );
       res.json(session);
     } catch (err: any) {
@@ -28,12 +28,17 @@ export class PaymentController {
    */
   static async xpayWebhook(req: any, res: Response): Promise<void> {
     try {
-      const signature = req.headers['x-postex-signature'] || req.headers['x-xpay-signature'] as string | undefined;
+      const signature =
+        req.headers["x-postex-signature"] ||
+        (req.headers["x-xpay-signature"] as string | undefined);
       const rawBody = req.rawBody || JSON.stringify(req.body);
-      
-      const isValid = PostExXPayService.verifyWebhookSignature(rawBody, signature as string | undefined);
+
+      const isValid = PostExXPayService.verifyWebhookSignature(
+        rawBody,
+        signature as string | undefined,
+      );
       if (!isValid) {
-        res.status(401).json({ error: 'Invalid XPay webhook signature' });
+        res.status(401).json({ error: "Invalid XPay webhook signature" });
         return;
       }
 

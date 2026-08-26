@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Tag,
   Plus,
@@ -11,20 +11,26 @@ import {
   AlertCircle,
   Calendar,
   Layers,
-} from 'lucide-react';
-import { fetchSellerCoupons, createSellerCoupon, SellerCoupon } from '../../lib/api';
+} from "lucide-react";
+import {
+  fetchSellerCoupons,
+  createSellerCoupon,
+  SellerCoupon,
+} from "../../lib/api";
 
 export default function SellerCouponsPage() {
   const [coupons, setCoupons] = useState<SellerCoupon[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
   // Form state
-  const [code, setCode] = useState('');
-  const [discountType, setDiscountType] = useState<'PERCENTAGE' | 'FIXED_PKR' | 'FREE_SHIPPING'>('PERCENTAGE');
-  const [discountValue, setDiscountValue] = useState('10');
-  const [minSpendPkr, setMinSpendPkr] = useState('3000');
-  const [maxDiscountPkr, setMaxDiscountPkr] = useState('1000');
-  const [maxUses, setMaxUses] = useState('100');
+  const [code, setCode] = useState("");
+  const [discountType, setDiscountType] = useState<
+    "PERCENTAGE" | "FIXED_PKR" | "FREE_SHIPPING"
+  >("PERCENTAGE");
+  const [discountValue, setDiscountValue] = useState("10");
+  const [minSpendPkr, setMinSpendPkr] = useState("3000");
+  const [maxDiscountPkr, setMaxDiscountPkr] = useState("1000");
+  const [maxUses, setMaxUses] = useState("100");
 
   useEffect(() => {
     fetchSellerCoupons().then(setCoupons);
@@ -42,16 +48,19 @@ export default function SellerCouponsPage() {
     });
     setCoupons([created, ...coupons]);
     setShowCreate(false);
-    setCode('');
+    setCode("");
   };
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Seller-Scoped Coupons & Deals</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            Seller-Scoped Coupons & Deals
+          </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Create custom promo codes that apply exclusively to items from your store.
+            Create custom promo codes that apply exclusively to items from your
+            store.
           </p>
         </div>
         <button
@@ -68,33 +77,41 @@ export default function SellerCouponsPage() {
           <Tag className="w-3.5 h-3.5" /> Seller-Funded Promo Policy
         </div>
         <p className="text-[11px] text-slate-300">
-          Coupons created here will only discount items in the buyer&apos;s cart that originate from your store. The discount is absorbed from your payout.
+          Coupons created here will only discount items in the buyer&apos;s cart
+          that originate from your store. The discount is absorbed from your
+          payout.
         </p>
       </div>
 
       {/* Create Form */}
       {showCreate && (
         <div className="p-6 rounded-2xl bg-[#0f172a] border border-slate-800 shadow-xl space-y-4 text-xs">
-          <h3 className="font-bold text-white text-sm">Configure New Store Promo Code</h3>
+          <h3 className="font-bold text-white text-sm">
+            Configure New Store Promo Code
+          </h3>
           <form onSubmit={handleCreateCoupon} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Coupon Code</label>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Coupon Code
+                </label>
                 <input
                   required
                   type="text"
                   placeholder="e.g. FLASH15"
                   value={code}
-                  onChange={e => setCode(e.target.value.toUpperCase())}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono uppercase focus:outline-none focus:border-amber-400"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Discount Type</label>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Discount Type
+                </label>
                 <select
                   value={discountType}
-                  onChange={e => setDiscountType(e.target.value as any)}
+                  onChange={(e) => setDiscountType(e.target.value as any)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                 >
                   <option value="PERCENTAGE">Percentage (%) Off</option>
@@ -104,12 +121,14 @@ export default function SellerCouponsPage() {
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Discount Value</label>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Discount Value
+                </label>
                 <input
                   required
                   type="number"
                   value={discountValue}
-                  onChange={e => setDiscountValue(e.target.value)}
+                  onChange={(e) => setDiscountValue(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                 />
               </div>
@@ -117,31 +136,37 @@ export default function SellerCouponsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Min Spend (PKR)</label>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Min Spend (PKR)
+                </label>
                 <input
                   type="number"
                   value={minSpendPkr}
-                  onChange={e => setMinSpendPkr(e.target.value)}
+                  onChange={(e) => setMinSpendPkr(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Max Cap (PKR - Optional)</label>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Max Cap (PKR - Optional)
+                </label>
                 <input
                   type="number"
                   value={maxDiscountPkr}
-                  onChange={e => setMaxDiscountPkr(e.target.value)}
+                  onChange={(e) => setMaxDiscountPkr(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Max Uses Limit</label>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Max Uses Limit
+                </label>
                 <input
                   type="number"
                   value={maxUses}
-                  onChange={e => setMaxUses(e.target.value)}
+                  onChange={(e) => setMaxUses(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                 />
               </div>
@@ -159,24 +184,34 @@ export default function SellerCouponsPage() {
 
       {/* Active Coupons Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {coupons.map(coupon => (
-          <div key={coupon.id} className="p-5 rounded-2xl bg-[#0f172a] border border-slate-800 shadow-lg space-y-3">
+        {coupons.map((coupon) => (
+          <div
+            key={coupon.id}
+            className="p-5 rounded-2xl bg-[#0f172a] border border-slate-800 shadow-lg space-y-3"
+          >
             <div className="flex items-center justify-between">
-              <span className="font-mono font-black text-amber-400 text-lg tracking-wider">{coupon.code}</span>
+              <span className="font-mono font-black text-amber-400 text-lg tracking-wider">
+                {coupon.code}
+              </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 ACTIVE
               </span>
             </div>
 
             <div className="text-xl font-bold text-white">
-              {coupon.discountType === 'PERCENTAGE' && `${coupon.discountValue}% OFF`}
-              {coupon.discountType === 'FIXED_PKR' && `PKR ${coupon.discountValue} OFF`}
-              {coupon.discountType === 'FREE_SHIPPING' && 'FREE DELIVERY'}
+              {coupon.discountType === "PERCENTAGE" &&
+                `${coupon.discountValue}% OFF`}
+              {coupon.discountType === "FIXED_PKR" &&
+                `PKR ${coupon.discountValue} OFF`}
+              {coupon.discountType === "FREE_SHIPPING" && "FREE DELIVERY"}
             </div>
 
             <div className="text-[11px] text-slate-400 space-y-1">
               <div>Min. Spend: PKR {coupon.minSpendPkr.toLocaleString()}</div>
-              <div>Redeemed: {coupon.currentUses} {coupon.maxUses ? `/ ${coupon.maxUses}` : ''} times</div>
+              <div>
+                Redeemed: {coupon.currentUses}{" "}
+                {coupon.maxUses ? `/ ${coupon.maxUses}` : ""} times
+              </div>
             </div>
           </div>
         ))}

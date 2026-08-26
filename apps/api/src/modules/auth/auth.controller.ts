@@ -1,12 +1,12 @@
-import { Request, Response } from 'express';
-import { AuthService } from './auth.service.js';
+import { Request, Response } from "express";
+import { AuthService } from "./auth.service.js";
 
 export class AuthController {
   static async requestOtp(req: Request, res: Response): Promise<void> {
     try {
       const { phone } = req.body;
       if (!phone) {
-        res.status(400).json({ error: 'Phone number is required' });
+        res.status(400).json({ error: "Phone number is required" });
         return;
       }
       const result = await AuthService.requestWhatsAppOtp(phone);
@@ -20,10 +20,16 @@ export class AuthController {
     try {
       const { phone, otp, role, storeName, city } = req.body;
       if (!phone || !otp) {
-        res.status(400).json({ error: 'Phone and OTP are required' });
+        res.status(400).json({ error: "Phone and OTP are required" });
         return;
       }
-      const result = await AuthService.verifyWhatsAppOtp(phone, otp, role, storeName, city);
+      const result = await AuthService.verifyWhatsAppOtp(
+        phone,
+        otp,
+        role,
+        storeName,
+        city,
+      );
       res.json(result);
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -34,7 +40,7 @@ export class AuthController {
     try {
       const { supabaseUser } = req.body;
       if (!supabaseUser || !supabaseUser.id) {
-        res.status(400).json({ error: 'Invalid user payload' });
+        res.status(400).json({ error: "Invalid user payload" });
         return;
       }
       const profile = await AuthService.syncOAuthUser(supabaseUser);

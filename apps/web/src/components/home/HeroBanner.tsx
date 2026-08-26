@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   ArrowRight,
   ChevronLeft,
@@ -17,70 +17,80 @@ import {
   Store,
   Award,
   CheckCircle2,
-} from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
-import { SellerType } from '@waw/types';
+} from "lucide-react";
+import { useCartStore } from "@/store/useCartStore";
+import { SellerType } from "@waw/types";
 
 const HERO_SLIDES = [
   {
-    id: 'slide_1',
-    badge: '🔥 FEATURED CRAFTS & TECH',
-    badgeBg: 'bg-slate-950 text-amber-400 border border-amber-400/30',
-    title: 'Authentic Goods Across Pakistan',
-    highlightText: 'Direct from Verified Local Makers',
-    subtitle: 'Shop direct from authentic Karachi fashion houses, Lahore tech importers, Sialkot sports makers, and Peshawar leather craftsmen.',
-    primaryCta: 'SHOP FEATURED DEALS',
-    primaryHref: '/category/mobiles-tech',
-    bgGradient: 'from-amber-400 via-amber-500 to-yellow-500',
-    textColor: 'text-slate-950',
-    productImage: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80',
-    productTitle: 'Handcrafted Cow Leather Bifold Wallet',
-    productPrice: 'PKR 2,499',
-    productOriginalPrice: 'PKR 3,800',
-    productRating: 'Verified Merchant',
-    floatingBadge: '⚡ Fast Nationwide Delivery',
+    id: "slide_1",
+    badge: "🔥 FEATURED CRAFTS & TECH",
+    badgeBg: "bg-slate-950 text-amber-400 border border-amber-400/30",
+    title: "Authentic Goods Across Pakistan",
+    highlightText: "Direct from Verified Local Makers",
+    subtitle:
+      "Shop direct from authentic Karachi fashion houses, Lahore tech importers, Sialkot sports makers, and Peshawar leather craftsmen.",
+    primaryCta: "SHOP FEATURED DEALS",
+    primaryHref: "/category/mobiles-tech",
+    bgGradient: "from-amber-400 via-amber-500 to-yellow-500",
+    textColor: "text-slate-950",
+    productImage:
+      "https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80",
+    productTitle: "Handcrafted Cow Leather Bifold Wallet",
+    productPrice: "PKR 2,499",
+    productOriginalPrice: "PKR 3,800",
+    productRating: "Verified Merchant",
+    floatingBadge: "⚡ Fast Nationwide Delivery",
   },
   {
-    id: 'slide_2',
-    badge: '👗 FESTIVE SUMMER LAWN',
-    badgeBg: 'bg-slate-950 text-rose-400 border border-rose-400/30',
-    title: 'Designer Lawn & Luxury Festive Suits',
-    highlightText: 'Direct Textile Mill Prices',
-    subtitle: 'Authentic embroidered lawn from top fashion houses in Karachi & Lahore with free nationwide delivery above PKR 5,000.',
-    primaryCta: 'EXPLORE LAWN COLLECTION',
-    primaryHref: '/category/womens-lawn',
-    bgGradient: 'from-rose-500 via-rose-600 to-amber-500',
-    textColor: 'text-white',
-    productImage: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80',
-    productTitle: 'Embroidered 3-Piece Festive Lawn Suit',
-    productPrice: 'PKR 4,499',
-    productOriginalPrice: 'PKR 6,500',
-    productRating: 'Pure Cotton',
-    floatingBadge: '✨ Premium Collection',
+    id: "slide_2",
+    badge: "👗 FESTIVE SUMMER LAWN",
+    badgeBg: "bg-slate-950 text-rose-400 border border-rose-400/30",
+    title: "Designer Lawn & Luxury Festive Suits",
+    highlightText: "Direct Textile Mill Prices",
+    subtitle:
+      "Authentic embroidered lawn from top fashion houses in Karachi & Lahore with free nationwide delivery above PKR 5,000.",
+    primaryCta: "EXPLORE LAWN COLLECTION",
+    primaryHref: "/category/womens-lawn",
+    bgGradient: "from-rose-500 via-rose-600 to-amber-500",
+    textColor: "text-white",
+    productImage:
+      "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80",
+    productTitle: "Embroidered 3-Piece Festive Lawn Suit",
+    productPrice: "PKR 4,499",
+    productOriginalPrice: "PKR 6,500",
+    productRating: "Pure Cotton",
+    floatingBadge: "✨ Premium Collection",
   },
   {
-    id: 'slide_3',
-    badge: '🏏 SIALKOT EXPORT HUB',
-    badgeBg: 'bg-slate-950 text-emerald-400 border border-emerald-400/30',
-    title: 'Match Grade Footballs & Sports Gear',
-    highlightText: 'World Famous Craftsmanship',
-    subtitle: 'Direct from certified Sialkot sports makers to your doorstep with fast tracked delivery.',
-    primaryCta: 'SHOP SIALKOT SPORTS',
-    primaryHref: '/category/sialkot-sports',
-    bgGradient: 'from-emerald-700 via-teal-800 to-slate-950',
-    textColor: 'text-white',
-    productImage: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80',
-    productTitle: 'Pro Thermally Bonded Match Football',
-    productPrice: 'PKR 2,800',
-    productOriginalPrice: 'PKR 4,200',
-    productRating: 'Handcrafted',
-    floatingBadge: '🏆 Match Quality Spec',
+    id: "slide_3",
+    badge: "🏏 SIALKOT EXPORT HUB",
+    badgeBg: "bg-slate-950 text-emerald-400 border border-emerald-400/30",
+    title: "Match Grade Footballs & Sports Gear",
+    highlightText: "World Famous Craftsmanship",
+    subtitle:
+      "Direct from certified Sialkot sports makers to your doorstep with fast tracked delivery.",
+    primaryCta: "SHOP SIALKOT SPORTS",
+    primaryHref: "/category/sialkot-sports",
+    bgGradient: "from-emerald-700 via-teal-800 to-slate-950",
+    textColor: "text-white",
+    productImage:
+      "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80",
+    productTitle: "Pro Thermally Bonded Match Football",
+    productPrice: "PKR 2,800",
+    productOriginalPrice: "PKR 4,200",
+    productRating: "Handcrafted",
+    floatingBadge: "🏆 Match Quality Spec",
   },
 ];
 
 export function HeroBanner() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [timeLeft, setTimeLeft] = useState({ hours: 8, minutes: 34, seconds: 12 });
+  const [timeLeft, setTimeLeft] = useState({
+    hours: 8,
+    minutes: 34,
+    seconds: 12,
+  });
   const { addItem } = useCartStore();
   const [dealAdded, setDealAdded] = useState(false);
 
@@ -96,7 +106,8 @@ export function HeroBanner() {
       setTimeLeft((prev) => {
         if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
         if (prev.minutes > 0) return { ...prev, minutes: 59, seconds: 59 };
-        if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
+        if (prev.hours > 0)
+          return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
         return { hours: 12, minutes: 0, seconds: 0 };
       });
     }, 1000);
@@ -107,13 +118,14 @@ export function HeroBanner() {
 
   const handleQuickAdd = () => {
     addItem({
-      productId: 'prod_m2',
-      title: 'Pro ANC Wireless Earbuds with Heavy Bass & 40h Battery',
-      imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80',
+      productId: "prod_m2",
+      title: "Pro ANC Wireless Earbuds with Heavy Bass & 40h Battery",
+      imageUrl:
+        "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80",
       pricePkr: 3200,
       quantity: 1,
       sellerType: SellerType.THIRD_PARTY,
-      storeName: 'Lahore Tech Hub',
+      storeName: "Lahore Tech Hub",
     });
     setDealAdded(true);
     setTimeout(() => setDealAdded(false), 1600);
@@ -225,7 +237,9 @@ export function HeroBanner() {
                     key={idx}
                     onClick={() => setCurrentSlide(idx)}
                     className={`h-2 rounded-full transition-all cursor-pointer ${
-                      currentSlide === idx ? 'w-6 bg-slate-950' : 'w-2 bg-slate-950/30 hover:bg-slate-950/60'
+                      currentSlide === idx
+                        ? "w-6 bg-slate-950"
+                        : "w-2 bg-slate-950/30 hover:bg-slate-950/60"
                     }`}
                     aria-label={`Go to slide ${idx + 1}`}
                   />
@@ -236,14 +250,21 @@ export function HeroBanner() {
             {/* Slider Arrow Buttons */}
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setCurrentSlide((prev) => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
+                onClick={() =>
+                  setCurrentSlide(
+                    (prev) =>
+                      (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length,
+                  )
+                }
                 className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
                 aria-label="Previous slide"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)}
+                onClick={() =>
+                  setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)
+                }
                 className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
                 aria-label="Next slide"
               >
@@ -266,9 +287,9 @@ export function HeroBanner() {
               {/* Ticking countdown */}
               <div className="flex items-center gap-1 font-mono font-black text-xs text-amber-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-white/10">
                 <Clock className="w-3 h-3" />
-                <span>{String(timeLeft.hours).padStart(2, '0')}:</span>
-                <span>{String(timeLeft.minutes).padStart(2, '0')}:</span>
-                <span>{String(timeLeft.seconds).padStart(2, '0')}</span>
+                <span>{String(timeLeft.hours).padStart(2, "0")}:</span>
+                <span>{String(timeLeft.minutes).padStart(2, "0")}:</span>
+                <span>{String(timeLeft.seconds).padStart(2, "0")}</span>
               </div>
             </div>
 
@@ -294,8 +315,12 @@ export function HeroBanner() {
                   Pro ANC Wireless Earbuds (40h Playtime)
                 </h4>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-sm font-black text-amber-400">PKR 3,200</span>
-                  <span className="text-[10px] text-slate-500 line-through">PKR 4,800</span>
+                  <span className="text-sm font-black text-amber-400">
+                    PKR 3,200
+                  </span>
+                  <span className="text-[10px] text-slate-500 line-through">
+                    PKR 4,800
+                  </span>
                 </div>
               </div>
             </div>
@@ -305,12 +330,14 @@ export function HeroBanner() {
               onClick={handleQuickAdd}
               className={`w-full py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer ${
                 dealAdded
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-amber-400 hover:bg-amber-500 text-slate-950'
+                  ? "bg-emerald-600 text-white"
+                  : "bg-amber-400 hover:bg-amber-500 text-slate-950"
               }`}
             >
               <ShoppingBag className="w-3.5 h-3.5" />
-              <span>{dealAdded ? 'ADDED TO CART!' : 'CLAIM DEAL FOR PKR 3,200'}</span>
+              <span>
+                {dealAdded ? "ADDED TO CART!" : "CLAIM DEAL FOR PKR 3,200"}
+              </span>
             </button>
           </div>
 
@@ -331,7 +358,8 @@ export function HeroBanner() {
                 Save PKR 100 on Every Order!
               </h3>
               <p className="text-xs text-slate-700 leading-snug font-medium line-clamp-2">
-                Pay online using Debit / Credit Card or Instant QR to waive the standard COD handling fee.
+                Pay online using Debit / Credit Card or Instant QR to waive the
+                standard COD handling fee.
               </p>
             </div>
 
@@ -346,60 +374,7 @@ export function HeroBanner() {
         </div>
       </div>
 
-      {/* ── 3. Elevated Marketplace Trust & Regional Stats Ribbon ─────────── */}
-      <div className="mt-3.5 bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-xs">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center divide-y md:divide-y-0 md:divide-x divide-slate-100">
-          <div className="flex items-center justify-center gap-2.5 py-1">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/60">
-              <Store className="w-4.5 h-4.5" />
-            </div>
-            <div className="text-left">
-              <div className="text-xs sm:text-sm font-black text-slate-950">2,450+ Verified Sellers</div>
-              <div className="text-[11px] text-slate-500 font-medium">Karachi, Lahore & Peshawar</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-2.5 py-1">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/60">
-              <Zap className="w-4.5 h-4.5 fill-amber-500 text-amber-500" />
-            </div>
-            <div className="text-left">
-              <div className="text-xs sm:text-sm font-black text-slate-950">4-5 Days Waw Express</div>
-              <div className="text-[11px] text-slate-500 font-medium">Fast priority dispatch</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-2.5 py-1">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200/60">
-              <Truck className="w-4.5 h-4.5" />
-            </div>
-            <div className="text-left">
-              <div className="text-xs sm:text-sm font-black text-slate-950">Free Nationwide Shipping</div>
-              <div className="text-[11px] text-slate-500 font-medium">On orders &gt; PKR 5,000</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-2.5 py-1">
-            <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-200/60">
-              <ShieldCheck className="w-4.5 h-4.5" />
-            </div>
-            <div className="text-left">
-              <div className="text-xs sm:text-sm font-black text-slate-950">100% Secure Checkout</div>
-              <div className="text-[11px] text-slate-500 font-medium">Escrow payment protection</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-2.5 py-1 col-span-2 md:col-span-1">
-            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200/60">
-              <Award className="w-4.5 h-4.5" />
-            </div>
-            <div className="text-left">
-              <div className="text-xs sm:text-sm font-black text-slate-950">7-Day Free Returns</div>
-              <div className="text-[11px] text-slate-500 font-medium">Doorstep rider pickup</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      
     </section>
   );
 }

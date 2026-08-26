@@ -3,31 +3,38 @@
  * Connects storefront to Fastify backend API (http://localhost:3002/api).
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002/api";
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public data?: any) {
+  constructor(
+    public status: number,
+    message: string,
+    public data?: any,
+  ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
 export async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
-  
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE_URL}${endpoint}`;
+
   const headers = new Headers(options.headers);
-  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
-    headers.set('Content-Type', 'application/json');
+  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
   }
 
   // Attach token from localStorage if available
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('waw_auth_token');
-    if (token && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${token}`);
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("waw_auth_token");
+    if (token && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${token}`);
     }
   }
 
@@ -43,7 +50,11 @@ export async function fetchApi<T>(
     } catch {
       errorData = { message: response.statusText };
     }
-    throw new ApiError(response.status, errorData.message || 'API Request Failed', errorData);
+    throw new ApiError(
+      response.status,
+      errorData.message || "API Request Failed",
+      errorData,
+    );
   }
 
   return response.json();
@@ -51,19 +62,19 @@ export async function fetchApi<T>(
 
 export const api = {
   get: <T>(endpoint: string, options?: RequestInit) =>
-    fetchApi<T>(endpoint, { ...options, method: 'GET' }),
+    fetchApi<T>(endpoint, { ...options, method: "GET" }),
   post: <T>(endpoint: string, body?: any, options?: RequestInit) =>
     fetchApi<T>(endpoint, {
       ...options,
-      method: 'POST',
+      method: "POST",
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
   put: <T>(endpoint: string, body?: any, options?: RequestInit) =>
     fetchApi<T>(endpoint, {
       ...options,
-      method: 'PUT',
+      method: "PUT",
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
   delete: <T>(endpoint: string, options?: RequestInit) =>
-    fetchApi<T>(endpoint, { ...options, method: 'DELETE' }),
+    fetchApi<T>(endpoint, { ...options, method: "DELETE" }),
 };

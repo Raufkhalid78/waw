@@ -1,13 +1,16 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 interface WhatsAppIconProps {
   className?: string;
   size?: number;
 }
 
-export function WhatsAppIcon({ className = 'w-6 h-6', size = 24 }: WhatsAppIconProps) {
+export function WhatsAppIcon({
+  className = "w-6 h-6",
+  size = 24,
+}: WhatsAppIconProps) {
   return (
     <svg
       viewBox="0 0 48 48"
@@ -22,7 +25,7 @@ export function WhatsAppIcon({ className = 'w-6 h-6', size = 24 }: WhatsAppIconP
         d="M24 4C12.954 4 4 12.954 4 24C4 27.879 5.105 31.503 7.02 34.58L4.35 44.35L14.34 41.73C17.295 43.43 20.529 44 24 44C35.046 44 44 35.046 44 24C44 12.954 35.046 4 24 4Z"
         fill="#25D366"
       />
-      
+
       {/* Crisp White WhatsApp Handset Receiver */}
       <path
         fillRule="evenodd"

@@ -1,17 +1,22 @@
-import './globals.css';
-import type { Metadata } from 'next';
+import "./globals.css";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: 'Waw Admin Control Center — Pakistan Marketplace Operations',
-  description: 'Enterprise control center for Waw marketplace: orders, seller KYC, inventory, PostEx logistics, and seller payouts.',
+  title: "Waw Admin Control Center — Pakistan Marketplace Operations",
+  description:
+    "Enterprise control center for Waw marketplace: orders, seller KYC, inventory, PostEx logistics, and seller payouts.",
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <head>

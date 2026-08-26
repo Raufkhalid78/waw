@@ -1,10 +1,10 @@
-import { PaymentMethod, SellerType } from './enums.js';
+import { PaymentMethod, SellerType } from "./enums.js";
 export const MARKETPLACE_CONFIG = {
     FREE_DELIVERY_THRESHOLD_PKR: 5000,
     DEFAULT_SHIPPING_FEE_PKR: 200,
     DEFAULT_COD_FEE_PKR: 100,
     DEFAULT_COMMISSION_PERCENTAGE: 10,
-    CURRENCY: 'PKR',
+    CURRENCY: "PKR",
 };
 /**
  * Calculates complete order totals, applying the Free Delivery rule (Subtotal >= 5000 PKR)
@@ -23,7 +23,8 @@ export function calculateOrderSummary(items, paymentMethod, customShippingFee = 
         const grossAmountPkr = item.unitPricePkr * item.quantity;
         const commissionRatePercentage = item.sellerType === SellerType.FIRST_PARTY
             ? 0
-            : item.commissionRatePercentage ?? MARKETPLACE_CONFIG.DEFAULT_COMMISSION_PERCENTAGE;
+            : (item.commissionRatePercentage ??
+                MARKETPLACE_CONFIG.DEFAULT_COMMISSION_PERCENTAGE);
         const wawCommissionPkr = item.sellerType === SellerType.FIRST_PARTY
             ? 0
             : Math.round((grossAmountPkr * commissionRatePercentage) / 100);

@@ -1,6 +1,15 @@
-import { OrderStatus, PaymentMethod, PaymentStatus, PayoutStatus, SellerType, StoreStatus } from '@waw/types';
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  PayoutStatus,
+  SellerType,
+  StoreStatus,
+} from "@waw/types";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+).replace(/\/+$/, "");
 
 export interface SellerStore {
   id: string;
@@ -88,7 +97,7 @@ export interface SellerPayout {
 export interface SellerCoupon {
   id: string;
   code: string;
-  discountType: 'PERCENTAGE' | 'FIXED_PKR' | 'FREE_SHIPPING';
+  discountType: "PERCENTAGE" | "FIXED_PKR" | "FREE_SHIPPING";
   discountValue: number;
   minSpendPkr: number;
   maxDiscountPkr?: number;
@@ -100,105 +109,123 @@ export interface SellerCoupon {
 }
 
 function getAuthHeader(): Record<string, string> {
-  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' };
-  const token = localStorage.getItem('waw_seller_token') || localStorage.getItem('waw_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (typeof window === "undefined")
+    return { "Content-Type": "application/json" };
+  const token =
+    localStorage.getItem("waw_seller_token") ||
+    localStorage.getItem("waw_auth_token");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = "Bearer " + token;
   return headers;
 }
 
 export async function fetchSellerStore(): Promise<SellerStore | null> {
   try {
-    const res = await fetch(API_BASE + '/api/seller/store', {
+    const res = await fetch(API_BASE + "/api/seller/store", {
       headers: getAuthHeader(),
-      cache: 'no-store',
+      cache: "no-store",
     });
     if (!res.ok) {
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('waw_seller_user');
-        if (stored) {
-          const user = JSON.parse(stored);
-          return {
-            id: user.store_id || localStorage.getItem('waw_store_id') || 'store_lahore_tech',
-            name: user.storeName || 'My Waw Store',
-            slug: (user.storeName || 'my-store').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            sellerType: SellerType.THIRD_PARTY,
-            status: StoreStatus.ACTIVE,
-            commissionRatePercentage: 10,
-            city: user.city || 'Lahore',
-            address: 'Warehouse & Logistics Center, Pakistan',
-            isVerified: true,
-            ratingAverage: 4.9,
-            ratingCount: 24,
-          };
-        }
-      }
       return null;
     }
-    return await res.json();
+    const data = await res.json();
+    if (!data || data.message || !data.id) return null;
+
+    return {
+      id: data.id,
+      name: data.name,
+      slug: data.slug,
+      description: data.description,
+      logoUrl: data.logo_url,
+      sellerType: data.seller_type || SellerType.THIRD_PARTY,
+      status: data.status || StoreStatus.PENDING_KYC,
+      commissionRatePercentage: Number(data.commission_rate_percentage) || 10,
+      cnicNumber: data.cnic_number,
+      bankAccountTitle: data.bank_account_title,
+      bankAccountNumber: data.bank_account_number,
+      bankName: data.bank_name,
+      city: data.city || "",
+      address: data.address || "",
+      isVerified: Boolean(data.is_verified),
+      ratingAverage: Number(data.rating_average) || 0,
+      ratingCount: Number(data.rating_count) || 0,
+    };
   } catch (err) {
-    console.error('Failed to fetch seller store:', err);
+    console.error("Failed to fetch seller store:", err);
     return null;
   }
 }
 
 export async function fetchSellerOrders(): Promise<SellerOrder[]> {
   try {
-    const res = await fetch(API_BASE + '/api/seller/orders', {
+    const res = await fetch(API_BASE + "/api/seller/orders", {
       headers: getAuthHeader(),
-      cache: 'no-store',
+      cache: "no-store",
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data) ? data : (data?.orders || []);
+    return Array.isArray(data) ? data : data?.orders || [];
   } catch (err) {
-    console.error('Failed to fetch seller orders:', err);
+    console.error("Failed to fetch seller orders:", err);
     return [];
   }
 }
 
-export async function updateStoreOrderStatus(storeOrderId: string, status: OrderStatus): Promise<boolean> {
-  const res = await fetch(API_BASE + '/api/seller/orders/' + storeOrderId + '/status', {
-    method: 'PATCH',
-    headers: getAuthHeader(),
-    body: JSON.stringify({ status }),
-  });
+export async function updateStoreOrderStatus(
+  storeOrderId: string,
+  status: OrderStatus,
+): Promise<boolean> {
+  const res = await fetch(
+    API_BASE + "/api/seller/orders/" + storeOrderId + "/status",
+    {
+      method: "PATCH",
+      headers: getAuthHeader(),
+      body: JSON.stringify({ status }),
+    },
+  );
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || 'Failed to update order status');
+    throw new Error(errData.error || "Failed to update order status");
   }
   return true;
 }
 
 export async function fetchSellerProducts(): Promise<SellerProduct[]> {
   try {
-    const storeId = typeof window !== 'undefined' ? localStorage.getItem('waw_store_id') : null;
-    const url = storeId ? API_BASE + '/api/products?storeId=' + storeId : API_BASE + '/api/products';
+    const storeId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("waw_store_id")
+        : null;
+    const url = storeId
+      ? API_BASE + "/api/products?storeId=" + storeId
+      : API_BASE + "/api/products";
     const res = await fetch(url, {
       headers: getAuthHeader(),
-      cache: 'no-store',
+      cache: "no-store",
     });
     if (!res.ok) return [];
     const data = await res.json();
-    const rawItems = Array.isArray(data) ? data : (data?.items || []);
+    const rawItems = Array.isArray(data) ? data : data?.items || [];
     return rawItems.map((p: any) => ({
       id: p.id,
       title: p.title,
       titleUrdu: p.title_urdu || p.titleUrdu,
       slug: p.slug,
-      categoryName: p.category?.name || p.categoryName || 'General',
+      categoryName: p.category?.name || p.categoryName || "General",
       categoryId: p.category_id || p.categoryId,
       basePricePkr: p.price_pkr || p.basePricePkr || 0,
       compareAtPricePkr: p.compare_at_price_pkr || p.compareAtPricePkr,
       stockQuantity: p.stock_quantity ?? p.stockQuantity ?? 0,
       isActive: p.is_active ?? p.isActive ?? true,
-      sku: p.sku || ('SKU-' + p.id.slice(-6)),
+      sku: p.sku || "SKU-" + p.id.slice(-6),
       images: p.images || [],
       weightKg: p.weight_kg || 1.0,
       createdAt: p.created_at || p.createdAt || new Date().toISOString(),
     }));
   } catch (err) {
-    console.error('Failed to fetch seller products:', err);
+    console.error("Failed to fetch seller products:", err);
     return [];
   }
 }
@@ -215,9 +242,10 @@ export async function createSellerProduct(productData: {
   description: string;
   weightKg?: number;
 }): Promise<any> {
-  const storeId = typeof window !== 'undefined' ? localStorage.getItem('waw_store_id') : null;
-  const res = await fetch(API_BASE + '/api/products', {
-    method: 'POST',
+  const storeId =
+    typeof window !== "undefined" ? localStorage.getItem("waw_store_id") : null;
+  const res = await fetch(API_BASE + "/api/products", {
+    method: "POST",
     headers: getAuthHeader(),
     body: JSON.stringify({
       ...productData,
@@ -227,58 +255,58 @@ export async function createSellerProduct(productData: {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Failed to create product listing');
+    throw new Error(err.error || "Failed to create product listing");
   }
   return await res.json();
 }
 
 export async function fetchSellerPayouts(): Promise<SellerPayout[]> {
   try {
-    const res = await fetch(API_BASE + '/api/seller/payouts', {
+    const res = await fetch(API_BASE + "/api/seller/payouts", {
       headers: getAuthHeader(),
-      cache: 'no-store',
+      cache: "no-store",
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data) ? data : (data?.payouts || []);
+    return Array.isArray(data) ? data : data?.payouts || [];
   } catch (err) {
-    console.error('Failed to fetch seller payouts:', err);
+    console.error("Failed to fetch seller payouts:", err);
     return [];
   }
 }
 
 export async function fetchSellerCoupons(): Promise<SellerCoupon[]> {
   try {
-    const res = await fetch(API_BASE + '/api/seller/coupons', {
+    const res = await fetch(API_BASE + "/api/seller/coupons", {
       headers: getAuthHeader(),
-      cache: 'no-store',
+      cache: "no-store",
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data) ? data : (data?.coupons || []);
+    return Array.isArray(data) ? data : data?.coupons || [];
   } catch (err) {
-    console.error('Failed to fetch seller coupons:', err);
+    console.error("Failed to fetch seller coupons:", err);
     return [];
   }
 }
 
 export async function createSellerCoupon(couponData: {
   code: string;
-  discountType: 'PERCENTAGE' | 'FIXED_PKR' | 'FREE_SHIPPING';
+  discountType: "PERCENTAGE" | "FIXED_PKR" | "FREE_SHIPPING";
   discountValue: number;
   minSpendPkr: number;
   maxDiscountPkr?: number;
   expiresAt?: string;
   maxUses?: number;
 }): Promise<any> {
-  const res = await fetch(API_BASE + '/api/seller/coupons', {
-    method: 'POST',
+  const res = await fetch(API_BASE + "/api/seller/coupons", {
+    method: "POST",
     headers: getAuthHeader(),
     body: JSON.stringify(couponData),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Failed to create promotional coupon');
+    throw new Error(err.error || "Failed to create promotional coupon");
   }
   return await res.json();
 }
@@ -294,9 +322,9 @@ export interface SellerAnalytics {
 
 export async function fetchSellerAnalytics(): Promise<SellerAnalytics> {
   try {
-    const res = await fetch(API_BASE + '/api/seller/analytics', {
+    const res = await fetch(API_BASE + "/api/seller/analytics", {
       headers: getAuthHeader(),
-      cache: 'no-store',
+      cache: "no-store",
     });
     if (!res.ok) {
       return {
@@ -309,7 +337,7 @@ export async function fetchSellerAnalytics(): Promise<SellerAnalytics> {
     }
     return await res.json();
   } catch (err) {
-    console.error('Failed to fetch seller analytics:', err);
+    console.error("Failed to fetch seller analytics:", err);
     return {
       totalRevenuePkr: 0,
       pendingPayoutsPkr: 0,

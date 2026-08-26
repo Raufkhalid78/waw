@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCartStore } from '@/store/useCartStore';
-import { CartDrawer } from './CartDrawer';
-import { AuthModal } from './AuthModal';
-import { Logo } from '@/components/ui/Logo';
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCartStore } from "@/store/useCartStore";
+import { CartDrawer } from "./CartDrawer";
+import { AuthModal } from "./AuthModal";
+import { Logo } from "@/components/ui/Logo";
 import {
   Search,
   ShoppingBag,
@@ -32,142 +32,167 @@ import {
   Mic,
   MicOff,
   LogOut,
-} from 'lucide-react';
+} from "lucide-react";
 
 const PAKISTAN_CITIES = [
-  'Lahore',
-  'Karachi',
-  'Islamabad',
-  'Rawalpindi',
-  'Faisalabad',
-  'Peshawar',
-  'Multan',
-  'Sialkot',
-  'Gujranwala',
-  'Quetta',
+  "Lahore",
+  "Karachi",
+  "Islamabad",
+  "Rawalpindi",
+  "Faisalabad",
+  "Peshawar",
+  "Multan",
+  "Sialkot",
+  "Gujranwala",
+  "Quetta",
 ];
 
 const SEARCH_CATEGORIES = [
-  'All Categories',
-  'Mobiles & Tech',
+  "All Categories",
+  "Mobiles & Tech",
   "Women's Lawn",
-  'Leather & Footwear',
-  'Smart Watches',
-  'Sialkot Sports',
-  'Power & Chargers',
-  'Fragrances & Attar',
-  'Home & Kitchen',
+  "Leather & Footwear",
+  "Smart Watches",
+  "Sialkot Sports",
+  "Power & Chargers",
+  "Fragrances & Attar",
+  "Home & Kitchen",
 ];
 
 const POPULAR_SEARCHES = [
-  'Khaadi Lawn 2026',
-  'AirPods Pro ANC',
-  'Pure Leather Wallet',
-  'Peshawari Chappal',
-  'Amoled Smart Watch',
-  'Sialkot Match Football',
-  'Royal Oud Attar',
+  "Khaadi Lawn 2026",
+  "AirPods Pro ANC",
+  "Pure Leather Wallet",
+  "Peshawari Chappal",
+  "Amoled Smart Watch",
+  "Sialkot Match Football",
+  "Royal Oud Attar",
 ];
 
 const PROMOTIONAL_ANNOUNCEMENTS = [
   {
     id: 1,
-    tag: '⚡ MEGA DEALS',
-    text: 'Azadi Celebration: Up to 50% OFF with voucher AZADI2026 at checkout!',
-    link: '/category/mobiles-tech',
-    linkText: 'Shop Deals',
+    tag: "⚡ MEGA DEALS",
+    text: "Azadi Celebration: Up to 50% OFF with voucher AZADI2026 at checkout!",
+    link: "/category/mobiles-tech",
+    linkText: "Shop Deals",
   },
   {
     id: 2,
-    tag: '🚚 FREE DELIVERY',
-    text: 'Zero shipping charges on all orders above PKR 5,000 nationwide across Pakistan.',
-    link: '/cart',
-    linkText: 'Learn More',
+    tag: "🚚 FREE DELIVERY",
+    text: "Zero shipping charges on all orders above PKR 5,000 nationwide across Pakistan.",
+    link: "/cart",
+    linkText: "Learn More",
   },
   {
     id: 3,
-    tag: '🛡️ SECURE CHECKOUT',
-    text: '100% Safe Prepayments & 7-Day Hassle-Free Returns with Escrow Buyer Protection.',
-    link: '/buyer-protection',
-    linkText: 'View Guarantee',
+    tag: "🛡️ SECURE CHECKOUT",
+    text: "100% Safe Prepayments & 7-Day Hassle-Free Returns with Escrow Buyer Protection.",
+    link: "/buyer-protection",
+    linkText: "View Guarantee",
   },
   {
     id: 4,
-    tag: '🏪 SELL ON WAW',
-    text: '0% Listing Fees & Nationwide TCS Pickups for verified Pakistani merchants.',
-    link: '/sell',
-    linkText: 'Register Store',
+    tag: "🏪 SELL ON WAW",
+    text: "0% Listing Fees & Nationwide TCS Pickups for verified Pakistani merchants.",
+    link: "/sell",
+    linkText: "Register Store",
   },
 ];
 
 const CATEGORY_LINKS_EN = [
-  { label: '⚡ Waw Express', href: '/search?sellerType=1P', highlight: 'express' },
-  { label: '🔥 Mega Deals', href: '/search', highlight: 'deals' },
-  { label: '🏬 Verified Shops', href: '/search?sellerType=3P', highlight: 'shops' },
-  { label: 'Electronics & Mobiles', href: '/category/mobiles-tech' },
-  { label: 'Beauty & Fragrance', href: '/category/home-heritage' },
-  { label: "Women's Lawn & Fashion", href: '/category/womens-lawn' },
-  { label: 'Peshawari Footwear', href: '/category/peshawari-chappal' },
-  { label: 'Leather Craft & Bags', href: '/category/leather-craft' },
-  { label: 'Sialkot Sports Goods', href: '/category/sialkot-sports' },
-  { label: 'Power & Chargers', href: '/category/mobiles-tech' },
-  { label: 'Smart Watches', href: '/category/mobiles-tech' },
+  {
+    label: "⚡ Waw Express",
+    href: "/search?sellerType=1P",
+    highlight: "express",
+  },
+  { label: "🔥 Mega Deals", href: "/search", highlight: "deals" },
+  {
+    label: "🏬 Verified Shops",
+    href: "/search?sellerType=3P",
+    highlight: "shops",
+  },
+  { label: "Electronics & Mobiles", href: "/category/mobiles-tech" },
+  { label: "Beauty & Fragrance", href: "/category/home-heritage" },
+  { label: "Women's Lawn & Fashion", href: "/category/womens-lawn" },
+  { label: "Peshawari Footwear", href: "/category/peshawari-chappal" },
+  { label: "Leather Craft & Bags", href: "/category/leather-craft" },
+  { label: "Sialkot Sports Goods", href: "/category/sialkot-sports" },
+  { label: "Power & Chargers", href: "/category/mobiles-tech" },
+  { label: "Smart Watches", href: "/category/mobiles-tech" },
 ];
 
 const CATEGORY_LINKS_UR = [
-  { label: '⚡ واو ایکسپریس', href: '/search?sellerType=1P', highlight: 'express' },
-  { label: '🔥 میگا ڈیلز', href: '/search', highlight: 'deals' },
-  { label: '🏬 تصدیق شدہ دکانیں', href: '/search?sellerType=3P', highlight: 'shops' },
-  { label: 'موبائل اور ٹیک', href: '/category/mobiles-tech' },
-  { label: 'عطر اور خوشبویات', href: '/category/home-heritage' },
-  { label: 'خواتین کے ملبوسات', href: '/category/womens-lawn' },
-  { label: 'پشاوری چپل', href: '/category/peshawari-chappal' },
-  { label: 'چمڑے کا سامان', href: '/category/leather-craft' },
-  { label: 'سیالکوٹ اسپورٹس', href: '/category/sialkot-sports' },
-  { label: 'چارجرز اور بیٹریاں', href: '/category/mobiles-tech' },
-  { label: 'سمارٹ گھڑیاں', href: '/category/mobiles-tech' },
+  {
+    label: "⚡ واو ایکسپریس",
+    href: "/search?sellerType=1P",
+    highlight: "express",
+  },
+  { label: "🔥 میگا ڈیلز", href: "/search", highlight: "deals" },
+  {
+    label: "🏬 تصدیق شدہ دکانیں",
+    href: "/search?sellerType=3P",
+    highlight: "shops",
+  },
+  { label: "موبائل اور ٹیک", href: "/category/mobiles-tech" },
+  { label: "عطر اور خوشبویات", href: "/category/home-heritage" },
+  { label: "خواتین کے ملبوسات", href: "/category/womens-lawn" },
+  { label: "پشاوری چپل", href: "/category/peshawari-chappal" },
+  { label: "چمڑے کا سامان", href: "/category/leather-craft" },
+  { label: "سیالکوٹ اسپورٹس", href: "/category/sialkot-sports" },
+  { label: "چارجرز اور بیٹریاں", href: "/category/mobiles-tech" },
+  { label: "سمارٹ گھڑیاں", href: "/category/mobiles-tech" },
 ];
 
 const TRANSLATIONS = {
   EN: {
-    deliverTo: 'Deliver to',
-    pakistan: 'Pakistan',
-    searchPlaceholder: 'What are you looking for?',
-    mobileSearchPlaceholder: 'What are you looking for?',
-    allCategories: 'All Categories',
-    accountHello: 'Hi, Sign In',
-    accountText: 'Account',
-    orders: 'Orders',
-    wishlist: 'Wishlist',
-    cart: 'Cart',
-    selectCity: 'Select Your Delivery City:',
-    popularSearches: 'Popular Searches in Pakistan',
-    allCategoriesBtn: 'ALL CATEGORIES',
-    categoriesHeader: 'Waw Categories',
-    langToggle: 'اردو',
+    deliverTo: "Deliver to",
+    pakistan: "Pakistan",
+    searchPlaceholder: "What are you looking for?",
+    mobileSearchPlaceholder: "What are you looking for?",
+    allCategories: "All Categories",
+    accountHello: "Hi, Sign In",
+    accountText: "Account",
+    orders: "Orders",
+    wishlist: "Wishlist",
+    cart: "Cart",
+    selectCity: "Select Your Delivery City:",
+    popularSearches: "Popular Searches in Pakistan",
+    allCategoriesBtn: "ALL CATEGORIES",
+    categoriesHeader: "Waw Categories",
+    langToggle: "اردو",
   },
   UR: {
-    deliverTo: 'ترسیل برائے',
-    pakistan: 'پاکستان',
-    searchPlaceholder: 'آپ کیا تلاش کر رہے ہیں؟',
-    mobileSearchPlaceholder: 'آپ کیا تلاش کر رہے ہیں؟',
-    allCategories: 'تمام کیٹیگریز',
-    accountHello: 'خوش آمدید',
-    accountText: 'اکاؤنٹ',
-    orders: 'آرڈرز',
-    wishlist: 'پسندیدہ',
-    cart: 'کارٹ',
-    selectCity: 'اپنا ترسیلی شہر منتخب کریں:',
-    popularSearches: 'پاکستان میں مقبول تلاش',
-    allCategoriesBtn: 'تمام کیٹیگریز',
-    categoriesHeader: 'واو کیٹیگریز',
-    langToggle: 'English',
+    deliverTo: "ترسیل برائے",
+    pakistan: "پاکستان",
+    searchPlaceholder: "آپ کیا تلاش کر رہے ہیں؟",
+    mobileSearchPlaceholder: "آپ کیا تلاش کر رہے ہیں؟",
+    allCategories: "تمام کیٹیگریز",
+    accountHello: "خوش آمدید",
+    accountText: "اکاؤنٹ",
+    orders: "آرڈرز",
+    wishlist: "پسندیدہ",
+    cart: "کارٹ",
+    selectCity: "اپنا ترسیلی شہر منتخب کریں:",
+    popularSearches: "پاکستان میں مقبول تلاش",
+    allCategoriesBtn: "تمام کیٹیگریز",
+    categoriesHeader: "واو کیٹیگریز",
+    langToggle: "English",
   },
 };
 
 export function Header() {
   const router = useRouter();
-  const { items, selectedCity, setSelectedCity, wishlist, language, setLanguage, user, logout } = useCartStore();
+  const {
+    items,
+    selectedCity,
+    setSelectedCity,
+    wishlist,
+    language,
+    setLanguage,
+    user,
+    logout,
+  } = useCartStore();
   const cartCount = items.reduce((s, i) => s + i.quantity, 0);
   const wishlistCount = wishlist.length;
 
@@ -175,9 +200,9 @@ export function Header() {
   const [showCityModal, setShowCityModal] = useState(false);
   const [megaMenuOpen, setMegaMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [selectedSearchCat, setSelectedSearchCat] = useState('All Categories');
+  const [selectedSearchCat, setSelectedSearchCat] = useState("All Categories");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -185,13 +210,19 @@ export function Header() {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.EN;
-  const categoryLinks = language === 'UR' ? CATEGORY_LINKS_UR : CATEGORY_LINKS_EN;
+  const categoryLinks =
+    language === "UR" ? CATEGORY_LINKS_UR : CATEGORY_LINKS_EN;
 
   const handleVoiceSearch = () => {
-    if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (
+      typeof window !== "undefined" &&
+      ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)
+    ) {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.lang = language === 'UR' ? 'ur-PK' : 'en-PK';
+      recognition.lang = language === "UR" ? "ur-PK" : "en-PK";
       recognition.interimResults = false;
 
       recognition.onstart = () => setIsListening(true);
@@ -206,14 +237,16 @@ export function Header() {
 
       recognition.start();
     } else {
-      alert('Voice search is available on Google Chrome, Safari, and Edge.');
+      alert("Voice search is available on Google Chrome, Safari, and Edge.");
     }
   };
 
   // Auto rotate admin announcements every 5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
-      setActivePromoIndex((prev) => (prev + 1) % PROMOTIONAL_ANNOUNCEMENTS.length);
+      setActivePromoIndex(
+        (prev) => (prev + 1) % PROMOTIONAL_ANNOUNCEMENTS.length,
+      );
     }, 5000);
     return () => clearInterval(timer);
   }, []);
@@ -222,8 +255,9 @@ export function Header() {
     if (e) e.preventDefault();
     setSearchFocused(false);
     const params = new URLSearchParams();
-    if (query.trim()) params.set('q', query.trim());
-    if (selectedSearchCat !== 'All Categories') params.set('category', selectedSearchCat);
+    if (query.trim()) params.set("q", query.trim());
+    if (selectedSearchCat !== "All Categories")
+      params.set("category", selectedSearchCat);
     router.push(`/search?${params.toString()}`);
   };
 
@@ -241,26 +275,26 @@ export function Header() {
   };
 
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.dir = language === 'UR' ? 'rtl' : 'ltr';
-      document.documentElement.lang = language === 'UR' ? 'ur' : 'en';
+    if (typeof document !== "undefined") {
+      document.documentElement.dir = language === "UR" ? "rtl" : "ltr";
+      document.documentElement.lang = language === "UR" ? "ur" : "en";
     }
     checkScrollability();
     const el = catScrollRef.current;
     if (el) {
-      el.addEventListener('scroll', checkScrollability);
-      window.addEventListener('resize', checkScrollability);
+      el.addEventListener("scroll", checkScrollability);
+      window.addEventListener("resize", checkScrollability);
       return () => {
-        el.removeEventListener('scroll', checkScrollability);
-        window.removeEventListener('resize', checkScrollability);
+        el.removeEventListener("scroll", checkScrollability);
+        window.removeEventListener("resize", checkScrollability);
       };
     }
   }, [language]);
 
-  const scrollCategories = (direction: 'left' | 'right') => {
+  const scrollCategories = (direction: "left" | "right") => {
     if (catScrollRef.current) {
-      const scrollAmount = direction === 'left' ? -280 : 280;
-      catScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      const scrollAmount = direction === "left" ? -280 : 280;
+      catScrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
       setTimeout(checkScrollability, 300);
     }
   };
@@ -270,12 +304,15 @@ export function Header() {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setSearchFocused(false);
       }
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
         setShowUserMenu(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const activePromo = PROMOTIONAL_ANNOUNCEMENTS[activePromoIndex];
@@ -311,7 +348,9 @@ export function Header() {
                     key={idx}
                     onClick={() => setActivePromoIndex(idx)}
                     className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer ${
-                      activePromoIndex === idx ? 'bg-amber-400 w-3' : 'bg-slate-700 hover:bg-slate-500'
+                      activePromoIndex === idx
+                        ? "bg-amber-400 w-3"
+                        : "bg-slate-700 hover:bg-slate-500"
                     }`}
                   />
                 ))}
@@ -334,7 +373,9 @@ export function Header() {
                   className="flex items-center gap-1.5 text-slate-900 hover:bg-black/10 font-bold text-xs sm:text-sm bg-black/5 px-3 py-1.5 rounded-full transition-all cursor-pointer border border-black/10 shadow-xs"
                 >
                   <MapPin className="w-3.5 h-3.5 text-slate-900" />
-                  <span className="font-semibold text-slate-800">{t.deliverTo}:</span>
+                  <span className="font-semibold text-slate-800">
+                    {t.deliverTo}:
+                  </span>
                   <strong className="font-black text-slate-950 underline underline-offset-2">
                     {selectedCity}
                   </strong>
@@ -357,12 +398,14 @@ export function Header() {
                           }}
                           className={`text-left px-2.5 py-1.5 text-xs rounded-xl font-bold transition-colors flex items-center justify-between cursor-pointer ${
                             selectedCity === city
-                              ? 'bg-amber-400 text-slate-950 font-black'
-                              : 'hover:bg-slate-100 text-slate-700'
+                              ? "bg-amber-400 text-slate-950 font-black"
+                              : "hover:bg-slate-100 text-slate-700"
                           }`}
                         >
                           <span>{city}</span>
-                          {selectedCity === city && <Check className="w-3.5 h-3.5" />}
+                          {selectedCity === city && (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
                         </button>
                       ))}
                     </div>
@@ -372,7 +415,10 @@ export function Header() {
             </div>
 
             {/* Center: Search Input */}
-            <div ref={searchRef} className="flex-1 max-w-2xl relative hidden sm:block">
+            <div
+              ref={searchRef}
+              className="flex-1 max-w-2xl relative hidden sm:block"
+            >
               <form
                 onSubmit={handleSearchSubmit}
                 className="flex items-center rounded-full bg-white shadow-xs border border-slate-200 hover:border-slate-400 focus-within:ring-2 focus-within:ring-slate-950 overflow-hidden transition-all px-3.5 py-1.5"
@@ -389,7 +435,7 @@ export function Header() {
                 {query && (
                   <button
                     type="button"
-                    onClick={() => setQuery('')}
+                    onClick={() => setQuery("")}
                     className="p-1 text-slate-400 hover:text-slate-600 mr-1 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -403,8 +449,8 @@ export function Header() {
                   title="Voice Search (English & Urdu)"
                   className={`p-1.5 rounded-full transition-all cursor-pointer ${
                     isListening
-                      ? 'bg-rose-500 text-white animate-pulse'
-                      : 'text-slate-500 hover:text-slate-950 hover:bg-slate-100'
+                      ? "bg-rose-500 text-white animate-pulse"
+                      : "text-slate-500 hover:text-slate-950 hover:bg-slate-100"
                   }`}
                 >
                   <Mic className="w-3.5 h-3.5" />
@@ -444,14 +490,16 @@ export function Header() {
             <div className="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm font-black text-slate-950">
               {/* Language Switch */}
               <button
-                onClick={() => setLanguage(language === 'EN' ? 'UR' : 'EN')}
+                onClick={() => setLanguage(language === "EN" ? "UR" : "EN")}
                 className="hidden lg:flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer font-bold"
               >
                 <Globe className="w-3.5 h-3.5 text-slate-900" />
                 <span>{t.langToggle}</span>
               </button>
 
-              <span className="text-slate-900/20 hidden lg:inline font-light">|</span>
+              <span className="text-slate-900/20 hidden lg:inline font-light">
+                |
+              </span>
 
               {/* Account / User Sign In or User Dropdown */}
               {user ? (
@@ -473,8 +521,12 @@ export function Header() {
                   {showUserMenu && (
                     <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 text-slate-900 overflow-hidden animate-fade-up">
                       <div className="p-3 bg-slate-50 border-b border-slate-100">
-                        <p className="text-xs font-black text-slate-900 truncate">{user.name}</p>
-                        <p className="text-[10px] text-slate-500 font-medium truncate">{user.emailOrPhone}</p>
+                        <p className="text-xs font-black text-slate-900 truncate">
+                          {user.name}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-medium truncate">
+                          {user.emailOrPhone}
+                        </p>
                         <span className="inline-block mt-1 bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded">
                           Verified Customer
                         </span>
@@ -527,7 +579,9 @@ export function Header() {
                           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-black transition-colors text-left cursor-pointer"
                         >
                           <LogOut className="w-4 h-4 text-rose-600" />
-                          <span>{language === 'UR' ? 'لاگ آؤٹ کریں' : 'Sign Out'}</span>
+                          <span>
+                            {language === "UR" ? "لاگ آؤٹ کریں" : "Sign Out"}
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -543,7 +597,9 @@ export function Header() {
                 </button>
               )}
 
-              <span className="text-slate-900/20 hidden md:inline font-light">|</span>
+              <span className="text-slate-900/20 hidden md:inline font-light">
+                |
+              </span>
 
               {/* Orders */}
               <Link
@@ -554,7 +610,9 @@ export function Header() {
                 <span>{t.orders}</span>
               </Link>
 
-              <span className="text-slate-900/20 hidden md:inline font-light">|</span>
+              <span className="text-slate-900/20 hidden md:inline font-light">
+                |
+              </span>
 
               {/* Wishlist */}
               <Link
@@ -562,7 +620,9 @@ export function Header() {
                 className="relative flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all"
                 title="View Saved Wishlist"
               >
-                <Heart className={`w-4 h-4 ${wishlistCount > 0 ? 'text-rose-600 fill-rose-600' : 'text-slate-900'}`} />
+                <Heart
+                  className={`w-4 h-4 ${wishlistCount > 0 ? "text-rose-600 fill-rose-600" : "text-slate-900"}`}
+                />
                 <span className="hidden md:inline">{t.wishlist}</span>
                 {wishlistCount > 0 && (
                   <span className="bg-rose-600 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center -ml-0.5">
@@ -571,7 +631,9 @@ export function Header() {
                 )}
               </Link>
 
-              <span className="text-slate-900/20 hidden md:inline font-light">|</span>
+              <span className="text-slate-900/20 hidden md:inline font-light">
+                |
+              </span>
 
               {/* Cart */}
               <button
@@ -592,7 +654,11 @@ export function Header() {
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="sm:hidden p-1.5 rounded-lg text-slate-950 hover:bg-black/10"
               >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {mobileMenuOpen ? (
+                  <X className="w-5 h-5" />
+                ) : (
+                  <Menu className="w-5 h-5" />
+                )}
               </button>
             </div>
           </div>
@@ -616,7 +682,7 @@ export function Header() {
         <div className="bg-white border-b border-slate-200/80 hidden sm:block relative shadow-xs">
           <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 flex items-center justify-between gap-3 py-0.5">
             {/* Left: Mega Categories Button */}
-            <div 
+            <div
               className="relative group"
               onMouseEnter={() => setMegaMenuOpen(true)}
               onMouseLeave={() => setMegaMenuOpen(false)}
@@ -637,7 +703,10 @@ export function Header() {
                     <ul className="space-y-2">
                       {SEARCH_CATEGORIES.slice(1).map((cat) => (
                         <li key={cat} className="group/item">
-                          <Link href={`/category/${cat.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} className="text-sm font-bold text-slate-600 hover:text-amber-600 flex items-center gap-2 transition-colors">
+                          <Link
+                            href={`/category/${cat.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                            className="text-sm font-bold text-slate-600 hover:text-amber-600 flex items-center gap-2 transition-colors"
+                          >
                             <ArrowRight className="w-3 h-3 text-slate-300 group-hover/item:text-amber-500 transition-colors" />
                             {cat}
                           </Link>
@@ -647,11 +716,22 @@ export function Header() {
                   </div>
                   <div className="bg-amber-50 rounded-xl p-4 flex flex-col justify-between border border-amber-100">
                     <div>
-                      <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm mb-2 inline-block">Flash Deals</span>
-                      <h5 className="font-black text-slate-900 text-lg leading-tight mb-2">Save up to 50% on Electronics</h5>
-                      <p className="text-xs font-medium text-slate-600 mb-4">Limited time offer on smartphones and wearables.</p>
+                      <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm mb-2 inline-block">
+                        Flash Deals
+                      </span>
+                      <h5 className="font-black text-slate-900 text-lg leading-tight mb-2">
+                        Save up to 50% on Electronics
+                      </h5>
+                      <p className="text-xs font-medium text-slate-600 mb-4">
+                        Limited time offer on smartphones and wearables.
+                      </p>
                     </div>
-                    <Link href="/category/mobiles-tech" className="text-xs font-black bg-slate-900 text-white py-2 px-4 rounded-lg text-center hover:bg-slate-800 transition-colors">Shop Now</Link>
+                    <Link
+                      href="/category/mobiles-tech"
+                      className="text-xs font-black bg-slate-900 text-white py-2 px-4 rounded-lg text-center hover:bg-slate-800 transition-colors"
+                    >
+                      Shop Now
+                    </Link>
                   </div>
                 </div>
               )}
@@ -661,7 +741,7 @@ export function Header() {
             <div className="relative flex-1 min-w-0 flex items-center">
               {canScrollLeft && (
                 <button
-                  onClick={() => scrollCategories('left')}
+                  onClick={() => scrollCategories("left")}
                   className="absolute left-0 z-10 p-1.5 rounded-full bg-white border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -ml-1 cursor-pointer"
                   aria-label="Scroll left"
                 >
@@ -674,13 +754,17 @@ export function Header() {
                 className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1 text-xs font-bold scroll-smooth px-1"
               >
                 {categoryLinks.map((link) => {
-                  let badgeClass = 'text-slate-700 hover:text-amber-600 hover:bg-slate-100';
-                  if (link.highlight === 'express') {
-                    badgeClass = 'bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-lg shadow-xs';
-                  } else if (link.highlight === 'deals') {
-                    badgeClass = 'bg-rose-100 text-rose-700 font-black px-2.5 py-0.5 rounded-lg';
-                  } else if (link.highlight === 'shops') {
-                    badgeClass = 'bg-sky-100 text-sky-800 font-bold px-2.5 py-0.5 rounded-lg';
+                  let badgeClass =
+                    "text-slate-700 hover:text-amber-600 hover:bg-slate-100";
+                  if (link.highlight === "express") {
+                    badgeClass =
+                      "bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-lg shadow-xs";
+                  } else if (link.highlight === "deals") {
+                    badgeClass =
+                      "bg-rose-100 text-rose-700 font-black px-2.5 py-0.5 rounded-lg";
+                  } else if (link.highlight === "shops") {
+                    badgeClass =
+                      "bg-sky-100 text-sky-800 font-bold px-2.5 py-0.5 rounded-lg";
                   }
 
                   return (
@@ -697,7 +781,7 @@ export function Header() {
 
               {canScrollRight && (
                 <button
-                  onClick={() => scrollCategories('right')}
+                  onClick={() => scrollCategories("right")}
                   className="absolute right-0 z-10 p-1.5 rounded-full bg-white/95 border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -mr-1"
                   aria-label="Scroll right"
                 >
@@ -754,13 +838,16 @@ export function Header() {
       )}
 
       {/* Slide-Over Cart Drawer */}
-      <CartDrawer isOpen={cartDrawerOpen} onClose={() => setCartDrawerOpen(false)} />
+      <CartDrawer
+        isOpen={cartDrawerOpen}
+        onClose={() => setCartDrawerOpen(false)}
+      />
 
       {/* WhatsApp Phone OTP Authentication Modal */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        onSuccess={() => router.push('/account')}
+        onSuccess={() => router.push("/account")}
       />
     </>
   );

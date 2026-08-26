@@ -1,30 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getProductById, getRelatedProducts } from '@/data/mockProducts';
+import { fetchProductById, fetchProducts } from '@/lib/api';
 import { useCartStore } from '@/store/useCartStore';
 import { ProductCard } from '@/components/ui/ProductCard';
+import { ProductDetail } from '@/data/mockProducts';
 import {
-  Star,
-  Truck,
-  ShieldCheck,
-  RotateCcw,
-  Store,
-  CheckCircle2,
-  Share2,
-  Heart,
-  Plus,
-  Minus,
-  ShoppingBag,
-  Zap,
-  ChevronRight,
-  MapPin,
-  Flame,
-  Award,
-  Sparkles,
-  MessageSquare,
+  Star, Truck, ShieldCheck, RotateCcw, Store, CheckCircle2, Share2, Heart,
+  Plus, Minus, ShoppingBag, Zap, ChevronRight, MapPin, Flame, Award, Sparkles, MessageSquare, Loader2
 } from 'lucide-react';
 import { SellerType } from '@waw/types';
 
@@ -32,21 +17,54 @@ export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const productId = params.id as string;
-  const product = getProductById(productId) || getProductById('prod_m1')!;
+
+  const [product, setProduct] = useState<ProductDetail | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<ProductDetail[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [reviewsList, setReviewsList] = useState(product.reviews);
-  const [newRating, setNewRating] = useState(5);
-  const [newAuthor, setNewAuthor] = useState('');
-  const [newCity, setNewCity] = useState('Lahore');
-  const [newComment, setNewComment] = useState('');
 
   const { addItem, selectedCity, toggleWishlist, isInWishlist } = useCartStore();
+
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      const data = await fetchProductById(productId);
+      if (data) {
+        setProduct(data);
+        const related = await fetchProducts({ category: data.category });
+        setRelatedProducts(related.filter(p => p.productId !== data.productId).slice(0, 4));
+      }
+      setIsLoading(false);
+    }
+    loadData();
+  }, [productId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+        <p className="text-slate-500 font-medium">Loading product details...</p>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <h2 className="text-2xl font-black text-slate-900">Product Not Found</h2>
+        <p className="text-slate-500">The product you are looking for does not exist or has been removed.</p>
+        <button onClick={() => router.push('/')} className="bg-amber-400 text-slate-950 hover:bg-amber-500 font-bold px-6 py-2.5 rounded-xl transition-all cursor-pointer">
+          Return to Home
+        </button>
+      </div>
+    );
+  }
+
   const isWishlisted = isInWishlist(product.productId);
-  const relatedProducts = getRelatedProducts(product.category, product.productId);
+  const reviewsList = product.reviews || [];
 
   const handleAddToCart = () => {
     addItem({
@@ -80,26 +98,6 @@ export default function ProductDetailPage() {
       `Salam Waw Customer Care! 🛍️\n\nI want to place an order for:\n📦 Product: ${product.title}\n🔖 SKU: ${product.sku}\n💵 Price: PKR ${(product.pricePkr * quantity).toLocaleString()} (Qty: ${quantity})\n📍 Delivery City: ${selectedCity}, Pakistan\n🔗 Link: ${typeof window !== 'undefined' ? window.location.href : ''}\n\nPlease confirm availability and dispatch details.`
     );
     window.open(`https://wa.me/923001234567?text=${text}`, '_blank');
-  };
-
-  const handleAddReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAuthor.trim() || !newComment.trim()) return;
-
-    const newRev = {
-      id: `rev_${Date.now()}`,
-      author: newAuthor.trim(),
-      city: newCity,
-      rating: newRating,
-      date: 'Just now',
-      comment: newComment.trim(),
-      verifiedPurchase: true,
-    };
-
-    setReviewsList([newRev, ...reviewsList]);
-    setNewAuthor('');
-    setNewComment('');
-    setShowReviewModal(false);
   };
 
   return (
@@ -148,7 +146,7 @@ export default function ProductDetailPage() {
                 <button
                   key={idx}
                   onClick={() => setSelectedImageIndex(idx)}
-                  className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all shrink-0 bg-slate-50 ${
+                  className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all shrink-0 bg-slate-50 cursor-pointer ${
                     selectedImageIndex === idx
                       ? 'border-amber-500 ring-2 ring-amber-400/30 scale-105'
                       : 'border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100'
@@ -329,14 +327,14 @@ export default function ProductDetailPage() {
               <div className="flex items-center border-2 border-slate-200 rounded-2xl bg-slate-50 p-1">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white transition-colors"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white transition-colors cursor-pointer"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
                 <span className="w-12 text-center font-black text-sm text-slate-900">{quantity}</span>
                 <button
                   onClick={() => setQuantity(Math.min(product.stockCount, quantity + 1))}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white transition-colors"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white transition-colors cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -344,7 +342,7 @@ export default function ProductDetailPage() {
 
               {/* Add to Cart Button */}
               <button
-                onClick={handleAddToCart}
+               onClick={handleAddToCart}
                 className="flex-1 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black py-3.5 px-6 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-md hover:scale-[1.01] transition-all cursor-pointer"
               >
                 <ShoppingBag className="w-4 h-4" />
@@ -442,19 +440,13 @@ export default function ProductDetailPage() {
                 <div className="text-[10px] text-slate-500 font-bold">{reviewsList.length} Verified Reviews</div>
               </div>
             </div>
-
-            <button
-              onClick={() => setShowReviewModal(true)}
-              className="bg-slate-950 hover:bg-amber-400 hover:text-slate-950 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
-            >
-              ✍️ Write a Review
-            </button>
+            {/* Fake review form button removed for Phase A compliance */}
           </div>
         </div>
 
         {/* Review Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {reviewsList.map((rev) => (
+          {reviewsList.length > 0 ? reviewsList.map((rev) => (
             <div key={rev.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1 text-amber-400">
@@ -479,134 +471,50 @@ export default function ProductDetailPage() {
                 )}
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="col-span-full py-8 text-center text-slate-500 text-sm">
+              No customer reviews yet. Purchase this item to be the first to review!
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Review Submission Modal */}
-      {showReviewModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-lg font-black text-slate-950">Write a Verified Review</h3>
-                <p className="text-xs text-slate-500">{product.title}</p>
-              </div>
-              <button onClick={() => setShowReviewModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">
-                ✕
-              </button>
-            </div>
+      {/* ── Related / Frequently Bought Together Items ───────────────────── */}
+      {relatedProducts.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black text-slate-950 tracking-tight flex items-center gap-2">
+              <Flame className="w-5 h-5 text-amber-500 fill-amber-400" />
+              <span>Similar Items You Might Like</span>
+            </h2>
+            <Link href="/" className="text-xs font-bold text-amber-600 hover:text-amber-700">
+              View All in {product.category} →
+            </Link>
+          </div>
 
-            <form onSubmit={handleAddReview} className="space-y-4 text-xs">
-              {/* Star Rating Selector */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">Your Rating</label>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      type="button"
-                      key={star}
-                      onClick={() => setNewRating(star)}
-                      className="p-1 cursor-pointer hover:scale-125 transition-transform"
-                    >
-                      <Star className={`w-6 h-6 ${newRating >= star ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`} />
-                    </button>
-                  ))}
-                  <span className="font-black text-slate-800 ml-2">{newRating} of 5 Stars</span>
-                </div>
-              </div>
-
-              {/* Name & City */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Asad Malik"
-                    value={newAuthor}
-                    onChange={(e) => setNewAuthor(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 font-medium"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">City</label>
-                  <select
-                    value={newCity}
-                    onChange={(e) => setNewCity(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 font-medium"
-                  >
-                    {['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Peshawar', 'Multan', 'Faisalabad', 'Sialkot', 'Quetta'].map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Comment */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Your Feedback</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Share your experience regarding material quality, delivery time, or fit..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 font-medium"
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  Verified Buyer Badge Attached
-                </span>
-                <button
-                  type="submit"
-                  className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
-                >
-                  Submit Review
-                </button>
-              </div>
-            </form>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            {relatedProducts.map((rel) => (
+              <ProductCard
+                key={rel.productId}
+                productId={rel.productId}
+                title={rel.title}
+                pricePkr={rel.pricePkr}
+                originalPricePkr={rel.originalPricePkr}
+                discountPercent={rel.discountPercent}
+                rating={rel.rating}
+                reviewsCount={rel.reviewsCount}
+                soldCount={rel.soldCount}
+                isExpress={rel.isExpress}
+                sellerType={rel.sellerType}
+                storeName={rel.storeName}
+                sellerCity={rel.sellerCity}
+                deliveryTime={rel.deliveryTime}
+                imageUrl={rel.images[0]}
+              />
+            ))}
           </div>
         </div>
       )}
-
-      {/* ── Related / Frequently Bought Together Items ───────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black text-slate-950 tracking-tight flex items-center gap-2">
-            <Flame className="w-5 h-5 text-amber-500 fill-amber-400" />
-            <span>Similar Items You Might Like</span>
-          </h2>
-          <Link href="/" className="text-xs font-bold text-amber-600 hover:text-amber-700">
-            View All in {product.category} →
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          {relatedProducts.map((rel) => (
-            <ProductCard
-              key={rel.productId}
-              productId={rel.productId}
-              title={rel.title}
-              pricePkr={rel.pricePkr}
-              originalPricePkr={rel.originalPricePkr}
-              discountPercent={rel.discountPercent}
-              rating={rel.rating}
-              reviewsCount={rel.reviewsCount}
-              soldCount={rel.soldCount}
-              isExpress={rel.isExpress}
-              sellerType={rel.sellerType}
-              storeName={rel.storeName}
-              sellerCity={rel.sellerCity}
-              deliveryTime={rel.deliveryTime}
-              imageUrl={rel.images[0]}
-            />
-          ))}
-        </div>
-      </div>
 
       {/* ── Mobile Sticky Bottom Action Bar ───────────────────────────────── */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 shadow-2xl flex items-center justify-between gap-3">

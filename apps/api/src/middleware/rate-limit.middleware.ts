@@ -1,22 +1,26 @@
-import rateLimit from 'express-rate-limit';
-import RedisStore from 'rate-limit-redis';
-import { Redis } from 'ioredis';
-import { ENV } from '../config/env.js';
+import rateLimit from "express-rate-limit";
+import RedisStore from "rate-limit-redis";
+import { Redis } from "ioredis";
+import { ENV } from "../config/env.js";
 
 // Setup ioredis client using the Upstash URL + Token with authenticated TLS
 const redisPassword = ENV.UPSTASH_REDIS_REST_TOKEN || ENV.REDIS_PASSWORD;
-const redisClient = (ENV.UPSTASH_REDIS_REST_URL && redisPassword)
-  ? new Redis(ENV.UPSTASH_REDIS_REST_URL.replace('https://', 'rediss://'), {
-      password: redisPassword,
-      tls: { rejectUnauthorized: false },
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-    })
-  : undefined;
+const redisClient =
+  ENV.UPSTASH_REDIS_REST_URL && redisPassword
+    ? new Redis(ENV.UPSTASH_REDIS_REST_URL.replace("https://", "rediss://"), {
+        password: redisPassword,
+        tls: { rejectUnauthorized: false },
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+      })
+    : undefined;
 
 if (redisClient) {
   redisClient.connect().catch((err) => {
-    console.warn('⚠️ Rate limiter Redis connection error, will use in-memory fallback:', err.message);
+    console.warn(
+      "⚠️ Rate limiter Redis connection error, will use in-memory fallback:",
+      err.message,
+    );
   });
 }
 
@@ -28,12 +32,16 @@ export const otpRateLimiter = rateLimit({
   max: 5, // Limit each IP to 5 OTP requests per window
   standardHeaders: true,
   legacyHeaders: false,
-  store: redisClient ? new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-    prefix: 'rl_otp:',
-  }) : undefined,
+  store: redisClient
+    ? new RedisStore({
+        sendCommand: (...args: string[]) =>
+          redisClient.call(args[0], ...args.slice(1)) as any,
+        prefix: "rl_otp:",
+      })
+    : undefined,
   message: {
-    error: 'Too many OTP requests from this IP. Please try again after 15 minutes.',
+    error:
+      "Too many OTP requests from this IP. Please try again after 15 minutes.",
   },
 });
 
@@ -45,11 +53,14 @@ export const apiRateLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  store: redisClient ? new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-    prefix: 'rl_api:',
-  }) : undefined,
+  store: redisClient
+    ? new RedisStore({
+        sendCommand: (...args: string[]) =>
+          redisClient.call(args[0], ...args.slice(1)) as any,
+        prefix: "rl_api:",
+      })
+    : undefined,
   message: {
-    error: 'Rate limit exceeded. Please slow down requests.',
+    error: "Rate limit exceeded. Please slow down requests.",
   },
 });

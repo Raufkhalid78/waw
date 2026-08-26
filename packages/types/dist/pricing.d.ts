@@ -1,4 +1,4 @@
-import { PaymentMethod, SellerType } from './enums.js';
+import { PaymentMethod, SellerType } from "./enums.js";
 export declare const MARKETPLACE_CONFIG: {
     FREE_DELIVERY_THRESHOLD_PKR: number;
     DEFAULT_SHIPPING_FEE_PKR: number;

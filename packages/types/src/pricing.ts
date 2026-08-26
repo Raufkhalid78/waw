@@ -1,11 +1,11 @@
-import { PaymentMethod, SellerType } from './enums.js';
+import { PaymentMethod, SellerType } from "./enums.js";
 
 export const MARKETPLACE_CONFIG = {
   FREE_DELIVERY_THRESHOLD_PKR: 5000,
   DEFAULT_SHIPPING_FEE_PKR: 200,
   DEFAULT_COD_FEE_PKR: 100,
   DEFAULT_COMMISSION_PERCENTAGE: 10,
-  CURRENCY: 'PKR',
+  CURRENCY: "PKR",
 };
 
 export interface OrderItemPricingInput {
@@ -46,18 +46,19 @@ export function calculateOrderSummary(
   items: OrderItemPricingInput[],
   paymentMethod: PaymentMethod,
   customShippingFee = MARKETPLACE_CONFIG.DEFAULT_SHIPPING_FEE_PKR,
-  customCodFee = MARKETPLACE_CONFIG.DEFAULT_COD_FEE_PKR
+  customCodFee = MARKETPLACE_CONFIG.DEFAULT_COD_FEE_PKR,
 ): OrderCalculationResult {
   const subtotalPkr = items.reduce(
     (sum, item) => sum + item.unitPricePkr * item.quantity,
-    0
+    0,
   );
 
-  const isFreeDelivery = subtotalPkr >= MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR ? 1 : 0;
+  const isFreeDelivery =
+    subtotalPkr >= MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR ? 1 : 0;
   const shippingPkr = isFreeDelivery ? 0 : customShippingFee;
   const amountNeededForFreeDeliveryPkr = Math.max(
     0,
-    MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR - subtotalPkr
+    MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR - subtotalPkr,
   );
 
   const isCod = paymentMethod === PaymentMethod.COD;
@@ -71,7 +72,8 @@ export function calculateOrderSummary(
     const commissionRatePercentage =
       item.sellerType === SellerType.FIRST_PARTY
         ? 0
-        : item.commissionRatePercentage ?? MARKETPLACE_CONFIG.DEFAULT_COMMISSION_PERCENTAGE;
+        : (item.commissionRatePercentage ??
+          MARKETPLACE_CONFIG.DEFAULT_COMMISSION_PERCENTAGE);
 
     const wawCommissionPkr =
       item.sellerType === SellerType.FIRST_PARTY

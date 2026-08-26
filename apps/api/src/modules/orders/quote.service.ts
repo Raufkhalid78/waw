@@ -2,7 +2,12 @@ import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { redis } from "../../config/redis.js";
 import { ENV } from "../../config/env.js";
-import { CheckoutQuoteRequest, CheckoutQuoteResponse, PaymentMethod, SellerType } from "../../types/index.js";
+import {
+  CheckoutQuoteRequest,
+  CheckoutQuoteResponse,
+  PaymentMethod,
+  SellerType,
+} from "../../types/index.js";
 
 export class QuoteService {
   /**
@@ -10,7 +15,9 @@ export class QuoteService {
    * Validates live inventory, seller commissions, delivery fees, and coupons.
    * Returns a 15-minute cryptographically signed quote token.
    */
-  static async generateQuote(input: CheckoutQuoteRequest): Promise<CheckoutQuoteResponse> {
+  static async generateQuote(
+    input: CheckoutQuoteRequest,
+  ): Promise<CheckoutQuoteResponse> {
     if (!input.items || input.items.length === 0) {
       throw new Error("Cannot generate quote for empty cart");
     }
@@ -22,12 +29,16 @@ export class QuoteService {
     for (const item of input.items) {
       const { data: product, error: prodErr } = await supabaseAdmin
         .from("products")
-        .select("id, title, base_price_pkr, is_active, store_id, is_first_party, stores(id, name, commission_rate_percentage)")
+        .select(
+          "id, title, base_price_pkr, is_active, store_id, is_first_party, stores(id, name, commission_rate_percentage)",
+        )
         .eq("id", item.productId)
         .single();
 
       if (prodErr || !product) {
-        throw new Error(`Product not found or no longer available: ${item.productId}`);
+        throw new Error(
+          `Product not found or no longer available: ${item.productId}`,
+        );
       }
 
       if (!product.is_active) {
@@ -47,14 +58,18 @@ export class QuoteService {
           .single();
 
         if (varErr || !variant || !variant.is_active) {
-          throw new Error(`Variant selected is no longer available for ${product.title}`);
+          throw new Error(
+            `Variant selected is no longer available for ${product.title}`,
+          );
         }
 
         if (variant.stock_quantity < item.quantity) {
-          throw new Error(`Insufficient stock for ${product.title}. Only ${variant.stock_quantity} available.`);
+          throw new Error(
+            `Insufficient stock for ${product.title}. Only ${variant.stock_quantity} available.`,
+          );
         }
 
-        unitPrice += (variant.price_adjustment_pkr || 0);
+        unitPrice += variant.price_adjustment_pkr || 0;
         stockAvailable = variant.stock_quantity;
         variantSku = variant.sku;
       }
@@ -69,8 +84,11 @@ export class QuoteService {
         title: product.title,
         storeId: product.store_id || "waw_official_retail",
         storeName: (product.stores as any)?.name || "Waw Official Retail",
-        commissionRatePercentage: (product.stores as any)?.commission_rate_percentage || 10,
-        sellerType: product.is_first_party ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
+        commissionRatePercentage:
+          (product.stores as any)?.commission_rate_percentage || 10,
+        sellerType: product.is_first_party
+          ? SellerType.FIRST_PARTY
+          : SellerType.THIRD_PARTY,
         unitPricePkr: unitPrice,
         quantity: item.quantity,
         totalPricePkr: itemTotal,
@@ -78,11 +96,12 @@ export class QuoteService {
     }
 
     // 2. Delivery Fee Policy (Free Delivery >= PKR 5,000)
-    const shippingFeePkr = subtotalPkr >= (ENV.FREE_DELIVERY_THRESHOLD_PKR || 5000) ? 0 : 200;
+    const shippingFeePkr =
+      subtotalPkr >= (ENV.FREE_DELIVERY_THRESHOLD_PKR || 5000) ? 0 : 200;
 
     // 3. COD Fee Policy (+PKR 100)
     const isCod = input.paymentMethod === PaymentMethod.COD;
-    const codFeePkr = isCod ? (ENV.DEFAULT_COD_FEE_PKR || 100) : 0;
+    const codFeePkr = isCod ? ENV.DEFAULT_COD_FEE_PKR || 100 : 0;
 
     // 4. Coupon Calculation
     let couponDiscountPkr = 0;
@@ -108,10 +127,19 @@ export class QuoteService {
 
             if (eligibleTotal >= coupon.min_spend_pkr) {
               if (coupon.discount_type === "PERCENTAGE") {
-                couponDiscountPkr = Math.round(eligibleTotal * (coupon.discount_value / 100));
-                if (coupon.max_discount_pkr) couponDiscountPkr = Math.min(couponDiscountPkr, coupon.max_discount_pkr);
+                couponDiscountPkr = Math.round(
+                  eligibleTotal * (coupon.discount_value / 100),
+                );
+                if (coupon.max_discount_pkr)
+                  couponDiscountPkr = Math.min(
+                    couponDiscountPkr,
+                    coupon.max_discount_pkr,
+                  );
               } else if (coupon.discount_type === "FIXED_PKR") {
-                couponDiscountPkr = Math.min(coupon.discount_value, eligibleTotal);
+                couponDiscountPkr = Math.min(
+                  coupon.discount_value,
+                  eligibleTotal,
+                );
               } else if (coupon.discount_type === "FREE_SHIPPING") {
                 couponDiscountPkr = shippingFeePkr;
               }
@@ -122,7 +150,10 @@ export class QuoteService {
       }
     }
 
-    const totalPkr = Math.max(0, subtotalPkr + shippingFeePkr + codFeePkr - couponDiscountPkr);
+    const totalPkr = Math.max(
+      0,
+      subtotalPkr + shippingFeePkr + codFeePkr - couponDiscountPkr,
+    );
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     const quotePayload = {
@@ -138,10 +169,17 @@ export class QuoteService {
       expiresAt,
     };
 
-    const quoteToken = jwt.sign(quotePayload, ENV.JWT_SECRET, { expiresIn: "15m" });
+    const quoteToken = jwt.sign(quotePayload, ENV.JWT_SECRET, {
+      expiresIn: "15m",
+    });
 
     // Cache in Redis with 15-min TTL
-    await redis.set(`quote:${quoteToken.slice(-16)}`, JSON.stringify(quotePayload), "EX", 900);
+    await redis.set(
+      `quote:${quoteToken.slice(-16)}`,
+      JSON.stringify(quotePayload),
+      "EX",
+      900,
+    );
 
     return {
       quoteToken,
@@ -170,7 +208,9 @@ export class QuoteService {
     try {
       const decoded: any = jwt.verify(quoteToken, ENV.JWT_SECRET);
       if (new Date(decoded.expiresAt) < new Date()) {
-        throw new Error("Checkout quote has expired. Please refresh your cart.");
+        throw new Error(
+          "Checkout quote has expired. Please refresh your cart.",
+        );
       }
       return decoded;
     } catch (err: any) {

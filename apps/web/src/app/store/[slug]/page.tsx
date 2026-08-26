@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { getStoreBySlug } from '@/data/mockStores';
-import { CATALOG_PRODUCTS } from '@/data/mockProducts';
-import { ProductCard } from '@/components/ui/ProductCard';
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { getStoreBySlug } from "@/data/mockStores";
+import { CATALOG_PRODUCTS } from "@/data/mockProducts";
+import { ProductCard } from "@/components/ui/ProductCard";
 import {
   Store,
   CheckCircle2,
@@ -18,16 +18,18 @@ import {
   ChevronRight,
   Sparkles,
   Share2,
-} from 'lucide-react';
+} from "lucide-react";
 
 export default function StoreProfilePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const store = getStoreBySlug(slug) || getStoreBySlug('lahore-tech-hub')!;
+  const store = getStoreBySlug(slug) || getStoreBySlug("lahore-tech-hub")!;
 
   // Products belonging to this store
   const storeProducts = CATALOG_PRODUCTS.filter(
-    (p) => p.storeSlug === store.slug || p.storeName.toLowerCase() === store.name.toLowerCase()
+    (p) =>
+      p.storeSlug === store.slug ||
+      p.storeName.toLowerCase() === store.name.toLowerCase(),
   );
   // If fewer than 2, show related products from the same city/category
   const displayProducts =
@@ -37,9 +39,16 @@ export default function StoreProfilePage() {
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-6 space-y-8">
       {/* ── Breadcrumb Navigation ────────────────────────────────────────── */}
       <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-        <Link href="/" className="hover:text-amber-600 transition-colors">Home</Link>
+        <Link href="/" className="hover:text-amber-600 transition-colors">
+          Home
+        </Link>
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <Link href="/search?sellerType=3P" className="hover:text-amber-600 transition-colors">Verified Stores</Link>
+        <Link
+          href="/search?sellerType=3P"
+          className="hover:text-amber-600 transition-colors"
+        >
+          Verified Stores
+        </Link>
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
         <span className="text-slate-900 font-bold">{store.name}</span>
       </nav>
@@ -62,7 +71,11 @@ export default function StoreProfilePage() {
             {/* Logo & Main Info */}
             <div className="flex items-end gap-5">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white shrink-0">
-                <img src={store.logoImage} alt={store.name} className="w-full h-full object-cover" />
+                <img
+                  src={store.logoImage}
+                  alt={store.name}
+                  className="w-full h-full object-cover"
+                />
               </div>
 
               <div className="space-y-1">
@@ -92,17 +105,27 @@ export default function StoreProfilePage() {
                   <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
                   <span>{store.rating}</span>
                 </div>
-                <div className="text-[10px] text-slate-500 font-bold">{store.reviewsCount} Reviews</div>
+                <div className="text-[10px] text-slate-500 font-bold">
+                  {store.reviewsCount} Reviews
+                </div>
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center min-w-[90px]">
-                <div className="text-base font-black text-slate-950">{store.salesCount.toLocaleString()}+</div>
-                <div className="text-[10px] text-slate-500 font-bold">Orders Shipped</div>
+                <div className="text-base font-black text-slate-950">
+                  {store.salesCount.toLocaleString()}+
+                </div>
+                <div className="text-[10px] text-slate-500 font-bold">
+                  Orders Shipped
+                </div>
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center min-w-[90px]">
-                <div className="text-base font-black text-emerald-700">99.2%</div>
-                <div className="text-[10px] text-slate-500 font-bold">On-Time Dispatch</div>
+                <div className="text-base font-black text-emerald-700">
+                  99.2%
+                </div>
+                <div className="text-[10px] text-slate-500 font-bold">
+                  On-Time Dispatch
+                </div>
               </div>
             </div>
           </div>
@@ -110,14 +133,18 @@ export default function StoreProfilePage() {
           {/* Store Bio & Specialties */}
           <div className="border-t border-slate-100 pt-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-8 space-y-2">
-              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">About This Merchant</h3>
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                About This Merchant
+              </h3>
               <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed">
                 {store.about}
               </p>
             </div>
 
             <div className="lg:col-span-4 space-y-2">
-              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Specialties</h3>
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                Specialties
+              </h3>
               <div className="flex flex-wrap gap-1.5">
                 {store.specialties.map((spec, i) => (
                   <span
@@ -142,10 +169,13 @@ export default function StoreProfilePage() {
               <span>Products from {store.name}</span>
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Browse authentic items directly backed by store warranty and secure payments
+              Browse authentic items directly backed by store warranty and
+              secure payments
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-500">{displayProducts.length} Items Available</span>
+          <span className="text-xs font-bold text-slate-500">
+            {displayProducts.length} Items Available
+          </span>
         </div>
 
         {/* Product Grid */}

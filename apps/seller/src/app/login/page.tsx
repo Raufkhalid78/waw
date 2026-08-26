@@ -1,18 +1,28 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Store, Smartphone, ArrowRight, CheckCircle2, AlertCircle, Building2, MapPin } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Store,
+  Smartphone,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  MapPin,
+} from "lucide-react";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+).replace(/\/+$/, "");
 
 export default function SellerLoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
-  const [phone, setPhone] = useState('+923219876543');
-  const [storeName, setStoreName] = useState('');
-  const [city, setCity] = useState('Lahore');
-  const [otp, setOtp] = useState('');
+  const [tab, setTab] = useState<"LOGIN" | "REGISTER">("LOGIN");
+  const [phone, setPhone] = useState("+923219876543");
+  const [storeName, setStoreName] = useState("");
+  const [city, setCity] = useState("Lahore");
+  const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,15 +33,15 @@ export default function SellerLoginPage() {
     setError(null);
     try {
       const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to request OTP');
+      if (!res.ok) throw new Error(data.error || "Failed to request OTP");
       setOtpSent(true);
     } catch (err: any) {
-      setError(err.message || 'Unable to reach authentication server');
+      setError(err.message || "Unable to reach authentication server");
     } finally {
       setLoading(false);
     }
@@ -43,21 +53,24 @@ export default function SellerLoginPage() {
     setError(null);
     try {
       const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp, role: 'SELLER', storeName, city }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, otp, role: "SELLER", storeName, city }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Invalid OTP');
+      if (!res.ok) throw new Error(data.error || "Invalid OTP");
 
-      localStorage.setItem('waw_seller_token', data.token);
-      localStorage.setItem('waw_seller_user', JSON.stringify(data.user || { role: 'SELLER', phone }));
+      localStorage.setItem("waw_seller_token", data.token);
+      localStorage.setItem(
+        "waw_seller_user",
+        JSON.stringify(data.user || { role: "SELLER", phone }),
+      );
       if (data.user?.store_id) {
-        localStorage.setItem('waw_store_id', data.user.store_id);
+        localStorage.setItem("waw_store_id", data.user.store_id);
       }
-      router.push('/');
+      router.push("/");
     } catch (err: any) {
-      setError(err.message || 'OTP verification failed');
+      setError(err.message || "OTP verification failed");
     } finally {
       setLoading(false);
     }
@@ -75,7 +88,8 @@ export default function SellerLoginPage() {
           </div>
           <h1 className="text-2xl font-black text-white">Waw Seller Portal</h1>
           <p className="text-xs text-slate-400">
-            Manage your store, fulfill customer sub-orders, print PostEx labels, and track payouts.
+            Manage your store, fulfill customer sub-orders, print PostEx labels,
+            and track payouts.
           </p>
         </div>
 
@@ -89,15 +103,21 @@ export default function SellerLoginPage() {
         <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
           <button
             type="button"
-            onClick={() => { setTab('LOGIN'); setOtpSent(false); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${tab === 'LOGIN' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+            onClick={() => {
+              setTab("LOGIN");
+              setOtpSent(false);
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${tab === "LOGIN" ? "bg-amber-400 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"}`}
           >
             Merchant Sign In
           </button>
           <button
             type="button"
-            onClick={() => { setTab('REGISTER'); setOtpSent(false); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${tab === 'REGISTER' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+            onClick={() => {
+              setTab("REGISTER");
+              setOtpSent(false);
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${tab === "REGISTER" ? "bg-amber-400 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"}`}
           >
             Register Store
           </button>
@@ -105,10 +125,12 @@ export default function SellerLoginPage() {
 
         {!otpSent ? (
           <form onSubmit={handleRequestOtp} className="space-y-4">
-            {tab === 'REGISTER' && (
+            {tab === "REGISTER" && (
               <>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">Brand / Store Name</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Brand / Store Name
+                  </label>
                   <div className="relative">
                     <Building2 className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
                     <input
@@ -123,7 +145,9 @@ export default function SellerLoginPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">Warehouse City</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Warehouse City
+                  </label>
                   <div className="relative">
                     <MapPin className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
                     <input
@@ -140,7 +164,9 @@ export default function SellerLoginPage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">WhatsApp Merchant Number</label>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                WhatsApp Merchant Number
+              </label>
               <div className="relative">
                 <Smartphone className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
                 <input
@@ -159,14 +185,18 @@ export default function SellerLoginPage() {
               disabled={loading}
               className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 text-slate-950 font-black rounded-2xl text-xs transition-all shadow-lg shadow-amber-400/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <span>{loading ? 'Requesting OTP...' : 'Send WhatsApp Access Code'}</span>
+              <span>
+                {loading ? "Requesting OTP..." : "Send WhatsApp Access Code"}
+              </span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">Enter 6-Digit WhatsApp Code</label>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                Enter 6-Digit WhatsApp Code
+              </label>
               <input
                 type="text"
                 value={otp}
@@ -184,11 +214,12 @@ export default function SellerLoginPage() {
               className="w-full py-3.5 bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-500 text-slate-950 font-black rounded-2xl text-xs transition-all shadow-lg shadow-emerald-400/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{loading ? 'Verifying...' : 'Access Merchant Dashboard'}</span>
+              <span>
+                {loading ? "Verifying..." : "Access Merchant Dashboard"}
+              </span>
             </button>
           </form>
         )}
-
       </div>
     </div>
   );

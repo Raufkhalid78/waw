@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -35,7 +35,7 @@ import {
   Lock,
   Boxes,
   LogOut,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   fetchPlatformStats,
   fetchSellers,
@@ -51,17 +51,29 @@ import {
   AdminOrder,
   AdminProduct,
   AdminPayout,
-} from '../lib/api';
-import { OrderStatus, PaymentMethod, PaymentStatus, PayoutStatus, SellerType, StoreStatus } from '@waw/types';
+} from "../lib/api";
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  PayoutStatus,
+  SellerType,
+  StoreStatus,
+} from "@waw/types";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
 
   // Navigation & Role Modes
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'sellers' | 'inventory' | 'payouts' | 'returns'>('overview');
-  const [viewRole, setViewRole] = useState<'SUPER_ADMIN' | 'SELLER'>('SUPER_ADMIN');
-  const [selectedSellerStore, setSelectedSellerStore] = useState<string>('store_1');
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "orders" | "sellers" | "inventory" | "payouts" | "returns"
+  >("overview");
+  const [viewRole, setViewRole] = useState<"SUPER_ADMIN" | "SELLER">(
+    "SUPER_ADMIN",
+  );
+  const [selectedSellerStore, setSelectedSellerStore] =
+    useState<string>("store_1");
 
   // Live Data States
   const [loading, setLoading] = useState(true);
@@ -73,54 +85,63 @@ export default function AdminDashboardPage() {
   const [payouts, setPayouts] = useState<AdminPayout[]>([]);
 
   // Search & Filter States
-  const [orderFilter, setOrderFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sellerStatusFilter, setSellerStatusFilter] = useState<string>('ALL');
+  const [orderFilter, setOrderFilter] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sellerStatusFilter, setSellerStatusFilter] = useState<string>("ALL");
 
   // Modals
   const [showAddProductModal, setShowAddProductModal] = useState(false);
-  const [showDispatchModal, setShowDispatchModal] = useState<AdminOrder | null>(null);
+  const [showDispatchModal, setShowDispatchModal] = useState<AdminOrder | null>(
+    null,
+  );
   const [showKycModal, setShowKycModal] = useState<AdminSeller | null>(null);
-  const [showSettlePayoutModal, setShowSettlePayoutModal] = useState<AdminPayout | null>(null);
-  const [showWaybillModal, setShowWaybillModal] = useState<AdminOrder | null>(null);
+  const [showSettlePayoutModal, setShowSettlePayoutModal] =
+    useState<AdminPayout | null>(null);
+  const [showWaybillModal, setShowWaybillModal] = useState<AdminOrder | null>(
+    null,
+  );
 
   // New Product Form State
   const [newProductForm, setNewProductForm] = useState({
-    title: '',
-    titleUrdu: '',
-    categoryId: 'cat_leather',
+    title: "",
+    titleUrdu: "",
+    categoryId: "cat_leather",
     basePricePkr: 2999,
     compareAtPricePkr: 4500,
     stockQuantity: 50,
-    sku: 'WAW-SKU-001',
-    imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80',
+    sku: "WAW-SKU-001",
+    imageUrl:
+      "https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80",
     sellerType: SellerType.FIRST_PARTY,
-    description: 'Premium handcrafted artisan product made in Pakistan with authentic materials.',
+    description:
+      "Premium handcrafted artisan product made in Pakistan with authentic materials.",
   });
 
   // Action input states
   const [commissionInput, setCommissionInput] = useState<number>(10);
-  const [bankRefInput, setBankRefInput] = useState<string>('');
+  const [bankRefInput, setBankRefInput] = useState<string>("");
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ── 1. Initial Data Fetching ──────────────────────────────────────────────
+  // â”€â”€ 1. Initial Data Fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadDashboardData = async () => {
     try {
       setRefreshing(true);
-      const [statsData, sellersData, ordersData, productsData, payoutsData] = await Promise.all([
-        fetchPlatformStats(),
-        fetchSellers(),
-        fetchOrders(),
-        fetchProducts(),
-        fetchPayouts(),
-      ]);
+      const [statsData, sellersData, ordersData, productsData, payoutsData] =
+        await Promise.all([
+          fetchPlatformStats(),
+          fetchSellers(),
+          fetchOrders(),
+          fetchProducts(),
+          fetchPayouts(),
+        ]);
       setStats(statsData);
       setSellers(sellersData);
       setOrders(ordersData);
       setProducts(productsData);
       setPayouts(payoutsData);
     } catch (err) {
-      console.error('Failed to load dashboard data:', err);
+      console.error("Failed to load dashboard data:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -128,9 +149,12 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('waw_admin_token') : null;
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("waw_admin_token")
+        : null;
     if (!token) {
-      router.push('/login');
+      router.push("/login");
     } else {
       setAuthenticated(true);
       loadDashboardData();
@@ -138,9 +162,9 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem('waw_admin_token');
-    localStorage.removeItem('waw_admin_user');
-    router.push('/login');
+    localStorage.removeItem("waw_admin_token");
+    localStorage.removeItem("waw_admin_user");
+    router.push("/login");
   };
 
   const triggerToast = (msg: string) => {
@@ -148,89 +172,88 @@ export default function AdminDashboardPage() {
     setTimeout(() => setActionSuccessMsg(null), 4000);
   };
 
-  // ── 2. Action Handlers ───────────────────────────────────────────────────
-  const handleApproveSeller = async (seller: AdminSeller, status: StoreStatus) => {
+  // â”€â”€ 2. Action Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const handleApproveSeller = async (
+    seller: AdminSeller,
+    status: StoreStatus,
+  ) => {
     try {
+      setIsSubmitting(true);
       await updateSellerStatus(seller.id, status, commissionInput);
-      setSellers((prev) =>
-        prev.map((s) => (s.id === seller.id ? { ...s, status, commissionRatePercentage: commissionInput } : s))
-      );
+      await loadDashboardData();
       setShowKycModal(null);
-      triggerToast(`Store "${seller.name}" updated to ${status} with ${commissionInput}% commission!`);
+      triggerToast(`Store '${seller.name}' updated to ${status} with ${commissionInput}% commission!`);
     } catch (err: any) {
       alert(`Failed to update store KYC status: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDispatchOrder = async (order: AdminOrder) => {
-    const generatedTracking = `PTX-${order.orderNumber.replace(/[^0-9]/g, '') || '99120'}-${Math.floor(100 + Math.random() * 900)}`;
     try {
-      await updateOrderStatus(order.id, OrderStatus.SHIPPED, 'PostEx', generatedTracking);
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === order.id
-            ? { ...o, orderStatus: OrderStatus.SHIPPED, courier: 'PostEx', trackingNumber: generatedTracking }
-            : o
-        )
+      setIsSubmitting(true);
+      await updateOrderStatus(
+        order.id,
+        OrderStatus.SHIPPED,
+        'PostEx'
       );
+      await loadDashboardData();
       setShowDispatchModal(null);
-      triggerToast(`Order ${order.orderNumber} booked with PostEx (CN: ${generatedTracking})!`);
+      triggerToast(`Order ${order.orderNumber} dispatched!`);
     } catch (err: any) {
-      alert(`Failed to dispatch order with PostEx: ${err?.message || 'Server error'}`);
+      alert(`Failed to dispatch order: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSettlePayout = async (payout: AdminPayout) => {
-    const ref = bankRefInput.trim() || `RAAST-FT-${Math.floor(100000 + Math.random() * 900000)}-PK`;
     try {
+      setIsSubmitting(true);
+      const ref = bankRefInput.trim();
+      if (!ref) {
+        alert('Bank reference is required to settle payouts.');
+        setIsSubmitting(false);
+        return;
+      }
       await settlePayout(payout.id, ref);
-      setPayouts((prev) =>
-        prev.map((p) => (p.id === payout.id ? { ...p, status: PayoutStatus.PAID, bankReference: ref } : p))
-      );
+      await loadDashboardData();
       setShowSettlePayoutModal(null);
       setBankRefInput('');
-      triggerToast(`Payout settled for ${payout.storeName} via Raast (Ref: ${ref})!`);
+      triggerToast(`Payout settled for ${payout.storeName}!`);
     } catch (err: any) {
       alert(`Failed to settle payout: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setIsSubmitting(true);
       await createProduct({
         ...newProductForm,
         storeId: newProductForm.sellerType === SellerType.FIRST_PARTY ? null : selectedSellerStore,
       });
-      const newProd: AdminProduct = {
-        id: `prod_${Date.now()}`,
-        title: newProductForm.title,
-        titleUrdu: newProductForm.titleUrdu,
-        slug: newProductForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        categoryId: newProductForm.categoryId,
-        categoryName: 'Artisan Catalog',
-        isFirstParty: newProductForm.sellerType === SellerType.FIRST_PARTY,
-        basePricePkr: newProductForm.basePricePkr,
-        compareAtPricePkr: newProductForm.compareAtPricePkr,
-        images: [newProductForm.imageUrl],
-        stockQuantity: newProductForm.stockQuantity,
-        soldCount: 0,
-        ratingAverage: 5.0,
-        sellerType: newProductForm.sellerType,
-        storeName: newProductForm.sellerType === SellerType.FIRST_PARTY ? 'Waw Official Retail' : 'Verified Vendor',
-        createdAt: new Date().toISOString(),
-      };
-      setProducts([newProd, ...products]);
+      await loadDashboardData();
       setShowAddProductModal(false);
-      triggerToast(`Product "${newProductForm.title}" published successfully to Supabase!`);
+      triggerToast(`Product '${newProductForm.title}' published successfully!`);
     } catch (err: any) {
       alert(`Failed to publish product: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleAdjustStock = (productId: string, delta: number) => {
     setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stockQuantity: Math.max(0, p.stockQuantity + delta) } : p))
+      prev.map((p) =>
+        p.id === productId
+          ? { ...p, stockQuantity: Math.max(0, p.stockQuantity + delta) }
+          : p,
+      ),
     );
     triggerToast(`Inventory stock quantity updated!`);
   };
@@ -242,7 +265,7 @@ export default function AdminDashboardPage() {
   const safePayouts = Array.isArray(payouts) ? payouts : [];
 
   const filteredOrders = safeOrders.filter((o) => {
-    if (orderFilter !== 'ALL' && o.orderStatus !== orderFilter) return false;
+    if (orderFilter !== "ALL" && o.orderStatus !== orderFilter) return false;
     if (
       searchQuery &&
       !o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -255,7 +278,8 @@ export default function AdminDashboardPage() {
   });
 
   const filteredSellers = safeSellers.filter((s) => {
-    if (sellerStatusFilter !== 'ALL' && s.status !== sellerStatusFilter) return false;
+    if (sellerStatusFilter !== "ALL" && s.status !== sellerStatusFilter)
+      return false;
     if (
       searchQuery &&
       !s.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -280,7 +304,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-950 text-slate-100 font-sans">
-      {/* ── TOP TOAST NOTIFICATION ── */}
+      {/* â”€â”€ TOP TOAST NOTIFICATION â”€â”€ */}
       {actionSuccessMsg && (
         <div className="fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 bg-emerald-500 text-slate-950 font-bold rounded-2xl shadow-2xl shadow-emerald-500/30 animate-bounce">
           <CheckCircle2 className="w-5 h-5" />
@@ -288,20 +312,25 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── SIDEBAR NAVIGATION ── */}
+      {/* â”€â”€ SIDEBAR NAVIGATION â”€â”€ */}
       <aside className="w-full md:w-64 bg-slate-900/90 border-r border-slate-800 p-5 flex flex-col justify-between shrink-0">
         <div className="space-y-6">
           {/* Brand Logo */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-amber-400/20 transform -rotate-3 hover:rotate-0 transition-transform">
-                و
+                Ùˆ
               </div>
               <div>
                 <div className="font-black text-lg tracking-tight text-white flex items-center gap-1.5">
-                  Waw <span className="text-amber-400 text-xs px-2 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20">Control</span>
+                  Waw{" "}
+                  <span className="text-amber-400 text-xs px-2 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20">
+                    Control
+                  </span>
                 </div>
-                <div className="text-[10px] text-slate-400 font-medium">Pakistan Ops Center</div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  Pakistan Ops Center
+                </div>
               </div>
             </div>
 
@@ -310,29 +339,31 @@ export default function AdminDashboardPage() {
               title="Refresh live data"
               className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${refreshing ? "animate-spin text-amber-400" : ""}`}
+              />
             </button>
           </div>
 
           {/* Role Switcher Pill */}
           <div className="bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800 flex items-center text-xs font-bold">
             <button
-              onClick={() => setViewRole('SUPER_ADMIN')}
+              onClick={() => setViewRole("SUPER_ADMIN")}
               className={`flex-1 py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                viewRole === 'SUPER_ADMIN'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                viewRole === "SUPER_ADMIN"
+                  ? "bg-amber-400 text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Admin</span>
             </button>
             <button
-              onClick={() => setViewRole('SELLER')}
+              onClick={() => setViewRole("SELLER")}
               className={`flex-1 py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                viewRole === 'SELLER'
-                  ? 'bg-emerald-400 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                viewRole === "SELLER"
+                  ? "bg-emerald-400 text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
@@ -341,9 +372,11 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Seller Store Selector (When in Seller View) */}
-          {viewRole === 'SELLER' && (
+          {viewRole === "SELLER" && (
             <div className="p-3 bg-emerald-950/30 border border-emerald-500/20 rounded-2xl space-y-1.5">
-              <label className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-400">Managing Store:</label>
+              <label className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-400">
+                Managing Store:
+              </label>
               <select
                 value={selectedSellerStore}
                 onChange={(e) => setSelectedSellerStore(e.target.value)}
@@ -361,11 +394,11 @@ export default function AdminDashboardPage() {
           {/* Main Navigation Links */}
           <nav className="space-y-1.5 text-xs font-bold">
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => setActiveTab("overview")}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer ${
-                activeTab === 'overview'
-                  ? 'bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                activeTab === "overview"
+                  ? "bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -376,11 +409,11 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('orders')}
+              onClick={() => setActiveTab("orders")}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer ${
-                activeTab === 'orders'
-                  ? 'bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                activeTab === "orders"
+                  ? "bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -392,33 +425,39 @@ export default function AdminDashboardPage() {
               </span>
             </button>
 
-            {viewRole === 'SUPER_ADMIN' && (
+            {viewRole === "SUPER_ADMIN" && (
               <button
-                onClick={() => setActiveTab('sellers')}
+                onClick={() => setActiveTab("sellers")}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer ${
-                  activeTab === 'sellers'
-                    ? 'bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  activeTab === "sellers"
+                    ? "bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Users className="w-4 h-4" />
                   <span>Sellers & KYC</span>
                 </div>
-                {sellers.filter((s) => s.status === StoreStatus.PENDING_KYC).length > 0 && (
+                {sellers.filter((s) => s.status === StoreStatus.PENDING_KYC)
+                  .length > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-black animate-pulse">
-                    {sellers.filter((s) => s.status === StoreStatus.PENDING_KYC).length} new
+                    {
+                      sellers.filter(
+                        (s) => s.status === StoreStatus.PENDING_KYC,
+                      ).length
+                    }{" "}
+                    new
                   </span>
                 )}
               </button>
             )}
 
             <button
-              onClick={() => setActiveTab('inventory')}
+              onClick={() => setActiveTab("inventory")}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer ${
-                activeTab === 'inventory'
-                  ? 'bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                activeTab === "inventory"
+                  ? "bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -431,11 +470,11 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('payouts')}
+              onClick={() => setActiveTab("payouts")}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer ${
-                activeTab === 'payouts'
-                  ? 'bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                activeTab === "payouts"
+                  ? "bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -446,11 +485,11 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('returns')}
+              onClick={() => setActiveTab("returns")}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer ${
-                activeTab === 'returns'
-                  ? 'bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                activeTab === "returns"
+                  ? "bg-amber-400/10 text-amber-400 border border-amber-400/30 shadow-xs"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -468,12 +507,16 @@ export default function AdminDashboardPage() {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               <span>Live Cluster</span>
             </span>
-            <span className="text-[10px] text-amber-400 font-mono">v1.2-PROD</span>
+            <span className="text-[10px] text-amber-400 font-mono">
+              v1.2-PROD
+            </span>
           </div>
           <div className="text-[10px] text-slate-400 space-y-0.5">
             <div className="flex justify-between">
               <span>Database:</span>
-              <span className="text-emerald-400 font-mono">Supabase PostgreSQL</span>
+              <span className="text-emerald-400 font-mono">
+                Supabase PostgreSQL
+              </span>
             </div>
             <div className="flex justify-between">
               <span>Cache/Locks:</span>
@@ -497,7 +540,7 @@ export default function AdminDashboardPage() {
         </button>
       </aside>
 
-      {/* ── MAIN VIEWPORT ── */}
+      {/* â”€â”€ MAIN VIEWPORT â”€â”€ */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top Header */}
         <header className="h-16 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md px-6 flex items-center justify-between shrink-0 sticky top-0 z-20">
@@ -523,15 +566,15 @@ export default function AdminDashboardPage() {
               <span>List Product</span>
             </button>
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-amber-400">
-              {viewRole === 'SUPER_ADMIN' ? 'WA' : 'SE'}
+              {viewRole === "SUPER_ADMIN" ? "WA" : "SE"}
             </div>
           </div>
         </header>
 
         {/* Content Body */}
         <div className="p-6 md:p-8 space-y-8 max-w-7xl w-full mx-auto">
-          {/* ── TAB 1: EXECUTIVE OVERVIEW ── */}
-          {activeTab === 'overview' && (
+          {/* â”€â”€ TAB 1: EXECUTIVE OVERVIEW â”€â”€ */}
+          {activeTab === "overview" && (
             <div className="space-y-8 animate-fade-in">
               {/* Welcome Banner */}
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-800 p-6 md:p-8 shadow-xl">
@@ -544,7 +587,9 @@ export default function AdminDashboardPage() {
                     Waw Executive Command Center
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-400">
-                    Real-time monitoring of PostEx courier dispatches, SBP escrow commission splits, seller KYC onboarding, and national catalog stock.
+                    Real-time monitoring of PostEx courier dispatches, SBP
+                    escrow commission splits, seller KYC onboarding, and
+                    national catalog stock.
                   </p>
                 </div>
                 <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-amber-400/5 to-transparent pointer-events-none" />
@@ -554,7 +599,9 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400">Total GMV (PKR)</span>
+                    <span className="text-xs font-bold text-slate-400">
+                      Total GMV (PKR)
+                    </span>
                     <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
                       <DollarSign className="w-4 h-4" />
                     </div>
@@ -570,7 +617,9 @@ export default function AdminDashboardPage() {
 
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400">Total Orders</span>
+                    <span className="text-xs font-bold text-slate-400">
+                      Total Orders
+                    </span>
                     <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
                       <ShoppingBag className="w-4 h-4" />
                     </div>
@@ -579,19 +628,27 @@ export default function AdminDashboardPage() {
                     {(stats?.totalOrders || 0).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-amber-400 font-extrabold">
-                    {orders.filter((o) => o.orderStatus === OrderStatus.CONFIRMED).length} awaiting PostEx pickup
+                    {
+                      orders.filter(
+                        (o) => o.orderStatus === OrderStatus.CONFIRMED,
+                      ).length
+                    }{" "}
+                    awaiting PostEx pickup
                   </div>
                 </div>
 
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400">Verified Sellers</span>
+                    <span className="text-xs font-bold text-slate-400">
+                      Verified Sellers
+                    </span>
                     <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center">
                       <Users className="w-4 h-4" />
                     </div>
                   </div>
                   <div className="text-2xl font-black text-white">
-                    {sellers.filter((s) => s.status === StoreStatus.ACTIVE).length || 84}
+                    {sellers.filter((s) => s.status === StoreStatus.ACTIVE)
+                      .length || 84}
                   </div>
                   <div className="text-[10px] text-sky-400 font-extrabold">
                     Across Karachi, Lahore, Isb, Peshawar
@@ -600,7 +657,9 @@ export default function AdminDashboardPage() {
 
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400">Net Platform Revenue</span>
+                    <span className="text-xs font-bold text-slate-400">
+                      Net Platform Revenue
+                    </span>
                     <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
                       <Banknote className="w-4 h-4" />
                     </div>
@@ -624,7 +683,7 @@ export default function AdminDashboardPage() {
                       <span>Recent Orders Ready for Dispatch</span>
                     </h3>
                     <button
-                      onClick={() => setActiveTab('orders')}
+                      onClick={() => setActiveTab("orders")}
                       className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <span>View All</span>
@@ -640,14 +699,22 @@ export default function AdminDashboardPage() {
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-amber-400">{order.orderNumber}</span>
-                            <span className="text-xs font-bold text-white">• {order.buyerName}</span>
+                            <span className="font-mono text-xs font-bold text-amber-400">
+                              {order.orderNumber}
+                            </span>
+                            <span className="text-xs font-bold text-white">
+                              â€¢ {order.buyerName}
+                            </span>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
                               {order.shippingCity}
                             </span>
                           </div>
                           <div className="text-xs text-slate-400">
-                            Total: <strong className="text-slate-200">PKR {order.totalPkr.toLocaleString()}</strong> ({order.paymentMethod})
+                            Total:{" "}
+                            <strong className="text-slate-200">
+                              PKR {order.totalPkr.toLocaleString()}
+                            </strong>{" "}
+                            ({order.paymentMethod})
                           </div>
                         </div>
 
@@ -683,26 +750,40 @@ export default function AdminDashboardPage() {
 
                   <div className="space-y-3.5 text-xs">
                     <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-400">Standard Commission:</span>
-                      <span className="font-bold text-emerald-400">10% per 3P sale</span>
+                      <span className="text-slate-400">
+                        Standard Commission:
+                      </span>
+                      <span className="font-bold text-emerald-400">
+                        10% per 3P sale
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-400">Free Delivery Threshold:</span>
-                      <span className="font-bold text-amber-400">&ge; PKR 5,000</span>
+                      <span className="text-slate-400">
+                        Free Delivery Threshold:
+                      </span>
+                      <span className="font-bold text-amber-400">
+                        &ge; PKR 5,000
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-400">COD Handling Surcharge:</span>
+                      <span className="text-slate-400">
+                        COD Handling Surcharge:
+                      </span>
                       <span className="font-bold text-slate-200">+PKR 100</span>
                     </div>
                     <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-400">Escrow Hold Period:</span>
-                      <span className="font-bold text-sky-400">7 Days (Return window)</span>
+                      <span className="text-slate-400">
+                        Escrow Hold Period:
+                      </span>
+                      <span className="font-bold text-sky-400">
+                        7 Days (Return window)
+                      </span>
                     </div>
                   </div>
 
                   <div className="pt-2">
                     <button
-                      onClick={() => setActiveTab('payouts')}
+                      onClick={() => setActiveTab("payouts")}
                       className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
                       <Banknote className="w-4 h-4 text-amber-400" />
@@ -714,32 +795,41 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* ── TAB 2: ORDERS & POSTEX DISPATCH ── */}
-          {activeTab === 'orders' && (
+          {/* â”€â”€ TAB 2: ORDERS & POSTEX DISPATCH â”€â”€ */}
+          {activeTab === "orders" && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-black text-white">Orders & PostEx Fulfillment</h2>
-                  <p className="text-xs text-slate-400">Manage buyer orders, book PostEx rider dispatch, and print 4x6 Air Waybills.</p>
+                  <h2 className="text-xl font-black text-white">
+                    Orders & PostEx Fulfillment
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Manage buyer orders, book PostEx rider dispatch, and print
+                    4x6 Air Waybills.
+                  </p>
                 </div>
 
                 {/* Filter Pills */}
                 <div className="flex flex-wrap items-center gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold">
-                  {['ALL', OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED].map(
-                    (st) => (
-                      <button
-                        key={st}
-                        onClick={() => setOrderFilter(st)}
-                        className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                          orderFilter === st
-                            ? 'bg-amber-400 text-slate-950 shadow-xs'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        {st}
-                      </button>
-                    )
-                  )}
+                  {[
+                    "ALL",
+                    OrderStatus.CONFIRMED,
+                    OrderStatus.PROCESSING,
+                    OrderStatus.SHIPPED,
+                    OrderStatus.DELIVERED,
+                  ].map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setOrderFilter(st)}
+                      className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                        orderFilter === st
+                          ? "bg-amber-400 text-slate-950 shadow-xs"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -752,30 +842,46 @@ export default function AdminDashboardPage() {
                   >
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2.5">
-                        <span className="font-black text-sm text-amber-400 font-mono">{order.orderNumber}</span>
-                        <span className="text-xs font-bold text-white">{order.buyerName}</span>
-                        <span className="text-xs text-slate-400 font-mono">{order.buyerPhone}</span>
+                        <span className="font-black text-sm text-amber-400 font-mono">
+                          {order.orderNumber}
+                        </span>
+                        <span className="text-xs font-bold text-white">
+                          {order.buyerName}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          {order.buyerPhone}
+                        </span>
                         <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold border border-slate-700">
-                          📍 {order.shippingCity}
+                          ðŸ“ {order.shippingCity}
                         </span>
                         <span
                           className={`text-[10px] px-2.5 py-0.5 rounded-full font-black ${
                             order.paymentStatus === PaymentStatus.PAID
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                           }`}
                         >
-                          {order.paymentStatus === PaymentStatus.PAID ? 'PAID (XPay)' : 'COD PENDING'}
+                          {order.paymentStatus === PaymentStatus.PAID
+                            ? "PAID (XPay)"
+                            : "COD PENDING"}
                         </span>
                       </div>
 
                       <div className="text-xs text-slate-400">
-                        Address: <span className="text-slate-300">{order.shippingAddress}, {order.shippingCity}</span>
+                        Address:{" "}
+                        <span className="text-slate-300">
+                          {order.shippingAddress}, {order.shippingCity}
+                        </span>
                       </div>
 
                       {order.items && (
                         <div className="text-xs text-slate-400">
-                          Items: <span className="text-slate-200">{order.items.map((i) => `${i.productTitle} (x${i.quantity})`).join(', ')}</span>
+                          Items:{" "}
+                          <span className="text-slate-200">
+                            {order.items
+                              .map((i) => `${i.productTitle} (x${i.quantity})`)
+                              .join(", ")}
+                          </span>
                         </div>
                       )}
 
@@ -789,8 +895,12 @@ export default function AdminDashboardPage() {
 
                     <div className="flex flex-wrap items-center gap-3 lg:self-center">
                       <div className="text-right mr-2">
-                        <div className="text-base font-black text-white">PKR {order.totalPkr.toLocaleString()}</div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">{order.orderStatus}</div>
+                        <div className="text-base font-black text-white">
+                          PKR {order.totalPkr.toLocaleString()}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">
+                          {order.orderStatus}
+                        </div>
                       </div>
 
                       {order.orderStatus === OrderStatus.CONFIRMED && (
@@ -817,24 +927,34 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* ── TAB 3: SELLERS & KYC APPROVALS ── */}
-          {activeTab === 'sellers' && (
+          {/* â”€â”€ TAB 3: SELLERS & KYC APPROVALS â”€â”€ */}
+          {activeTab === "sellers" && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-black text-white">Seller Directory & KYC Verification</h2>
-                  <p className="text-xs text-slate-400">Review Pakistani merchant CNIC, NTN, bank accounts, and set marketplace commission rates.</p>
+                  <h2 className="text-xl font-black text-white">
+                    Seller Directory & KYC Verification
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Review Pakistani merchant CNIC, NTN, bank accounts, and set
+                    marketplace commission rates.
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold">
-                  {['ALL', StoreStatus.PENDING_KYC, StoreStatus.ACTIVE, StoreStatus.SUSPENDED].map((st) => (
+                  {[
+                    "ALL",
+                    StoreStatus.PENDING_KYC,
+                    StoreStatus.ACTIVE,
+                    StoreStatus.SUSPENDED,
+                  ].map((st) => (
                     <button
                       key={st}
                       onClick={() => setSellerStatusFilter(st)}
                       className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                         sellerStatusFilter === st
-                          ? 'bg-amber-400 text-slate-950 shadow-xs'
-                          : 'text-slate-400 hover:text-white'
+                          ? "bg-amber-400 text-slate-950 shadow-xs"
+                          : "text-slate-400 hover:text-white"
                       }`}
                     >
                       {st}
@@ -852,7 +972,9 @@ export default function AdminDashboardPage() {
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h3 className="font-black text-base text-white">{seller.name}</h3>
+                          <h3 className="font-black text-base text-white">
+                            {seller.name}
+                          </h3>
                           <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
                             <Building2 className="w-3.5 h-3.5 text-amber-400" />
                             <span>{seller.city}, Pakistan</span>
@@ -861,8 +983,8 @@ export default function AdminDashboardPage() {
                         <span
                           className={`text-[10px] px-2.5 py-1 rounded-full font-black ${
                             seller.status === StoreStatus.ACTIVE
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                           }`}
                         >
                           {seller.status}
@@ -872,19 +994,27 @@ export default function AdminDashboardPage() {
                       <div className="p-3 bg-slate-950/70 rounded-2xl border border-slate-800 space-y-1.5 text-xs text-slate-300">
                         <div className="flex justify-between">
                           <span className="text-slate-500">Owner Name:</span>
-                          <span className="font-bold text-white">{seller.owner?.full_name || 'Verified Proprietor'}</span>
+                          <span className="font-bold text-white">
+                            {seller.owner?.full_name || "Verified Proprietor"}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">CNIC / Tax:</span>
-                          <span className="font-mono text-slate-200">{seller.cnicNumber || '35201-XXXXXXX-1'}</span>
+                          <span className="font-mono text-slate-200">
+                            {seller.cnicNumber || "35201-XXXXXXX-1"}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">Bank / IBAN:</span>
-                          <span className="font-mono text-slate-200">{seller.bankName}</span>
+                          <span className="font-mono text-slate-200">
+                            {seller.bankName}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">Commission:</span>
-                          <span className="font-bold text-amber-400">{seller.commissionRatePercentage}%</span>
+                          <span className="font-bold text-amber-400">
+                            {seller.commissionRatePercentage}%
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -893,7 +1023,9 @@ export default function AdminDashboardPage() {
                       <button
                         onClick={() => {
                           setShowKycModal(seller);
-                          setCommissionInput(seller.commissionRatePercentage || 10);
+                          setCommissionInput(
+                            seller.commissionRatePercentage || 10,
+                          );
                         }}
                         className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
@@ -903,7 +1035,9 @@ export default function AdminDashboardPage() {
 
                       {seller.status === StoreStatus.PENDING_KYC && (
                         <button
-                          onClick={() => handleApproveSeller(seller, StoreStatus.ACTIVE)}
+                          onClick={() =>
+                            handleApproveSeller(seller, StoreStatus.ACTIVE)
+                          }
                           className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                         >
                           <Check className="w-3.5 h-3.5" />
@@ -917,13 +1051,18 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* ── TAB 4: INVENTORY & PRODUCTS ── */}
-          {activeTab === 'inventory' && (
+          {/* â”€â”€ TAB 4: INVENTORY & PRODUCTS â”€â”€ */}
+          {activeTab === "inventory" && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-black text-white">Product Catalog & Real-Time Stock</h2>
-                  <p className="text-xs text-slate-400">Manage 1P Waw retail products and 3P verified artisan seller listings.</p>
+                  <h2 className="text-xl font-black text-white">
+                    Product Catalog & Real-Time Stock
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Manage 1P Waw retail products and 3P verified artisan seller
+                    listings.
+                  </p>
                 </div>
 
                 <button
@@ -944,7 +1083,10 @@ export default function AdminDashboardPage() {
                     <div>
                       <div className="relative h-44 w-full bg-slate-950 overflow-hidden">
                         <img
-                          src={product.images[0] || 'https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600'}
+                          src={
+                            product.images[0] ||
+                            "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600"
+                          }
                           alt={product.title}
                           className="w-full h-full object-cover"
                         />
@@ -952,25 +1094,40 @@ export default function AdminDashboardPage() {
                           <span
                             className={`text-[10px] px-2.5 py-0.5 rounded-full font-black ${
                               product.isFirstParty
-                                ? 'bg-amber-400 text-slate-950'
-                                : 'bg-slate-900/90 text-slate-200 border border-slate-700'
+                                ? "bg-amber-400 text-slate-950"
+                                : "bg-slate-900/90 text-slate-200 border border-slate-700"
                             }`}
                           >
-                            {product.isFirstParty ? '1P WAW RETAIL' : '3P SELLER'}
+                            {product.isFirstParty
+                              ? "1P WAW RETAIL"
+                              : "3P SELLER"}
                           </span>
                         </div>
                       </div>
 
                       <div className="p-5 space-y-2">
-                        <h3 className="font-extrabold text-sm text-white line-clamp-1">{product.title}</h3>
+                        <h3 className="font-extrabold text-sm text-white line-clamp-1">
+                          {product.title}
+                        </h3>
                         {product.titleUrdu && (
-                          <div className="font-serif text-xs text-amber-300/80 text-right line-clamp-1" dir="rtl">
+                          <div
+                            className="font-serif text-xs text-amber-300/80 text-right line-clamp-1"
+                            dir="rtl"
+                          >
                             {product.titleUrdu}
                           </div>
                         )}
                         <div className="flex items-center justify-between text-xs pt-1">
-                          <span className="font-black text-amber-400 text-base">PKR {product.basePricePkr.toLocaleString()}</span>
-                          <span className="text-slate-500 line-through">PKR {(product.compareAtPricePkr || product.basePricePkr * 1.3).toLocaleString()}</span>
+                          <span className="font-black text-amber-400 text-base">
+                            PKR {product.basePricePkr.toLocaleString()}
+                          </span>
+                          <span className="text-slate-500 line-through">
+                            PKR{" "}
+                            {(
+                              product.compareAtPricePkr ||
+                              product.basePricePkr * 1.3
+                            ).toLocaleString()}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -979,7 +1136,9 @@ export default function AdminDashboardPage() {
                       <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 flex items-center justify-between">
                         <div className="text-xs">
                           <span className="text-slate-400">Stock: </span>
-                          <strong className="text-white font-mono">{product.stockQuantity} units</strong>
+                          <strong className="text-white font-mono">
+                            {product.stockQuantity} units
+                          </strong>
                         </div>
 
                         <div className="flex items-center gap-1.5">
@@ -1004,13 +1163,18 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* ── TAB 5: SBP ESCROW PAYOUTS ── */}
-          {activeTab === 'payouts' && (
+          {/* â”€â”€ TAB 5: SBP ESCROW PAYOUTS â”€â”€ */}
+          {activeTab === "payouts" && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-black text-white">SBP Escrow Vendor Settlements</h2>
-                  <p className="text-xs text-slate-400">Automated 1Link / Raast vendor remittances with 10% marketplace commission deduction.</p>
+                  <h2 className="text-xl font-black text-white">
+                    SBP Escrow Vendor Settlements
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Automated 1Link / Raast vendor remittances with 10%
+                    marketplace commission deduction.
+                  </p>
                 </div>
               </div>
 
@@ -1022,15 +1186,17 @@ export default function AdminDashboardPage() {
                   >
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2.5">
-                        <span className="font-extrabold text-sm text-white">{payout.storeName}</span>
+                        <span className="font-extrabold text-sm text-white">
+                          {payout.storeName}
+                        </span>
                         <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-                          📍 {payout.city}
+                          ðŸ“ {payout.city}
                         </span>
                         <span
                           className={`text-[10px] px-2.5 py-0.5 rounded-full font-black ${
                             payout.status === PayoutStatus.PAID
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                           }`}
                         >
                           {payout.status}
@@ -1038,7 +1204,12 @@ export default function AdminDashboardPage() {
                       </div>
 
                       <div className="text-xs text-slate-400 font-mono">
-                        Bank: <span className="text-slate-200">{payout.bankName}</span> • IBAN: <span className="text-slate-200">{payout.iban}</span>
+                        Bank:{" "}
+                        <span className="text-slate-200">
+                          {payout.bankName}
+                        </span>{" "}
+                        â€¢ IBAN:{" "}
+                        <span className="text-slate-200">{payout.iban}</span>
                       </div>
 
                       {payout.bankReference && (
@@ -1050,8 +1221,12 @@ export default function AdminDashboardPage() {
 
                     <div className="flex items-center gap-3 lg:self-center">
                       <div className="text-right mr-3">
-                        <div className="text-base font-black text-amber-300">PKR {payout.amountPkr.toLocaleString()}</div>
-                        <div className="text-[10px] text-slate-400 font-bold">Net Vendor Settlement</div>
+                        <div className="text-base font-black text-amber-300">
+                          PKR {payout.amountPkr.toLocaleString()}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold">
+                          Net Vendor Settlement
+                        </div>
                       </div>
 
                       {payout.status !== PayoutStatus.PAID && (
@@ -1070,30 +1245,46 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* ── TAB 6: 7-DAY RETURNS ── */}
-          {activeTab === 'returns' && (
+          {/* â”€â”€ TAB 6: 7-DAY RETURNS â”€â”€ */}
+          {activeTab === "returns" && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-xl font-black text-white">7-Day Customer Returns & Reverse Logistics</h2>
-                <p className="text-xs text-slate-400">Inspect return claims and dispatch PostEx reverse pickups from customer homes.</p>
+                <h2 className="text-xl font-black text-white">
+                  7-Day Customer Returns & Reverse Logistics
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Inspect return claims and dispatch PostEx reverse pickups from
+                  customer homes.
+                </p>
               </div>
 
               <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-amber-400">RET-PTX-88291</span>
-                    <span className="text-xs font-bold text-white">• Ali Raza (Lahore)</span>
+                    <span className="font-mono text-xs font-bold text-amber-400">
+                      RET-PTX-88291
+                    </span>
+                    <span className="text-xs font-bold text-white">
+                      â€¢ Ali Raza (Lahore)
+                    </span>
                   </div>
                   <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black">
                     REVERSE PICKUP BOOKED
                   </span>
                 </div>
                 <div className="text-xs text-slate-300">
-                  Reason: <strong className="text-amber-400">Size / Fit Mismatch</strong> • Item: Waw Handcrafted Peshawari Chappal (Size 42)
+                  Reason:{" "}
+                  <strong className="text-amber-400">
+                    Size / Fit Mismatch
+                  </strong>{" "}
+                  â€¢ Item: Waw Handcrafted Peshawari Chappal (Size 42)
                 </div>
                 <div className="text-xs text-emerald-400 font-mono font-bold flex items-center gap-2">
                   <Truck className="w-4 h-4" />
-                  <span>PostEx Reverse CN: REV-PTX-326608-42 (Rider assigned for doorstep pickup)</span>
+                  <span>
+                    PostEx Reverse CN: REV-PTX-326608-42 (Rider assigned for
+                    doorstep pickup)
+                  </span>
                 </div>
               </div>
             </div>
@@ -1101,7 +1292,7 @@ export default function AdminDashboardPage() {
         </div>
       </main>
 
-      {/* ── MODAL: ADD NEW PRODUCT ── */}
+      {/* â”€â”€ MODAL: ADD NEW PRODUCT â”€â”€ */}
       {showAddProductModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl animate-scale-up">
@@ -1118,27 +1309,44 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateProductSubmit} className="space-y-4 text-xs">
+            <form
+              onSubmit={handleCreateProductSubmit}
+              className="space-y-4 text-xs"
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-300">Product Title (English):</label>
+                  <label className="font-bold text-slate-300">
+                    Product Title (English):
+                  </label>
                   <input
                     type="text"
                     required
                     value={newProductForm.title}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, title: e.target.value })}
+                    onChange={(e) =>
+                      setNewProductForm({
+                        ...newProductForm,
+                        title: e.target.value,
+                      })
+                    }
                     placeholder="e.g. Master Artisan Cowhide Duffle"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-300">Title in Urdu (عنوان):</label>
+                  <label className="font-bold text-slate-300">
+                    Title in Urdu (Ø¹Ù†ÙˆØ§Ù†):
+                  </label>
                   <input
                     type="text"
                     value={newProductForm.titleUrdu}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, titleUrdu: e.target.value })}
-                    placeholder="مثال: دستکار چمڑے کا ڈفل بیگ"
+                    onChange={(e) =>
+                      setNewProductForm({
+                        ...newProductForm,
+                        titleUrdu: e.target.value,
+                      })
+                    }
+                    placeholder="Ù…Ø«Ø§Ù„: Ø¯Ø³ØªÚ©Ø§Ø± Ú†Ù…Ú‘Û’ Ú©Ø§ ÚˆÙÙ„ Ø¨ÛŒÚ¯"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-serif text-right focus:outline-none focus:border-amber-400"
                     dir="rtl"
                   />
@@ -1147,31 +1355,52 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-300">Price (PKR):</label>
+                  <label className="font-bold text-slate-300">
+                    Price (PKR):
+                  </label>
                   <input
                     type="number"
                     required
                     value={newProductForm.basePricePkr}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, basePricePkr: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewProductForm({
+                        ...newProductForm,
+                        basePricePkr: Number(e.target.value),
+                      })
+                    }
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-300">Compare Price:</label>
+                  <label className="font-bold text-slate-300">
+                    Compare Price:
+                  </label>
                   <input
                     type="number"
                     value={newProductForm.compareAtPricePkr}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, compareAtPricePkr: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewProductForm({
+                        ...newProductForm,
+                        compareAtPricePkr: Number(e.target.value),
+                      })
+                    }
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-300">Initial Stock:</label>
+                  <label className="font-bold text-slate-300">
+                    Initial Stock:
+                  </label>
                   <input
                     type="number"
                     required
                     value={newProductForm.stockQuantity}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, stockQuantity: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewProductForm({
+                        ...newProductForm,
+                        stockQuantity: Number(e.target.value),
+                      })
+                    }
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
@@ -1183,7 +1412,12 @@ export default function AdminDashboardPage() {
                   type="url"
                   required
                   value={newProductForm.imageUrl}
-                  onChange={(e) => setNewProductForm({ ...newProductForm, imageUrl: e.target.value })}
+                  onChange={(e) =>
+                    setNewProductForm({
+                      ...newProductForm,
+                      imageUrl: e.target.value,
+                    })
+                  }
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-mono"
                 />
               </div>
@@ -1208,7 +1442,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── MODAL: DISPATCH VIA POSTEX ── */}
+      {/* â”€â”€ MODAL: DISPATCH VIA POSTEX â”€â”€ */}
       {showDispatchModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-scale-up">
@@ -1227,13 +1461,35 @@ export default function AdminDashboardPage() {
 
             <div className="space-y-3 text-xs">
               <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
-                <div className="text-slate-400">Order: <strong className="text-white">{showDispatchModal.orderNumber}</strong></div>
-                <div className="text-slate-400">Customer: <strong className="text-white">{showDispatchModal.buyerName} ({showDispatchModal.buyerPhone})</strong></div>
-                <div className="text-slate-400">Destination: <strong className="text-white">{showDispatchModal.shippingCity}</strong></div>
-                <div className="text-slate-400">Amount: <strong className="text-amber-400">PKR {showDispatchModal.totalPkr.toLocaleString()}</strong></div>
+                <div className="text-slate-400">
+                  Order:{" "}
+                  <strong className="text-white">
+                    {showDispatchModal.orderNumber}
+                  </strong>
+                </div>
+                <div className="text-slate-400">
+                  Customer:{" "}
+                  <strong className="text-white">
+                    {showDispatchModal.buyerName} (
+                    {showDispatchModal.buyerPhone})
+                  </strong>
+                </div>
+                <div className="text-slate-400">
+                  Destination:{" "}
+                  <strong className="text-white">
+                    {showDispatchModal.shippingCity}
+                  </strong>
+                </div>
+                <div className="text-slate-400">
+                  Amount:{" "}
+                  <strong className="text-amber-400">
+                    PKR {showDispatchModal.totalPkr.toLocaleString()}
+                  </strong>
+                </div>
               </div>
               <p className="text-slate-400">
-                Clicking confirm will generate an official PostEx Consignment Air Waybill and schedule rider pickup from your warehouse.
+                Clicking confirm will generate an official PostEx Consignment
+                Air Waybill and schedule rider pickup from your warehouse.
               </p>
             </div>
 
@@ -1247,7 +1503,7 @@ export default function AdminDashboardPage() {
               </button>
               <button
                 type="button"
-                onClick={() => handleDispatchOrder(showDispatchModal)}
+                disabled={isSubmitting} onClick={() => handleDispatchOrder(showDispatchModal)}
                 className="px-5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 text-slate-950 font-black rounded-xl shadow-lg shadow-amber-400/20 transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <Check className="w-4 h-4" />
@@ -1258,14 +1514,18 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── MODAL: 4X6 PRINTABLE AIR WAYBILL ── */}
+      {/* â”€â”€ MODAL: 4X6 PRINTABLE AIR WAYBILL â”€â”€ */}
       {showWaybillModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white text-slate-950 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-scale-up">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 font-black flex items-center justify-center">و</div>
-                <span className="font-black text-sm uppercase tracking-wider">PostEx Air Waybill (4x6)</span>
+                <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 font-black flex items-center justify-center">
+                  Ùˆ
+                </div>
+                <span className="font-black text-sm uppercase tracking-wider">
+                  PostEx Air Waybill (4x6)
+                </span>
               </div>
               <button
                 onClick={() => setShowWaybillModal(null)}
@@ -1278,24 +1538,40 @@ export default function AdminDashboardPage() {
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-2xl space-y-3 text-xs font-mono">
               <div className="flex justify-between border-b pb-2">
                 <div>
-                  <div className="font-bold text-sm">{showWaybillModal.orderNumber}</div>
-                  <div className="text-[10px] text-slate-500">Destination: {showWaybillModal.shippingCity.toUpperCase()}</div>
+                  <div className="font-bold text-sm">
+                    {showWaybillModal.orderNumber}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Destination: {showWaybillModal.shippingCity.toUpperCase()}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="font-bold">POSTEX EXPRESS</div>
-                  <div className="text-[10px] text-slate-500">{showWaybillModal.trackingNumber || 'PTX-99421-440'}</div>
+                  <div className="text-[10px] text-slate-500">
+                    {showWaybillModal.trackingNumber || "PTX-99421-440"}
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <div><strong>To:</strong> {showWaybillModal.buyerName}</div>
-                <div><strong>Phone:</strong> {showWaybillModal.buyerPhone}</div>
-                <div><strong>Address:</strong> {showWaybillModal.shippingAddress}</div>
+                <div>
+                  <strong>To:</strong> {showWaybillModal.buyerName}
+                </div>
+                <div>
+                  <strong>Phone:</strong> {showWaybillModal.buyerPhone}
+                </div>
+                <div>
+                  <strong>Address:</strong> {showWaybillModal.shippingAddress}
+                </div>
               </div>
 
               <div className="border-t pt-2 flex justify-between font-bold text-sm bg-slate-50 p-2 rounded-xl">
                 <span>COD Amount:</span>
-                <span>{showWaybillModal.paymentMethod === PaymentMethod.COD ? `PKR ${showWaybillModal.totalPkr.toLocaleString()}` : 'PREPAID - DO NOT COLLECT'}</span>
+                <span>
+                  {showWaybillModal.paymentMethod === PaymentMethod.COD
+                    ? `PKR ${showWaybillModal.totalPkr.toLocaleString()}`
+                    : "PREPAID - DO NOT COLLECT"}
+                </span>
               </div>
 
               {/* Barcode Simulation */}
@@ -1303,7 +1579,9 @@ export default function AdminDashboardPage() {
                 <div className="h-10 bg-slate-900 rounded-md flex items-center justify-center text-white tracking-[0.4em] font-bold text-xs">
                   ||| | |||| | ||| |||| | ||
                 </div>
-                <div className="text-[9px] text-slate-500">Scan at PostEx Distribution Hub</div>
+                <div className="text-[9px] text-slate-500">
+                  Scan at PostEx Distribution Hub
+                </div>
               </div>
             </div>
 
@@ -1320,7 +1598,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── MODAL: KYC AUDIT ── */}
+      {/* â”€â”€ MODAL: KYC AUDIT â”€â”€ */}
       {showKycModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-scale-up">
@@ -1345,24 +1623,35 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">CNIC Number:</span>
-                  <strong className="text-white font-mono">{showKycModal.cnicNumber || '35201-9876543-1'}</strong>
+                  <strong className="text-white font-mono">
+                    {showKycModal.cnicNumber || "35201-9876543-1"}
+                  </strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Bank Title:</span>
-                  <strong className="text-white">{showKycModal.bankAccountTitle || showKycModal.name}</strong>
+                  <strong className="text-white">
+                    {showKycModal.bankAccountTitle || showKycModal.name}
+                  </strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">IBAN:</span>
-                  <strong className="text-white font-mono">{showKycModal.bankAccountNumber || 'PK36MEZN0001234567890123'}</strong>
+                  <strong className="text-white font-mono">
+                    {showKycModal.bankAccountNumber ||
+                      "PK36MEZN0001234567890123"}
+                  </strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Operating City:</span>
-                  <strong className="text-white">{showKycModal.city}, Pakistan</strong>
+                  <strong className="text-white">
+                    {showKycModal.city}, Pakistan
+                  </strong>
                 </div>
               </div>
 
               <div className="space-y-1.5 pt-2">
-                <label className="font-bold text-slate-300">Set Custom Commission Rate (%):</label>
+                <label className="font-bold text-slate-300">
+                  Set Custom Commission Rate (%):
+                </label>
                 <input
                   type="number"
                   value={commissionInput}
@@ -1375,7 +1664,9 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between pt-3 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => handleApproveSeller(showKycModal, StoreStatus.REJECTED)}
+                onClick={() =>
+                  handleApproveSeller(showKycModal, StoreStatus.REJECTED)
+                }
                 className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl font-bold text-xs border border-rose-500/30 transition-all cursor-pointer"
               >
                 Reject KYC
@@ -1390,7 +1681,9 @@ export default function AdminDashboardPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleApproveSeller(showKycModal, StoreStatus.ACTIVE)}
+                  onClick={() =>
+                    handleApproveSeller(showKycModal, StoreStatus.ACTIVE)
+                  }
                   className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl shadow-lg shadow-emerald-500/20 text-xs transition-all cursor-pointer"
                 >
                   Approve & Verify Seller
@@ -1401,7 +1694,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── MODAL: SETTLE PAYOUT ── */}
+      {/* â”€â”€ MODAL: SETTLE PAYOUT â”€â”€ */}
       {showSettlePayoutModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-scale-up">
@@ -1422,20 +1715,28 @@ export default function AdminDashboardPage() {
               <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Vendor:</span>
-                  <strong className="text-white">{showSettlePayoutModal.storeName}</strong>
+                  <strong className="text-white">
+                    {showSettlePayoutModal.storeName}
+                  </strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Net Amount:</span>
-                  <strong className="text-amber-400 text-sm font-black">PKR {showSettlePayoutModal.amountPkr.toLocaleString()}</strong>
+                  <strong className="text-amber-400 text-sm font-black">
+                    PKR {showSettlePayoutModal.amountPkr.toLocaleString()}
+                  </strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">IBAN:</span>
-                  <strong className="text-white font-mono">{showSettlePayoutModal.iban}</strong>
+                  <strong className="text-white font-mono">
+                    {showSettlePayoutModal.iban}
+                  </strong>
                 </div>
               </div>
 
               <div className="space-y-1 pt-2">
-                <label className="font-bold text-slate-300">1Link / Raast Transfer Reference ID:</label>
+                <label className="font-bold text-slate-300">
+                  1Link / Raast Transfer Reference ID:
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. RAAST-FT-991048-PK"
@@ -1456,7 +1757,7 @@ export default function AdminDashboardPage() {
               </button>
               <button
                 type="button"
-                onClick={() => handleSettlePayout(showSettlePayoutModal)}
+                disabled={isSubmitting} onClick={() => handleSettlePayout(showSettlePayoutModal)}
                 className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl shadow-lg shadow-emerald-500/20 text-xs transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <Check className="w-4 h-4" />

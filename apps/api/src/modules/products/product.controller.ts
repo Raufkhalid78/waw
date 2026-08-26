@@ -1,5 +1,5 @@
-import { Request, Response } from 'express';
-import { ProductService } from './product.service.js';
+import { Request, Response } from "express";
+import { ProductService } from "./product.service.js";
 
 export class ProductController {
   static async list(req: Request, res: Response): Promise<void> {
@@ -8,7 +8,8 @@ export class ProductController {
       const result = await ProductService.listProducts({
         categoryId: categoryId as string,
         storeId: storeId as string,
-        isFirstParty: isFirstParty !== undefined ? isFirstParty === 'true' : undefined,
+        isFirstParty:
+          isFirstParty !== undefined ? isFirstParty === "true" : undefined,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 20,
       });
@@ -23,7 +24,7 @@ export class ProductController {
       const { slug } = req.params;
       const product = await ProductService.getProductBySlug(slug);
       if (!product) {
-        res.status(404).json({ error: 'Product not found' });
+        res.status(404).json({ error: "Product not found" });
         return;
       }
       res.json(product);

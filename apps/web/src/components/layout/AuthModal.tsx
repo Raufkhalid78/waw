@@ -1,16 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import {
-  X,
-  Mail,
-  Smartphone,
-  CheckCircle2,
-  ChevronLeft,
-} from 'lucide-react';
-import { WhatsAppIcon } from '@/components/ui/WhatsAppIcon';
-import { useCartStore } from '@/store/useCartStore';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { X, Mail, Smartphone, CheckCircle2, ChevronLeft } from "lucide-react";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { useCartStore } from "@/store/useCartStore";
 
 export function AuthModal({
   isOpen,
@@ -22,18 +16,18 @@ export function AuthModal({
   onSuccess?: (identifier: string) => void;
 }) {
   const { language, login } = useCartStore();
-  const isUrdu = language === 'UR';
+  const isUrdu = language === "UR";
 
-  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
-  const [step, setStep] = useState<'INPUT' | 'OTP' | 'SUCCESS'>('INPUT');
-  const [identifier, setIdentifier] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [mode, setMode] = useState<"LOGIN" | "SIGNUP">("LOGIN");
+  const [step, setStep] = useState<"INPUT" | "OTP" | "SUCCESS">("INPUT");
+  const [identifier, setIdentifier] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(45);
 
   useEffect(() => {
     let interval: any;
-    if (step === 'OTP' && resendTimer > 0) {
+    if (step === "OTP" && resendTimer > 0) {
       interval = setInterval(() => setResendTimer((t) => t - 1), 1000);
     }
     return () => clearInterval(interval);
@@ -41,23 +35,23 @@ export function AuthModal({
 
   if (!isOpen) return null;
 
-  const isEmail = identifier.includes('@');
+  const isEmail = identifier.includes("@");
   const hasInput = identifier.trim().length > 0;
   const formattedTarget = isEmail
     ? identifier
-    : identifier.startsWith('+')
-    ? identifier
-    : `+92 ${identifier.replace(/^0+/, '')}`;
+    : identifier.startsWith("+")
+      ? identifier
+      : `+92 ${identifier.replace(/^0+/, "")}`;
 
   const parseDisplayName = (raw: string) => {
-    if (raw.includes('@')) {
-      const userPart = raw.split('@')[0].replace(/[._]/g, ' ');
+    if (raw.includes("@")) {
+      const userPart = raw.split("@")[0].replace(/[._]/g, " ");
       return userPart
-        .split(' ')
+        .split(" ")
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
+        .join(" ");
     }
-    return 'Ali Khan';
+    return "Ali Khan";
   };
 
   const handleContinue = (e: React.FormEvent) => {
@@ -68,7 +62,7 @@ export function AuthModal({
     setTimeout(() => {
       setLoading(false);
       setResendTimer(45);
-      setStep('OTP');
+      setStep("OTP");
     }, 600);
   };
 
@@ -90,7 +84,7 @@ export function AuthModal({
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      setStep('SUCCESS');
+      setStep("SUCCESS");
 
       // Update global user authentication state
       const userName = parseDisplayName(identifier);
@@ -102,20 +96,23 @@ export function AuthModal({
       setTimeout(() => {
         if (onSuccess) onSuccess(identifier);
         onClose();
-        setStep('INPUT');
-        setOtp(['', '', '', '', '', '']);
+        setStep("INPUT");
+        setOtp(["", "", "", "", "", ""]);
       }, 1000);
     }, 700);
   };
 
-  const handleOAuthLogin = (provider: 'GOOGLE' | 'APPLE') => {
+  const handleOAuthLogin = (provider: "GOOGLE" | "APPLE") => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      setStep('SUCCESS');
+      setStep("SUCCESS");
 
-      const userName = provider === 'GOOGLE' ? 'Rauf Khalid' : 'Rauf Khalid';
-      const userEmail = provider === 'GOOGLE' ? 'rauf.khalid@gmail.com' : 'rauf.khalid@icloud.com';
+      const userName = provider === "GOOGLE" ? "Rauf Khalid" : "Rauf Khalid";
+      const userEmail =
+        provider === "GOOGLE"
+          ? "rauf.khalid@gmail.com"
+          : "rauf.khalid@icloud.com";
 
       login({
         name: userName,
@@ -125,7 +122,7 @@ export function AuthModal({
       setTimeout(() => {
         if (onSuccess) onSuccess(userEmail);
         onClose();
-        setStep('INPUT');
+        setStep("INPUT");
       }, 1000);
     }, 800);
   };
@@ -217,36 +214,36 @@ export function AuthModal({
           {/* Header Title */}
           <div className="text-center">
             <h2 className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-tight">
-              {isUrdu ? 'خوش آمدید! شروع کریں' : 'Welcome! Let’s get started'}
+              {isUrdu ? "خوش آمدید! شروع کریں" : "Welcome! Let’s get started"}
             </h2>
           </div>
 
           {/* ── STEP 1: Entry Mode (Log in / Sign up + Email/Phone + OAuth) ──── */}
-          {step === 'INPUT' && (
+          {step === "INPUT" && (
             <div className="space-y-3.5">
               {/* Segmented Tab Pill: Log in vs Sign up */}
               <div className="bg-[#2D3344] p-1 rounded-2xl flex items-center text-xs font-bold text-white shadow-inner">
                 <button
                   type="button"
-                  onClick={() => setMode('LOGIN')}
+                  onClick={() => setMode("LOGIN")}
                   className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
-                    mode === 'LOGIN'
-                      ? 'bg-white text-slate-900 shadow-md font-black'
-                      : 'text-slate-300 hover:text-white'
+                    mode === "LOGIN"
+                      ? "bg-white text-slate-900 shadow-md font-black"
+                      : "text-slate-300 hover:text-white"
                   }`}
                 >
-                  {isUrdu ? 'لاگ ان کریں' : 'Log in'}
+                  {isUrdu ? "لاگ ان کریں" : "Log in"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMode('SIGNUP')}
+                  onClick={() => setMode("SIGNUP")}
                   className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
-                    mode === 'SIGNUP'
-                      ? 'bg-white text-slate-900 shadow-md font-black'
-                      : 'text-slate-300 hover:text-white'
+                    mode === "SIGNUP"
+                      ? "bg-white text-slate-900 shadow-md font-black"
+                      : "text-slate-300 hover:text-white"
                   }`}
                 >
-                  {isUrdu ? 'نیا اکاؤنٹ بنائیں' : 'Sign up'}
+                  {isUrdu ? "نیا اکاؤنٹ بنائیں" : "Sign up"}
                 </button>
               </div>
 
@@ -257,7 +254,11 @@ export function AuthModal({
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder={isUrdu ? 'ای میل یا موبائل نمبر درج کریں' : 'Please enter email or mobile number'}
+                    placeholder={
+                      isUrdu
+                        ? "ای میل یا موبائل نمبر درج کریں"
+                        : "Please enter email or mobile number"
+                    }
                     required
                     autoFocus
                     className="w-full px-4 py-3.5 bg-white border border-slate-300 rounded-2xl text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all shadow-xs"
@@ -277,14 +278,14 @@ export function AuthModal({
                   disabled={loading || !hasInput}
                   className={`w-full font-black py-3.5 rounded-2xl text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${
                     hasInput
-                      ? 'bg-[#2D3344] hover:bg-slate-950 text-white hover:shadow-lg hover:scale-[1.01]'
-                      : 'bg-[#E2E6EE] text-[#8E9AA8] cursor-not-allowed shadow-none'
+                      ? "bg-[#2D3344] hover:bg-slate-950 text-white hover:shadow-lg hover:scale-[1.01]"
+                      : "bg-[#E2E6EE] text-[#8E9AA8] cursor-not-allowed shadow-none"
                   }`}
                 >
                   {loading ? (
                     <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <span>{isUrdu ? 'جاری رکھیں' : 'CONTINUE'}</span>
+                    <span>{isUrdu ? "جاری رکھیں" : "CONTINUE"}</span>
                   )}
                 </button>
               </form>
@@ -293,7 +294,7 @@ export function AuthModal({
               <div className="relative flex items-center justify-center my-1.5">
                 <div className="border-t border-slate-200 w-full" />
                 <span className="bg-white px-3 text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0">
-                  {isUrdu ? 'یا اس کے ساتھ جاری رکھیں' : 'OR CONTINUE WITH'}
+                  {isUrdu ? "یا اس کے ساتھ جاری رکھیں" : "OR CONTINUE WITH"}
                 </span>
                 <div className="border-t border-slate-200 w-full" />
               </div>
@@ -303,7 +304,7 @@ export function AuthModal({
                 {/* Google OAuth */}
                 <button
                   type="button"
-                  onClick={() => handleOAuthLogin('GOOGLE')}
+                  onClick={() => handleOAuthLogin("GOOGLE")}
                   className="flex items-center justify-center gap-2 p-2.5 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer group"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -330,10 +331,13 @@ export function AuthModal({
                 {/* Apple OAuth */}
                 <button
                   type="button"
-                  onClick={() => handleOAuthLogin('APPLE')}
+                  onClick={() => handleOAuthLogin("APPLE")}
                   className="flex items-center justify-center gap-2 p-2.5 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer group"
                 >
-                  <svg className="w-4 h-4 fill-slate-900 shrink-0" viewBox="0 0 24 24">
+                  <svg
+                    className="w-4 h-4 fill-slate-900 shrink-0"
+                    viewBox="0 0 24 24"
+                  >
                     <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.85c.65-.79 1.1-1.89.98-2.99-1 .04-2.19.67-2.88 1.48-.61.71-1.15 1.83-1.01 2.92 1.12.09 2.26-.62 2.91-1.41z" />
                   </svg>
                   <span>Apple</span>
@@ -344,37 +348,51 @@ export function AuthModal({
               <button
                 type="button"
                 onClick={() => {
-                  setIdentifier('+92 300 1234567');
-                  setStep('OTP');
+                  setIdentifier("+92 300 1234567");
+                  setStep("OTP");
                 }}
                 className="w-full flex items-center justify-center gap-2 p-2.5 bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-xs font-black text-emerald-800 transition-all shadow-xs cursor-pointer"
               >
                 <WhatsAppIcon className="w-4 h-4" />
-                <span>{isUrdu ? 'واٹس ایپ فاسٹ ون کلک لاگ ان' : 'Fast WhatsApp Instant Login'}</span>
+                <span>
+                  {isUrdu
+                    ? "واٹس ایپ فاسٹ ون کلک لاگ ان"
+                    : "Fast WhatsApp Instant Login"}
+                </span>
               </button>
 
               {/* Privacy Footer */}
               <p className="text-[11px] text-center text-slate-500 font-medium pt-0.5 leading-snug">
-                {isUrdu ? 'جاری رکھ کر آپ ہماری ' : 'By continuing, I confirm that I have read the '}
-                <Link href="/privacy" onClick={onClose} className="font-bold text-amber-600 hover:underline">
-                  {isUrdu ? 'پرائیویسی پالیسی' : 'Privacy Policy'}
+                {isUrdu
+                  ? "جاری رکھ کر آپ ہماری "
+                  : "By continuing, I confirm that I have read the "}
+                <Link
+                  href="/privacy"
+                  onClick={onClose}
+                  className="font-bold text-amber-600 hover:underline"
+                >
+                  {isUrdu ? "پرائیویسی پالیسی" : "Privacy Policy"}
                 </Link>
-                {isUrdu ? ' اور ' : ' & '}
-                <Link href="/terms" onClick={onClose} className="font-bold text-amber-600 hover:underline">
-                  {isUrdu ? 'شرائط و ضوابط' : 'Terms of Service'}
+                {isUrdu ? " اور " : " & "}
+                <Link
+                  href="/terms"
+                  onClick={onClose}
+                  className="font-bold text-amber-600 hover:underline"
+                >
+                  {isUrdu ? "شرائط و ضوابط" : "Terms of Service"}
                 </Link>
               </p>
             </div>
           )}
 
           {/* ── STEP 2: 6-Digit OTP Verification Code ────────────────────────── */}
-          {step === 'OTP' && (
+          {step === "OTP" && (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div className="text-center space-y-1">
                 <p className="text-xs font-semibold text-slate-600">
                   {isUrdu
-                    ? 'ہم نے 6 ہندسوں کا تصدیقی کوڈ بھیجا ہے:'
-                    : 'We sent a 6-digit verification code to:'}
+                    ? "ہم نے 6 ہندسوں کا تصدیقی کوڈ بھیجا ہے:"
+                    : "We sent a 6-digit verification code to:"}
                 </p>
                 <div className="inline-block px-3 py-1 bg-amber-50 rounded-full border border-amber-200 text-xs font-black text-slate-900">
                   {formattedTarget}
@@ -393,8 +411,10 @@ export function AuthModal({
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Backspace' && !digit && idx > 0) {
-                        const prev = document.getElementById(`waw-otp-${idx - 1}`);
+                      if (e.key === "Backspace" && !digit && idx > 0) {
+                        const prev = document.getElementById(
+                          `waw-otp-${idx - 1}`,
+                        );
                         if (prev) prev.focus();
                       }
                     }}
@@ -411,23 +431,29 @@ export function AuthModal({
                 {loading ? (
                   <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <span>{isUrdu ? 'کوڈ کی تصدیق کریں' : 'VERIFY & PROCEED'}</span>
+                  <span>
+                    {isUrdu ? "کوڈ کی تصدیق کریں" : "VERIFY & PROCEED"}
+                  </span>
                 )}
               </button>
 
               <div className="flex items-center justify-between text-xs font-bold pt-1 text-slate-500">
                 <button
                   type="button"
-                  onClick={() => setStep('INPUT')}
+                  onClick={() => setStep("INPUT")}
                   className="flex items-center gap-1 hover:text-slate-900 transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>{isUrdu ? 'نمبر تبدیل کریں' : 'Change number/email'}</span>
+                  <span>
+                    {isUrdu ? "نمبر تبدیل کریں" : "Change number/email"}
+                  </span>
                 </button>
 
                 {resendTimer > 0 ? (
                   <span className="text-slate-400 font-normal">
-                    {isUrdu ? `دوبارہ بھیجیں: ${resendTimer}s` : `Resend code in ${resendTimer}s`}
+                    {isUrdu
+                      ? `دوبارہ بھیجیں: ${resendTimer}s`
+                      : `Resend code in ${resendTimer}s`}
                   </span>
                 ) : (
                   <button
@@ -435,7 +461,7 @@ export function AuthModal({
                     onClick={() => setResendTimer(45)}
                     className="text-amber-600 hover:text-amber-700 underline cursor-pointer"
                   >
-                    {isUrdu ? 'دوبارہ کوڈ بھیجیں' : 'Resend Code'}
+                    {isUrdu ? "دوبارہ کوڈ بھیجیں" : "Resend Code"}
                   </button>
                 )}
               </div>
@@ -443,16 +469,20 @@ export function AuthModal({
           )}
 
           {/* ── STEP 3: Success State ────────────────────────────────────────── */}
-          {step === 'SUCCESS' && (
+          {step === "SUCCESS" && (
             <div className="py-6 text-center space-y-3">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-md animate-bounce">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
               <h3 className="text-lg font-black text-slate-950">
-                {isUrdu ? 'کامیابی سے لاگ ان ہو گئے!' : 'Signed in Successfully!'}
+                {isUrdu
+                  ? "کامیابی سے لاگ ان ہو گئے!"
+                  : "Signed in Successfully!"}
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                {isUrdu ? 'واو میں خوش آمدید' : 'Redirecting to your personalized Waw dashboard...'}
+                {isUrdu
+                  ? "واو میں خوش آمدید"
+                  : "Redirecting to your personalized Waw dashboard..."}
               </p>
             </div>
           )}

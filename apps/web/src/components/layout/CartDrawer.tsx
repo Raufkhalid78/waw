@@ -1,12 +1,28 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { useCartStore } from '@/store/useCartStore';
-import { X, ShoppingBag, Trash2, ArrowRight, Truck, ShieldCheck, Zap, Plus, Minus } from 'lucide-react';
-import Link from 'next/link';
-import { SellerType } from '@waw/types';
+import { useRouter } from "next/navigation";
+import { useCartStore } from "@/store/useCartStore";
+import {
+  X,
+  ShoppingBag,
+  Trash2,
+  ArrowRight,
+  Truck,
+  ShieldCheck,
+  Zap,
+  Plus,
+  Minus,
+} from "lucide-react";
+import Link from "next/link";
+import { SellerType } from "@waw/types";
 
-export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export function CartDrawer({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const { items, removeItem, updateQuantity, getSummary } = useCartStore();
   const summary = getSummary();
@@ -15,17 +31,23 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   if (!isOpen) return null;
 
   const freeDeliveryThreshold = 5000;
-  const remainingForFreeDelivery = Math.max(0, freeDeliveryThreshold - summary.subtotalPkr);
-  const progressPercent = Math.min(100, Math.round((summary.subtotalPkr / freeDeliveryThreshold) * 100));
+  const remainingForFreeDelivery = Math.max(
+    0,
+    freeDeliveryThreshold - summary.subtotalPkr,
+  );
+  const progressPercent = Math.min(
+    100,
+    Math.round((summary.subtotalPkr / freeDeliveryThreshold) * 100),
+  );
 
   const handleGoToCart = () => {
     onClose();
-    router.push('/cart');
+    router.push("/cart");
   };
 
   const handleGoToCheckout = () => {
     onClose();
-    router.push('/checkout');
+    router.push("/checkout");
   };
 
   return (
@@ -42,7 +64,9 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-900 text-white">
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-amber-400" />
-              <h2 className="text-base font-bold">Shopping Cart ({cartCount})</h2>
+              <h2 className="text-base font-bold">
+                Shopping Cart ({cartCount})
+              </h2>
             </div>
             <button
               type="button"
@@ -59,14 +83,22 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               <span className="font-bold text-amber-950 flex items-center gap-1.5">
                 <Truck className="w-4 h-4 text-amber-600" />
                 {remainingForFreeDelivery === 0 ? (
-                  <span className="text-emerald-700 font-extrabold">🎉 You unlocked FREE Nationwide Delivery!</span>
+                  <span className="text-emerald-700 font-extrabold">
+                    🎉 You unlocked FREE Nationwide Delivery!
+                  </span>
                 ) : (
                   <span>
-                    Add <strong className="text-slate-950">PKR {remainingForFreeDelivery.toLocaleString()}</strong> more for FREE Delivery!
+                    Add{" "}
+                    <strong className="text-slate-950">
+                      PKR {remainingForFreeDelivery.toLocaleString()}
+                    </strong>{" "}
+                    more for FREE Delivery!
                   </span>
                 )}
               </span>
-              <span className="font-extrabold text-amber-900">{progressPercent}%</span>
+              <span className="font-extrabold text-amber-900">
+                {progressPercent}%
+              </span>
             </div>
             <div className="w-full bg-amber-200/80 rounded-full h-2 overflow-hidden">
               <div
@@ -83,9 +115,12 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
                   <ShoppingBag className="w-8 h-8" />
                 </div>
-                <h3 className="text-base font-bold text-slate-800">Your cart is empty</h3>
+                <h3 className="text-base font-bold text-slate-800">
+                  Your cart is empty
+                </h3>
                 <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                  Browse through thousands of verified Pakistani shops and add deals to your cart.
+                  Browse through thousands of verified Pakistani shops and add
+                  deals to your cart.
                 </p>
                 <button
                   type="button"
@@ -97,10 +132,16 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               </div>
             ) : (
               items.map((item) => (
-                <div key={`${item.productId}-${item.variantId || ''}`} className="pt-3 flex gap-3">
+                <div
+                  key={`${item.productId}-${item.variantId || ""}`}
+                  className="pt-3 flex gap-3"
+                >
                   <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
                     <img
-                      src={item.imageUrl || 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=200'}
+                      src={
+                        item.imageUrl ||
+                        "https://images.unsplash.com/photo-1627123424574-724758594e93?w=200"
+                      }
                       alt={item.title}
                       className="w-full h-full object-cover"
                     />
@@ -113,7 +154,9 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                       </h4>
                       <button
                         type="button"
-                        onClick={() => removeItem(item.productId, item.variantId)}
+                        onClick={() =>
+                          removeItem(item.productId, item.variantId)
+                        }
                         className="text-slate-400 hover:text-rose-600 transition-colors p-1 cursor-pointer"
                         title="Remove item"
                       >
@@ -141,7 +184,13 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                       <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                         <button
                           type="button"
-                          onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantId)}
+                          onClick={() =>
+                            updateQuantity(
+                              item.productId,
+                              item.quantity - 1,
+                              item.variantId,
+                            )
+                          }
                           className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
@@ -151,7 +200,13 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variantId)}
+                          onClick={() =>
+                            updateQuantity(
+                              item.productId,
+                              item.quantity + 1,
+                              item.variantId,
+                            )
+                          }
                           className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
@@ -170,25 +225,34 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal</span>
-                  <span className="font-bold text-slate-900">PKR {summary.subtotalPkr.toLocaleString()}</span>
+                  <span className="font-bold text-slate-900">
+                    PKR {summary.subtotalPkr.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Shipping Fee</span>
                   {summary.shippingPkr === 0 ? (
                     <span className="font-bold text-emerald-600">FREE</span>
                   ) : (
-                    <span className="font-bold text-slate-900">PKR {summary.shippingPkr.toLocaleString()}</span>
+                    <span className="font-bold text-slate-900">
+                      PKR {summary.shippingPkr.toLocaleString()}
+                    </span>
                   )}
                 </div>
                 <div className="flex justify-between text-sm font-black text-slate-950 pt-2 border-t border-slate-200">
                   <span>Estimated Total</span>
-                  <span className="text-base text-amber-600">PKR {summary.totalPkr.toLocaleString()}</span>
+                  <span className="text-base text-amber-600">
+                    PKR {summary.totalPkr.toLocaleString()}
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg text-[11px] text-emerald-800 font-medium">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Save PKR 100 COD fee by paying online with Visa, Mastercard or Raast!</span>
+                <span>
+                  Save PKR 100 COD fee by paying online with Visa, Mastercard or
+                  Raast!
+                </span>
               </div>
 
               <div className="space-y-2">

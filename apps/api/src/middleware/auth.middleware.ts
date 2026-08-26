@@ -1,8 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { ENV } from '../config/env.js';
-import { supabaseAdmin } from '../config/supabase.js';
-import { UserRole } from '../types/index.js';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { ENV } from "../config/env.js";
+import { supabaseAdmin } from "../config/supabase.js";
+import { UserRole } from "../types/index.js";
 
 export interface AuthenticatedUser {
   id: string;
@@ -22,14 +22,20 @@ declare global {
 /**
  * Verifies Bearer JWT token issued by Waw or Supabase Auth.
  */
-export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized: Missing or invalid Authorization header' });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res
+      .status(401)
+      .json({ error: "Unauthorized: Missing or invalid Authorization header" });
     return;
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
 
   try {
     // 1. First try verifying with JWT Secret
@@ -39,7 +45,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         if (decoded && decoded.sub) {
           req.user = {
             id: decoded.sub,
-            phone: decoded.phone || '',
+            phone: decoded.phone || "",
             email: decoded.email,
             role: decoded.role || UserRole.BUYER,
           };
@@ -51,22 +57,27 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     // 2. Verify with Supabase Auth API
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    const {
+      data: { user },
+      error,
+    } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) {
-      res.status(401).json({ error: 'Unauthorized: Invalid or expired session token' });
+      res
+        .status(401)
+        .json({ error: "Unauthorized: Invalid or expired session token" });
       return;
     }
 
     // Fetch user profile from Supabase Database
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role, phone, email')
-      .eq('id', user.id)
+      .from("profiles")
+      .select("role, phone, email")
+      .eq("id", user.id)
       .single();
 
     req.user = {
       id: user.id,
-      phone: profile?.phone || user.phone || '',
+      phone: profile?.phone || user.phone || "",
       email: profile?.email || user.email,
       role: (profile?.role as UserRole) || UserRole.BUYER,
     };

@@ -1,4 +1,13 @@
-import { CourierProvider, OrderStatus, PaymentMethod, PaymentStatus, PayoutStatus, SellerType, StoreStatus, UserRole } from './enums.js';
+import {
+  CourierProvider,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  PayoutStatus,
+  SellerType,
+  StoreStatus,
+  UserRole,
+} from "./enums.js";
 
 export interface UserProfile {
   id: string; // Supabase auth.users id
@@ -156,7 +165,7 @@ export interface Coupon {
   id: string;
   code: string;
   storeId?: string | null; // null = platform-wide
-  discountType: 'PERCENTAGE' | 'FIXED_PKR' | 'FREE_SHIPPING';
+  discountType: "PERCENTAGE" | "FIXED_PKR" | "FREE_SHIPPING";
   discountValue: number;
   minSpendPkr: number;
   maxDiscountPkr?: number;
@@ -206,7 +215,13 @@ export interface ReturnRequest {
   buyerId?: string;
   reason: string;
   evidenceImages: string[];
-  status: 'PENDING_REVIEW' | 'APPROVED' | 'REVERSE_PICKUP_BOOKED' | 'RECEIVED' | 'REFUNDED' | 'REJECTED';
+  status:
+    | "PENDING_REVIEW"
+    | "APPROVED"
+    | "REVERSE_PICKUP_BOOKED"
+    | "RECEIVED"
+    | "REFUNDED"
+    | "REJECTED";
   reverseCourierCn?: string;
   refundAmountPkr: number;
   staffNotes?: string;
@@ -227,4 +242,3 @@ export interface AuditLog {
   ipAddress?: string;
   createdAt: string;
 }
-

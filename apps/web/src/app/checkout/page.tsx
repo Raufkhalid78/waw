@@ -1,46 +1,69 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useCartStore } from '@/store/useCartStore';
-import { PaymentMethod, CheckoutQuoteResponse } from '@waw/types';
-import { ShieldCheck, Truck, MessageSquare, CheckCircle2, Lock, ArrowLeft, QrCode, Sparkles, Smartphone, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
-import { fetchCheckoutQuote, createOrderApi, initiatePaymentApi } from '@/lib/api';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useCartStore } from "@/store/useCartStore";
+import { PaymentMethod, CheckoutQuoteResponse } from "@waw/types";
+import {
+  ShieldCheck,
+  Truck,
+  MessageSquare,
+  CheckCircle2,
+  Lock,
+  ArrowLeft,
+  QrCode,
+  Sparkles,
+  Smartphone,
+  AlertCircle,
+} from "lucide-react";
+import Link from "next/link";
+import {
+  fetchCheckoutQuote,
+  createOrderApi,
+  initiatePaymentApi,
+} from "@/lib/api";
 
 const PK_CITIES = [
-  'Lahore',
-  'Karachi',
-  'Islamabad',
-  'Rawalpindi',
-  'Faisalabad',
-  'Multan',
-  'Peshawar',
-  'Quetta',
-  'Sialkot',
-  'Gujranwala',
-  'Hyderabad',
+  "Lahore",
+  "Karachi",
+  "Islamabad",
+  "Rawalpindi",
+  "Faisalabad",
+  "Multan",
+  "Peshawar",
+  "Quetta",
+  "Sialkot",
+  "Gujranwala",
+  "Hyderabad",
 ];
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, paymentMethod, setPaymentMethod, clearCart, selectedCity } = useCartStore();
+  const { items, paymentMethod, setPaymentMethod, clearCart, selectedCity } =
+    useCartStore();
 
   const [formData, setFormData] = useState({
-    fullName: 'Ali Khan',
-    phone: '+923001234567',
-    address: 'House 42, Street 8, Phase 5, DHA',
-    city: selectedCity || 'Lahore',
-    province: 'Punjab',
-    notes: '',
+    fullName: "Ali Khan",
+    phone: "+923001234567",
+    address: "House 42, Street 8, Phase 5, DHA",
+    city: selectedCity || "Lahore",
+    province: "Punjab",
+    notes: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [quoteData, setQuoteData] = useState<CheckoutQuoteResponse | null>(null);  const [voucherInput, setVoucherInput] = useState('');
-  const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discountPkr: number; description: string } | null>(null);
-  const [voucherError, setVoucherError] = useState('');
+  const [quoteData, setQuoteData] = useState<CheckoutQuoteResponse | null>(
+    null,
+  );
+  const [voucherInput, setVoucherInput] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    code: string;
+    discountPkr: number;
+    description: string;
+  } | null>(null);
+  const [voucherError, setVoucherError] = useState("");
 
   // 1. Fetch Server-Authoritative Quote on Cart / Form change
   useEffect(() => {
@@ -52,7 +75,11 @@ export default function CheckoutPage() {
         setQuoteLoading(true);
         setQuoteError(null);
         const quote = await fetchCheckoutQuote({
-          items: items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
+          items: items.map((i) => ({
+            productId: i.productId,
+            variantId: i.variantId,
+            quantity: i.quantity,
+          })),
           shippingCity: formData.city,
           paymentMethod,
           couponCode: appliedVoucher?.code,
@@ -60,28 +87,37 @@ export default function CheckoutPage() {
         if (isMounted) {
           setQuoteData(quote);
           if (quote.couponDiscountPkr > 0 && appliedVoucher) {
-            setAppliedVoucher((prev) => prev ? { ...prev, discountPkr: quote.couponDiscountPkr } : null);
+            setAppliedVoucher((prev) =>
+              prev ? { ...prev, discountPkr: quote.couponDiscountPkr } : null,
+            );
           }
         }
       } catch (err: any) {
-        if (isMounted) setQuoteError(err.message || 'Unable to calculate live pricing');
+        if (isMounted)
+          setQuoteError(err.message || "Unable to calculate live pricing");
       } finally {
         if (isMounted) setQuoteLoading(false);
       }
     }
 
     loadQuote();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [items, formData.city, paymentMethod, appliedVoucher?.code]);
 
   const handleApplyVoucher = (e: React.FormEvent) => {
     e.preventDefault();
-    setVoucherError('');
+    setVoucherError("");
     const code = voucherInput.trim().toUpperCase();
 
     if (!code) return;
-    setAppliedVoucher({ code, discountPkr: 0, description: `Promo Code ${code}` });
-    setVoucherInput('');
+    setAppliedVoucher({
+      code,
+      discountPkr: 0,
+      description: `Promo Code ${code}`,
+    });
+    setVoucherInput("");
   };
 
   const finalTotalPkr = quoteData?.totalPkr || 0;
@@ -93,7 +129,9 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quoteData?.quoteToken) {
-      setQuoteError('Please wait for the live price quote to finish calculating.');
+      setQuoteError(
+        "Please wait for the live price quote to finish calculating.",
+      );
       return;
     }
 
@@ -137,7 +175,9 @@ export default function CheckoutPage() {
       clearCart();
       router.push(`/orders/${orderId}`);
     } catch (err: any) {
-      setQuoteError(err.message || 'Failed to complete order placement. Please try again.');
+      setQuoteError(
+        err.message || "Failed to complete order placement. Please try again.",
+      );
       setIsSubmitting(false);
     }
   };
@@ -147,9 +187,12 @@ export default function CheckoutPage() {
         <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto text-amber-600">
           <Truck className="w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-black text-slate-900">Your Cart is Empty</h1>
+        <h1 className="text-2xl font-black text-slate-900">
+          Your Cart is Empty
+        </h1>
         <p className="text-sm text-slate-500">
-          Explore thousands of verified products from top artisans and brands across Pakistan.
+          Explore thousands of verified products from top artisans and brands
+          across Pakistan.
         </p>
         <Link
           href="/"
@@ -193,35 +236,47 @@ export default function CheckoutPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Recipient Full Name</label>
+                <label className="text-xs font-bold text-slate-700">
+                  Recipient Full Name
+                </label>
                 <input
                   type="text"
                   required
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fullName: e.target.value })
+                  }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">WhatsApp Mobile Number</label>
+                <label className="text-xs font-bold text-slate-700">
+                  WhatsApp Mobile Number
+                </label>
                 <input
                   type="tel"
                   required
                   placeholder="+92 300 1234567"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium"
                 />
               </div>
 
               <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-bold text-slate-700">Complete Street Address</label>
+                <label className="text-xs font-bold text-slate-700">
+                  Complete Street Address
+                </label>
                 <input
                   type="text"
                   required
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium"
                 />
               </div>
@@ -230,7 +285,9 @@ export default function CheckoutPage() {
                 <label className="text-xs font-bold text-slate-700">City</label>
                 <select
                   value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, city: e.target.value })
+                  }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium cursor-pointer"
                 >
                   {PK_CITIES.map((c) => (
@@ -242,11 +299,15 @@ export default function CheckoutPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Province</label>
+                <label className="text-xs font-bold text-slate-700">
+                  Province
+                </label>
                 <input
                   type="text"
                   value={formData.province}
-                  onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, province: e.target.value })
+                  }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium"
                 />
               </div>
@@ -265,8 +326,8 @@ export default function CheckoutPage() {
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
                   paymentMethod === PaymentMethod.XPAY_CARD
-                    ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'
-                    : 'border-slate-200 hover:bg-slate-50'
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
+                    : "border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 <input
@@ -278,7 +339,9 @@ export default function CheckoutPage() {
                 />
                 <div>
                   <div className="font-black text-sm text-slate-900 flex items-center gap-2">
-                    <span>Debit / Credit Cards (Visa, Mastercard & PayPak)</span>
+                    <span>
+                      Debit / Credit Cards (Visa, Mastercard & PayPak)
+                    </span>
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
                       Save PKR 100
                     </span>
@@ -293,21 +356,26 @@ export default function CheckoutPage() {
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
                   paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH
-                    ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'
-                    : 'border-slate-200 hover:bg-slate-50'
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
+                    : "border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 <input
                   type="radio"
                   name="paymentMethod"
                   checked={paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH}
-                  onChange={() => setPaymentMethod(PaymentMethod.XPAY_WALLET_JAZZCASH)}
+                  onChange={() =>
+                    setPaymentMethod(PaymentMethod.XPAY_WALLET_JAZZCASH)
+                  }
                   className="mt-1 accent-amber-500"
                 />
                 <div>
-                  <div className="font-black text-sm text-slate-900">JazzCash Mobile Account</div>
+                  <div className="font-black text-sm text-slate-900">
+                    JazzCash Mobile Account
+                  </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Authorize instant payment via PostEx XPay using your JazzCash MPIN.
+                    Authorize instant payment via PostEx XPay using your
+                    JazzCash MPIN.
                   </p>
                 </div>
               </label>
@@ -316,21 +384,28 @@ export default function CheckoutPage() {
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
                   paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA
-                    ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'
-                    : 'border-slate-200 hover:bg-slate-50'
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
+                    : "border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 <input
                   type="radio"
                   name="paymentMethod"
-                  checked={paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA}
-                  onChange={() => setPaymentMethod(PaymentMethod.XPAY_WALLET_EASYPAISA)}
+                  checked={
+                    paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA
+                  }
+                  onChange={() =>
+                    setPaymentMethod(PaymentMethod.XPAY_WALLET_EASYPAISA)
+                  }
                   className="mt-1 accent-amber-500"
                 />
                 <div>
-                  <div className="font-black text-sm text-slate-900">Easypaisa Mobile Wallet</div>
+                  <div className="font-black text-sm text-slate-900">
+                    Easypaisa Mobile Wallet
+                  </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Approve instant OTP payment via PostEx XPay in your Easypaisa app.
+                    Approve instant OTP payment via PostEx XPay in your
+                    Easypaisa app.
                   </p>
                 </div>
               </label>
@@ -339,8 +414,8 @@ export default function CheckoutPage() {
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
                   paymentMethod === PaymentMethod.COD
-                    ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20'
-                    : 'border-slate-200 hover:bg-slate-50'
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
+                    : "border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 <input
@@ -358,7 +433,8 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Pay cash directly to the PostEx delivery rider upon parcel inspection.
+                    Pay cash directly to the PostEx delivery rider upon parcel
+                    inspection.
                   </p>
                 </div>
               </label>
@@ -373,9 +449,7 @@ export default function CheckoutPage() {
             {isSubmitting ? (
               <span>Processing Order...</span>
             ) : (
-              <span>
-                Confirm Order (PKR {finalTotalPkr.toLocaleString()})
-              </span>
+              <span>Confirm Order (PKR {finalTotalPkr.toLocaleString()})</span>
             )}
           </button>
         </form>
@@ -384,16 +458,24 @@ export default function CheckoutPage() {
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-5">
             <h2 className="font-black text-base text-slate-950 border-b border-slate-100 pb-3">
-              Order Summary ({items.length} {items.length === 1 ? 'item' : 'items'})
+              Order Summary ({items.length}{" "}
+              {items.length === 1 ? "item" : "items"})
             </h2>
 
             {/* Item Mini List */}
             <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
               {items.map((item) => (
-                <div key={item.productId} className="flex items-center justify-between gap-3 text-xs">
+                <div
+                  key={item.productId}
+                  className="flex items-center justify-between gap-3 text-xs"
+                >
                   <div className="flex items-center gap-2.5 truncate">
-                    <span className="font-bold text-slate-900 shrink-0">{item.quantity}x</span>
-                    <span className="text-slate-700 truncate">{item.title}</span>
+                    <span className="font-bold text-slate-900 shrink-0">
+                      {item.quantity}x
+                    </span>
+                    <span className="text-slate-700 truncate">
+                      {item.title}
+                    </span>
                   </div>
                   <span className="font-black text-slate-900 shrink-0">
                     PKR {(item.pricePkr * item.quantity).toLocaleString()}
@@ -403,7 +485,10 @@ export default function CheckoutPage() {
             </div>
 
             {/* Voucher Box */}
-            <form onSubmit={handleApplyVoucher} className="space-y-2 pt-2 border-t border-slate-100">
+            <form
+              onSubmit={handleApplyVoucher}
+              className="space-y-2 pt-2 border-t border-slate-100"
+            >
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -419,7 +504,11 @@ export default function CheckoutPage() {
                   Apply
                 </button>
               </div>
-              {voucherError && <div className="text-[11px] font-bold text-rose-600">{voucherError}</div>}
+              {voucherError && (
+                <div className="text-[11px] font-bold text-rose-600">
+                  {voucherError}
+                </div>
+              )}
               {appliedVoucher && (
                 <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 p-2 rounded-lg flex items-center justify-between">
                   <span>✅ {appliedVoucher.description}</span>
@@ -451,15 +540,21 @@ export default function CheckoutPage() {
 
                   <div className="flex justify-between">
                     <span>Items Subtotal</span>
-                    <span className="font-bold text-slate-900">PKR {subtotalPkr.toLocaleString()}</span>
+                    <span className="font-bold text-slate-900">
+                      PKR {subtotalPkr.toLocaleString()}
+                    </span>
                   </div>
 
                   <div className="flex justify-between">
                     <span>PostEx Express Delivery</span>
                     {shippingFeePkr === 0 ? (
-                      <span className="font-black text-emerald-600">FREE (Orders &gt; 5,000)</span>
+                      <span className="font-black text-emerald-600">
+                        FREE (Orders &gt; 5,000)
+                      </span>
                     ) : (
-                      <span className="font-bold text-slate-900">PKR {shippingFeePkr}</span>
+                      <span className="font-bold text-slate-900">
+                        PKR {shippingFeePkr}
+                      </span>
                     )}
                   </div>
 
@@ -478,7 +573,9 @@ export default function CheckoutPage() {
                   )}
 
                   <div className="border-t border-slate-200 pt-3 flex justify-between items-baseline text-sm">
-                    <span className="font-black text-slate-950">Total Payable</span>
+                    <span className="font-black text-slate-950">
+                      Total Payable
+                    </span>
                     <span className="text-xl font-black text-slate-950">
                       PKR {finalTotalPkr.toLocaleString()}
                     </span>
@@ -494,7 +591,8 @@ export default function CheckoutPage() {
                 <span>100% Secure Payments</span>
               </div>
               <p className="text-[11px] text-emerald-700 font-medium">
-                Your payment is processed securely via our trusted payment gateway.
+                Your payment is processed securely via our trusted payment
+                gateway.
               </p>
             </div>
           </div>
@@ -502,7 +600,6 @@ export default function CheckoutPage() {
       </div>
 
       {/* ── State Bank Raast P2M Dynamic QR Modal ─────────────────────────── */}
-      
     </div>
   );
 }

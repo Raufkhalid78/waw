@@ -1,11 +1,20 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Heart, ShoppingBag, Zap, CheckCircle2, Check, Star, ShieldCheck, Sparkles } from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
-import { RatingStars, WawExpressBadge } from './Badges';
-import type { SellerType } from '@waw/types';
+import { useState } from "react";
+import Link from "next/link";
+import {
+  Heart,
+  ShoppingBag,
+  Zap,
+  CheckCircle2,
+  Check,
+  Star,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import { useCartStore } from "@/store/useCartStore";
+import { RatingStars, WawExpressBadge } from "./Badges";
+import type { SellerType } from "@waw/types";
 
 export interface ProductCardProps {
   productId: string;
@@ -36,16 +45,16 @@ export function ProductCard({
   pricePkr,
   originalPricePkr,
   discountPercent,
-  rating = 4.8,
-  reviewsCount = 120,
+  rating = 0,
+  reviewsCount = 0,
   imageUrl,
   isExpress = false,
   sellerType,
   soldCount,
-  deliveryTime = isExpress ? '4-5 Days Express' : '7-9 Days Standard',
+  deliveryTime = isExpress ? "4-5 Days Express" : "7-9 Days Standard",
 }: ProductCardProps) {
   const { addItem, toggleWishlist, isInWishlist, language } = useCartStore();
-  const isUrdu = language === 'UR';
+  const isUrdu = language === "UR";
   const wishlisted = isInWishlist(productId);
   const [added, setAdded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -56,7 +65,7 @@ export function ProductCard({
     addItem({
       productId,
       title,
-      titleUrdu: titleUrdu ?? '',
+      titleUrdu: titleUrdu ?? "",
       imageUrl,
       pricePkr,
       quantity: 1,
@@ -78,7 +87,10 @@ export function ProductCard({
     >
       <div>
         {/* ── 1. Image Container with Badges ───────────────────────────── */}
-        <Link href={`/products/${productId}`} className="block relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-3">
+        <Link
+          href={`/products/${productId}`}
+          className="block relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-3"
+        >
           <img
             src={imageUrl}
             alt={title}
@@ -89,14 +101,9 @@ export function ProductCard({
           {/* Top Badges Row */}
           <div className="absolute top-2 left-2 flex flex-col gap-1.5 z-10">
             {discountPercent && (
-              <>
-                <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm w-fit animate-pulse">
-                  FLASH SALE - Ends in 2h
-                </span>
-                <span className="bg-amber-400 text-slate-950 text-xs font-black px-2 py-1 rounded-md shadow-sm w-fit">
-                  -{discountPercent}% OFF
-                </span>
-              </>
+              <span className="bg-amber-400 text-slate-950 text-xs font-black px-2 py-1 rounded-md shadow-sm w-fit">
+                -{discountPercent}% OFF
+              </span>
             )}
             {isExpress && (
               <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-xs w-fit">
@@ -124,11 +131,11 @@ export function ProductCard({
               });
             }}
             className="absolute top-2.5 right-2.5 p-2.5 rounded-full bg-white/95 hover:bg-white text-slate-400 hover:text-rose-600 shadow-md transition-all hover:scale-115 cursor-pointer z-10"
-            title={wishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+            title={wishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
           >
             <Heart
               className={`w-4 h-4 transition-colors ${
-                wishlisted ? 'fill-rose-600 text-rose-600' : 'text-slate-600'
+                wishlisted ? "fill-rose-600 text-rose-600" : "text-slate-600"
               }`}
             />
           </button>
@@ -142,7 +149,9 @@ export function ProductCard({
               {storeName}
             </span>
             {sellerCity && (
-              <span className="text-xs text-slate-400 shrink-0 font-medium">({sellerCity})</span>
+              <span className="text-xs text-slate-400 shrink-0 font-medium">
+                ({sellerCity})
+              </span>
             )}
           </div>
         </div>
@@ -158,8 +167,12 @@ export function ProductCard({
         <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
           <div className="flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/60">
             <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span className="text-xs sm:text-sm font-black text-slate-900">{rating}</span>
-            <span className="text-xs text-slate-400 font-semibold">({reviewsCount})</span>
+            <span className="text-xs sm:text-sm font-black text-slate-900">
+              {rating}
+            </span>
+            <span className="text-xs text-slate-400 font-semibold">
+              ({reviewsCount})
+            </span>
           </div>
 
           {soldCount && (
@@ -205,19 +218,21 @@ export function ProductCard({
           onClick={handleAddToCart}
           className={`w-full py-3 px-4 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer ${
             added
-              ? 'bg-emerald-600 text-white scale-[0.98]'
-              : 'bg-amber-400 hover:bg-slate-950 hover:text-white text-slate-950 active:scale-95'
+              ? "bg-emerald-600 text-white scale-[0.98]"
+              : "bg-amber-400 hover:bg-slate-950 hover:text-white text-slate-950 active:scale-95"
           }`}
         >
           {added ? (
             <>
               <Check className="w-4 h-4" />
-              <span>{isUrdu ? 'ٹوکری میں شامل کر دیا گیا!' : 'ADDED TO CART!'}</span>
+              <span>
+                {isUrdu ? "ٹوکری میں شامل کر دیا گیا!" : "ADDED TO CART!"}
+              </span>
             </>
           ) : (
             <>
               <ShoppingBag className="w-4 h-4" />
-              <span>{isUrdu ? 'ٹوکری میں شامل کریں' : 'ADD TO CART'}</span>
+              <span>{isUrdu ? "ٹوکری میں شامل کریں" : "ADD TO CART"}</span>
             </>
           )}
         </button>

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useCartStore } from '@/store/useCartStore';
+import Link from "next/link";
+import { useCartStore } from "@/store/useCartStore";
 import {
   Heart,
   ShoppingBag,
@@ -12,7 +12,7 @@ import {
   Sparkles,
   CheckCircle2,
   ChevronRight,
-} from 'lucide-react';
+} from "lucide-react";
 
 export default function WishlistPage() {
   const { wishlist, toggleWishlist, addItem } = useCartStore();
@@ -31,16 +31,25 @@ export default function WishlistPage() {
   };
 
   const handleShareWishlist = () => {
-    const listText = wishlist.map((item, idx) => `${idx + 1}. ${item.title} - PKR ${item.pricePkr.toLocaleString()}`).join('\n');
-    const text = encodeURIComponent(`Check out my Waw Pakistan Wishlist! 🛍️✨\n\n${listText}\n\nShop on Waw: http://localhost:3000`);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    const listText = wishlist
+      .map(
+        (item, idx) =>
+          `${idx + 1}. ${item.title} - PKR ${item.pricePkr.toLocaleString()}`,
+      )
+      .join("\n");
+    const text = encodeURIComponent(
+      `Check out my Waw Pakistan Wishlist! 🛍️✨\n\n${listText}\n\nShop on Waw: http://localhost:3000`,
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-8 space-y-8">
       {/* ── Breadcrumb Navigation ────────────────────────────────────────── */}
       <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-        <Link href="/" className="hover:text-amber-600 transition-colors">Home</Link>
+        <Link href="/" className="hover:text-amber-600 transition-colors">
+          Home
+        </Link>
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
         <span className="text-slate-900 font-bold">My Saved Wishlist</span>
       </nav>
@@ -53,7 +62,8 @@ export default function WishlistPage() {
             <span>My Saved Wishlist</span>
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            {wishlist.length} {wishlist.length === 1 ? 'item' : 'items'} saved from verified Pakistani artisans & flagship stores
+            {wishlist.length} {wishlist.length === 1 ? "item" : "items"} saved
+            from verified Pakistani artisans & flagship stores
           </p>
         </div>
 
@@ -78,7 +88,10 @@ export default function WishlistPage() {
             >
               <div className="space-y-3">
                 {/* Image */}
-                <Link href={`/products/${item.productId}`} className="block relative aspect-square rounded-2xl overflow-hidden bg-slate-50">
+                <Link
+                  href={`/products/${item.productId}`}
+                  className="block relative aspect-square rounded-2xl overflow-hidden bg-slate-50"
+                >
                   <img
                     src={item.imageUrl}
                     alt={item.title}
@@ -100,7 +113,7 @@ export default function WishlistPage() {
                 {/* Seller & Title */}
                 <div className="space-y-1">
                   <div className="text-[10px] font-bold text-slate-500 truncate">
-                    🏬 {item.storeName || 'Verified Store'}
+                    🏬 {item.storeName || "Verified Store"}
                   </div>
                   <Link href={`/products/${item.productId}`}>
                     <h3 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-2 leading-snug group-hover:text-amber-600 transition-colors">
@@ -134,9 +147,12 @@ export default function WishlistPage() {
             <Heart className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-xl font-black text-slate-950">Your Wishlist is Empty</h3>
+            <h3 className="text-xl font-black text-slate-950">
+              Your Wishlist is Empty
+            </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Save your favorite items by tapping the heart icon on any product to easily find them later or track price drops.
+              Save your favorite items by tapping the heart icon on any product
+              to easily find them later or track price drops.
             </p>
           </div>
           <Link

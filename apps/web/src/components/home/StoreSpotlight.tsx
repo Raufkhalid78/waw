@@ -1,9 +1,17 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { Store, Star, CheckCircle2, ArrowRight, ShieldCheck, MapPin, Sparkles } from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
-import { SellerType } from '@waw/types';
+import Link from "next/link";
+import {
+  Store,
+  Star,
+  CheckCircle2,
+  ArrowRight,
+  ShieldCheck,
+  MapPin,
+  Sparkles,
+} from "lucide-react";
+import { useCartStore } from "@/store/useCartStore";
+import { SellerType } from "@waw/types";
 
 interface ShopData {
   id: string;
@@ -30,160 +38,174 @@ interface ShopData {
 
 const FEATURED_SHOPS: ShopData[] = [
   {
-    id: 'shop_khyber_leather',
-    slug: 'khyber-artisans',
-    name: 'Khyber Leather Craft',
-    nameUrdu: 'خیبر لیدر کرافٹ',
-    city: 'Peshawar',
-    category: 'Handmade Footwear & Wallets',
-    established: 'Est. 2012',
+    id: "shop_khyber_leather",
+    slug: "khyber-artisans",
+    name: "Khyber Leather Craft",
+    nameUrdu: "خیبر لیدر کرافٹ",
+    city: "Peshawar",
+    category: "Handmade Footwear & Wallets",
+    established: "Est. 2012",
     rating: 4.9,
     reviewsCount: 1420,
-    totalSales: '18.4k Sold',
-    bannerBg: 'from-amber-900 to-amber-950',
-    avatarText: 'KL',
-    avatarBg: 'bg-amber-400 text-slate-950',
+    totalSales: "18.4k Sold",
+    bannerBg: "from-amber-900 to-amber-950",
+    avatarText: "KL",
+    avatarBg: "bg-amber-400 text-slate-950",
     products: [
       {
-        id: 'kl_1',
-        title: 'Norozi Double Sole Peshawari Chappal',
+        id: "kl_1",
+        title: "Norozi Double Sole Peshawari Chappal",
         pricePkr: 3800,
         originalPricePkr: 5200,
-        imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'kl_2',
-        title: 'Full Grain Slim Bifold Leather Wallet',
+        id: "kl_2",
+        title: "Full Grain Slim Bifold Leather Wallet",
         pricePkr: 2499,
         originalPricePkr: 3600,
-        imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'kl_3',
+        id: "kl_3",
         title: 'Handmade Leather Laptop Sleeve 15"',
         pricePkr: 4200,
         originalPricePkr: 5800,
-        imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
   {
-    id: 'shop_lahore_tech',
-    slug: 'lahore-tech-hub',
-    name: 'Lahore Tech Hub',
-    nameUrdu: 'لاہور ٹیک ہب',
-    city: 'Lahore (Hafeez Centre)',
-    category: 'Audio, Gadgets & Wearables',
-    established: 'Est. 2018',
+    id: "shop_lahore_tech",
+    slug: "lahore-tech-hub",
+    name: "Lahore Tech Hub",
+    nameUrdu: "لاہور ٹیک ہب",
+    city: "Lahore (Hafeez Centre)",
+    category: "Audio, Gadgets & Wearables",
+    established: "Est. 2018",
     rating: 4.8,
     reviewsCount: 3850,
-    totalSales: '35.1k Sold',
-    bannerBg: 'from-sky-900 to-slate-950',
-    avatarText: 'LT',
-    avatarBg: 'bg-sky-500 text-white',
+    totalSales: "35.1k Sold",
+    bannerBg: "from-sky-900 to-slate-950",
+    avatarText: "LT",
+    avatarBg: "bg-sky-500 text-white",
     products: [
       {
-        id: 'lt_1',
-        title: 'Pro ANC Wireless Earbuds (Heavy Bass)',
+        id: "lt_1",
+        title: "Pro ANC Wireless Earbuds (Heavy Bass)",
         pricePkr: 3200,
         originalPricePkr: 4800,
-        imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'lt_2',
-        title: '65W GaN Fast Charger Multi-Port',
+        id: "lt_2",
+        title: "65W GaN Fast Charger Multi-Port",
         pricePkr: 2800,
         originalPricePkr: 3999,
-        imageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'lt_3',
-        title: 'Amoled Bluetooth Calling Smart Watch',
+        id: "lt_3",
+        title: "Amoled Bluetooth Calling Smart Watch",
         pricePkr: 4999,
         originalPricePkr: 7499,
-        imageUrl: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
   {
-    id: 'shop_sindh_lawn',
-    slug: 'waw-official-hub',
-    name: 'Sindh Silk & Lawn Gallery',
-    nameUrdu: 'سندھ سلک اور لان گیلری',
-    city: 'Karachi (Tariq Road)',
+    id: "shop_sindh_lawn",
+    slug: "waw-official-hub",
+    name: "Sindh Silk & Lawn Gallery",
+    nameUrdu: "سندھ سلک اور لان گیلری",
+    city: "Karachi (Tariq Road)",
     category: "Women's Unstitched Apparel",
-    established: 'Est. 2015',
+    established: "Est. 2015",
     rating: 4.9,
     reviewsCount: 2190,
-    totalSales: '24.8k Sold',
-    bannerBg: 'from-rose-900 to-slate-950',
-    avatarText: 'SL',
-    avatarBg: 'bg-rose-500 text-white',
+    totalSales: "24.8k Sold",
+    bannerBg: "from-rose-900 to-slate-950",
+    avatarText: "SL",
+    avatarBg: "bg-rose-500 text-white",
     products: [
       {
-        id: 'sl_1',
-        title: 'Luxury 3-Piece Embroidered Summer Lawn',
+        id: "sl_1",
+        title: "Luxury 3-Piece Embroidered Summer Lawn",
         pricePkr: 4499,
         originalPricePkr: 6500,
-        imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'sl_2',
-        title: 'Pure Chiffon Digital Printed Dupatta Suit',
+        id: "sl_2",
+        title: "Pure Chiffon Digital Printed Dupatta Suit",
         pricePkr: 5200,
         originalPricePkr: 7500,
-        imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'sl_3',
-        title: 'Classic Jacquard Festive Collection 2026',
+        id: "sl_3",
+        title: "Classic Jacquard Festive Collection 2026",
         pricePkr: 6499,
         originalPricePkr: 8999,
-        imageUrl: 'https://images.unsplash.com/photo-1596783049539-74d326233ba7?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1596783049539-74d326233ba7?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
   {
-    id: 'shop_sialkot_sports',
-    slug: 'sialkot-sports-direct',
-    name: 'Sialkot Sports World',
-    nameUrdu: 'سیالکوٹ اسپورٹس ورلڈ',
-    city: 'Sialkot Export Zone',
-    category: 'Handcrafted Match Gear',
-    established: 'Est. 2008',
+    id: "shop_sialkot_sports",
+    slug: "sialkot-sports-direct",
+    name: "Sialkot Sports World",
+    nameUrdu: "سیالکوٹ اسپورٹس ورلڈ",
+    city: "Sialkot Export Zone",
+    category: "Handcrafted Match Gear",
+    established: "Est. 2008",
     rating: 5.0,
     reviewsCount: 3100,
-    totalSales: '42.9k Sold',
-    bannerBg: 'from-emerald-900 to-slate-950',
-    avatarText: 'SW',
-    avatarBg: 'bg-emerald-500 text-white',
+    totalSales: "42.9k Sold",
+    bannerBg: "from-emerald-900 to-slate-950",
+    avatarText: "SW",
+    avatarBg: "bg-emerald-500 text-white",
     products: [
       {
-        id: 'sw_1',
-        title: 'Tournament Hand-Stitched Match Football',
+        id: "sw_1",
+        title: "Tournament Hand-Stitched Match Football",
         pricePkr: 2999,
         originalPricePkr: 4500,
-        imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'sw_2',
-        title: 'Grade-A English Willow Cricket Bat',
+        id: "sw_2",
+        title: "Grade-A English Willow Cricket Bat",
         pricePkr: 8500,
         originalPricePkr: 12000,
-        imageUrl: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=300&auto=format&fit=crop&q=80",
       },
       {
-        id: 'sw_3',
-        title: 'Pro Leather Boxing & Training Gloves',
+        id: "sw_3",
+        title: "Pro Leather Boxing & Training Gloves",
         pricePkr: 3600,
         originalPricePkr: 5200,
-        imageUrl: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
 ];
 
 export function StoreSpotlight() {
+  return null;
+
   const { addItem } = useCartStore();
 
   return (
@@ -198,7 +220,8 @@ export function StoreSpotlight() {
             </h2>
           </div>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Shop directly from authentic craftsmen, workshops, and flagship brands across Pakistan.
+            Shop directly from authentic craftsmen, workshops, and flagship
+            brands across Pakistan.
           </p>
         </div>
 
@@ -219,7 +242,9 @@ export function StoreSpotlight() {
             className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs hover:shadow-lg transition-all flex flex-col justify-between"
           >
             {/* Store Top Card Header */}
-            <div className={`bg-gradient-to-r ${shop.bannerBg} p-4 sm:p-5 text-white relative`}>
+            <div
+              className={`bg-gradient-to-r ${shop.bannerBg} p-4 sm:p-5 text-white relative`}
+            >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div
@@ -251,9 +276,13 @@ export function StoreSpotlight() {
                   <div className="flex items-center gap-1 bg-black/40 px-2.5 py-1 rounded-full text-amber-400 text-xs font-black">
                     <Star className="w-3.5 h-3.5 fill-amber-400" />
                     <span>{shop.rating.toFixed(1)}</span>
-                    <span className="text-slate-400 font-normal text-[10px]">({shop.reviewsCount})</span>
+                    <span className="text-slate-400 font-normal text-[10px]">
+                      ({shop.reviewsCount})
+                    </span>
                   </div>
-                  <div className="text-[10px] text-emerald-300 font-bold mt-1">{shop.totalSales}</div>
+                  <div className="text-[10px] text-emerald-300 font-bold mt-1">
+                    {shop.totalSales}
+                  </div>
                 </div>
               </div>
             </div>
@@ -314,7 +343,7 @@ export function StoreSpotlight() {
                   {shop.established} • 100% Genuine Direct Dispatch
                 </span>
                 <Link
-                  href={`/store/${shop.slug || 'lahore-tech-hub'}`}
+                  href={`/store/${shop.slug || "lahore-tech-hub"}`}
                   className="font-bold text-slate-900 hover:text-amber-600 flex items-center gap-1 group"
                 >
                   <span>Visit Shop Storefront</span>

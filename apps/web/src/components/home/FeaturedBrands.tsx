@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
+import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
 import {
   CheckCircle2,
   Sparkles,
@@ -15,8 +15,8 @@ import {
   ChevronRight,
   Store,
   Tag,
-} from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
+} from "lucide-react";
+import { useCartStore } from "@/store/useCartStore";
 
 interface BrandHub {
   name: string;
@@ -48,177 +48,196 @@ interface BrandHub {
 
 const BRAND_HUBS: BrandHub[] = [
   {
-    name: 'Waw Official Flagship',
-    nameUrdu: 'واو آفیشل فلیگ شپ سٹور',
-    slug: 'waw-official-hub',
-    category: '1P Waw Retail & Express',
-    categoryUrdu: 'ڈائریکٹ ریٹیل اور 24 گھنٹے ڈلیوری',
-    city: 'Islamabad',
-    cityUrdu: 'اسلام آباد',
+    name: "Waw Official Flagship",
+    nameUrdu: "واو آفیشل فلیگ شپ سٹور",
+    slug: "waw-official-hub",
+    category: "1P Waw Retail & Express",
+    categoryUrdu: "ڈائریکٹ ریٹیل اور 24 گھنٹے ڈلیوری",
+    city: "Islamabad",
+    cityUrdu: "اسلام آباد",
     isFirstParty: true,
     rating: 5.0,
     reviewsCount: 4820,
-    badge: '1P Official Flagship',
-    badgeUrdu: 'آفیشل اسٹور',
-    discount: 'Up to 50% Off',
-    tagline: '100% Genuine with 24h Waw Express',
-    taglineUrdu: '100% اصلی گارنٹی اور تیز رفتار ڈلیوری',
+    badge: "1P Official Flagship",
+    badgeUrdu: "آفیشل اسٹور",
+    discount: "Up to 50% Off",
+    tagline: "100% Genuine with 24h Waw Express",
+    taglineUrdu: "100% اصلی گارنٹی اور تیز رفتار ڈلیوری",
     isWawIcon: true,
-    avatarBg: 'bg-[#FEF600]',
-    avatarTextColor: 'text-slate-950',
-    accentColor: 'from-amber-500/20 to-yellow-500/10',
+    avatarBg: "bg-[#FEF600]",
+    avatarTextColor: "text-slate-950",
+    accentColor: "from-amber-500/20 to-yellow-500/10",
     featuredItems: [
       {
-        title: 'Cow Leather Wallet',
+        title: "Cow Leather Wallet",
         pricePkr: 2499,
-        imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: 'Heavy Bass Earbuds',
+        title: "Heavy Bass Earbuds",
         pricePkr: 3200,
-        imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: 'Oud Al-Layl Attar',
+        title: "Oud Al-Layl Attar",
         pricePkr: 1850,
-        imageUrl: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
   {
-    name: 'Khyber Leather Craft',
-    nameUrdu: 'خیبر لیدر کرافٹ پشاور',
-    slug: 'khyber-artisans',
-    category: 'Handmade Footwear & Chappal',
-    categoryUrdu: 'ہاتھ سے بنی پشاوری چپل اور لیدر',
-    city: 'Peshawar',
-    cityUrdu: 'پشاور (نمک منڈی)',
+    name: "Khyber Leather Craft",
+    nameUrdu: "خیبر لیدر کرافٹ پشاور",
+    slug: "khyber-artisans",
+    category: "Handmade Footwear & Chappal",
+    categoryUrdu: "ہاتھ سے بنی پشاوری چپل اور لیدر",
+    city: "Peshawar",
+    cityUrdu: "پشاور (نمک منڈی)",
     isFirstParty: false,
     rating: 4.9,
     reviewsCount: 1420,
-    badge: 'Master Artisan',
-    badgeUrdu: 'دستکار مرکز',
-    discount: 'Flat 25% Off',
-    tagline: 'Authentic Norozi & Kaptaan Soles',
-    taglineUrdu: 'اصلی نوروزی اور کپتان ڈبل تلا چپل',
-    avatarText: 'KL',
-    avatarBg: 'bg-gradient-to-br from-amber-600 to-amber-900',
-    avatarTextColor: 'text-amber-100',
-    accentColor: 'from-amber-600/20 to-orange-500/10',
+    badge: "Master Artisan",
+    badgeUrdu: "دستکار مرکز",
+    discount: "Flat 25% Off",
+    tagline: "Authentic Norozi & Kaptaan Soles",
+    taglineUrdu: "اصلی نوروزی اور کپتان ڈبل تلا چپل",
+    avatarText: "KL",
+    avatarBg: "bg-gradient-to-br from-amber-600 to-amber-900",
+    avatarTextColor: "text-amber-100",
+    accentColor: "from-amber-600/20 to-orange-500/10",
     featuredItems: [
       {
-        title: 'Norozi Chappal',
+        title: "Norozi Chappal",
         pricePkr: 3800,
-        imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: 'Kaptaan Chappal',
+        title: "Kaptaan Chappal",
         pricePkr: 4200,
-        imageUrl: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: 'Pure Leather Belt',
+        title: "Pure Leather Belt",
         pricePkr: 1650,
-        imageUrl: 'https://images.unsplash.com/photo-1624222247344-550fb60583dc?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1624222247344-550fb60583dc?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
   {
-    name: 'Lahore Tech Hub',
-    nameUrdu: 'لاہور ٹیک ہب (حفیظ سینٹر)',
-    slug: 'lahore-tech-hub',
-    category: 'Audio, Fast Chargers & Gadgets',
-    categoryUrdu: 'جدید گیجٹس اور فاسٹ چارجرز',
-    city: 'Lahore',
-    cityUrdu: 'لاہور',
+    name: "Lahore Tech Hub",
+    nameUrdu: "لاہور ٹیک ہب (حفیظ سینٹر)",
+    slug: "lahore-tech-hub",
+    category: "Audio, Fast Chargers & Gadgets",
+    categoryUrdu: "جدید گیجٹس اور فاسٹ چارجرز",
+    city: "Lahore",
+    cityUrdu: "لاہور",
     isFirstParty: false,
     rating: 4.8,
     reviewsCount: 3850,
-    badge: 'Verified Tech Partner',
-    badgeUrdu: 'تصدیق شدہ ٹیک پارٹنر',
-    discount: 'Up to 50% Off',
-    tagline: 'Direct Import with 1-Year Warranty',
-    taglineUrdu: '1 سال وارنٹی اور تصدیق شدہ لوازمات',
-    avatarText: 'LT',
-    avatarBg: 'bg-gradient-to-br from-sky-500 to-blue-700',
-    avatarTextColor: 'text-white',
-    accentColor: 'from-sky-500/20 to-blue-600/10',
+    badge: "Verified Tech Partner",
+    badgeUrdu: "تصدیق شدہ ٹیک پارٹنر",
+    discount: "Up to 50% Off",
+    tagline: "Direct Import with 1-Year Warranty",
+    taglineUrdu: "1 سال وارنٹی اور تصدیق شدہ لوازمات",
+    avatarText: "LT",
+    avatarBg: "bg-gradient-to-br from-sky-500 to-blue-700",
+    avatarTextColor: "text-white",
+    accentColor: "from-sky-500/20 to-blue-600/10",
     featuredItems: [
       {
-        title: 'Pro ANC Wireless Earbuds',
+        title: "Pro ANC Wireless Earbuds",
         pricePkr: 3200,
-        imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: '65W GaN Fast Charger',
+        title: "65W GaN Fast Charger",
         pricePkr: 2800,
-        imageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: 'AMOLED Smartwatch',
+        title: "AMOLED Smartwatch",
         pricePkr: 5499,
-        imageUrl: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
   {
-    name: 'Sindh Silk & Lawn Gallery',
-    nameUrdu: 'سندھ سلک اور لان گیلری',
-    slug: 'waw-official-hub',
-    category: 'Designer Lawn & Handloom',
-    categoryUrdu: 'خالص لان اور ہاتھ سے بنا ملبوسات',
-    city: 'Karachi',
-    cityUrdu: 'کراچی',
+    name: "Sindh Silk & Lawn Gallery",
+    nameUrdu: "سندھ سلک اور لان گیلری",
+    slug: "waw-official-hub",
+    category: "Designer Lawn & Handloom",
+    categoryUrdu: "خالص لان اور ہاتھ سے بنا ملبوسات",
+    city: "Karachi",
+    cityUrdu: "کراچی",
     isFirstParty: false,
     rating: 4.9,
     reviewsCount: 2190,
-    badge: 'Heritage Textiles',
-    badgeUrdu: 'ہینڈلوم ٹیکسٹائل',
-    discount: 'Summer Fest 2026',
-    tagline: 'Premium Unstitched & Chunri Prints',
-    taglineUrdu: 'پریمیم 3 پیس لان اور چنری دوپٹہ',
-    avatarText: 'SS',
-    avatarBg: 'bg-gradient-to-br from-rose-600 to-pink-800',
-    avatarTextColor: 'text-white',
-    accentColor: 'from-rose-500/20 to-pink-600/10',
+    badge: "Heritage Textiles",
+    badgeUrdu: "ہینڈلوم ٹیکسٹائل",
+    discount: "Summer Fest 2026",
+    tagline: "Premium Unstitched & Chunri Prints",
+    taglineUrdu: "پریمیم 3 پیس لان اور چنری دوپٹہ",
+    avatarText: "SS",
+    avatarBg: "bg-gradient-to-br from-rose-600 to-pink-800",
+    avatarTextColor: "text-white",
+    accentColor: "from-rose-500/20 to-pink-600/10",
     featuredItems: [
       {
-        title: 'Embroidered 3-Piece Lawn',
+        title: "Embroidered 3-Piece Lawn",
         pricePkr: 4800,
-        imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: 'Pure Chiffon Chunri',
+        title: "Pure Chiffon Chunri",
         pricePkr: 3200,
-        imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80",
       },
       {
-        title: 'Silk Formal Kurta',
+        title: "Silk Formal Kurta",
         pricePkr: 3999,
-        imageUrl: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=300&auto=format&fit=crop&q=80',
+        imageUrl:
+          "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=300&auto=format&fit=crop&q=80",
       },
     ],
   },
 ];
 
 export function FeaturedBrands() {
+  return null;
+
   const { language } = useCartStore();
-  const isUrdu = language === 'UR';
-  const [selectedFilter, setSelectedFilter] = useState<'ALL' | '1P' | 'LEATHER' | 'TECH' | 'FASHION'>('ALL');
+  const isUrdu = language === "UR";
+  const [selectedFilter, setSelectedFilter] = useState<
+    "ALL" | "1P" | "LEATHER" | "TECH" | "FASHION"
+  >("ALL");
 
   const filters = [
-    { key: 'ALL', label: isUrdu ? 'تمام برانڈ مالز' : 'All Brand Malls' },
-    { key: '1P', label: isUrdu ? '⚡ واو آفیشل' : '⚡ Waw Official 1P' },
-    { key: 'LEATHER', label: isUrdu ? '👞 لیدر اور پشاوری' : '👞 Leather & Footwear' },
-    { key: 'TECH', label: isUrdu ? '📱 ٹیک اور آڈیو' : '📱 Tech & Audio' },
-    { key: 'FASHION', label: isUrdu ? '👗 فیشن اور لان' : '👗 Fashion & Lawn' },
+    { key: "ALL", label: isUrdu ? "تمام برانڈ مالز" : "All Brand Malls" },
+    { key: "1P", label: isUrdu ? "⚡ واو آفیشل" : "⚡ Waw Official 1P" },
+    {
+      key: "LEATHER",
+      label: isUrdu ? "👞 لیدر اور پشاوری" : "👞 Leather & Footwear",
+    },
+    { key: "TECH", label: isUrdu ? "📱 ٹیک اور آڈیو" : "📱 Tech & Audio" },
+    { key: "FASHION", label: isUrdu ? "👗 فیشن اور لان" : "👗 Fashion & Lawn" },
   ];
 
   const filteredHubs = BRAND_HUBS.filter((hub) => {
-    if (selectedFilter === '1P') return hub.isFirstParty;
-    if (selectedFilter === 'LEATHER') return hub.slug === 'khyber-artisans';
-    if (selectedFilter === 'TECH') return hub.slug === 'lahore-tech-hub';
-    if (selectedFilter === 'FASHION') return hub.name.includes('Silk');
+    if (selectedFilter === "1P") return hub.isFirstParty;
+    if (selectedFilter === "LEATHER") return hub.slug === "khyber-artisans";
+    if (selectedFilter === "TECH") return hub.slug === "lahore-tech-hub";
+    if (selectedFilter === "FASHION") return hub.name.includes("Silk");
     return true;
   });
 
@@ -235,17 +254,25 @@ export function FeaturedBrands() {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-black text-amber-300 tracking-wider uppercase shadow-xs">
               <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-              <span>{isUrdu ? 'ویریفائیڈ برانڈ مالز اور علاقائی دستکاری' : 'Official Brand Malls & Regional Hubs'}</span>
+              <span>
+                {isUrdu
+                  ? "ویریفائیڈ برانڈ مالز اور علاقائی دستکاری"
+                  : "Official Brand Malls & Regional Hubs"}
+              </span>
             </div>
 
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-              <span>{isUrdu ? 'پاکستان کے تصدیق شدہ آفیشل اسٹورز' : 'Verified Brand Stores & Artisan Hubs'}</span>
+              <span>
+                {isUrdu
+                  ? "پاکستان کے تصدیق شدہ آفیشل اسٹورز"
+                  : "Verified Brand Stores & Artisan Hubs"}
+              </span>
             </h2>
 
             <p className="text-xs sm:text-sm text-slate-400 font-medium max-w-2xl">
               {isUrdu
-                ? 'براہ راست تصدیق شدہ فیکٹری آؤٹ لیٹس، گارنٹی شدہ وارنٹی اور مستند علاقائی دستکاری سے خریداری کریں۔ 100% اسٹیٹ بینک ایسکرو پروٹیکشن۔'
-                : 'Shop directly with guaranteed manufacturer warranties, 24h Waw Express priority dispatch, and authentic provincial craftsmanship.'}
+                ? "براہ راست تصدیق شدہ فیکٹری آؤٹ لیٹس، گارنٹی شدہ وارنٹی اور مستند علاقائی دستکاری سے خریداری کریں۔ 100% اسٹیٹ بینک ایسکرو پروٹیکشن۔"
+                : "Shop directly with guaranteed manufacturer warranties, 24h Waw Express priority dispatch, and authentic provincial craftsmanship."}
             </p>
           </div>
 
@@ -254,7 +281,11 @@ export function FeaturedBrands() {
             href="/store/khyber-artisans"
             className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs px-5 py-3 rounded-2xl transition-all shadow-md hover:shadow-lg hover:scale-102 shrink-0 group cursor-pointer self-start md:self-auto"
           >
-            <span>{isUrdu ? 'تمام برانڈ اسٹورز دیکھیں' : 'Explore All Verified Hubs'}</span>
+            <span>
+              {isUrdu
+                ? "تمام برانڈ اسٹورز دیکھیں"
+                : "Explore All Verified Hubs"}
+            </span>
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
@@ -267,8 +298,8 @@ export function FeaturedBrands() {
               onClick={() => setSelectedFilter(f.key as any)}
               className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
                 selectedFilter === f.key
-                  ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-amber-300/30 scale-102'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+                  ? "bg-amber-400 text-slate-950 shadow-md ring-2 ring-amber-300/30 scale-102"
+                  : "bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
               }`}
             >
               {f.label}
@@ -312,7 +343,9 @@ export function FeaturedBrands() {
                     <div className="flex items-center justify-end gap-1 text-[11px] font-bold text-amber-400">
                       <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                       <span>{hub.rating.toFixed(1)}</span>
-                      <span className="text-slate-500 font-normal">({hub.reviewsCount})</span>
+                      <span className="text-slate-500 font-normal">
+                        ({hub.reviewsCount})
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -330,7 +363,9 @@ export function FeaturedBrands() {
                     <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span>{isUrdu ? hub.cityUrdu : hub.city}</span>
                     <span className="text-slate-600">•</span>
-                    <span className="text-slate-300 font-semibold">{isUrdu ? hub.categoryUrdu : hub.category}</span>
+                    <span className="text-slate-300 font-semibold">
+                      {isUrdu ? hub.categoryUrdu : hub.category}
+                    </span>
                   </div>
 
                   <p className="text-[11px] text-slate-400/90 font-medium line-clamp-1">
@@ -343,7 +378,11 @@ export function FeaturedBrands() {
               <div className="space-y-2 pt-2 border-t border-slate-800">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
                   <Flame className="w-3 h-3 text-rose-500" />
-                  <span>{isUrdu ? 'سب سے زیادہ فروخت ہونے والی اشیاء' : 'Best-Selling Catalog'}</span>
+                  <span>
+                    {isUrdu
+                      ? "سب سے زیادہ فروخت ہونے والی اشیاء"
+                      : "Best-Selling Catalog"}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
@@ -373,7 +412,9 @@ export function FeaturedBrands() {
                 className="w-full py-2.5 bg-slate-800 hover:bg-amber-400 text-slate-200 hover:text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs group-hover:shadow-md cursor-pointer mt-1"
               >
                 <Store className="w-3.5 h-3.5" />
-                <span>{isUrdu ? 'آفیشل اسٹور وزٹ کریں' : 'Visit Official Hub'}</span>
+                <span>
+                  {isUrdu ? "آفیشل اسٹور وزٹ کریں" : "Visit Official Hub"}
+                </span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -386,19 +427,21 @@ export function FeaturedBrands() {
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <span className="font-bold">
               {isUrdu
-                ? '100% اسٹیٹ بینک آف پاکستان ایسکرو پروٹیکشن — ہر برانڈ پر 7 دن واپسی کی سہولت'
-                : '100% Secure Checkout — 7-Day Hassle-Free Returns on All Verified Malls'}
+                ? "100% اسٹیٹ بینک آف پاکستان ایسکرو پروٹیکشن — ہر برانڈ پر 7 دن واپسی کی سہولت"
+                : "100% Secure Checkout — 7-Day Hassle-Free Returns on All Verified Malls"}
             </span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px] font-bold">
             <span className="flex items-center gap-1 text-amber-300">
               <Award className="w-3.5 h-3.5 text-amber-400" />
-              <span>{isUrdu ? 'اصلی برانڈ وارنٹی' : 'Official Warranty'}</span>
+              <span>{isUrdu ? "اصلی برانڈ وارنٹی" : "Official Warranty"}</span>
             </span>
             <span className="text-slate-600">•</span>
             <span className="text-emerald-400">
-              {isUrdu ? '24 گھنٹے واو ایکسپریس' : '24h Waw Express Priority Dispatch'}
+              {isUrdu
+                ? "24 گھنٹے واو ایکسپریس"
+                : "24h Waw Express Priority Dispatch"}
             </span>
           </div>
         </div>

@@ -1,175 +1,49 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
-import { HeroBanner } from '@/components/home/HeroBanner';
-import { CategoryCircles } from '@/components/home/CategoryCircles';
-import { FlashDeals } from '@/components/home/FlashDeals';
-import { StoreSpotlight } from '@/components/home/StoreSpotlight';
-import { FeaturedBrands } from '@/components/home/FeaturedBrands';
-import { ProductCard } from '@/components/ui/ProductCard';
-import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, Truck, Award, Zap } from 'lucide-react';
-import { SellerType } from '@waw/types';
-import { fetchProducts } from '@/lib/api';
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { HeroBanner } from "@/components/home/HeroBanner";
+import { CategoryCircles } from "@/components/home/CategoryCircles";
+import { FlashDeals } from "@/components/home/FlashDeals";
+import { StoreSpotlight } from "@/components/home/StoreSpotlight";
+import { FeaturedBrands } from "@/components/home/FeaturedBrands";
+import { ProductCard } from "@/components/ui/ProductCard";
+import {
+  Flame,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  Sparkles,
+  Truck,
+  Award,
+  Zap,
+} from "lucide-react";
+import { SellerType } from "@waw/types";
+import { fetchProducts } from "@/lib/api";
 
 const MARKETPLACE_TABS = [
-  'All Products',
-  'Mobiles & Tech',
+  "All Products",
+  "Mobiles & Tech",
   "Women's Lawn",
-  'Leather & Footwear',
-  'Sialkot Sports',
-  'Fragrances & Attar',
-  'Smart Watches',
-  'Power & Chargers',
+  "Leather & Footwear",
+  "Sialkot Sports",
+  "Fragrances & Attar",
+  "Smart Watches",
+  "Power & Chargers",
 ] as const;
 
-type MarketTab = typeof MARKETPLACE_TABS[number];
+type MarketTab = (typeof MARKETPLACE_TABS)[number];
 
-const TRENDING_MARKETPLACE_PRODUCTS = [
-  {
-    productId: 'prod_m1',
-    title: 'Waw Signature Slim Bifold Pure Cow Leather Wallet',
-    category: 'Leather & Footwear' as MarketTab,
-    pricePkr: 2499,
-    originalPricePkr: 3600,
-    discountPercent: 30,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: true,
-    sellerType: SellerType.FIRST_PARTY,
-    storeName: 'Waw Official Hub',
-    sellerCity: 'Islamabad Hub',
-    deliveryTime: 'Get it by Tomorrow',
-    imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    productId: 'prod_m2',
-    title: 'Pro ANC Wireless Earbuds with Heavy Bass & 40h Battery',
-    category: 'Mobiles & Tech' as MarketTab,
-    pricePkr: 3200,
-    originalPricePkr: 4800,
-    discountPercent: 33,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: true,
-    sellerType: SellerType.THIRD_PARTY,
-    storeName: 'Lahore Tech Hub',
-    sellerCity: 'Lahore',
-    deliveryTime: '24-48h Dispatch',
-    imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    productId: 'prod_m3',
-    title: 'Handmade Traditional Norozi Peshawari Chappal (Pure Mustard Leather)',
-    category: 'Leather & Footwear' as MarketTab,
-    pricePkr: 3800,
-    originalPricePkr: 5200,
-    discountPercent: 27,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: false,
-    sellerType: SellerType.THIRD_PARTY,
-    storeName: 'Khyber Artisans',
-    sellerCity: 'Peshawar',
-    deliveryTime: '3-4 Days Express',
-    imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    productId: 'prod_m4',
-    title: 'Luxury Floral Embroidered 3-Piece Unstitched Summer Lawn Collection',
-    category: "Women's Lawn" as MarketTab,
-    pricePkr: 4499,
-    originalPricePkr: 6500,
-    discountPercent: 30,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: true,
-    sellerType: SellerType.THIRD_PARTY,
-    storeName: 'Sindh Lawn Gallery',
-    sellerCity: 'Karachi',
-    deliveryTime: '24-48h Dispatch',
-    imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    productId: 'prod_m5',
-    title: 'Amoled Bluetooth Calling Smart Watch (Waterproof IP68)',
-    category: 'Smart Watches' as MarketTab,
-    pricePkr: 4999,
-    originalPricePkr: 7999,
-    discountPercent: 37,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: true,
-    sellerType: SellerType.FIRST_PARTY,
-    storeName: 'Waw Electronics Hub',
-    sellerCity: 'Lahore Hub',
-    deliveryTime: 'Get it in 24 Hours',
-    imageUrl: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    productId: 'prod_m6',
-    title: 'Original Sialkot Professional Match Football (Hand-Stitched)',
-    category: 'Sialkot Sports' as MarketTab,
-    pricePkr: 2800,
-    originalPricePkr: 4200,
-    discountPercent: 33,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: true,
-    sellerType: SellerType.THIRD_PARTY,
-    storeName: 'Sialkot Sports Direct',
-    sellerCity: 'Sialkot',
-    deliveryTime: '24-48h Dispatch',
-    imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    productId: 'prod_m7',
-    title: 'Royal Oud Al-Layl Concentrated Perfume Oil / Non-Alcoholic Attar (12ml)',
-    category: 'Fragrances & Attar' as MarketTab,
-    pricePkr: 1850,
-    originalPricePkr: 2800,
-    discountPercent: 34,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: true,
-    sellerType: SellerType.THIRD_PARTY,
-    storeName: 'Arabian Oud PK',
-    sellerCity: 'Karachi',
-    deliveryTime: '24-48h Dispatch',
-    imageUrl: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    productId: 'prod_m8',
-    title: '65W Fast Charging GaN Multi-Port USB-C Wall Charger',
-    category: 'Power & Chargers' as MarketTab,
-    pricePkr: 2800,
-    originalPricePkr: 3999,
-    discountPercent: 30,
-    rating: 0,
-    reviewsCount: 0,
-    soldCount: 0,
-    isExpress: true,
-    sellerType: SellerType.THIRD_PARTY,
-    storeName: 'Islamabad Gadgets',
-    sellerCity: 'Islamabad',
-    deliveryTime: '24-48h Dispatch',
-    imageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80',
-  },
-];
+
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<MarketTab>('All Products');
+  const [activeTab, setActiveTab] = useState<MarketTab>("All Products");
   const tabScrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [liveProducts, setLiveProducts] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
   const checkTabScroll = () => {
     if (tabScrollRef.current) {
@@ -183,8 +57,8 @@ export default function HomePage() {
     checkTabScroll();
     const el = tabScrollRef.current;
     if (el) {
-      el.addEventListener('scroll', checkTabScroll);
-      return () => el.removeEventListener('scroll', checkTabScroll);
+      el.addEventListener("scroll", checkTabScroll);
+      return () => el.removeEventListener("scroll", checkTabScroll);
     }
   }, []);
 
@@ -192,44 +66,58 @@ export default function HomePage() {
     async function loadCatalog() {
       try {
         const data = await fetchProducts();
-        if (Array.isArray(data) && data.length > 0) {
-          setLiveProducts(data.map((p: any) => ({
-            productId: p.id,
-            title: p.title,
-            category: (p.categoryName || 'Mobiles & Tech') as MarketTab,
-            pricePkr: p.pricePkr || 2999,
-            originalPricePkr: p.compareAtPricePkr || (p.pricePkr ? Math.round(p.pricePkr * 1.3) : 3999),
-            discountPercent: p.compareAtPricePkr ? Math.round(((p.compareAtPricePkr - p.pricePkr) / p.compareAtPricePkr) * 100) : 25,
-            rating: p.ratingAverage || 0,
-            reviewsCount: p.reviewsCount || 0,
-            soldCount: p.soldCount || 0,
-            isExpress: p.isFirstParty ?? true,
-            sellerType: p.isFirstParty ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
-            storeName: p.storeName || 'Waw Official Hub',
-            sellerCity: 'Pakistan',
-            deliveryTime: '2-3 Days Fast Dispatch',
-            imageUrl: p.imageUrl || p.images?.[0] || 'https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80',
-          })));
+        if (Array.isArray(data)) {
+          setLiveProducts(
+            data.map((p: any) => ({
+              productId: p.id,
+              title: p.title,
+              category: (p.categoryName || "Mobiles & Tech") as MarketTab,
+              pricePkr: p.pricePkr || 2999,
+              originalPricePkr:
+                p.compareAtPricePkr ||
+                (p.pricePkr ? Math.round(p.pricePkr * 1.3) : 3999),
+              discountPercent: p.compareAtPricePkr
+                ? Math.round(
+                    ((p.compareAtPricePkr - p.pricePkr) / p.compareAtPricePkr) *
+                      100,
+                  )
+                : 25,
+              rating: p.ratingAverage || 0,
+              reviewsCount: p.reviewsCount || 0,
+              soldCount: p.soldCount || 0,
+              isExpress: p.isFirstParty ?? true,
+              sellerType: p.isFirstParty
+                ? SellerType.FIRST_PARTY
+                : SellerType.THIRD_PARTY,
+              storeName: p.storeName || "Waw Official Hub",
+              sellerCity: "Pakistan",
+              deliveryTime: "2-3 Days Fast Dispatch",
+              imageUrl:
+                p.imageUrl ||
+                p.images?.[0] ||
+                "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80",
+            })),
+          );
         }
       } catch (err) {
-        console.warn('Using baseline catalog for buyer homepage:', err);
+        console.warn("Using baseline catalog for buyer homepage:", err);
       }
     }
     loadCatalog();
   }, []);
 
-  const scrollTabs = (direction: 'left' | 'right') => {
+  const scrollTabs = (direction: "left" | "right") => {
     if (tabScrollRef.current) {
-      const amount = direction === 'left' ? -220 : 220;
-      tabScrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+      const amount = direction === "left" ? -220 : 220;
+      tabScrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
       setTimeout(checkTabScroll, 300);
     }
   };
 
-  const allProductsList = liveProducts.length > 0 ? liveProducts : TRENDING_MARKETPLACE_PRODUCTS;
+  const allProductsList = liveProducts;
 
   const filteredProducts =
-    activeTab === 'All Products'
+    activeTab === "All Products"
       ? allProductsList
       : allProductsList.filter((p) => p.category === activeTab);
 
@@ -247,7 +135,6 @@ export default function HomePage() {
       {/* 4. Multi-Vendor Store Spotlight (Etsy & Noon Style) */}
       <StoreSpotlight />
 
-      
       {/* 6. Official Brand Malls & Regional Hubs */}
       <FeaturedBrands />
 
@@ -266,7 +153,8 @@ export default function HomePage() {
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
-                Top rated products with verified buyer reviews and fast nationwide shipping from local sellers.
+                Top rated products with verified buyer reviews and fast
+                nationwide shipping from local sellers.
               </p>
             </div>
 
@@ -274,7 +162,7 @@ export default function HomePage() {
             <div className="flex items-center gap-2 max-w-full md:max-w-md relative">
               {canScrollLeft && (
                 <button
-                  onClick={() => scrollTabs('left')}
+                  onClick={() => scrollTabs("left")}
                   className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
                   aria-label="Scroll left"
                 >
@@ -292,8 +180,8 @@ export default function HomePage() {
                     onClick={() => setActiveTab(tab)}
                     className={`px-4.5 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                       activeTab === tab
-                        ? 'bg-slate-950 text-amber-400 shadow-md scale-102'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        ? "bg-slate-950 text-amber-400 shadow-md scale-102"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                     }`}
                   >
                     {tab}
@@ -303,7 +191,7 @@ export default function HomePage() {
 
               {canScrollRight && (
                 <button
-                  onClick={() => scrollTabs('right')}
+                  onClick={() => scrollTabs("right")}
                   className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
                   aria-label="Scroll right"
                 >
@@ -314,27 +202,35 @@ export default function HomePage() {
           </div>
 
           {/* Product Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {filteredProducts.map((prod) => (
-              <ProductCard
-                key={prod.productId}
-                productId={prod.productId}
-                title={prod.title}
-                storeName={prod.storeName}
-                sellerCity={prod.sellerCity}
-                pricePkr={prod.pricePkr}
-                originalPricePkr={prod.originalPricePkr}
-                discountPercent={prod.discountPercent}
-                rating={prod.rating}
-                reviewsCount={prod.reviewsCount}
-                soldCount={prod.soldCount}
-                imageUrl={prod.imageUrl}
-                isExpress={prod.isExpress}
-                sellerType={prod.sellerType}
-                deliveryTime={prod.deliveryTime}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-20 text-slate-500 font-bold">No products found.</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+              {filteredProducts.map((prod) => (
+                <ProductCard
+                  key={prod.productId}
+                  productId={prod.productId}
+                  title={prod.title}
+                  storeName={prod.storeName}
+                  sellerCity={prod.sellerCity}
+                  pricePkr={prod.pricePkr}
+                  originalPricePkr={prod.originalPricePkr}
+                  discountPercent={prod.discountPercent}
+                  rating={prod.rating}
+                  reviewsCount={prod.reviewsCount}
+                  soldCount={prod.soldCount}
+                  imageUrl={prod.imageUrl}
+                  isExpress={prod.isExpress}
+                  sellerType={prod.sellerType}
+                  deliveryTime={prod.deliveryTime}
+                />
+              ))}
+            </div>
+          )}
 
           {/* View More Button */}
           <div className="text-center pt-5">

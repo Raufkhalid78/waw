@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   CheckCircle2,
   Package,
@@ -17,14 +17,14 @@ import {
   Store,
   ChevronRight,
   Loader2,
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { fetchOrderById } from '@/lib/api';
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import { fetchOrderById } from "@/lib/api";
 
 export default function OrderTrackingPage() {
   const params = useParams();
   const router = useRouter();
-  const orderId = (params.id as string) || 'WAW-PK-88492';
+  const orderId = (params.id as string) || "WAW-PK-88492";
   const [copied, setCopied] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +36,7 @@ export default function OrderTrackingPage() {
         const data = await fetchOrderById(orderId);
         setOrder(data);
       } catch (err) {
-        console.warn('Could not load order details:', err);
+        console.warn("Could not load order details:", err);
       } finally {
         setLoading(false);
       }
@@ -52,50 +52,112 @@ export default function OrderTrackingPage() {
     }
   };
 
-  const currentStatus = order?.order_status || order?.orderStatus || 'CONFIRMED';
+  const currentStatus =
+    order?.order_status || order?.orderStatus || "CONFIRMED";
+
+  const trackingNumber =
+    order?.tracking_number ||
+    order?.store_orders?.[0]?.shipments?.[0]?.tracking_number ||
+    order?.shipments?.[0]?.tracking_number ||
+    null;
 
   const steps = [
     {
-      title: 'Order Confirmed',
-      desc: 'Payment authorized & order logged into Waw Secure Payments',
-      time: order?.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
-      status: 'completed',
+      title: "Order Confirmed",
+      desc: "Payment authorized & order logged into Waw Secure Payments",
+      time: order?.created_at
+        ? new Date(order.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Just now",
+      status: "completed",
     },
     {
-      title: 'Packed & Quality Verified',
-      desc: 'Merchant inspected & sealed with Waw tamper-proof tape',
-      time: currentStatus === 'CONFIRMED' ? 'In Progress' : 'Completed',
-      status: currentStatus === 'CONFIRMED' ? 'active' : 'completed',
+      title: "Packed & Quality Verified",
+      desc: "Merchant inspected & sealed with Waw tamper-proof tape",
+      time: currentStatus === "CONFIRMED" ? "In Progress" : "Completed",
+      status: currentStatus === "CONFIRMED" ? "active" : "completed",
     },
     {
-      title: 'Handed to Courier',
-      desc: 'Dispatched via PostEx Express Logistics',
-      time: order?.store_orders?.[0]?.shipments?.[0]?.tracking_number ? `CN: ${order.store_orders[0].shipments[0].tracking_number}` : 'Pending',
-      status: ['SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentStatus) ? 'completed' : 'upcoming',
+      title: "Handed to Courier",
+      desc: "Dispatched via PostEx Express Logistics",
+      time: trackingNumber ? `CN: ${trackingNumber}` : "Pending",
+      status: ["SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(
+        currentStatus,
+      )
+        ? "completed"
+        : "upcoming",
     },
     {
-      title: 'Out for Delivery',
-      desc: 'Local courier rider assigned for final doorstep drop',
-      time: 'Pending dispatch',
-      status: ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentStatus) ? 'active' : 'upcoming',
+      title: "Out for Delivery",
+      desc: "Local courier rider assigned for final doorstep drop",
+      time: currentStatus === "OUT_FOR_DELIVERY" ? "Out on bike" : "Pending dispatch",
+      status: ["OUT_FOR_DELIVERY", "DELIVERED"].includes(currentStatus)
+        ? "active"
+        : "upcoming",
     },
     {
-      title: 'Delivered & Completed',
-      desc: 'Package handed over to recipient',
-      time: currentStatus === 'DELIVERED' ? 'Completed' : 'Est. 24-48h',
-      status: currentStatus === 'DELIVERED' ? 'completed' : 'upcoming',
+      title: "Delivered & Completed",
+      desc: "Package handed over to recipient",
+      time: currentStatus === "DELIVERED" ? "Completed" : "Est. 24-48h",
+      status: currentStatus === "DELIVERED" ? "completed" : "upcoming",
     },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="w-10 h-10 border-4 border-amber-400/20 border-t-amber-400 rounded-full animate-spin" />
+        <p className="text-xs font-bold text-slate-400">Loading order tracking...</p>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-3xl text-center space-y-5 shadow-xs">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+          <Package className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-black text-slate-950">Order Not Found</h2>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            We could not find any active or past order with reference <strong className="text-slate-900 font-mono">{orderId}</strong>.
+          </p>
+        </div>
+        <Link
+          href="/account"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-slate-950 hover:bg-slate-800 text-white font-black rounded-xl text-xs transition-all shadow-xs"
+        >
+          <span>View All Orders</span>
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+    );
+  }
+
+  const items =
+    order.order_items ||
+    order.store_orders?.flatMap((so: any) => so.order_items || []) ||
+    [];
 
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-10 space-y-8">
       {/* ── Breadcrumb Navigation ────────────────────────────────────────── */}
       <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-        <Link href="/" className="hover:text-amber-600 transition-colors">Home</Link>
+        <Link href="/" className="hover:text-amber-600 transition-colors">
+          Home
+        </Link>
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <Link href="/account" className="hover:text-amber-600 transition-colors">My Orders</Link>
+        <Link
+          href="/account"
+          className="hover:text-amber-600 transition-colors"
+        >
+          My Orders
+        </Link>
         <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <span className="text-slate-900 font-bold">{orderId}</span>
+        <span className="text-slate-900 font-bold">{order.order_number || orderId}</span>
       </nav>
 
       {/* ── Top Success Header Banner ────────────────────────────────────── */}
@@ -106,25 +168,34 @@ export default function OrderTrackingPage() {
               <CheckCircle2 className="w-8 h-8 text-white" />
             </div>
             <div>
-              <div className="text-xs font-black uppercase tracking-widest text-emerald-200">Order Confirmed</div>
+              <div className="text-xs font-black uppercase tracking-widest text-emerald-200">
+                Order {currentStatus.replace(/_/g, " ")}
+              </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                Thank You for Your Order!
+                {currentStatus === "DELIVERED"
+                  ? "Order Delivered!"
+                  : "Thank You for Your Order!"}
               </h1>
             </div>
           </div>
 
           {/* Copyable Order Number */}
           <div className="flex items-center gap-2 bg-black/30 backdrop-blur px-4 py-2.5 rounded-2xl border border-white/20 self-start sm:self-auto">
-            <span className="text-xs text-emerald-200 font-medium">Order ID:</span>
-            <span className="font-mono font-black text-sm text-white">{orderId}</span>
+            <span className="text-xs font-mono font-bold">
+              {order.order_number || orderId}
+            </span>
             <button
               onClick={handleCopyOrderId}
-              className="p-1 hover:text-amber-300 transition-colors ml-1"
+              className="hover:text-amber-300 transition-colors cursor-pointer"
               title="Copy Order ID"
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
-            {copied && <span className="text-[10px] text-amber-300 font-bold">Copied!</span>}
+            {copied && (
+              <span className="text-[10px] text-amber-300 font-bold">
+                Copied!
+              </span>
+            )}
           </div>
         </div>
 
@@ -132,7 +203,8 @@ export default function OrderTrackingPage() {
         <div className="flex items-center gap-3 p-3.5 bg-white/10 backdrop-blur rounded-2xl text-xs font-medium border border-white/15">
           <MessageSquare className="w-4 h-4 text-emerald-200 shrink-0" />
           <span>
-            Real-time delivery updates, courier tracking link & digital receipt have been dispatched via <strong>WhatsApp</strong>.
+            Real-time delivery updates, courier tracking link & digital receipt
+            have been dispatched via <strong>WhatsApp ({order.buyer_phone})</strong>.
           </span>
         </div>
       </div>
@@ -146,12 +218,14 @@ export default function OrderTrackingPage() {
               <div>
                 <h2 className="text-lg font-black text-slate-950 tracking-tight flex items-center gap-2">
                   <Truck className="w-5 h-5 text-amber-500" />
-                  <span>Live PostEx Courier Status</span>
+                  <span>Live Courier Status</span>
                 </h2>
-                <p className="text-xs text-slate-500 font-medium">Partner: PostEx Express Logistics PK</p>
+                <p className="text-xs text-slate-500 font-medium">
+                  Partner: PostEx Express Logistics PK
+                </p>
               </div>
               <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-                Tracking: PTX-88492-910
+                {trackingNumber ? `Tracking: ${trackingNumber}` : "Dispatch in Queue"}
               </span>
             </div>
 
@@ -163,7 +237,9 @@ export default function OrderTrackingPage() {
                   {idx < steps.length - 1 && (
                     <div
                       className={`absolute left-3.5 top-8 bottom-0 w-0.5 -mb-6 ${
-                        step.status === 'completed' ? 'bg-emerald-500' : 'bg-slate-200'
+                        step.status === "completed"
+                          ? "bg-emerald-500"
+                          : "bg-slate-200"
                       }`}
                     />
                   )}
@@ -171,14 +247,14 @@ export default function OrderTrackingPage() {
                   {/* Step Dot */}
                   <div
                     className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs shrink-0 z-10 ${
-                      step.status === 'completed'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : step.status === 'active'
-                        ? 'bg-amber-400 text-slate-950 ring-4 ring-amber-200 shadow-sm'
-                        : 'bg-slate-100 text-slate-400 border border-slate-200'
+                      step.status === "completed"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : step.status === "active"
+                          ? "bg-amber-400 text-slate-950 ring-4 ring-amber-200 shadow-sm"
+                          : "bg-slate-100 text-slate-400 border border-slate-200"
                     }`}
                   >
-                    {step.status === 'completed' ? (
+                    {step.status === "completed" ? (
                       <CheckCircle2 className="w-4 h-4" />
                     ) : (
                       <span>{idx + 1}</span>
@@ -190,18 +266,22 @@ export default function OrderTrackingPage() {
                     <div className="flex items-center gap-2">
                       <h3
                         className={`text-xs sm:text-sm font-black ${
-                          step.status === 'completed'
-                            ? 'text-emerald-900'
-                            : step.status === 'active'
-                            ? 'text-slate-950'
-                            : 'text-slate-400'
+                          step.status === "completed"
+                            ? "text-emerald-900"
+                            : step.status === "active"
+                              ? "text-slate-950"
+                              : "text-slate-400"
                         }`}
                       >
                         {step.title}
                       </h3>
-                      <span className="text-[10px] font-bold text-slate-400">{step.time}</span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {step.time}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-500 font-medium">{step.desc}</p>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {step.desc}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -215,11 +295,13 @@ export default function OrderTrackingPage() {
               <span>Delivery Address</span>
             </h3>
             <div className="text-xs text-slate-700 font-medium space-y-1">
-              <div className="font-bold text-slate-900 text-sm">Customer Recipient</div>
-              <div>House 14-B, Street 3, Sector F-8/2, Islamabad, Pakistan</div>
+              <div className="font-bold text-slate-900 text-sm">
+                {order.buyer_name || "Recipient"}
+              </div>
+              <div>{order.shipping_address}, {order.shipping_city}, Pakistan</div>
               <div className="flex items-center gap-1.5 text-slate-500 pt-1">
                 <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                <span>+92 300 1234567 (WhatsApp Verified)</span>
+                <span>{order.buyer_phone} (WhatsApp Verified)</span>
               </div>
             </div>
           </div>
@@ -235,68 +317,98 @@ export default function OrderTrackingPage() {
 
             {/* Items List */}
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl border border-slate-100">
-                <img
-                  src="https://images.unsplash.com/photo-1627123424574-724758594e93?w=120&auto=format&fit=crop&q=80"
-                  alt="Item"
-                  className="w-14 h-14 rounded-xl object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-bold text-slate-900 truncate">Waw Signature Pure Cow Leather Wallet</h4>
-                  <div className="text-[10px] text-slate-500 font-medium">Qty: 1 • Waw Official Hub</div>
-                  <div className="text-xs font-black text-slate-950 mt-0.5">PKR 2,499</div>
+              {items.map((item: any, idx: number) => (
+                <div
+                  key={item.id || idx}
+                  className="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl border border-slate-100"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-slate-400">
+                    {item.product_image || item.image ? (
+                      <img
+                        src={item.product_image || item.image}
+                        alt={item.product_title || item.title || "Item"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Package className="w-6 h-6" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs font-bold text-slate-900 truncate">
+                      {item.product_title || item.title || "Marketplace Product"}
+                    </h4>
+                    <div className="text-[10px] text-slate-500 font-medium">
+                      Qty: {item.quantity || item.qty || 1} • {item.store_name || "Verified Merchant"}
+                    </div>
+                    <div className="text-xs font-black text-slate-950 mt-0.5">
+                      PKR {(item.unit_price_pkr || item.unitPricePkr || item.price || 0).toLocaleString()}
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl border border-slate-100">
-                <img
-                  src="https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=120&auto=format&fit=crop&q=80"
-                  alt="Item"
-                  className="w-14 h-14 rounded-xl object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-bold text-slate-900 truncate">Pro ANC Wireless Earbuds (Heavy Bass)</h4>
-                  <div className="text-[10px] text-slate-500 font-medium">Qty: 1 • Lahore Tech Hub</div>
-                  <div className="text-xs font-black text-slate-950 mt-0.5">PKR 3,200</div>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Financial Totals */}
             <div className="border-t border-slate-100 pt-3 space-y-2 text-xs text-slate-600">
               <div className="flex justify-between">
                 <span>Items Subtotal</span>
-                <span className="font-bold text-slate-900">PKR 5,699</span>
+                <span className="font-bold text-slate-900">
+                  PKR {(order.subtotal_pkr || order.total_pkr || 0).toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Delivery Charges</span>
-                <span className="font-bold text-emerald-700">FREE (Orders &gt; PKR 5,000)</span>
+                <span className="font-bold text-emerald-700">
+                  {order.shipping_fee_pkr === 0 ? "FREE (Standard Dispatch)" : `PKR ${order.shipping_fee_pkr}`}
+                </span>
               </div>
+              {order.cod_fee_pkr > 0 && (
+                <div className="flex justify-between">
+                  <span>COD Handling Fee</span>
+                  <span className="font-bold text-slate-900">
+                    PKR {order.cod_fee_pkr}
+                  </span>
+                </div>
+              )}
+              {order.coupon_discount_pkr > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Coupon Discount</span>
+                  <span className="font-bold">
+                    - PKR {order.coupon_discount_pkr}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Payment Mode</span>
-                <span className="font-bold text-slate-900">Online Prepaid</span>
+                <span className="font-bold text-slate-900">{order.payment_method}</span>
               </div>
               <div className="flex justify-between border-t border-slate-100 pt-3 text-sm font-black text-slate-950">
-                <span>Total Paid</span>
-                <span className="text-base text-amber-600">PKR 5,699</span>
+                <span>Total Amount</span>
+                <span className="text-base text-amber-600">
+                  PKR {(order.total_pkr || 0).toLocaleString()}
+                </span>
               </div>
             </div>
 
             {/* Escrow Protected Guarantee */}
             <div className="flex items-center gap-2 p-3 bg-sky-50 text-sky-900 rounded-2xl text-[11px] font-bold border border-sky-200">
               <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
-              <span>Protected by Waw Buyer Protection until delivery is confirmed.</span>
+              <span>
+                Protected by Waw Buyer Protection until delivery is confirmed.
+              </span>
             </div>
 
             {/* Buttons */}
             <div className="space-y-2 pt-2">
-              <Link
-                href={`/orders/${orderId}/return`}
-                className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-2xl text-xs flex items-center justify-center gap-2 transition-all shadow-xs"
-              >
-                <ShieldCheck className="w-4 h-4 text-slate-950" />
-                <span>Request Return / Exchange (7-Day Guarantee)</span>
-              </Link>
+              {currentStatus !== "CANCELLED" && currentStatus !== "RETURN_REQUESTED" && (
+                <Link
+                  href={`/orders/${orderId}/return`}
+                  className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-2xl text-xs flex items-center justify-center gap-2 transition-all shadow-xs"
+                >
+                  <ShieldCheck className="w-4 h-4 text-slate-950" />
+                  <span>Request Return / Exchange (7-Day Guarantee)</span>
+                </Link>
+              )}
 
               <button
                 onClick={() => window.print()}
