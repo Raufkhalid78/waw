@@ -94,7 +94,7 @@ const PROMOTIONAL_ANNOUNCEMENTS = [
   {
     id: 4,
     tag: "🏪 SELL ON WAW",
-    text: "0% Listing Fees & Nationwide TCS Pickups for verified Pakistani merchants.",
+    text: "0% Listing Fees & Nationwide PostEx Pickups for verified Pakistani merchants.",
     link: "/sell",
     linkText: "Register Store",
   },
@@ -113,7 +113,7 @@ const CATEGORY_LINKS_EN = [
     highlight: "shops",
   },
   { label: "Electronics & Mobiles", href: "/category/mobiles-tech" },
-  { label: "Beauty & Fragrance", href: "/category/home-heritage" },
+  { label: "Beauty & Fragrance", href: "/category/beauty-fragrance" },
   { label: "Women's Lawn & Fashion", href: "/category/womens-lawn" },
   { label: "Peshawari Footwear", href: "/category/peshawari-chappal" },
   { label: "Leather Craft & Bags", href: "/category/leather-craft" },
@@ -135,7 +135,7 @@ const CATEGORY_LINKS_UR = [
     highlight: "shops",
   },
   { label: "موبائل اور ٹیک", href: "/category/mobiles-tech" },
-  { label: "عطر اور خوشبویات", href: "/category/home-heritage" },
+  { label: "عطر اور خوشبویات", href: "/category/beauty-fragrance" },
   { label: "خواتین کے ملبوسات", href: "/category/womens-lawn" },
   { label: "پشاوری چپل", href: "/category/peshawari-chappal" },
   { label: "چمڑے کا سامان", href: "/category/leather-craft" },
@@ -543,7 +543,7 @@ export function Header() {
                         </Link>
 
                         <Link
-                          href="/orders/WAW-PK-88492"
+                          href="/account"
                           onClick={() => setShowUserMenu(false)}
                           className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 hover:text-slate-950 transition-colors"
                         >

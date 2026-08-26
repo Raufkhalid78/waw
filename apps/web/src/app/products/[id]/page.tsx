@@ -291,7 +291,7 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Delivering directly to <strong className="text-slate-900">{selectedCity}, Pakistan</strong> & 200+ cities via TCS / PostEx.
+                  Delivering directly to <strong className="text-slate-900">{selectedCity}, Pakistan</strong> & 200+ cities via PostEx Express Logistics.
                 </p>
               </div>
             </div>

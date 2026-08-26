@@ -4,12 +4,28 @@ import { ProductService } from "./product.service.js";
 export class ProductController {
   static async list(req: Request, res: Response): Promise<void> {
     try {
-      const { categoryId, storeId, isFirstParty, page, limit } = req.query;
+      const {
+        categoryId,
+        categorySlug,
+        storeId,
+        city,
+        isFirstParty,
+        minPrice,
+        maxPrice,
+        sortBy,
+        page,
+        limit,
+      } = req.query;
       const result = await ProductService.listProducts({
         categoryId: categoryId as string,
+        categorySlug: categorySlug as string,
         storeId: storeId as string,
+        city: city as string,
         isFirstParty:
           isFirstParty !== undefined ? isFirstParty === "true" : undefined,
+        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+        sortBy: sortBy as any,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 20,
       });

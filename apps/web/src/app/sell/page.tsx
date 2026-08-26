@@ -152,7 +152,7 @@ export default function SellOnWawPage() {
             </div>
             <div>
               <div className="text-xs font-black text-white">
-                Nationwide TCS Logistics
+                Nationwide PostEx Logistics
               </div>
               <div className="text-[11px] text-slate-400 mt-0.5">
                 Automated doorstep pickups & label generation

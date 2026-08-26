@@ -29,6 +29,7 @@ import {
 
 // Controllers
 import { AuthController } from "./modules/auth/auth.controller.js";
+import { CategoryController } from "./modules/categories/category.controller.js";
 import { ProductController } from "./modules/products/product.controller.js";
 import { OrderService } from "./modules/orders/order.service.js";
 import { CourierService } from "./modules/logistics/courier.service.js";
@@ -137,7 +138,11 @@ app.post(
 
 app.post("/api/auth/oauth/sync", AuthController.syncOAuth);
 
-// â”€â”€ Product Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Category Taxonomy Routes (Hierarchical Database Tree) ───────────────
+app.get("/api/categories", CategoryController.listTree);
+app.get("/api/categories/:slug", CategoryController.getBySlug);
+
+// ── Product Routes ──────────────────────────────────────────────────────────
 app.get("/api/products", ProductController.list);
 app.get("/api/products/:slug", ProductController.getBySlug);
 

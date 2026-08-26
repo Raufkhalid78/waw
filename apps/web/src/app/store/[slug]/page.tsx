@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { getStoreBySlug } from "@/data/mockStores";
-import { CATALOG_PRODUCTS } from "@/data/mockProducts";
+import { fetchProducts } from "@/lib/api";
 import { ProductCard } from "@/components/ui/ProductCard";
 import {
   Store,
@@ -24,16 +25,29 @@ export default function StoreProfilePage() {
   const params = useParams();
   const slug = params.slug as string;
   const store = getStoreBySlug(slug) || getStoreBySlug("lahore-tech-hub")!;
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Products belonging to this store
-  const storeProducts = CATALOG_PRODUCTS.filter(
-    (p) =>
-      p.storeSlug === store.slug ||
-      p.storeName.toLowerCase() === store.name.toLowerCase(),
-  );
-  // If fewer than 2, show related products from the same city/category
-  const displayProducts =
-    storeProducts.length > 0 ? storeProducts : CATALOG_PRODUCTS.slice(0, 4);
+  useEffect(() => {
+    async function loadStoreProducts() {
+      try {
+        const data = await fetchProducts();
+        const matching = data.filter(
+          (p) =>
+            p.storeSlug === store.slug ||
+            p.storeName?.toLowerCase() === store.name?.toLowerCase(),
+        );
+        setProducts(matching.length > 0 ? matching : data.slice(0, 4));
+      } catch (err) {
+        console.error("Failed to load store products:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStoreProducts();
+  }, [store.slug, store.name]);
+
+  const displayProducts = products;
 
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-6 space-y-8">

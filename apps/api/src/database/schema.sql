@@ -120,9 +120,14 @@ CREATE TABLE IF NOT EXISTS stores (
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   name TEXT NOT NULL,
+  name_urdu TEXT,
   slug TEXT UNIQUE NOT NULL,
   parent_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
   image_url TEXT,
+  description TEXT,
+  description_urdu TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -135,6 +140,31 @@ CREATE TABLE IF NOT EXISTS category_schemas (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+-- Seed Initial Verified Taxonomy
+INSERT INTO categories (id, name, name_urdu, slug, parent_id, sort_order, is_active, image_url, description)
+VALUES
+  ('cat_electronics', 'Electronics & Mobility', 'الیکٹرانکس اور موبائل', 'mobiles-tech', NULL, 1, true, 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&auto=format&fit=crop&q=80', 'Smartphones, ANC audio, wearables and chargers.'),
+  ('cat_fashion', 'Fashion & Apparel', 'فیشن اور ملبوسات', 'fashion', NULL, 2, true, 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80', 'Women unstitched lawn, festive silk, and ready-to-wear collections.'),
+  ('cat_leather', 'Leather Craft & Footwear', 'چمڑے کا سامان اور جوتے', 'leather-craft', NULL, 3, true, 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&auto=format&fit=crop&q=80', 'Pure cowhide leather wallets, bags, and handmade traditional footwear.'),
+  ('cat_beauty', 'Beauty & Fragrance', 'خوبصورتی اور عطر', 'beauty-fragrance', NULL, 4, true, 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=300&auto=format&fit=crop&q=80', 'Authentic non-alcoholic attar, pure oud, and grooming essentials.'),
+  ('cat_sports', 'Sports & Outdoors', 'کھیلوں کا سامان', 'sialkot-sports', NULL, 5, true, 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=300&auto=format&fit=crop&q=80', 'Sialkot export-grade match footballs, English willow bats and gear.'),
+  ('cat_home', 'Home & Living', 'گھریلو سجاوٹ اور سامان', 'home-living', NULL, 6, true, 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=300&auto=format&fit=crop&q=80', 'Décor, lighting, bedsheets, and artisan kitchen essentials.'),
+  ('cat_heritage', 'Pakistani Heritage & Handmade', 'پاکستانی ثقافت اور دستکاری', 'home-heritage', NULL, 7, true, 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=300&auto=format&fit=crop&q=80', 'Multani blue pottery, handmade brass art, and cultural souvenirs.'),
+  -- Child Subcategories
+  ('cat_audio', 'Audio & Wireless Earbuds', 'وائرلیس ایئربڈز اور آڈیو', 'wireless-earbuds', 'cat_electronics', 1, true, 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80', 'True wireless earbuds with ANC and deep bass.'),
+  ('cat_watches', 'Smart Watches & Wearables', 'سمارٹ واچز', 'smart-watches', 'cat_electronics', 2, true, 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=300&auto=format&fit=crop&q=80', 'AMOLED display smart watches and health trackers.'),
+  ('cat_lawn', 'Women Unstitched & Lawn', 'خواتین کے ان سلے لان سوٹ', 'womens-lawn', 'cat_fashion', 1, true, 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80', 'Pure lawn 3-piece embroidered suits.'),
+  ('cat_shoes', 'Handmade Peshawari Chappal', 'ہاتھ سے بنی پشاوری چپل', 'peshawari-chappal', 'cat_leather', 1, true, 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80', 'Authentic Norozi and tyre sole Peshawari chappals.'),
+  ('cat_attar', 'Pure Attar & Concentrated Oils', 'خالص عطر اور پرفیوم آئلز', 'attar-fragrance', 'cat_beauty', 1, true, 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=300&auto=format&fit=crop&q=80', 'Long lasting alcohol-free artisan attar.')
+ON CONFLICT (slug) DO UPDATE SET
+  name = EXCLUDED.name,
+  name_urdu = EXCLUDED.name_urdu,
+  parent_id = EXCLUDED.parent_id,
+  image_url = EXCLUDED.image_url,
+  description = EXCLUDED.description,
+  sort_order = EXCLUDED.sort_order,
+  is_active = EXCLUDED.is_active;
 
 -- 5. Products Table
 

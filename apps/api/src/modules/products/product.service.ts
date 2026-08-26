@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { typesenseClient } from "../../config/typesense.js";
+import { CategoryService } from "../categories/category.service.js";
 
 export class ProductService {
   /**
@@ -7,8 +8,13 @@ export class ProductService {
    */
   static async listProducts(query: {
     categoryId?: string;
+    categorySlug?: string;
     storeId?: string;
+    city?: string;
     isFirstParty?: boolean;
+    minPrice?: number;
+    maxPrice?: number;
+    sortBy?: "featured" | "price-asc" | "price-desc" | "rating";
     limit?: number;
     page?: number;
   }) {
@@ -20,23 +26,49 @@ export class ProductService {
     let dbQuery = supabaseAdmin
       .from("products")
       .select(
-        "*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)",
+        "*, variants:product_variants(*), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(*)",
         { count: "exact" },
-      );
+      )
+      .eq("is_active", true);
 
-    if (query.categoryId) dbQuery = dbQuery.eq("category_id", query.categoryId);
+    if (query.categoryId) {
+      dbQuery = dbQuery.eq("category_id", query.categoryId);
+    } else if (query.categorySlug) {
+      const descendantIds = await CategoryService.getCategoryDescendantIds(
+        query.categorySlug,
+      );
+      if (descendantIds.length === 1) {
+        dbQuery = dbQuery.eq("category_id", descendantIds[0]);
+      } else if (descendantIds.length > 1) {
+        dbQuery = dbQuery.in("category_id", descendantIds);
+      }
+    }
+
     if (query.storeId) dbQuery = dbQuery.eq("store_id", query.storeId);
     if (query.isFirstParty !== undefined)
       dbQuery = dbQuery.eq("is_first_party", query.isFirstParty);
+    if (query.minPrice !== undefined)
+      dbQuery = dbQuery.gte("base_price_pkr", query.minPrice);
+    if (query.maxPrice !== undefined)
+      dbQuery = dbQuery.lte("base_price_pkr", query.maxPrice);
+
+    if (query.sortBy === "price-asc") {
+      dbQuery = dbQuery.order("base_price_pkr", { ascending: true });
+    } else if (query.sortBy === "price-desc") {
+      dbQuery = dbQuery.order("base_price_pkr", { ascending: false });
+    } else if (query.sortBy === "rating") {
+      dbQuery = dbQuery.order("rating_average", { ascending: false });
+    } else {
+      dbQuery = dbQuery
+        .order("is_sponsored", { ascending: false })
+        .order("sold_count", { ascending: false });
+    }
 
     const {
       data: items,
       count,
       error,
-    } = await dbQuery
-      .order("is_sponsored", { ascending: false })
-      .order("sold_count", { ascending: false })
-      .range(from, to);
+    } = await dbQuery.range(from, to);
 
     const total = count || 0;
     return {

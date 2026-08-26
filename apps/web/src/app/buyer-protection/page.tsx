@@ -133,7 +133,7 @@ export default function BuyerProtectionPage() {
               Live Courier Tracking
             </div>
             <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              TCS / PostEx delivers the package with real-time GPS tracking
+              PostEx Express Logistics delivers the package with real-time GPS
               milestones and automated WhatsApp SMS updates to your phone.
             </p>
           </div>

@@ -78,7 +78,7 @@ const CATEGORIES = [
   },
   {
     id: "cat_fragrance",
-    slug: "home-heritage",
+    slug: "beauty-fragrance",
     name: "Attar & Fragrance",
     nameUrdu: "عطر اور خوشبویات",
     image:

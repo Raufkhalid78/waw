@@ -28,8 +28,21 @@ export interface Store {
     city: string;
     address: string;
     ratingAverage: number;
-    ratingCount: number;
     createdAt: string;
+}
+export interface Category {
+    id: string;
+    name: string;
+    nameUrdu?: string;
+    slug: string;
+    parentId?: string | null;
+    imageUrl?: string;
+    description?: string;
+    descriptionUrdu?: string;
+    sortOrder?: number;
+    isActive?: boolean;
+    children?: Category[];
+    productCount?: number;
 }
 export interface ProductVariant {
     id: string;

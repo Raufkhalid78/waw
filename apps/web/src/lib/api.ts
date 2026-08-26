@@ -1,6 +1,7 @@
 import { ProductDetail } from "@/data/mockProducts";
 import { STORES_CATALOG, StoreDetail } from "@/data/mockStores";
 import {
+  Category,
   CheckoutQuoteRequest,
   CheckoutQuoteResponse,
   PaymentMethod,
@@ -58,17 +59,52 @@ function mapApiProductToDetail(p: any): ProductDetail {
     },
     inStock: (p.stock_quantity ?? p.stockQuantity ?? 10) > 0,
     stockCount: p.stock_quantity ?? p.stockQuantity ?? 10,
-    sku: p.sku || `SKU-${p.id?.slice(-4) || "1001"}`,
-    reviews: Array.isArray(p.reviews) ? p.reviews.map((r: any) => ({ id: r.id, author: r.buyer?.full_name || 'Waw Customer', city: 'Pakistan', rating: r.rating, date: new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), comment: r.comment || '', verifiedPurchase: r.is_verified_purchase ?? true })) : [],
+    sku: p.sku || "WAW-PROD",
+    reviews: [],
   };
+}
+
+export async function fetchCategories(locale = "en"): Promise<Category[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/categories?locale=${encodeURIComponent(locale)}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.warn("Failed to fetch categories:", error);
+    return [];
+  }
+}
+
+export async function fetchCategoryBySlug(
+  slug: string,
+): Promise<Category | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/categories/${slug}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    console.warn(`Failed to fetch category ${slug}:`, error);
+    return null;
+  }
 }
 
 export async function fetchProducts(params?: {
   q?: string;
   category?: string;
+  categorySlug?: string;
   city?: string;
   sellerType?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sortBy?: "featured" | "price-asc" | "price-desc" | "rating";
   page?: number;
+  limit?: number;
 }): Promise<ProductDetail[]> {
   try {
     if (params?.q) {
@@ -90,7 +126,21 @@ export async function fetchProducts(params?: {
 
     const query = new URLSearchParams();
     if (params?.category) query.append("categoryId", params.category);
+    if (params?.categorySlug) query.append("categorySlug", params.categorySlug);
+    if (params?.city && params.city !== "All Cities")
+      query.append("city", params.city);
+    if (params?.sellerType && params.sellerType !== "ALL")
+      query.append(
+        "isFirstParty",
+        params.sellerType === "1P" ? "true" : "false",
+      );
+    if (params?.minPrice !== undefined)
+      query.append("minPrice", params.minPrice.toString());
+    if (params?.maxPrice !== undefined)
+      query.append("maxPrice", params.maxPrice.toString());
+    if (params?.sortBy) query.append("sortBy", params.sortBy);
     if (params?.page) query.append("page", params.page.toString());
+    if (params?.limit) query.append("limit", params.limit.toString());
 
     const res = await fetch(
       `${API_BASE_URL}/api/products?${query.toString()}`,
