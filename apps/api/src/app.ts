@@ -236,7 +236,61 @@ app.get('/api/seller/orders', requireAuth, requireRole(UserRole.SELLER, UserRole
   }
 });
 
-app.get('/api/seller/payouts', requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), async (req, res) => {
+app.get('/api/seller/analytics', requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { supabaseAdmin } = await import('./config/supabase.js');
+      const { data: store } = await supabaseAdmin.from('stores').select('*').eq('owner_id', user.id).maybeSingle();
+      if (!store) {
+        res.json({
+          totalRevenuePkr: 0,
+          pendingPayoutsPkr: 0,
+          totalOrders: 0,
+          activeProducts: 0,
+          storeStatus: 'NOT_FOUND'
+        });
+        return;
+      }
+
+      // 1. Fetch store orders
+      const { data: storeOrders } = await supabaseAdmin
+        .from('store_orders')
+        .select('subtotal_pkr, order_status')
+        .eq('store_id', store.id);
+
+      const validOrders = (storeOrders || []).filter((o: any) => o.order_status !== 'CANCELLED');
+      const totalRevenuePkr = validOrders.reduce((sum: number, o: any) => sum + (o.subtotal_pkr || 0), 0);
+
+      // 2. Fetch pending payouts
+      const { data: payouts } = await supabaseAdmin
+        .from('payouts')
+        .select('amount_pkr')
+        .eq('store_id', store.id)
+        .eq('status', 'SCHEDULED');
+
+      const pendingPayoutsPkr = (payouts || []).reduce((sum: number, p: any) => sum + (p.amount_pkr || 0), 0);
+
+      // 3. Fetch active products count
+      const { count: activeProducts } = await supabaseAdmin
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('store_id', store.id)
+        .eq('is_active', true);
+
+      res.json({
+        totalRevenuePkr,
+        pendingPayoutsPkr,
+        totalOrders: (storeOrders || []).length,
+        activeProducts: activeProducts || 0,
+        storeStatus: store.status,
+        storeName: store.name,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/seller/payouts', requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), async (req, res) => {
   try {
     const user = (req as any).user;
     const { supabaseAdmin } = await import('./config/supabase.js');

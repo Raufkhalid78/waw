@@ -19,13 +19,17 @@ export class SearchService {
     const page = params.page || 1;
     const perPage = params.limit || 20;
 
-    const filterConditions: string[] = [];
-    if (params.categoryId) filterConditions.push(`categoryId:=${params.categoryId}`);
-    if (params.storeId) filterConditions.push(`storeId:=${params.storeId}`);
-    if (params.minPrice !== undefined) filterConditions.push(`basePricePkr:>=${params.minPrice}`);
-    if (params.maxPrice !== undefined) filterConditions.push(`basePricePkr:<=${params.maxPrice}`);
-
+    let hits: any[] = [];
+    let found = 0;
+    
+    // Attempt Typesense first
     try {
+      const filterConditions: string[] = [];
+      if (params.categoryId) filterConditions.push(`categoryId:=${params.categoryId}`);
+      if (params.storeId) filterConditions.push(`storeId:=${params.storeId}`);
+      if (params.minPrice !== undefined) filterConditions.push(`basePricePkr:>=${params.minPrice}`);
+      if (params.maxPrice !== undefined) filterConditions.push(`basePricePkr:<=${params.maxPrice}`);
+
       const searchResult = await typesenseClient.collections('products').documents().search({
         q,
         query_by: 'title,titleUrdu,description',
@@ -36,19 +40,17 @@ export class SearchService {
       });
 
       const productIds = (searchResult.hits || []).map((h: any) => h.document.id);
+      found = searchResult.found;
 
       // Hydrate with Supabase DB
-      const { data: products } = await supabaseAdmin
-        .from('products')
-        .select('*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)')
-        .in('id', productIds);
-
-      return {
-        hits: products || [],
-        found: searchResult.found,
-        page,
-        totalPages: Math.ceil(searchResult.found / perPage),
-      };
+      if (productIds.length > 0) {
+        const { data: products } = await supabaseAdmin
+          .from('products')
+          .select('*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)')
+          .in('id', productIds);
+        
+        hits = products || [];
+      }
     } catch (err: any) {
       // Fallback to Supabase PostgreSQL full-text search
       let dbQuery = supabaseAdmin
@@ -64,13 +66,30 @@ export class SearchService {
       const { data: fallbackProducts, count } = await dbQuery
         .range((page - 1) * perPage, page * perPage - 1);
 
-      return {
-        hits: fallbackProducts || [],
-        found: count || (fallbackProducts ? fallbackProducts.length : 0),
-        page,
-        totalPages: Math.ceil((count || 1) / perPage),
-      };
+      hits = fallbackProducts || [];
+      found = count || hits.length;
     }
+
+    // Extract dynamic JSONB facets from the returned hits
+    const facets: Record<string, string[]> = {};
+    for (const p of hits) {
+      if (p.attributes && typeof p.attributes === 'object') {
+        for (const [key, val] of Object.entries(p.attributes)) {
+          if (!facets[key]) facets[key] = [];
+          if (!facets[key].includes(String(val))) {
+            facets[key].push(String(val));
+          }
+        }
+      }
+    }
+
+    return {
+      hits,
+      found,
+      page,
+      totalPages: Math.ceil((found || 1) / perPage),
+      facets,
+    };
   }
 }
 

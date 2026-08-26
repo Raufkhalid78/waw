@@ -127,7 +127,17 @@ CREATE TABLE IF NOT EXISTS categories (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+
+CREATE TABLE IF NOT EXISTS category_schemas (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  schema_definition JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
 -- 5. Products Table
+
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   store_id TEXT REFERENCES stores(id) ON DELETE CASCADE,
@@ -144,6 +154,10 @@ CREATE TABLE IF NOT EXISTS products (
   seller_type "SellerType" NOT NULL DEFAULT 'THIRD_PARTY',
   is_first_party BOOLEAN NOT NULL DEFAULT false,
   is_active BOOLEAN NOT NULL DEFAULT true,
+  status TEXT NOT NULL DEFAULT 'DRAFT',
+  tags TEXT[] NOT NULL DEFAULT '{}',
+  weight_kg NUMERIC(6,2),
+  attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
   rating_average NUMERIC(3,2) NOT NULL DEFAULT 0.0,
   rating_count INTEGER NOT NULL DEFAULT 0,
   sold_count INTEGER NOT NULL DEFAULT 0,
@@ -156,8 +170,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   sku TEXT UNIQUE NOT NULL,
-  size TEXT,
-  color TEXT,
+  attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
   price_adjustment_pkr INTEGER NOT NULL DEFAULT 0,
   stock_quantity INTEGER NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,

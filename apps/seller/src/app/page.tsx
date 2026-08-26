@@ -16,31 +16,34 @@ import {
   ExternalLink,
   Sparkles,
 } from 'lucide-react';
-import { fetchSellerOrders, fetchSellerStore, fetchSellerProducts, SellerOrder, SellerStore, SellerProduct } from '../lib/api';
+import { fetchSellerOrders, fetchSellerStore, fetchSellerProducts, fetchSellerAnalytics, SellerAnalytics, SellerOrder, SellerStore, SellerProduct } from '../lib/api';
 import { OrderStatus } from '@waw/types';
 
 export default function SellerDashboardPage() {
   const [store, setStore] = useState<SellerStore | null>(null);
   const [orders, setOrders] = useState<SellerOrder[]>([]);
   const [products, setProducts] = useState<SellerProduct[]>([]);
+  const [analytics, setAnalytics] = useState<SellerAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
-      const [s, o, p] = await Promise.all([
+      const [s, o, p, a] = await Promise.all([
         fetchSellerStore(),
         fetchSellerOrders(),
         fetchSellerProducts(),
+        fetchSellerAnalytics(),
       ]);
       setStore(s);
       setOrders(o);
       setProducts(p);
+      setAnalytics(a);
       setLoading(false);
     }
     loadData();
   }, []);
 
-  const totalGrossPkr = orders.reduce((sum, o) => sum + o.subtotalPkr, 0);
+  const totalGrossPkr = analytics?.totalRevenuePkr ?? orders.reduce((sum, o) => sum + o.subtotalPkr, 0);
   const netEarningsPkr = orders.reduce((sum, o) => sum + o.sellerPayoutPkr, 0);
   const pendingShipments = orders.filter(o => o.orderStatus === OrderStatus.CONFIRMED).length;
 

@@ -282,3 +282,40 @@ export async function createSellerCoupon(couponData: {
   }
   return await res.json();
 }
+
+export interface SellerAnalytics {
+  totalRevenuePkr: number;
+  pendingPayoutsPkr: number;
+  totalOrders: number;
+  activeProducts: number;
+  storeStatus: StoreStatus | string;
+  storeName?: string;
+}
+
+export async function fetchSellerAnalytics(): Promise<SellerAnalytics> {
+  try {
+    const res = await fetch(API_BASE + '/api/seller/analytics', {
+      headers: getAuthHeader(),
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      return {
+        totalRevenuePkr: 0,
+        pendingPayoutsPkr: 0,
+        totalOrders: 0,
+        activeProducts: 0,
+        storeStatus: StoreStatus.PENDING_KYC,
+      };
+    }
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch seller analytics:', err);
+    return {
+      totalRevenuePkr: 0,
+      pendingPayoutsPkr: 0,
+      totalOrders: 0,
+      activeProducts: 0,
+      storeStatus: StoreStatus.PENDING_KYC,
+    };
+  }
+}
