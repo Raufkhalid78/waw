@@ -1,4 +1,4 @@
-import { CATALOG_PRODUCTS, ProductDetail } from '@/data/mockProducts';
+import { ProductDetail } from '@/data/mockProducts';
 import { STORES_CATALOG, StoreDetail } from '@/data/mockStores';
 import { CheckoutQuoteRequest, CheckoutQuoteResponse, PaymentMethod, SellerType } from '@waw/types';
 
@@ -16,15 +16,15 @@ function mapApiProductToDetail(p: any): ProductDetail {
     pricePkr: basePrice,
     originalPricePkr: comparePrice,
     discountPercent,
-    rating: p.rating_average || p.ratingAverage || p.rating || 4.8,
-    reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || 12,
-    soldCount: p.sold_count || p.soldCount || 45,
+    rating: p.rating_average || p.ratingAverage || p.rating || 0,
+    reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || 0,
+    soldCount: p.sold_count || p.soldCount || 0,
     isExpress: p.is_first_party ?? p.isFirstParty ?? true,
     sellerType: p.is_first_party ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
     storeName: p.store?.name || p.storeName || 'Waw Official Retail',
     storeSlug: p.store?.slug || p.storeSlug || 'waw-official',
     sellerCity: p.store?.city || p.sellerCity || 'Lahore',
-    deliveryTime: '2-3 Business Days',
+    deliveryTime: 'Standard Delivery',
     images: Array.isArray(p.images) && p.images.length > 0
       ? p.images
       : ['https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80'],
@@ -73,9 +73,9 @@ export async function fetchProducts(params?: {
     if (items.length > 0) {
       return items.map(mapApiProductToDetail);
     }
-    return CATALOG_PRODUCTS;
+    return [];
   } catch (error) {
-    return CATALOG_PRODUCTS;
+    return [];
   }
 }
 
@@ -88,9 +88,9 @@ export async function fetchProductById(productId: string): Promise<ProductDetail
       const data = await res.json();
       if (data?.id) return mapApiProductToDetail(data);
     }
-    return CATALOG_PRODUCTS.find((p) => p.productId === productId || p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === productId) || CATALOG_PRODUCTS[0];
+    return undefined;
   } catch (error) {
-    return CATALOG_PRODUCTS.find((p) => p.productId === productId) || CATALOG_PRODUCTS[0];
+    return undefined;
   }
 }
 

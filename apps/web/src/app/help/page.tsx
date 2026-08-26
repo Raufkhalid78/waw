@@ -18,11 +18,11 @@ import {
 const FAQS = [
   {
     q: 'How long does nationwide delivery take?',
-    a: 'For 1P Waw Express items in major cities (Lahore, Karachi, Islamabad, Rawalpindi), delivery takes 24 hours. For 3P verified artisan orders and other cities across Pakistan, standard delivery takes 48-72 hours via TCS / PostEx.',
+    a: 'Delivery across Pakistan generally takes 2-5 business days.',
     category: 'Delivery',
   },
   {
-    q: 'How does State Bank Escrow Protection safeguard my money?',
+    q: 'How does Buyer Protection safeguard my payments?',
     a: 'When you prepay via Card or Wallet, your payment is locked in a regulated escrow account. The funds are only remitted to the seller after the courier confirms successful delivery to your address.',
     category: 'Payments',
   },

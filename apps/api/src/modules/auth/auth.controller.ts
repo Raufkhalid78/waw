@@ -18,12 +18,12 @@ export class AuthController {
 
   static async verifyOtp(req: Request, res: Response): Promise<void> {
     try {
-      const { phone, otp } = req.body;
+      const { phone, otp, role, storeName, city } = req.body;
       if (!phone || !otp) {
         res.status(400).json({ error: 'Phone and OTP are required' });
         return;
       }
-      const result = await AuthService.verifyWhatsAppOtp(phone, otp);
+      const result = await AuthService.verifyWhatsAppOtp(phone, otp, role, storeName, city);
       res.json(result);
     } catch (err: any) {
       res.status(400).json({ error: err.message });

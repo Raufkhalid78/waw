@@ -134,83 +134,7 @@ export async function fetchSellers(status?: StoreStatus): Promise<AdminSeller[]>
     });
     if (!res.ok) throw new Error('Failed to fetch sellers');
     return await res.json();
-  } catch (err) {
-    console.warn('Using demo sellers fallback:', err);
-    return [
-      {
-        id: 'store_1',
-        name: 'Karachi Leather Goods',
-        slug: 'karachi-leather-goods',
-        city: 'Karachi',
-        cnicNumber: '42101-9876543-1',
-        bankAccountTitle: 'Karachi Leather Enterprise',
-        bankAccountNumber: 'PK36MEZN0001234567890123',
-        bankName: 'Meezan Bank',
-        sellerType: SellerType.THIRD_PARTY,
-        status: StoreStatus.PENDING_KYC,
-        commissionRatePercentage: 10,
-        address: 'Plot 45, Sector 15, Korangi Industrial Area, Karachi',
-        ratingAverage: 4.8,
-        ratingCount: 142,
-        createdAt: '2026-08-19T10:00:00Z',
-        owner: { full_name: 'Tariq Mehmood', phone: '+923001234567', email: 'tariq@karachileather.pk' },
-      },
-      {
-        id: 'store_2',
-        name: 'Lahore Tech & Audio Hub',
-        slug: 'lahore-tech-hub',
-        city: 'Lahore',
-        cnicNumber: '35202-1234567-3',
-        bankAccountTitle: 'Lahore Tech Hub SMC-Pvt',
-        bankAccountNumber: 'PK44HABB0009876543210987',
-        bankName: 'Habib Bank Limited (HBL)',
-        sellerType: SellerType.THIRD_PARTY,
-        status: StoreStatus.ACTIVE,
-        commissionRatePercentage: 8,
-        address: 'Shop 12, Hafeez Center, Main Boulevard Gulberg, Lahore',
-        ratingAverage: 4.9,
-        ratingCount: 310,
-        createdAt: '2026-08-15T12:00:00Z',
-        owner: { full_name: 'Bilal Ahmed', phone: '+923219876543', email: 'bilal@lahoretech.pk' },
-      },
-      {
-        id: 'store_3',
-        name: 'Peshawar Master Chappal Craft',
-        slug: 'peshawar-chappal-craft',
-        city: 'Peshawar',
-        cnicNumber: '17301-5544332-9',
-        bankAccountTitle: 'Zubair Artisan Footwear',
-        bankAccountNumber: 'PK12BOK0004561237890456',
-        bankName: 'Bank of Khyber',
-        sellerType: SellerType.THIRD_PARTY,
-        status: StoreStatus.ACTIVE,
-        commissionRatePercentage: 12,
-        address: 'Namak Mandi Heritage Bazaar, Peshawar',
-        ratingAverage: 4.95,
-        ratingCount: 520,
-        createdAt: '2026-08-12T09:00:00Z',
-        owner: { full_name: 'Zubair Khan', phone: '+923335551234', email: 'zubair@peshawarchappal.pk' },
-      },
-      {
-        id: 'store_4',
-        name: 'Faisalabad Handloom Weavers',
-        slug: 'faisalabad-weavers',
-        city: 'Faisalabad',
-        cnicNumber: '33100-8877665-5',
-        bankAccountTitle: 'Faisalabad Textile Traders',
-        bankAccountNumber: 'PK88BAHL0001122334455667',
-        bankName: 'Bank AL Habib',
-        sellerType: SellerType.THIRD_PARTY,
-        status: StoreStatus.PENDING_KYC,
-        commissionRatePercentage: 10,
-        address: 'Factory Area, Jhang Road, Faisalabad',
-        ratingAverage: 4.7,
-        ratingCount: 88,
-        createdAt: '2026-08-21T14:30:00Z',
-        owner: { full_name: 'Usman Ghani', phone: '+923456789012', email: 'usman@faisalabadtextiles.pk' },
-      },
-    ];
-  }
+  } catch (err) { throw err; }
 }
 
 export async function updateSellerStatus(
@@ -236,131 +160,7 @@ export async function fetchOrders(status?: OrderStatus): Promise<AdminOrder[]> {
     });
     if (!res.ok) throw new Error('Failed to fetch orders');
     return await res.json();
-  } catch (err) {
-    console.warn('Using demo orders fallback:', err);
-    return [
-      {
-        id: 'ord_1',
-        orderNumber: 'WAW-PK-98421',
-        buyerName: 'Muhammad Hamza',
-        buyerPhone: '+923001234567',
-        shippingAddress: 'House 14, Street 9, Sector F-7/2',
-        shippingCity: 'Islamabad',
-        subtotalPkr: 6499,
-        shippingFeePkr: 0,
-        codFeePkr: 0,
-        totalPkr: 6499,
-        paymentMethod: PaymentMethod.XPAY_CARD,
-        paymentStatus: PaymentStatus.PAID,
-        orderStatus: OrderStatus.CONFIRMED,
-        courier: 'PostEx',
-        trackingNumber: 'PTX-98421-440',
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        items: [
-          {
-            id: 'it_1',
-            productTitle: 'Waw Signature Handcrafted Cowhide Leather Duffle Bag',
-            productImage: 'https://images.unsplash.com/photo-1547949003-9792a18a2601?w=400&auto=format&fit=crop&q=80',
-            quantity: 1,
-            unitPricePkr: 6499,
-            totalPricePkr: 6499,
-            wawCommissionPkr: 650,
-            sellerPayoutPkr: 5849,
-          },
-        ],
-      },
-      {
-        id: 'ord_2',
-        orderNumber: 'WAW-PK-98422',
-        buyerName: 'Ayesha Siddiqui',
-        buyerPhone: '+923219876543',
-        shippingAddress: 'Apartment 4B, Clifton Block 5',
-        shippingCity: 'Karachi',
-        subtotalPkr: 3200,
-        shippingFeePkr: 200,
-        codFeePkr: 100,
-        totalPkr: 3500,
-        paymentMethod: PaymentMethod.COD,
-        paymentStatus: PaymentStatus.COD_PENDING,
-        orderStatus: OrderStatus.PROCESSING,
-        courier: 'PostEx',
-        trackingNumber: 'PTX-98422-819',
-        createdAt: new Date(Date.now() - 7200000).toISOString(),
-        items: [
-          {
-            id: 'it_2',
-            productTitle: 'ANC Pro Wireless Earbuds (Deep Bass Edition)',
-            productImage: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80',
-            quantity: 1,
-            unitPricePkr: 3200,
-            totalPricePkr: 3200,
-            wawCommissionPkr: 320,
-            sellerPayoutPkr: 2880,
-          },
-        ],
-      },
-      {
-        id: 'ord_3',
-        orderNumber: 'WAW-PK-98423',
-        buyerName: 'Dr. Kamran Malik',
-        buyerPhone: '+923334445566',
-        shippingAddress: 'House 88, Phase 6, DHA',
-        shippingCity: 'Lahore',
-        subtotalPkr: 7600,
-        shippingFeePkr: 0,
-        codFeePkr: 0,
-        totalPkr: 7600,
-        paymentMethod: PaymentMethod.XPAY_CARD,
-        paymentStatus: PaymentStatus.PAID,
-        orderStatus: OrderStatus.SHIPPED,
-        courier: 'PostEx',
-        trackingNumber: 'PTX-98423-112',
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        items: [
-          {
-            id: 'it_3',
-            productTitle: 'Khyber Master Artisan Peshawari Norozi Chappal',
-            productImage: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=400&auto=format&fit=crop&q=80',
-            quantity: 2,
-            unitPricePkr: 3800,
-            totalPricePkr: 7600,
-            wawCommissionPkr: 912,
-            sellerPayoutPkr: 6688,
-          },
-        ],
-      },
-      {
-        id: 'ord_4',
-        orderNumber: 'WAW-PK-98424',
-        buyerName: 'Zainab Fatima',
-        buyerPhone: '+923125556677',
-        shippingAddress: 'House 19, Street 4, University Town',
-        shippingCity: 'Peshawar',
-        subtotalPkr: 4999,
-        shippingFeePkr: 200,
-        codFeePkr: 0,
-        totalPkr: 5199,
-        paymentMethod: PaymentMethod.XPAY_WALLET_JAZZCASH,
-        paymentStatus: PaymentStatus.PAID,
-        orderStatus: OrderStatus.DELIVERED,
-        courier: 'PostEx',
-        trackingNumber: 'PTX-98424-904',
-        createdAt: new Date(Date.now() - 172800000).toISOString(),
-        items: [
-          {
-            id: 'it_4',
-            productTitle: 'Chiniot Heritage Carved Rosewood Spice Box & Brass Inlay',
-            productImage: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&auto=format&fit=crop&q=80',
-            quantity: 1,
-            unitPricePkr: 4999,
-            totalPricePkr: 4999,
-            wawCommissionPkr: 500,
-            sellerPayoutPkr: 4499,
-          },
-        ],
-      },
-    ];
-  }
+  } catch (err) { throw err; }
 }
 
 export async function updateOrderStatus(
@@ -379,80 +179,7 @@ export async function updateOrderStatus(
 }
 
 export async function fetchProducts(query?: { categoryId?: string; storeId?: string }): Promise<AdminProduct[]> {
-  const fallbackProducts: AdminProduct[] = [
-    {
-      id: 'prod_1',
-      title: 'Waw Signature Handcrafted Leather Duffle Bag',
-      titleUrdu: 'واو سگنیچر پریمیم لیدر ٹریول ڈفل بیگ',
-      slug: 'waw-leather-duffle-bag',
-      categoryId: 'cat_leather',
-      categoryName: 'Fashion & Leather',
-      isFirstParty: true,
-      basePricePkr: 6499,
-      compareAtPricePkr: 8999,
-      images: ['https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80'],
-      stockQuantity: 45,
-      soldCount: 182,
-      ratingAverage: 4.9,
-      sellerType: SellerType.FIRST_PARTY,
-      storeName: 'Waw Official Retail',
-      createdAt: '2026-08-10T10:00:00Z',
-    },
-    {
-      id: 'prod_2',
-      title: 'ANC Pro Wireless Bluetooth Earbuds (Deep Bass)',
-      titleUrdu: 'وائرلیس ایکٹو نائز کینسلیشن ائیربڈز',
-      slug: 'anc-pro-wireless-earbuds',
-      categoryId: 'cat_tech',
-      categoryName: 'Electronics & Audio',
-      isFirstParty: false,
-      basePricePkr: 3200,
-      compareAtPricePkr: 4500,
-      images: ['https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80'],
-      stockQuantity: 120,
-      soldCount: 430,
-      ratingAverage: 4.85,
-      sellerType: SellerType.THIRD_PARTY,
-      storeName: 'Lahore Tech & Audio Hub',
-      createdAt: '2026-08-14T11:00:00Z',
-    },
-    {
-      id: 'prod_3',
-      title: 'Khyber Master Artisan Peshawari Norozi Chappal',
-      titleUrdu: 'خیبر دستکار روایتی نوروزی پشاوری چپل',
-      slug: 'khyber-norozi-chappal',
-      categoryId: 'cat_footwear',
-      categoryName: 'Heritage Footwear',
-      isFirstParty: false,
-      basePricePkr: 3800,
-      compareAtPricePkr: 5200,
-      images: ['https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=600&auto=format&fit=crop&q=80'],
-      stockQuantity: 28,
-      soldCount: 310,
-      ratingAverage: 4.95,
-      sellerType: SellerType.THIRD_PARTY,
-      storeName: 'Peshawar Master Chappal Craft',
-      createdAt: '2026-08-12T15:00:00Z',
-    },
-    {
-      id: 'prod_4',
-      title: 'Chiniot Carved Rosewood Spice Box with Brass Inlay',
-      titleUrdu: 'چنیوٹی شیشم لکڑی کا مصالحہ دان بمعہ پیتل کا کام',
-      slug: 'chiniot-rosewood-spice-box',
-      categoryId: 'cat_artisan',
-      categoryName: 'Home & Heritage Decor',
-      isFirstParty: true,
-      basePricePkr: 4999,
-      compareAtPricePkr: 6500,
-      images: ['https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=600&auto=format&fit=crop&q=80'],
-      stockQuantity: 15,
-      soldCount: 94,
-      ratingAverage: 4.92,
-      sellerType: SellerType.FIRST_PARTY,
-      storeName: 'Waw Artisan Guild',
-      createdAt: '2026-08-16T16:00:00Z',
-    },
-  ];
+  
 
   try {
     const params = new URLSearchParams();
@@ -465,7 +192,7 @@ export async function fetchProducts(query?: { categoryId?: string; storeId?: str
     if (!res.ok) throw new Error('Failed to fetch products');
     const data = await res.json();
     const rawItems = Array.isArray(data) ? data : (data?.items || []);
-    if (!rawItems || rawItems.length === 0) return fallbackProducts;
+    if (!rawItems || rawItems.length === 0) return [];
     return rawItems.map((p: any) => ({
       id: p.id,
       title: p.title || 'Untitled Product',

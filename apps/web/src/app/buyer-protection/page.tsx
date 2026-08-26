@@ -29,13 +29,13 @@ export default function BuyerProtectionPage() {
         <div className="max-w-2xl space-y-4">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-black uppercase tracking-wider">
             <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-            100% Secure Checkout & Escrow
+            100% Secure Checkout
           </span>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight">
             Shop with Complete Confidence on <span className="text-amber-400">Waw</span>
           </h1>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
-            Every transaction on Waw is safeguarded under our Institutional Escrow Trust mechanism. Your money is never released to the seller until your order is delivered, inspected, and confirmed.
+            Every transaction on Waw is securely processed.
           </p>
         </div>
       </div>
@@ -46,9 +46,9 @@ export default function BuyerProtectionPage() {
           <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
             <Lock className="w-6 h-6" />
           </div>
-          <h3 className="font-black text-base text-slate-950">1. Escrow Protection Vault</h3>
+          <h3 className="font-black text-base text-slate-950">1. Secure Checkout</h3>
           <p className="text-xs text-slate-600 leading-relaxed font-medium">
-            Whether you pay online via Card, Instant QR, or Mobile Wallets, funds remain safely in an institutional escrow account until delivery.
+            Your payment is processed through a safe, encrypted gateway.
           </p>
         </div>
 
@@ -83,10 +83,10 @@ export default function BuyerProtectionPage() {
         </div>
       </div>
 
-      {/* ── How Escrow Works Step-by-Step ─────────────────────────────────── */}
+      {/* ── How Buyer Protection Works Step-by-Step ─────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 shadow-xs space-y-8">
         <div>
-          <h2 className="text-2xl font-black text-slate-950 tracking-tight">How the Escrow Process Protects You</h2>
+          <h2 className="text-2xl font-black text-slate-950 tracking-tight">How the Payment Process Protects You</h2>
           <p className="text-xs text-slate-500 font-medium mt-1">End-to-end lifecycle of every purchase made on Waw</p>
         </div>
 
@@ -95,7 +95,7 @@ export default function BuyerProtectionPage() {
             <div className="font-black text-amber-600 text-xs uppercase tracking-wider">Step 1</div>
             <div className="font-black text-sm text-slate-950">You Place Your Order</div>
             <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              Your payment is placed into secure institutional escrow. The seller is notified to pack and prepare the parcel for courier pickup.
+              Your payment is verified. The seller is notified to pack and prepare the parcel for courier pickup.
             </p>
           </div>
 
@@ -121,7 +121,7 @@ export default function BuyerProtectionPage() {
       <div className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6 border border-slate-800">
         <div className="space-y-1">
           <h3 className="text-lg font-black">Need assistance with an existing order?</h3>
-          <p className="text-xs text-slate-400">Our customer dispute & escrow resolution team is available 24/7 on WhatsApp.</p>
+          <p className="text-xs text-slate-400">Our customer dispute resolution team is available on WhatsApp.</p>
         </div>
         <a
           href="https://wa.me/923001234567"

@@ -86,7 +86,7 @@ export default function CategoryPage() {
   const meta = CATEGORY_META[slug] || {
     title: slug.replace(/-/g, ' ').toUpperCase(),
     titleUrdu: 'واو مارکیٹ مصنوعات',
-    desc: 'Browse verified Pakistani products backed by State Bank escrow protection.',
+    desc: 'Browse verified Pakistani products with secure payment protection.',
     bannerGradient: 'from-slate-950 via-slate-900 to-amber-950',
     filterCategory: 'Leather & Footwear',
   };
@@ -152,7 +152,7 @@ export default function CategoryPage() {
             </span>
             <span className="text-emerald-400 font-bold flex items-center gap-1">
               <Truck className="w-3.5 h-3.5" />
-              <span>Nationwide 24-48h Express Dispatch</span>
+              <span>Nationwide Delivery</span>
             </span>
           </div>
         </div>

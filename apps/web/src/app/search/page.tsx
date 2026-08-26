@@ -3,7 +3,9 @@
 import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CATALOG_PRODUCTS, ProductDetail } from '@/data/mockProducts';
+import { ProductDetail } from '@/data/mockProducts';
+import { fetchProducts } from '@/lib/api';
+import { useEffect } from 'react';
 import { ProductCard } from '@/components/ui/ProductCard';
 import {
   Search,
@@ -52,9 +54,27 @@ function SearchContent() {
   const [sortBy, setSortBy] = useState<'featured' | 'price_asc' | 'price_desc' | 'rating' | 'popular'>('featured');
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
+  const [products, setProducts] = useState<ProductDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetchProducts({
+      q: searchQuery.trim() ? searchQuery : undefined,
+      category: selectedCategory !== 'All Categories' ? selectedCategory : undefined,
+    }).then(data => {
+      if (active) {
+        setProducts(data);
+        setLoading(false);
+      }
+    });
+    return () => { active = false; };
+  }, [searchQuery, selectedCategory]);
+
   // Filter & Sort Products
   const filteredProducts = useMemo(() => {
-    return CATALOG_PRODUCTS.filter((prod) => {
+    return products.filter((prod) => {
       // Query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -101,7 +121,7 @@ function SearchContent() {
       if (sortBy === 'popular') return b.soldCount - a.soldCount;
       return 0; // 'featured'
     });
-  }, [searchQuery, selectedCategory, selectedCity, selectedSellerType, minPrice, maxPrice, minRating, sortBy]);
+  }, [products, searchQuery, selectedCategory, selectedCity, selectedSellerType, minPrice, maxPrice, minRating, sortBy]);
 
   const handleResetFilters = () => {
     setSelectedCategory('All Categories');
@@ -355,7 +375,9 @@ function SearchContent() {
 
         {/* ── Product Grid (9 Cols) ───────────────────────────────────────── */}
         <main className="lg:col-span-9 space-y-6">
-          {filteredProducts.length > 0 ? (
+          {loading ? (
+          <div className="w-full flex items-center justify-center py-20 text-slate-400 animate-pulse">Loading products...</div>
+        ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
               {filteredProducts.map((prod) => (
                 <ProductCard

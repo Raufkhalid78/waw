@@ -6,7 +6,6 @@ import { HeroBanner } from '@/components/home/HeroBanner';
 import { CategoryCircles } from '@/components/home/CategoryCircles';
 import { FlashDeals } from '@/components/home/FlashDeals';
 import { StoreSpotlight } from '@/components/home/StoreSpotlight';
-import { WawExpressSection } from '@/components/home/WawExpressSection';
 import { FeaturedBrands } from '@/components/home/FeaturedBrands';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Sparkles, Truck, Award, Zap } from 'lucide-react';
@@ -34,9 +33,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 2499,
     originalPricePkr: 3600,
     discountPercent: 30,
-    rating: 4.9,
-    reviewsCount: 382,
-    soldCount: 1420,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: true,
     sellerType: SellerType.FIRST_PARTY,
     storeName: 'Waw Official Hub',
@@ -51,9 +50,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 3200,
     originalPricePkr: 4800,
     discountPercent: 33,
-    rating: 4.8,
-    reviewsCount: 1150,
-    soldCount: 2190,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: true,
     sellerType: SellerType.THIRD_PARTY,
     storeName: 'Lahore Tech Hub',
@@ -68,9 +67,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 3800,
     originalPricePkr: 5200,
     discountPercent: 27,
-    rating: 5.0,
-    reviewsCount: 429,
-    soldCount: 890,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: false,
     sellerType: SellerType.THIRD_PARTY,
     storeName: 'Khyber Artisans',
@@ -85,9 +84,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 4499,
     originalPricePkr: 6500,
     discountPercent: 30,
-    rating: 4.7,
-    reviewsCount: 640,
-    soldCount: 640,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: true,
     sellerType: SellerType.THIRD_PARTY,
     storeName: 'Sindh Lawn Gallery',
@@ -102,9 +101,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 4999,
     originalPricePkr: 7999,
     discountPercent: 37,
-    rating: 4.7,
-    reviewsCount: 512,
-    soldCount: 780,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: true,
     sellerType: SellerType.FIRST_PARTY,
     storeName: 'Waw Electronics Hub',
@@ -119,9 +118,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 2800,
     originalPricePkr: 4200,
     discountPercent: 33,
-    rating: 5.0,
-    reviewsCount: 210,
-    soldCount: 450,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: true,
     sellerType: SellerType.THIRD_PARTY,
     storeName: 'Sialkot Sports Direct',
@@ -136,9 +135,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 1850,
     originalPricePkr: 2800,
     discountPercent: 34,
-    rating: 4.9,
-    reviewsCount: 820,
-    soldCount: 820,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: true,
     sellerType: SellerType.THIRD_PARTY,
     storeName: 'Arabian Oud PK',
@@ -153,9 +152,9 @@ const TRENDING_MARKETPLACE_PRODUCTS = [
     pricePkr: 2800,
     originalPricePkr: 3999,
     discountPercent: 30,
-    rating: 4.7,
-    reviewsCount: 950,
-    soldCount: 950,
+    rating: 0,
+    reviewsCount: 0,
+    soldCount: 0,
     isExpress: true,
     sellerType: SellerType.THIRD_PARTY,
     storeName: 'Islamabad Gadgets',
@@ -201,9 +200,9 @@ export default function HomePage() {
             pricePkr: p.pricePkr || 2999,
             originalPricePkr: p.compareAtPricePkr || (p.pricePkr ? Math.round(p.pricePkr * 1.3) : 3999),
             discountPercent: p.compareAtPricePkr ? Math.round(((p.compareAtPricePkr - p.pricePkr) / p.compareAtPricePkr) * 100) : 25,
-            rating: p.ratingAverage || 4.9,
-            reviewsCount: p.reviewsCount || 88,
-            soldCount: p.soldCount || 240,
+            rating: p.ratingAverage || 0,
+            reviewsCount: p.reviewsCount || 0,
+            soldCount: p.soldCount || 0,
             isExpress: p.isFirstParty ?? true,
             sellerType: p.isFirstParty ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
             storeName: p.storeName || 'Waw Official Hub',
@@ -248,9 +247,7 @@ export default function HomePage() {
       {/* 4. Multi-Vendor Store Spotlight (Etsy & Noon Style) */}
       <StoreSpotlight />
 
-      {/* 5. Fulfilled by Waw (1P Official Express Catalog) */}
-      <WawExpressSection />
-
+      
       {/* 6. Official Brand Malls & Regional Hubs */}
       <FeaturedBrands />
 
@@ -360,13 +357,13 @@ export default function HomePage() {
           <div className="space-y-3 relative z-10 max-w-2xl">
             <div className="flex items-center gap-2 text-amber-400 text-xs sm:text-sm font-black uppercase tracking-wider">
               <ShieldCheck className="w-5 h-5" />
-              <span>State Bank Regulated Escrow Guarantee</span>
+              <span>Secure Payments</span>
             </div>
             <h3 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
               Shop with 100% Peace of Mind on Waw
             </h3>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
-              Your money stays in secure escrow until you inspect your parcel. Enjoy hassle-free 7-day doorstep returns with free PostEx rider pickups nationwide.
+              Your payments are protected. Enjoy a transparent delivery process.
             </p>
           </div>
 
@@ -375,7 +372,7 @@ export default function HomePage() {
               href="/buyer-protection"
               className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black px-7 py-4 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xl hover:scale-105 transition-all"
             >
-              <span>Learn About Escrow</span>
+              <span>Learn About Buyer Protection</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
