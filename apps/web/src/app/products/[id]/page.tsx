@@ -175,7 +175,7 @@ export default function ProductDetailPage() {
             <div className="p-3 bg-white border border-slate-200 rounded-2xl text-center space-y-1 shadow-2xs">
               <Award className="w-5 h-5 text-sky-600 mx-auto" />
               <div className="text-[11px] font-black text-slate-900">Secure Checkout</div>
-              <div className="text-[10px] text-slate-500 font-medium">Escrow Protected</div>
+              <div className="text-[10px] text-slate-500 font-medium">Safe & Encrypted</div>
             </div>
           </div>
         </div>
@@ -236,17 +236,21 @@ export default function ProductDetailPage() {
               {product.title}
             </h1>
 
-            {/* Rating & Sold Stats */}
+            {/* Rating & Stock Stats (Reconciled to Real Reviews List) */}
             <div className="flex flex-wrap items-center gap-4 text-xs">
-              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
-                <span className="font-black text-slate-900">{product.rating}</span>
-                <span className="text-slate-500">({product.reviewsCount} verified reviews)</span>
-              </div>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-600 font-bold">
-                <strong className="text-slate-900">{product.soldCount.toLocaleString()}+</strong> units sold
-              </span>
+              {reviewsList.length > 0 ? (
+                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
+                  <span className="font-black text-slate-900">
+                    {(reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)}
+                  </span>
+                  <span className="text-slate-500">({reviewsList.length} verified {reviewsList.length === 1 ? 'review' : 'reviews'})</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-500 font-medium">
+                  <span>No customer reviews yet</span>
+                </div>
+              )}
               <span className="text-slate-300">|</span>
               <span className="text-emerald-700 font-bold flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -311,8 +315,9 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              <span className="text-xs font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
-                ★ 4.9 Rating
+              <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Verified Store</span>
               </span>
             </div>
           </div>
@@ -600,6 +605,29 @@ export default function ProductDetailPage() {
               imageUrl={rel.images[0]}
             />
           ))}
+        </div>
+      </div>
+
+      {/* ── Mobile Sticky Bottom Action Bar ───────────────────────────────── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 shadow-2xl flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[10px] text-slate-500 font-medium">Total Price:</div>
+          <div className="text-lg font-black text-slate-950 font-mono">PKR {(product.pricePkr * quantity).toLocaleString()}</div>
+        </div>
+        <div className="flex items-center gap-2 flex-1 max-w-[220px]">
+          <button
+            onClick={handleAddToCart}
+            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-950 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>{addedAnimation ? 'Added!' : 'Add'}</span>
+          </button>
+          <button
+            onClick={handleBuyNow}
+            className="flex-1 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black py-2.5 px-3 rounded-xl text-xs flex items-center justify-center transition-all shadow-md cursor-pointer"
+          >
+            Buy Now
+          </button>
         </div>
       </div>
     </div>

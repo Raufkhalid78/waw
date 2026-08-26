@@ -92,7 +92,7 @@ export default function SellOnWawPage() {
             Grow Your Business Across Pakistan with <span className="text-amber-400">Waw</span>
           </h1>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
-            Join over 2,450+ verified artisans, wholesalers, and flagship brands. Reach millions of customers in 200+ cities with automated TCS logistics and guaranteed 48-hour State Bank escrow payouts.
+            Join Pakistan’s growing merchant network of authentic artisans, wholesalers, and brand distributors. Reach customers nationwide with automated courier logistics and direct bank settlements.
           </p>
         </div>
 
@@ -334,10 +334,10 @@ export default function SellOnWawPage() {
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs space-y-1">
                   <div className="font-black flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>State Bank Regulated Direct Settlements</span>
+                    <span>Direct Bank Settlements</span>
                   </div>
                   <p className="text-[11px] text-emerald-700">
-                    Your sales revenue is deposited directly into your verified Pakistani bank account via Raast / 1Link within 48 hours of customer delivery.
+                    Your sales revenue is deposited directly into your verified Pakistani bank account via Raast / 1Link within the scheduled payout timeline after customer delivery.
                   </p>
                 </div>
 

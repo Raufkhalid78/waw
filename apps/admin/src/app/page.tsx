@@ -157,13 +157,8 @@ export default function AdminDashboardPage() {
       );
       setShowKycModal(null);
       triggerToast(`Store "${seller.name}" updated to ${status} with ${commissionInput}% commission!`);
-    } catch {
-      // Optimistic fallback
-      setSellers((prev) =>
-        prev.map((s) => (s.id === seller.id ? { ...s, status, commissionRatePercentage: commissionInput } : s))
-      );
-      setShowKycModal(null);
-      triggerToast(`Store "${seller.name}" updated to ${status}!`);
+    } catch (err: any) {
+      alert(`Failed to update store KYC status: ${err?.message || 'Server error'}`);
     }
   };
 
@@ -180,17 +175,8 @@ export default function AdminDashboardPage() {
       );
       setShowDispatchModal(null);
       triggerToast(`Order ${order.orderNumber} booked with PostEx (CN: ${generatedTracking})!`);
-    } catch {
-      // Optimistic
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === order.id
-            ? { ...o, orderStatus: OrderStatus.SHIPPED, courier: 'PostEx', trackingNumber: generatedTracking }
-            : o
-        )
-      );
-      setShowDispatchModal(null);
-      triggerToast(`Order ${order.orderNumber} booked with PostEx!`);
+    } catch (err: any) {
+      alert(`Failed to dispatch order with PostEx: ${err?.message || 'Server error'}`);
     }
   };
 
@@ -204,13 +190,8 @@ export default function AdminDashboardPage() {
       setShowSettlePayoutModal(null);
       setBankRefInput('');
       triggerToast(`Payout settled for ${payout.storeName} via Raast (Ref: ${ref})!`);
-    } catch {
-      setPayouts((prev) =>
-        prev.map((p) => (p.id === payout.id ? { ...p, status: PayoutStatus.PAID, bankReference: ref } : p))
-      );
-      setShowSettlePayoutModal(null);
-      setBankRefInput('');
-      triggerToast(`Payout settled for ${payout.storeName}!`);
+    } catch (err: any) {
+      alert(`Failed to settle payout: ${err?.message || 'Server error'}`);
     }
   };
 
@@ -242,10 +223,8 @@ export default function AdminDashboardPage() {
       setProducts([newProd, ...products]);
       setShowAddProductModal(false);
       triggerToast(`Product "${newProductForm.title}" published successfully to Supabase!`);
-    } catch {
-      // Optimistic
-      setShowAddProductModal(false);
-      triggerToast(`Product listed successfully!`);
+    } catch (err: any) {
+      alert(`Failed to publish product: ${err?.message || 'Server error'}`);
     }
   };
 
