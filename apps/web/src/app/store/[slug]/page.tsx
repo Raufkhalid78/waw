@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getStoreBySlug } from "@/data/mockStores";
+
 import { fetchProducts } from "@/lib/api";
 import { ProductCard } from "@/components/ui/ProductCard";
 import {
@@ -24,28 +24,42 @@ import {
 export default function StoreProfilePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const store = getStoreBySlug(slug) || getStoreBySlug("lahore-tech-hub")!;
+  const [store, setStore] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadStoreProducts() {
+    async function loadData() {
       try {
-        const data = await fetchProducts();
-        const matching = data.filter(
-          (p) =>
-            p.storeSlug === store.slug ||
-            p.storeName?.toLowerCase() === store.name?.toLowerCase(),
-        );
-        setProducts(matching.length > 0 ? matching : data.slice(0, 4));
+        const { fetchStoreBySlug, fetchProducts } = await import("@/lib/api");
+        const storeData = await fetchStoreBySlug(slug);
+        
+        if (storeData) {
+          setStore(storeData);
+          const data = await fetchProducts();
+          const matching = data.filter(
+            (p) =>
+              p.storeSlug === storeData.slug ||
+              p.storeName?.toLowerCase() === storeData.name?.toLowerCase(),
+          );
+          setProducts(matching.length > 0 ? matching : data.slice(0, 4));
+        }
       } catch (err) {
-        console.error("Failed to load store products:", err);
+        console.error("Failed to load store:", err);
       } finally {
         setLoading(false);
       }
     }
-    loadStoreProducts();
-  }, [store.slug, store.name]);
+    loadData();
+  }, [slug]);
+
+  if (loading) {
+    return <div className="p-10 text-center text-slate-500 font-bold">Loading Store...</div>;
+  }
+
+  if (!store) {
+    return <div className="p-10 text-center text-red-500 font-bold">Store not found or inactive.</div>;
+  }
 
   const displayProducts = products;
 
@@ -107,7 +121,7 @@ export default function StoreProfilePage() {
 
                 <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{store.location}</span>
+                  <span>{store.city || "Pakistan"}</span>
                 </p>
               </div>
             </div>
@@ -117,58 +131,33 @@ export default function StoreProfilePage() {
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center min-w-[90px]">
                 <div className="text-base font-black text-slate-950 flex items-center justify-center gap-1">
                   <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
-                  <span>{store.rating}</span>
+                  <span>{store.rating_average || "5.0"}</span>
                 </div>
                 <div className="text-[10px] text-slate-500 font-bold">
-                  {store.reviewsCount} Reviews
+                  {store.rating_count || 0} Reviews
                 </div>
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center min-w-[90px]">
-                <div className="text-base font-black text-slate-950">
-                  {store.salesCount.toLocaleString()}+
+                <div className="text-base font-black text-emerald-700 flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
                 <div className="text-[10px] text-slate-500 font-bold">
-                  Orders Shipped
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center min-w-[90px]">
-                <div className="text-base font-black text-emerald-700">
-                  99.2%
-                </div>
-                <div className="text-[10px] text-slate-500 font-bold">
-                  On-Time Dispatch
+                  Verified Store
                 </div>
               </div>
             </div>
           </div>
 
           {/* Store Bio & Specialties */}
-          <div className="border-t border-slate-100 pt-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-8 space-y-2">
+          <div className="border-t border-slate-100 pt-5 grid grid-cols-1 gap-6 items-start">
+            <div className="space-y-2">
               <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
                 About This Merchant
               </h3>
               <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed">
-                {store.about}
+                {store.description || "A trusted seller on Waw Marketplace."}
               </p>
-            </div>
-
-            <div className="lg:col-span-4 space-y-2">
-              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
-                Specialties
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {store.specialties.map((spec, i) => (
-                  <span
-                    key={i}
-                    className="text-[11px] font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl"
-                  >
-                    {spec}
-                  </span>
-                ))}
-              </div>
             </div>
           </div>
         </div>

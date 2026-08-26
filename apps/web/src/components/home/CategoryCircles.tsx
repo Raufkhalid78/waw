@@ -4,109 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
-
-const CATEGORIES = [
-  {
-    id: "cat_mobiles",
-    slug: "mobiles-tech",
-    name: "Smartphones & Tech",
-    nameUrdu: "موبائل اور ٹیکنالوجی",
-    image:
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&auto=format&fit=crop&q=80",
-    tag: "340+ Verified Shops",
-    discount: "Up to 30% Off",
-  },
-  {
-    id: "cat_lawn",
-    slug: "womens-lawn",
-    name: "Women's Lawn Suits",
-    nameUrdu: "خواتین کے ملبوسات",
-    image:
-      "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80",
-    tag: "520+ Fashion Shops",
-    discount: "Festive 2026",
-  },
-  {
-    id: "cat_leather",
-    slug: "leather-craft",
-    name: "Pure Leather Craft",
-    nameUrdu: "اصلی چمڑے کا سامان",
-    image:
-      "https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&auto=format&fit=crop&q=80",
-    tag: "180+ Artisans",
-    discount: "Handcrafted",
-  },
-  {
-    id: "cat_shoes",
-    slug: "peshawari-chappal",
-    name: "Peshawari Chappal",
-    nameUrdu: "پشاوری چپل",
-    image:
-      "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80",
-    tag: "120+ Master Makers",
-    discount: "Double Sole",
-  },
-  {
-    id: "cat_audio",
-    slug: "mobiles-tech",
-    name: "Wireless Earbuds",
-    nameUrdu: "ہیڈ فونز اور آڈیو",
-    image:
-      "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80",
-    tag: "290+ Audio Hubs",
-    discount: "Top Rated",
-  },
-  {
-    id: "cat_watches",
-    slug: "mobiles-tech",
-    name: "Smart Watches",
-    nameUrdu: "سمارٹ گھڑیاں",
-    image:
-      "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=300&auto=format&fit=crop&q=80",
-    tag: "160+ Gadget Shops",
-    discount: "AMOLED 2026",
-  },
-  {
-    id: "cat_sports",
-    slug: "sialkot-sports",
-    name: "Sialkot Sports",
-    nameUrdu: "سیالکوٹ کھیلوں کا سامان",
-    image:
-      "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=300&auto=format&fit=crop&q=80",
-    tag: "210+ Exporters",
-    discount: "FIFA Grade",
-  },
-  {
-    id: "cat_fragrance",
-    slug: "beauty-fragrance",
-    name: "Attar & Fragrance",
-    nameUrdu: "عطر اور خوشبویات",
-    image:
-      "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=300&auto=format&fit=crop&q=80",
-    tag: "95+ Perfumers",
-    discount: "Pure Oud",
-  },
-  {
-    id: "cat_pottery",
-    slug: "home-heritage",
-    name: "Multani Blue Art",
-    nameUrdu: "ملتانی بلیو پوٹری",
-    image:
-      "https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=300&auto=format&fit=crop&q=80",
-    tag: "65+ Workshops",
-    discount: "Hand Painted",
-  },
-  {
-    id: "cat_power",
-    slug: "mobiles-tech",
-    name: "Power & Cables",
-    nameUrdu: "چارجرز اور بیٹریاں",
-    image:
-      "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=300&auto=format&fit=crop&q=80",
-    tag: "140+ Sellers",
-    discount: "Fast Charging",
-  },
-];
+import { fetchCategories } from "@/lib/api";
 
 export function CategoryCircles() {
   const { language } = useCartStore();
@@ -114,6 +12,7 @@ export function CategoryCircles() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [categories, setCategories] = useState<any[]>([]);
 
   const checkScroll = () => {
     if (scrollRef.current) {
@@ -122,6 +21,14 @@ export function CategoryCircles() {
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
     }
   };
+
+  useEffect(() => {
+    async function load() {
+      const cats = await fetchCategories(language.toLowerCase());
+      setCategories(cats);
+    }
+    load();
+  }, [language]);
 
   useEffect(() => {
     checkScroll();
@@ -134,7 +41,7 @@ export function CategoryCircles() {
         window.removeEventListener("resize", checkScroll);
       };
     }
-  }, []);
+  }, [categories]);
 
   const handleScroll = (dir: "left" | "right") => {
     if (scrollRef.current) {
@@ -142,6 +49,8 @@ export function CategoryCircles() {
       scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
     }
   };
+
+  if (categories.length === 0) return null;
 
   return (
     <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
@@ -192,7 +101,7 @@ export function CategoryCircles() {
           ref={scrollRef}
           className="flex items-center gap-5 sm:gap-8 overflow-x-auto no-scrollbar scroll-smooth py-3 px-1"
         >
-          {CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const displayName =
               isUrdu && cat.nameUrdu ? cat.nameUrdu : cat.name;
 
@@ -206,7 +115,7 @@ export function CategoryCircles() {
                 <div className="relative w-22 h-22 sm:w-28 sm:h-28 rounded-full p-1.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 shadow-md group-hover:shadow-xl transition-all group-hover:scale-105">
                   <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5 border-2 border-white">
                     <img
-                      src={cat.image}
+                      src={cat.imageUrl || "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=300&auto=format&fit=crop&q=80"}
                       alt={cat.name}
                       loading="lazy"
                       className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
@@ -215,18 +124,13 @@ export function CategoryCircles() {
 
                   {/* Top Floating Badge */}
                   <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-slate-950 text-[#FFEB00] text-[9px] sm:text-xs font-black px-2.5 py-0.5 rounded-full shadow-md uppercase tracking-wider whitespace-nowrap border border-white/50">
-                    {cat.discount}
+                    SHOP NOW
                   </span>
                 </div>
 
                 {/* Category Label */}
                 <span className="mt-3 text-xs sm:text-sm font-black text-slate-900 group-hover:text-amber-700 line-clamp-1 transition-colors">
                   {displayName}
-                </span>
-
-                {/* Subtitle / Shop Count */}
-                <span className="text-[11px] sm:text-xs text-slate-500 font-semibold mt-0.5">
-                  {cat.tag}
                 </span>
               </Link>
             );

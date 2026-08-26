@@ -7,7 +7,7 @@ import { fetchCategoryBySlug, fetchProducts } from "@/lib/api";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { useCartStore } from "@/store/useCartStore";
 import { Category } from "@waw/types";
-import { ProductDetail } from "@/data/mockProducts";
+import { ProductDetail } from "@/types/models";
 import {
   ChevronRight,
   SlidersHorizontal,
@@ -105,10 +105,6 @@ export default function CategoryPage() {
             <span className="bg-white/10 px-3 py-1 rounded-full font-bold">
               📦 {products.length} {isUrdu ? "مصنوعات" : "Items Available"}
             </span>
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <Truck className="w-3.5 h-3.5" />
-              <span>{isUrdu ? "ملک بھر میں ترسیل" : "Nationwide Delivery"}</span>
-            </span>
           </div>
         </div>
       </div>
@@ -139,58 +135,14 @@ export default function CategoryPage() {
             </h3>
             <button
               onClick={() => {
-                setSelectedCity("All Cities");
                 setSelectedSellerType("ALL");
-                setMaxPrice(15000);
+                setMaxPrice(500000);
                 setMinRating(0);
               }}
               className="text-[11px] font-bold text-amber-600 hover:text-amber-700 cursor-pointer"
             >
               {isUrdu ? "تمام ری سیٹ کریں" : "Reset All"}
             </button>
-          </div>
-
-          {/* Price Range Slider */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-700">
-                {isUrdu ? "زیادہ سے زیادہ بجٹ:" : "Max Budget:"}
-              </span>
-              <span className="font-black text-slate-950">
-                PKR {maxPrice.toLocaleString()}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="1000"
-              max="25000"
-              step="500"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="w-full accent-amber-500 cursor-pointer"
-            />
-            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-              <span>PKR 1,000</span>
-              <span>PKR 25,000+</span>
-            </div>
-          </div>
-
-          {/* Origin City */}
-          <div className="space-y-2">
-            <div className="text-xs font-bold text-slate-700">
-              {isUrdu ? "شہر:" : "Artisan / Dispatch City:"}
-            </div>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-400 font-medium"
-            >
-              {PAKISTAN_CITIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Fulfillment Type */}

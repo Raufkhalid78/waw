@@ -1,174 +1,9 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { Category } from "../../types/index.js";
 
-// Standard approved baseline taxonomy for reliable initialization & fallback
-export const APPROVED_BASELINE_TAXONOMY: Array<{
-  id: string;
-  name: string;
-  nameUrdu: string;
-  slug: string;
-  parentId: string | null;
-  sortOrder: number;
-  isActive: boolean;
-  imageUrl: string;
-  description: string;
-  descriptionUrdu?: string;
-}> = [
-  {
-    id: "cat_electronics",
-    name: "Electronics & Mobility",
-    nameUrdu: "الیکٹرانکس اور موبائل",
-    slug: "mobiles-tech",
-    parentId: null,
-    sortOrder: 1,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&auto=format&fit=crop&q=80",
-    description: "Smartphones, ANC audio, wearables and chargers.",
-  },
-  {
-    id: "cat_fashion",
-    name: "Fashion & Apparel",
-    nameUrdu: "فیشن اور ملبوسات",
-    slug: "fashion",
-    parentId: null,
-    sortOrder: 2,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80",
-    description:
-      "Women unstitched lawn, festive silk, and ready-to-wear collections.",
-  },
-  {
-    id: "cat_leather",
-    name: "Leather Craft & Footwear",
-    nameUrdu: "چمڑے کا سامان اور جوتے",
-    slug: "leather-craft",
-    parentId: null,
-    sortOrder: 3,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&auto=format&fit=crop&q=80",
-    description:
-      "Pure cowhide leather wallets, bags, and handmade traditional footwear.",
-  },
-  {
-    id: "cat_beauty",
-    name: "Beauty & Fragrance",
-    nameUrdu: "خوبصورتی اور عطر",
-    slug: "beauty-fragrance",
-    parentId: null,
-    sortOrder: 4,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=300&auto=format&fit=crop&q=80",
-    description:
-      "Authentic non-alcoholic attar, pure oud, and grooming essentials.",
-  },
-  {
-    id: "cat_sports",
-    name: "Sports & Outdoors",
-    nameUrdu: "کھیلوں کا سامان",
-    slug: "sialkot-sports",
-    parentId: null,
-    sortOrder: 5,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=300&auto=format&fit=crop&q=80",
-    description:
-      "Sialkot export-grade match footballs, English willow bats and gear.",
-  },
-  {
-    id: "cat_home",
-    name: "Home & Living",
-    nameUrdu: "گھریلو سجاوٹ اور سامان",
-    slug: "home-living",
-    parentId: null,
-    sortOrder: 6,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=300&auto=format&fit=crop&q=80",
-    description: "Décor, lighting, bedsheets, and artisan kitchen essentials.",
-  },
-  {
-    id: "cat_heritage",
-    name: "Pakistani Heritage & Handmade",
-    nameUrdu: "پاکستانی ثقافت اور دستکاری",
-    slug: "home-heritage",
-    parentId: null,
-    sortOrder: 7,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=300&auto=format&fit=crop&q=80",
-    description:
-      "Multani blue pottery, handmade brass art, and cultural souvenirs.",
-  },
-  // Subcategories
-  {
-    id: "cat_audio",
-    name: "Audio & Wireless Earbuds",
-    nameUrdu: "وائرلیس ایئربڈز اور آڈیو",
-    slug: "wireless-earbuds",
-    parentId: "cat_electronics",
-    sortOrder: 1,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=300&auto=format&fit=crop&q=80",
-    description: "True wireless earbuds with ANC and deep bass.",
-  },
-  {
-    id: "cat_watches",
-    name: "Smart Watches & Wearables",
-    nameUrdu: "سمارٹ واچز",
-    slug: "smart-watches",
-    parentId: "cat_electronics",
-    sortOrder: 2,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=300&auto=format&fit=crop&q=80",
-    description: "AMOLED display smart watches and health trackers.",
-  },
-  {
-    id: "cat_lawn",
-    name: "Women Unstitched & Lawn",
-    nameUrdu: "خواتین کے ان سلے لان سوٹ",
-    slug: "womens-lawn",
-    parentId: "cat_fashion",
-    sortOrder: 1,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=300&auto=format&fit=crop&q=80",
-    description: "Pure lawn 3-piece embroidered suits.",
-  },
-  {
-    id: "cat_shoes",
-    name: "Handmade Peshawari Chappal",
-    nameUrdu: "ہاتھ سے بنی پشاوری چپل",
-    slug: "peshawari-chappal",
-    parentId: "cat_leather",
-    sortOrder: 1,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=300&auto=format&fit=crop&q=80",
-    description: "Authentic Norozi and tyre sole Peshawari chappals.",
-  },
-  {
-    id: "cat_attar",
-    name: "Pure Attar & Concentrated Oils",
-    nameUrdu: "خالص عطر اور پرفیوم آئلز",
-    slug: "attar-fragrance",
-    parentId: "cat_beauty",
-    sortOrder: 1,
-    isActive: true,
-    imageUrl:
-      "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=300&auto=format&fit=crop&q=80",
-    description: "Long lasting alcohol-free artisan attar.",
-  },
-];
-
 export class CategoryService {
   /**
-   * Retrieves all active categories from Supabase (or structured baseline)
+   * Retrieves all active categories from Supabase
    * and returns a hierarchical tree of root categories with nested children.
    */
   static async getCategoryTree(locale = "en"): Promise<Category[]> {
@@ -185,22 +20,11 @@ export class CategoryService {
         categoriesRaw = data;
       }
     } catch (e) {
-      console.warn("Failed to query categories table, using baseline:", e);
+      console.warn("Failed to query categories table:", e);
     }
 
     if (categoriesRaw.length === 0) {
-      categoriesRaw = APPROVED_BASELINE_TAXONOMY.map((c) => ({
-        id: c.id,
-        name: c.name,
-        name_urdu: c.nameUrdu,
-        slug: c.slug,
-        parent_id: c.parentId,
-        image_url: c.imageUrl,
-        description: c.description,
-        description_urdu: c.descriptionUrdu,
-        sort_order: c.sortOrder,
-        is_active: c.isActive,
-      }));
+      return [];
     }
 
     // Map to camelCase Category models

@@ -146,6 +146,26 @@ app.get("/api/categories/:slug", CategoryController.getBySlug);
 app.get("/api/products", ProductController.list);
 app.get("/api/products/:slug", ProductController.getBySlug);
 
+// ── Store Routes ───────────────────────────────────────────────────────────
+app.get("/api/stores/:slug", async (req, res) => {
+  try {
+    const { supabaseAdmin } = await import("./config/supabase.js");
+    const { data: store, error } = await supabaseAdmin
+      .from("stores")
+      .select("id, name, slug, description, logo_url, seller_type, status, city, rating_average, rating_count, created_at")
+      .eq("slug", req.params.slug)
+      .eq("status", "ACTIVE")
+      .single();
+
+    if (error || !store) {
+      return res.status(404).json({ error: "Store not found or not active" });
+    }
+    res.json(store);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Seller/Admin Only product listing
 app.post(
   "/api/products",

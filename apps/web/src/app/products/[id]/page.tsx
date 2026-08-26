@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { fetchProductById, fetchProducts } from '@/lib/api';
 import { useCartStore } from '@/store/useCartStore';
 import { ProductCard } from '@/components/ui/ProductCard';
-import { ProductDetail } from '@/data/mockProducts';
+import { ProductDetail } from "@/types/models";
 import {
   Star, Truck, ShieldCheck, RotateCcw, Store, CheckCircle2, Share2, Heart,
   Plus, Minus, ShoppingBag, Zap, ChevronRight, MapPin, Flame, Award, Sparkles, MessageSquare, Loader2

@@ -1,5 +1,5 @@
-import { ProductDetail } from "@/data/mockProducts";
-import { STORES_CATALOG, StoreDetail } from "@/data/mockStores";
+import { ProductDetail } from "@/types/models";
+import { StoreDetail } from "@/types/models";
 import {
   Category,
   CheckoutQuoteRequest,
@@ -13,53 +13,38 @@ const API_BASE_URL = (
 ).replace(/\/+$/, "");
 
 function mapApiProductToDetail(p: any): ProductDetail {
-  const basePrice = p.base_price_pkr || p.price_pkr || p.pricePkr || 2999;
-  const comparePrice =
-    p.compare_at_price_pkr || p.comparePricePkr || Math.round(basePrice * 1.25);
-  const discountPercent = Math.max(
-    0,
-    Math.round(((comparePrice - basePrice) / comparePrice) * 100),
-  );
+  const basePrice = p.base_price_pkr || p.price_pkr || p.pricePkr;
+  const comparePrice = p.compare_at_price_pkr || p.comparePricePkr || basePrice;
+  const discountPercent =
+    comparePrice > basePrice
+      ? Math.round(((comparePrice - basePrice) / comparePrice) * 100)
+      : 0;
 
   return {
     productId: p.id || p.productId,
-    title: p.title || "Product",
-    category: p.category?.name || p.categoryName || p.category || "General",
+    title: p.title,
+    category: p.category?.name || p.categoryName || p.category || "Unknown",
     pricePkr: basePrice,
     originalPricePkr: comparePrice,
     discountPercent,
     rating: p.rating_average || p.ratingAverage || p.rating || 0,
     reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || 0,
     soldCount: p.sold_count || p.soldCount || 0,
-    isExpress: p.is_first_party ?? p.isFirstParty ?? true,
+    isExpress: p.is_first_party ?? p.isFirstParty ?? false,
     sellerType: p.is_first_party
       ? SellerType.FIRST_PARTY
       : SellerType.THIRD_PARTY,
-    storeName: p.store?.name || p.storeName || "Waw Official Retail",
-    storeSlug: p.store?.slug || p.storeSlug || "waw-official",
-    sellerCity: p.store?.city || p.sellerCity || "Lahore",
+    storeName: p.store?.name || p.storeName || "Unknown Store",
+    storeSlug: p.store?.slug || p.storeSlug || "unknown-store",
+    sellerCity: p.store?.city || p.sellerCity || "Unknown",
     deliveryTime: "Standard Delivery",
-    images:
-      Array.isArray(p.images) && p.images.length > 0
-        ? p.images
-        : [
-            "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80",
-          ],
-    description:
-      p.description || "Premium artisan crafted product on Waw Marketplace.",
-    highlights: [
-      "Authentic Handmade Item",
-      "State Bank Escrow Protected",
-      "Direct Courier Dispatch with Tracking",
-    ],
-    specifications: {
-      Origin: "Pakistan",
-      Condition: "Brand New",
-      Packaging: "Tamper-evident Waw Box",
-    },
-    inStock: (p.stock_quantity ?? p.stockQuantity ?? 10) > 0,
-    stockCount: p.stock_quantity ?? p.stockQuantity ?? 10,
-    sku: p.sku || "WAW-PROD",
+    images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [],
+    description: p.description || "",
+    highlights: p.attributes?.highlights || [],
+    specifications: p.attributes?.specifications || {},
+    inStock: (p.stock_quantity ?? p.stockQuantity ?? 0) > 0,
+    stockCount: p.stock_quantity ?? p.stockQuantity ?? 0,
+    sku: p.sku || "",
     reviews: [],
   };
 }
@@ -181,13 +166,14 @@ export async function fetchStoreBySlug(
   slug: string,
 ): Promise<StoreDetail | undefined> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/products?storeSlug=${slug}`, {
+    const res = await fetch(`${API_BASE_URL}/api/stores/${slug}`, {
       cache: "no-store",
     });
-    if (!res.ok) throw new Error("Store not found");
-    return STORES_CATALOG[slug] || STORES_CATALOG["lahore-tech-hub"];
+    if (!res.ok) return undefined;
+    return await res.json();
   } catch (error) {
-    return STORES_CATALOG[slug] || STORES_CATALOG["lahore-tech-hub"];
+    console.error("Failed to fetch store:", error);
+    return undefined;
   }
 }
 
@@ -337,3 +323,4 @@ export async function initiatePaymentApi(paymentInput: {
   }
   return await res.json();
 }
+

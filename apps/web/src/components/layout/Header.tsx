@@ -100,49 +100,7 @@ const PROMOTIONAL_ANNOUNCEMENTS = [
   },
 ];
 
-const CATEGORY_LINKS_EN = [
-  {
-    label: "⚡ Waw Express",
-    href: "/search?sellerType=1P",
-    highlight: "express",
-  },
-  { label: "🔥 Mega Deals", href: "/search", highlight: "deals" },
-  {
-    label: "🏬 Verified Shops",
-    href: "/search?sellerType=3P",
-    highlight: "shops",
-  },
-  { label: "Electronics & Mobiles", href: "/category/mobiles-tech" },
-  { label: "Beauty & Fragrance", href: "/category/beauty-fragrance" },
-  { label: "Women's Lawn & Fashion", href: "/category/womens-lawn" },
-  { label: "Peshawari Footwear", href: "/category/peshawari-chappal" },
-  { label: "Leather Craft & Bags", href: "/category/leather-craft" },
-  { label: "Sialkot Sports Goods", href: "/category/sialkot-sports" },
-  { label: "Power & Chargers", href: "/category/mobiles-tech" },
-  { label: "Smart Watches", href: "/category/mobiles-tech" },
-];
 
-const CATEGORY_LINKS_UR = [
-  {
-    label: "⚡ واو ایکسپریس",
-    href: "/search?sellerType=1P",
-    highlight: "express",
-  },
-  { label: "🔥 میگا ڈیلز", href: "/search", highlight: "deals" },
-  {
-    label: "🏬 تصدیق شدہ دکانیں",
-    href: "/search?sellerType=3P",
-    highlight: "shops",
-  },
-  { label: "موبائل اور ٹیک", href: "/category/mobiles-tech" },
-  { label: "عطر اور خوشبویات", href: "/category/beauty-fragrance" },
-  { label: "خواتین کے ملبوسات", href: "/category/womens-lawn" },
-  { label: "پشاوری چپل", href: "/category/peshawari-chappal" },
-  { label: "چمڑے کا سامان", href: "/category/leather-craft" },
-  { label: "سیالکوٹ اسپورٹس", href: "/category/sialkot-sports" },
-  { label: "چارجرز اور بیٹریاں", href: "/category/mobiles-tech" },
-  { label: "سمارٹ گھڑیاں", href: "/category/mobiles-tech" },
-];
 
 const TRANSLATIONS = {
   EN: {
@@ -207,11 +165,42 @@ export function Header() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [categoryLinks, setCategoryLinks] = useState<any[]>([
+    { label: "⚡ Waw Express", href: "/search?sellerType=1P", highlight: "express" },
+    { label: "🔥 Mega Deals", href: "/search", highlight: "deals" },
+    { label: "🏬 Verified Shops", href: "/search?sellerType=3P", highlight: "shops" }
+  ]);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.EN;
-  const categoryLinks =
-    language === "UR" ? CATEGORY_LINKS_UR : CATEGORY_LINKS_EN;
+
+  useEffect(() => {
+    async function loadCats() {
+      try {
+        const { fetchCategories } = await import('@/lib/api');
+        const cats = await fetchCategories(language.toLowerCase());
+        const dynamicLinks = cats.map(c => ({
+          label: language === "UR" ? (c.nameUrdu || c.name) : c.name,
+          href: `/category/${c.slug}`
+        }));
+        
+        const staticLinks = language === "UR" ? [
+          { label: "⚡ واو ایکسپریس", href: "/search?sellerType=1P", highlight: "express" },
+          { label: "🔥 میگا ڈیلز", href: "/search", highlight: "deals" },
+          { label: "🏬 تصدیق شدہ دکانیں", href: "/search?sellerType=3P", highlight: "shops" }
+        ] : [
+          { label: "⚡ Waw Express", href: "/search?sellerType=1P", highlight: "express" },
+          { label: "🔥 Mega Deals", href: "/search", highlight: "deals" },
+          { label: "🏬 Verified Shops", href: "/search?sellerType=3P", highlight: "shops" }
+        ];
+
+        setCategoryLinks([...staticLinks, ...dynamicLinks.slice(0, 8)]);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadCats();
+  }, [language]);
 
   const handleVoiceSearch = () => {
     if (

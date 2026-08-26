@@ -3,7 +3,7 @@
 import { useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ProductDetail } from "@/data/mockProducts";
+import { ProductDetail } from "@/types/models";
 import { fetchProducts } from "@/lib/api";
 import { useEffect } from "react";
 import { ProductCard } from "@/components/ui/ProductCard";
@@ -531,3 +531,4 @@ export default function SearchPage() {
     </Suspense>
   );
 }
+
