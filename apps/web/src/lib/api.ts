@@ -24,6 +24,12 @@ function mapApiProductToDetail(p: any): ProductDetail {
       ? Math.round(((comparePrice - basePrice) / comparePrice) * 100)
       : 0;
 
+  // Derive stock by summing up active variants stock, or fallback to root property
+  const activeVariants = Array.isArray(p.variants) ? p.variants.filter((v: any) => v.is_active) : [];
+  const stockCount = activeVariants.length > 0 
+    ? activeVariants.reduce((sum: number, v: any) => sum + (v.stock_quantity || 0), 0)
+    : (p.stock_quantity ?? p.stockQuantity ?? 0);
+
   return {
     productId: p.id || p.productId,
     title: p.title,
@@ -32,7 +38,7 @@ function mapApiProductToDetail(p: any): ProductDetail {
     originalPricePkr: comparePrice,
     discountPercent,
     rating: p.rating_average || p.ratingAverage || p.rating || 0,
-    reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || 0,
+    reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || (Array.isArray(p.reviews) ? p.reviews.length : 0),
     soldCount: p.sold_count || p.soldCount || 0,
     isExpress: p.is_first_party ?? p.isFirstParty ?? false,
     sellerType: p.is_first_party
@@ -45,10 +51,10 @@ function mapApiProductToDetail(p: any): ProductDetail {
     description: p.description || "",
     highlights: p.attributes?.highlights || [],
     specifications: p.attributes?.specifications || {},
-    inStock: (p.stock_quantity ?? p.stockQuantity ?? 0) > 0,
-    stockCount: p.stock_quantity ?? p.stockQuantity ?? 0,
+    inStock: stockCount > 0,
+    stockCount: stockCount,
     sku: p.sku || "",
-    reviews: [],
+    reviews: Array.isArray(p.reviews) ? p.reviews : [],
   };
 }
 

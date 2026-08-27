@@ -104,7 +104,7 @@ export class ProductService {
     const { data: product, error } = await supabaseAdmin
       .from("products")
       .select(
-        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug), reviews(id, rating, comment, created_at, user_name)",
+        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug), reviews(id, rating, comment, created_at, is_verified_purchase)",
       )
       .eq("slug", slug)
       .maybeSingle();
