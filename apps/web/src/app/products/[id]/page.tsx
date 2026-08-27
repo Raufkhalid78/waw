@@ -35,7 +35,7 @@ export default function ProductDetailPage() {
       if (data) {
         setProduct(data);
         const related = await fetchProducts({ category: data.category });
-        setRelatedProducts(related.filter(p => p.productId !== data.productId).slice(0, 4));
+        setRelatedProducts((related.items || []).filter(p => p.productId !== data.productId).slice(0, 4));
       }
       setIsLoading(false);
     }
@@ -508,7 +508,6 @@ export default function ProductDetailPage() {
                 sellerType={rel.sellerType}
                 storeName={rel.storeName}
                 sellerCity={rel.sellerCity}
-                deliveryTime={rel.deliveryTime}
                 imageUrl={rel.images[0]}
               />
             ))}

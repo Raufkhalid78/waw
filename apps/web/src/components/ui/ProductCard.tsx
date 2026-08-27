@@ -32,7 +32,6 @@ export interface ProductCardProps {
   isExpress?: boolean;
   sellerType: SellerType;
   soldCount?: number;
-  deliveryTime?: string;
 }
 
 export function ProductCard({
@@ -51,7 +50,6 @@ export function ProductCard({
   isExpress = false,
   sellerType,
   soldCount,
-  deliveryTime = isExpress ? "4-5 Days Express" : "7-9 Days Standard",
 }: ProductCardProps) {
   const { addItem, toggleWishlist, isInWishlist, language } = useCartStore();
   const isUrdu = language === "UR";

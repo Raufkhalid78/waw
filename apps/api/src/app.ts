@@ -138,6 +138,10 @@ app.post(
 
 app.post("/api/auth/oauth/sync", AuthController.syncOAuth);
 
+// ── Storefront Config (Dynamic UI Metadata) ───────────────
+import { ConfigController } from "./modules/config/config.controller.js";
+app.get("/api/config/storefront", ConfigController.getStorefrontConfig);
+
 // ── Category Taxonomy Routes (Hierarchical Database Tree) ───────────────
 app.get("/api/categories", CategoryController.listTree);
 app.get("/api/categories/:slug", CategoryController.getBySlug);

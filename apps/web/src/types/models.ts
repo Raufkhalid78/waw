@@ -15,7 +15,6 @@ export interface ProductDetail {
   storeName: string;
   storeSlug: string;
   sellerCity: string;
-  deliveryTime: string;
   images: string[];
   description: string;
   highlights: string[];

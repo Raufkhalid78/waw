@@ -37,7 +37,6 @@ function mapApiProductToDetail(p: any): ProductDetail {
     storeName: p.store?.name || p.storeName || "Unknown Store",
     storeSlug: p.store?.slug || p.storeSlug || "unknown-store",
     sellerCity: p.store?.city || p.sellerCity || "Unknown",
-    deliveryTime: "Standard Delivery",
     images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [],
     description: p.description || "",
     highlights: p.attributes?.highlights || [],
@@ -90,7 +89,7 @@ export async function fetchProducts(params?: {
   sortBy?: "featured" | "price-asc" | "price-desc" | "rating";
   page?: number;
   limit?: number;
-}): Promise<ProductDetail[]> {
+}): Promise<{ items: ProductDetail[]; facets?: any }> {
   try {
     if (params?.q) {
       // Query Typesense Search Route
@@ -104,7 +103,7 @@ export async function fetchProducts(params?: {
         const searchData = await res.json();
         const hits = searchData.hits || searchData.results || [];
         if (hits.length > 0) {
-          return hits.map((h: any) => mapApiProductToDetail(h.document || h));
+          return { items: hits.map((h: any) => mapApiProductToDetail(h.document || h)) };
         }
       }
     }
@@ -136,12 +135,13 @@ export async function fetchProducts(params?: {
     if (!res.ok) throw new Error("API request failed");
     const data = await res.json();
     const items = Array.isArray(data) ? data : data.items || [];
-    if (items.length > 0) {
-      return items.map(mapApiProductToDetail);
-    }
-    return [];
+    
+    return {
+      items: items.map(mapApiProductToDetail),
+      facets: data.facets || { minPrice: 0, maxPrice: 15000, cities: [], sellerTypes: [] }
+    };
   } catch (error) {
-    return [];
+    return { items: [] };
   }
 }
 

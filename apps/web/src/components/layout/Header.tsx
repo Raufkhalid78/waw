@@ -34,19 +34,6 @@ import {
   LogOut,
 } from "lucide-react";
 
-const PAKISTAN_CITIES = [
-  "Lahore",
-  "Karachi",
-  "Islamabad",
-  "Rawalpindi",
-  "Faisalabad",
-  "Peshawar",
-  "Multan",
-  "Sialkot",
-  "Gujranwala",
-  "Quetta",
-];
-
 const SEARCH_CATEGORIES = [
   "All Categories",
   "Mobiles & Tech",
@@ -58,50 +45,6 @@ const SEARCH_CATEGORIES = [
   "Fragrances & Attar",
   "Home & Kitchen",
 ];
-
-const POPULAR_SEARCHES = [
-  "Khaadi Lawn 2026",
-  "AirPods Pro ANC",
-  "Pure Leather Wallet",
-  "Peshawari Chappal",
-  "Amoled Smart Watch",
-  "Sialkot Match Football",
-  "Royal Oud Attar",
-];
-
-const PROMOTIONAL_ANNOUNCEMENTS = [
-  {
-    id: 1,
-    tag: "⚡ MEGA DEALS",
-    text: "Azadi Celebration: Up to 50% OFF with voucher AZADI2026 at checkout!",
-    link: "/category/mobiles-tech",
-    linkText: "Shop Deals",
-  },
-  {
-    id: 2,
-    tag: "🚚 FREE DELIVERY",
-    text: "Zero shipping charges on all orders above PKR 5,000 nationwide across Pakistan.",
-    link: "/cart",
-    linkText: "Learn More",
-  },
-  {
-    id: 3,
-    tag: "🛡️ SECURE CHECKOUT",
-    text: "100% Safe Prepayments & 7-Day Hassle-Free Returns with Escrow Buyer Protection.",
-    link: "/buyer-protection",
-    linkText: "View Guarantee",
-  },
-  {
-    id: 4,
-    tag: "🏪 SELL ON WAW",
-    text: "0% Listing Fees & Nationwide PostEx Pickups for verified Pakistani merchants.",
-    link: "/sell",
-    linkText: "Register Store",
-  },
-];
-
-
-
 const TRANSLATIONS = {
   EN: {
     deliverTo: "Deliver to",
@@ -170,9 +113,29 @@ export function Header() {
     { label: "🔥 Mega Deals", href: "/search", highlight: "deals" },
     { label: "🏬 Verified Shops", href: "/search?sellerType=3P", highlight: "shops" }
   ]);
+  const [config, setConfig] = useState({
+    cities: ["Lahore", "Karachi"],
+    popularSearches: ["Smart Watches", "Lawn 2026"],
+    promotionalAnnouncements: [{ tag: "LOADING", text: "Loading offers...", link: "/", linkText: "" }] as any[]
+  });
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.EN;
+
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/config/storefront`);
+        if (res.ok) {
+          const data = await res.json();
+          setConfig(data);
+        }
+      } catch (err) {
+        console.error("Failed to load storefront config", err);
+      }
+    }
+    loadConfig();
+  }, []);
 
   useEffect(() => {
     async function loadCats() {
@@ -234,7 +197,7 @@ export function Header() {
   useEffect(() => {
     const timer = setInterval(() => {
       setActivePromoIndex(
-        (prev) => (prev + 1) % PROMOTIONAL_ANNOUNCEMENTS.length,
+        (prev) => (prev + 1) % config.promotionalAnnouncements.length,
       );
     }, 5000);
     return () => clearInterval(timer);
@@ -304,7 +267,7 @@ export function Header() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const activePromo = PROMOTIONAL_ANNOUNCEMENTS[activePromoIndex];
+  const activePromo = config.promotionalAnnouncements[activePromoIndex];
 
   return (
     <>
@@ -332,7 +295,7 @@ export function Header() {
             {/* Announcement Controls & Ticker Indicators */}
             <div className="hidden sm:flex items-center gap-2 text-slate-400 shrink-0">
               <div className="flex items-center gap-1">
-                {PROMOTIONAL_ANNOUNCEMENTS.map((_, idx) => (
+                {config.promotionalAnnouncements.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActivePromoIndex(idx)}
@@ -378,7 +341,7 @@ export function Header() {
                       {t.selectCity}
                     </div>
                     <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto">
-                      {PAKISTAN_CITIES.map((city) => (
+                      {config.cities.map((city) => (
                         <button
                           key={city}
                           onClick={() => {
@@ -456,7 +419,7 @@ export function Header() {
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {POPULAR_SEARCHES.map((tag) => (
+                    {config.popularSearches.map((tag) => (
                       <button
                         key={tag}
                         onClick={() => {

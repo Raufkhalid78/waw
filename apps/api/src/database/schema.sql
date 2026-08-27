@@ -512,27 +512,37 @@ ALTER TABLE xpay_webhooks_log ENABLE ROW LEVEL SECURITY;
 -- 16. RLS Policies (Phase 2)
 
 -- PROFILES: Users can read and update their own profile
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (id = auth.uid()::TEXT);
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (id = auth.uid()::TEXT);
 
 -- STORES: Public read, owners can mutate
+DROP POLICY IF EXISTS "Stores are publicly readable" ON stores;
 CREATE POLICY "Stores are publicly readable" ON stores FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Store owners can update their store" ON stores;
 CREATE POLICY "Store owners can update their store" ON stores FOR UPDATE USING (owner_id = auth.uid()::TEXT);
 
 -- PRODUCTS: Public read, store owners can mutate
+DROP POLICY IF EXISTS "Products are publicly readable" ON products;
 CREATE POLICY "Products are publicly readable" ON products FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Store owners can insert products" ON products;
 CREATE POLICY "Store owners can insert products" ON products FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM stores WHERE stores.id = store_id AND stores.owner_id = auth.uid()::TEXT)
 );
+DROP POLICY IF EXISTS "Store owners can update products" ON products;
 CREATE POLICY "Store owners can update products" ON products FOR UPDATE USING (
   EXISTS (SELECT 1 FROM stores WHERE stores.id = store_id AND stores.owner_id = auth.uid()::TEXT)
 );
+DROP POLICY IF EXISTS "Store owners can delete products" ON products;
 CREATE POLICY "Store owners can delete products" ON products FOR DELETE USING (
   EXISTS (SELECT 1 FROM stores WHERE stores.id = store_id AND stores.owner_id = auth.uid()::TEXT)
 );
 
 -- PRODUCT VARIANTS: Public read, store owners can mutate
+DROP POLICY IF EXISTS "Variants are publicly readable" ON product_variants;
 CREATE POLICY "Variants are publicly readable" ON product_variants FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Store owners can manage variants" ON product_variants;
 CREATE POLICY "Store owners can manage variants" ON product_variants FOR ALL USING (
   EXISTS (
     SELECT 1 FROM products 
@@ -542,10 +552,13 @@ CREATE POLICY "Store owners can manage variants" ON product_variants FOR ALL USI
 );
 
 -- ORDERS & PAYMENTS: Buyers can see their own
+DROP POLICY IF EXISTS "Buyers can view own orders" ON orders;
 CREATE POLICY "Buyers can view own orders" ON orders FOR SELECT USING (buyer_id = auth.uid()::TEXT);
+DROP POLICY IF EXISTS "Buyers can view own order items" ON order_items;
 CREATE POLICY "Buyers can view own order items" ON order_items FOR SELECT USING (
   EXISTS (SELECT 1 FROM orders WHERE orders.id = order_items.order_id AND orders.buyer_id = auth.uid()::TEXT)
 );
+DROP POLICY IF EXISTS "Buyers can view own payments" ON payments;
 CREATE POLICY "Buyers can view own payments" ON payments FOR SELECT USING (
   EXISTS (SELECT 1 FROM orders WHERE orders.id = payments.order_id AND orders.buyer_id = auth.uid()::TEXT)
 );

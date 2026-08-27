@@ -71,11 +71,23 @@ export class ProductService {
     } = await dbQuery.range(from, to);
 
     const total = count || 0;
+    
+    // Dynamically calculate applicable facets from the result set
+    const validItems = items || [];
+    const facets = {
+      minPrice: validItems.length ? Math.min(...validItems.map((i: any) => i.base_price_pkr || 0)) : 0,
+      maxPrice: validItems.length ? Math.max(...validItems.map((i: any) => i.base_price_pkr || 0)) : 0,
+      cities: Array.from(new Set(validItems.map((i: any) => i.store?.city).filter(Boolean))),
+      sellerTypes: Array.from(new Set(validItems.map((i: any) => i.store?.seller_type || (i.is_first_party ? 'FIRST_PARTY' : 'THIRD_PARTY')).filter(Boolean))),
+      categories: Array.from(new Set(validItems.map((i: any) => i.category?.name).filter(Boolean)))
+    };
+
     return {
-      items: items || [],
+      items: validItems,
       total,
       page,
       totalPages: Math.ceil(total / limit),
+      facets
     };
   }
 

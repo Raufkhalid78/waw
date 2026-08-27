@@ -17,15 +17,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-const PAKISTAN_CITIES = [
-  "All Cities",
-  "Lahore",
-  "Karachi",
-  "Islamabad",
-  "Peshawar",
-  "Sialkot",
-  "Multan",
-];
+
 
 export default function CategoryPage() {
   const params = useParams();
@@ -47,6 +39,8 @@ export default function CategoryPage() {
     "featured" | "price-asc" | "price-desc" | "rating"
   >("featured");
 
+  const [facets, setFacets] = useState<any>({ minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] });
+
   useEffect(() => {
     async function loadCategoryData() {
       setLoading(true);
@@ -62,7 +56,10 @@ export default function CategoryPage() {
           }),
         ]);
         setCategory(catData);
-        setProducts(prodData);
+        if (prodData) {
+          setProducts(prodData.items || []);
+          if (prodData.facets) setFacets(prodData.facets);
+        }
       } catch (err) {
         console.error("Failed to load category data:", err);
       } finally {
@@ -74,12 +71,28 @@ export default function CategoryPage() {
 
   // Fallback category metadata if database lookup is pending/offline
   const categoryTitle = isUrdu
-    ? category?.nameUrdu || category?.name || "زمرہ"
-    : category?.name || slug.replace(/-/g, " ").toUpperCase();
+    ? category?.nameUrdu || category?.name
+    : category?.name;
 
   const categoryDesc = isUrdu
-    ? category?.descriptionUrdu || category?.description || "مستند پاکستانی مصنوعات دریافت کریں۔"
-    : category?.description || "Explore authentic verified Pakistani products with secure payment protection.";
+    ? category?.descriptionUrdu || category?.description
+    : category?.description;
+
+  if (loading) {
+    return <div className="p-10 text-center text-slate-500 font-bold">Loading Category...</div>;
+  }
+
+  if (!category) {
+    return (
+      <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-20 text-center space-y-4">
+        <h1 className="text-2xl font-black text-slate-900">Category Not Found</h1>
+        <p className="text-slate-500 font-medium">The category you are looking for does not exist or is currently inactive.</p>
+        <Link href="/" className="inline-block mt-4 bg-amber-500 text-slate-950 px-6 py-2.5 rounded-full font-black uppercase text-sm tracking-wider">
+          Back to Home
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-8 space-y-8">
@@ -144,6 +157,44 @@ export default function CategoryPage() {
               {isUrdu ? "تمام ری سیٹ کریں" : "Reset All"}
             </button>
           </div>
+
+          {/* City Filter (Dynamic) */}
+          {facets.cities && facets.cities.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-700">
+                {isUrdu ? "شہر:" : "Ships From:"}
+              </div>
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-400"
+              >
+                <option value="All Cities">{isUrdu ? "تمام شہر" : "All Cities"}</option>
+                {facets.cities.map((city: string) => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Price Range (Dynamic) */}
+          {facets.maxPrice > 0 && (
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>{isUrdu ? "زیادہ سے زیادہ قیمت:" : "Max Price:"}</span>
+                <span className="text-amber-600">Rs. {maxPrice.toLocaleString()}</span>
+              </div>
+              <input
+                type="range"
+                min={facets.minPrice || 0}
+                max={facets.maxPrice || 500000}
+                step={500}
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(Number(e.target.value))}
+                className="w-full accent-amber-500"
+              />
+            </div>
+          )}
 
           {/* Fulfillment Type */}
           <div className="space-y-2">
@@ -232,7 +283,6 @@ export default function CategoryPage() {
                   sellerCity={prod.sellerCity}
                   isExpress={prod.isExpress}
                   soldCount={prod.soldCount}
-                  deliveryTime={prod.deliveryTime}
                 />
               ))}
             </div>

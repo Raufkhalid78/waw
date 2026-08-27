@@ -24,27 +24,6 @@ import {
 } from "lucide-react";
 import { SellerType } from "@waw/types";
 
-const CITIES = [
-  "All Cities",
-  "Lahore",
-  "Karachi",
-  "Islamabad",
-  "Peshawar",
-  "Sialkot",
-  "Multan",
-  "Faisalabad",
-];
-const CATEGORIES = [
-  "All Categories",
-  "Leather & Footwear",
-  "Mobiles & Tech",
-  "Women's Lawn",
-  "Smart Watches",
-  "Sialkot Sports",
-  "Power & Chargers",
-  "Fragrances & Attar",
-];
-
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -69,6 +48,7 @@ function SearchContent() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const [products, setProducts] = useState<ProductDetail[]>([]);
+  const [facets, setFacets] = useState<any>({ minPrice: 0, maxPrice: 100000, cities: [], sellerTypes: [], categories: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -80,7 +60,8 @@ function SearchContent() {
         selectedCategory !== "All Categories" ? selectedCategory : undefined,
     }).then((data) => {
       if (active) {
-        setProducts(data);
+        setProducts(data.items || []);
+        if (data.facets) setFacets(data.facets);
         setLoading(false);
       }
     });
@@ -324,7 +305,7 @@ function SearchContent() {
                 Category
               </label>
               <div className="space-y-1">
-                {CATEGORIES.map((cat) => (
+                {["All Categories", ...(facets.categories || [])].map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
@@ -352,7 +333,7 @@ function SearchContent() {
                 <input
                   type="number"
                   min="0"
-                  max="10000"
+                  max={facets.maxPrice || 100000}
                   value={minPrice}
                   onChange={(e) => setMinPrice(Number(e.target.value))}
                   placeholder="Min"
@@ -362,7 +343,7 @@ function SearchContent() {
                 <input
                   type="number"
                   min="0"
-                  max="10000"
+                  max={facets.maxPrice || 100000}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
                   placeholder="Max"
@@ -371,15 +352,15 @@ function SearchContent() {
               </div>
               <input
                 type="range"
-                min="500"
-                max="10000"
+                min={facets.minPrice || 0}
+                max={facets.maxPrice || 100000}
                 step="250"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
                 className="w-full accent-amber-500 cursor-pointer"
               />
               <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                <span>PKR 0</span>
+                <span>PKR {facets.minPrice || 0}</span>
                 <span>PKR {maxPrice.toLocaleString()}</span>
               </div>
             </div>
@@ -420,9 +401,9 @@ function SearchContent() {
                 onChange={(e) => setSelectedCity(e.target.value)}
                 className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
               >
-                {CITIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {(facets.cities || []).map((city: string) => (
+                  <option key={city} value={city}>
+                    {city}
                   </option>
                 ))}
               </select>
@@ -482,7 +463,6 @@ function SearchContent() {
                   sellerType={prod.sellerType}
                   storeName={prod.storeName}
                   sellerCity={prod.sellerCity}
-                  deliveryTime={prod.deliveryTime}
                   imageUrl={prod.images[0]}
                 />
               ))}

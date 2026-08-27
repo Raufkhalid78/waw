@@ -37,12 +37,12 @@ export default function StoreProfilePage() {
         if (storeData) {
           setStore(storeData);
           const data = await fetchProducts();
-          const matching = data.filter(
+          const matching = (data.items || []).filter(
             (p) =>
               p.storeSlug === storeData.slug ||
               p.storeName?.toLowerCase() === storeData.name?.toLowerCase(),
           );
-          setProducts(matching.length > 0 ? matching : data.slice(0, 4));
+          setProducts(matching);
         }
       } catch (err) {
         console.error("Failed to load store:", err);
@@ -182,27 +182,35 @@ export default function StoreProfilePage() {
         </div>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          {displayProducts.map((prod) => (
-            <ProductCard
-              key={prod.productId}
-              productId={prod.productId}
-              title={prod.title}
-              pricePkr={prod.pricePkr}
-              originalPricePkr={prod.originalPricePkr}
-              discountPercent={prod.discountPercent}
-              rating={prod.rating}
-              reviewsCount={prod.reviewsCount}
-              soldCount={prod.soldCount}
-              isExpress={prod.isExpress}
-              sellerType={prod.sellerType}
-              storeName={prod.storeName}
-              sellerCity={prod.sellerCity}
-              deliveryTime={prod.deliveryTime}
-              imageUrl={prod.images[0]}
-            />
-          ))}
-        </div>
+        {displayProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            {displayProducts.map((prod) => (
+              <ProductCard
+                key={prod.productId}
+                productId={prod.productId}
+                title={prod.title}
+                pricePkr={prod.pricePkr}
+                originalPricePkr={prod.originalPricePkr}
+                discountPercent={prod.discountPercent}
+                rating={prod.rating}
+                reviewsCount={prod.reviewsCount}
+                soldCount={prod.soldCount}
+                isExpress={prod.isExpress}
+                sellerType={prod.sellerType}
+                storeName={prod.storeName}
+                sellerCity={prod.sellerCity}
+                imageUrl={prod.images[0]}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
+            <h3 className="text-lg font-black text-slate-800">No active listings</h3>
+            <p className="text-sm text-slate-500 font-medium mt-1">
+              This store does not currently have any products available for purchase.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

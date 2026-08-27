@@ -113,13 +113,19 @@ export function CategoryCircles() {
               >
                 {/* Circular Image Frame with Gradient Ring */}
                 <div className="relative w-22 h-22 sm:w-28 sm:h-28 rounded-full p-1.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 shadow-md group-hover:shadow-xl transition-all group-hover:scale-105">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5 border-2 border-white">
-                    <img
-                      src={cat.imageUrl || "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=300&auto=format&fit=crop&q=80"}
-                      alt={cat.name}
-                      loading="lazy"
-                      className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
-                    />
+                  <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5 border-2 border-white flex items-center justify-center bg-slate-50">
+                    {cat.imageUrl ? (
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.name}
+                        loading="lazy"
+                        className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <span className="text-slate-300 font-black text-xl flex items-center justify-center w-full h-full rounded-full group-hover:scale-110 transition-transform duration-300">
+                        واو
+                      </span>
+                    )}
                   </div>
 
                   {/* Top Floating Badge */}

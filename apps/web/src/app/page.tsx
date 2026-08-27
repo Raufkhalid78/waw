@@ -226,7 +226,6 @@ export default function HomePage() {
                   imageUrl={prod.imageUrl}
                   isExpress={prod.isExpress}
                   sellerType={prod.sellerType}
-                  deliveryTime={prod.deliveryTime}
                 />
               ))}
             </div>
