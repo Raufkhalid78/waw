@@ -1,62 +1,29 @@
 import { Request, Response } from "express";
+import { supabaseAdmin } from "../../config/supabase.js";
 
 export class ConfigController {
   static async getStorefrontConfig(req: Request, res: Response): Promise<void> {
     try {
-      // In a fully dynamic system, these would be fetched from a CMS or DB table.
-      // For now, we govern them here at the API level instead of hardcoding in the frontend.
+      const [citiesRes, searchesRes, campaignsRes] = await Promise.all([
+        supabaseAdmin.from('serviceability_locations').select('city_name').eq('is_active', true).order('city_name'),
+        supabaseAdmin.from('search_suggestions').select('term').eq('is_active', true).order('score', { ascending: false }).limit(10),
+        supabaseAdmin.from('campaigns').select('*').eq('is_active', true).eq('campaign_type', 'PROMO_STRIP').order('sort_order', { ascending: true })
+      ]);
+
+      if (citiesRes.error) throw citiesRes.error;
+      if (searchesRes.error) throw searchesRes.error;
+      if (campaignsRes.error) throw campaignsRes.error;
+
       const config = {
-        cities: [
-          "Lahore",
-          "Karachi",
-          "Islamabad",
-          "Rawalpindi",
-          "Faisalabad",
-          "Peshawar",
-          "Multan",
-          "Sialkot",
-          "Gujranwala",
-          "Quetta",
-        ],
-        popularSearches: [
-          "Khaadi Lawn 2026",
-          "AirPods Pro ANC",
-          "Pure Leather Wallet",
-          "Peshawari Chappal",
-          "Amoled Smart Watch",
-          "Sialkot Match Football",
-          "Royal Oud Attar",
-        ],
-        promotionalAnnouncements: [
-          {
-            id: 1,
-            tag: "⚡ MEGA DEALS",
-            text: "Azadi Celebration: Up to 50% OFF with voucher AZADI2026 at checkout!",
-            link: "/category/mobiles-tech",
-            linkText: "Shop Deals",
-          },
-          {
-            id: 2,
-            tag: "🚚 FREE DELIVERY",
-            text: "Zero shipping charges on all orders above PKR 5,000 nationwide across Pakistan.",
-            link: "/cart",
-            linkText: "Learn More",
-          },
-          {
-            id: 3,
-            tag: "🛡️ SECURE CHECKOUT",
-            text: "100% Safe Prepayments & 7-Day Hassle-Free Returns with Escrow Buyer Protection.",
-            link: "/buyer-protection",
-            linkText: "View Guarantee",
-          },
-          {
-            id: 4,
-            tag: "🏪 SELL ON WAW",
-            text: "0% Listing Fees & Nationwide PostEx Pickups for verified Pakistani merchants.",
-            link: "/sell",
-            linkText: "Register Store",
-          },
-        ]
+        cities: citiesRes.data.map((c: any) => c.city_name),
+        popularSearches: searchesRes.data.map((s: any) => s.term),
+        promotionalAnnouncements: campaignsRes.data.map((c: any) => ({
+          id: c.id,
+          tag: c.tag,
+          text: c.title,
+          link: c.link_url,
+          linkText: c.link_text
+        }))
       };
       
       res.json(config);

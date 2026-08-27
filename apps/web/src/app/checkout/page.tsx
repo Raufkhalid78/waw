@@ -104,7 +104,7 @@ export default function CheckoutPage() {
     return () => {
       isMounted = false;
     };
-  }, [items, formData.city, paymentMethod, appliedVoucher?.code]);
+  }, [items, formData.city, paymentMethod, appliedVoucher]);
 
   const handleApplyVoucher = (e: React.FormEvent) => {
     e.preventDefault();

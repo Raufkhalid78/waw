@@ -201,7 +201,7 @@ export function Header() {
       );
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [config.promotionalAnnouncements.length]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
