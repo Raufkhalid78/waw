@@ -4,9 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { CategoryCircles } from "@/components/home/CategoryCircles";
-import { FlashDeals } from "@/components/home/FlashDeals";
-import { StoreSpotlight } from "@/components/home/StoreSpotlight";
-import { FeaturedBrands } from "@/components/home/FeaturedBrands";
 import { ProductCard } from "@/components/ui/ProductCard";
 import {
   Flame,
@@ -14,10 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Sparkles,
-  Truck,
-  Award,
-  Zap,
 } from "lucide-react";
 import { SellerType } from "@waw/types";
 import { fetchProducts } from "@/lib/api";
@@ -66,41 +59,32 @@ export default function HomePage() {
     async function loadCatalog() {
       try {
         const data = await fetchProducts();
-        if (Array.isArray(data)) {
-          setLiveProducts(
-            data.map((p: any) => ({
-              productId: p.id,
-              title: p.title,
-              category: (p.categoryName || "Mobiles & Tech") as MarketTab,
-              pricePkr: p.pricePkr || 2999,
-              originalPricePkr:
-                p.compareAtPricePkr ||
-                (p.pricePkr ? Math.round(p.pricePkr * 1.3) : 3999),
-              discountPercent: p.compareAtPricePkr
-                ? Math.round(
-                    ((p.compareAtPricePkr - p.pricePkr) / p.compareAtPricePkr) *
-                      100,
-                  )
-                : 25,
-              rating: p.ratingAverage || 0,
-              reviewsCount: p.reviewsCount || 0,
-              soldCount: p.soldCount || 0,
-              isExpress: p.isFirstParty ?? true,
-              sellerType: p.isFirstParty
-                ? SellerType.FIRST_PARTY
-                : SellerType.THIRD_PARTY,
-              storeName: p.storeName || "Waw Official Hub",
-              sellerCity: "Pakistan",
-              deliveryTime: "2-3 Days Fast Dispatch",
-              imageUrl:
-                p.imageUrl ||
-                p.images?.[0] ||
-                "https://images.unsplash.com/photo-1547949003-9792a18a2601?w=600&auto=format&fit=crop&q=80",
-            })),
-          );
-        }
+        const products = Array.isArray(data) ? data : data?.items || [];
+        
+        setLiveProducts(
+          products.map((p: any) => ({
+            productId: p.id,
+            title: p.title,
+            category: p.categoryName || "Mobiles & Tech",
+            pricePkr: p.pricePkr || 0,
+            originalPricePkr: p.compareAtPricePkr,
+            discountPercent: p.compareAtPricePkr && p.pricePkr
+              ? Math.round(((p.compareAtPricePkr - p.pricePkr) / p.compareAtPricePkr) * 100)
+              : undefined,
+            rating: p.ratingAverage || 0,
+            reviewsCount: p.reviewsCount || 0,
+            soldCount: p.soldCount || 0,
+            isExpress: p.isFirstParty ?? false,
+            sellerType: p.isFirstParty ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
+            storeName: p.storeName || "Waw Official Hub",
+            sellerCity: p.sellerCity || "Pakistan",
+            imageUrl: p.imageUrl || p.images?.[0] || "",
+          })),
+        );
       } catch (err) {
-        console.warn("Using baseline catalog for buyer homepage:", err);
+        console.error("Failed to load catalog:", err);
+      } finally {
+        setLoading(false);
       }
     }
     loadCatalog();
@@ -123,20 +107,11 @@ export default function HomePage() {
 
   return (
     <div className="space-y-3 pb-20">
-      {/* 1. Dynamic Hero Carousel + Sidekicks + Live Confidence Ticker */}
+      {/* 1. Dynamic Hero Banner */}
       <HeroBanner />
 
       {/* 2. Circular Category Story Bubbles */}
       <CategoryCircles />
-
-      {/* 3. Lightning Flash Deals Section */}
-      <FlashDeals />
-
-      {/* 4. Multi-Vendor Store Spotlight (Etsy & Noon Style) */}
-      <StoreSpotlight />
-
-      {/* 6. Official Brand Malls & Regional Hubs */}
-      <FeaturedBrands />
 
       {/* 7. Trending Marketplace Catalog with Multi-Tab Filtering */}
       <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
