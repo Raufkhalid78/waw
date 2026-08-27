@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { RatingStars, WawExpressBadge } from "./Badges";
-import type { SellerType } from "@waw/types";
+import { SellerType } from "@waw/types";
 
 export interface ProductCardProps {
   productId: string;
@@ -23,6 +23,8 @@ export interface ProductCardProps {
   storeName: string;
   sellerCity?: string;
   sellerRating?: number;
+  isStoreVerified?: boolean;
+  hasInstallments?: boolean;
   pricePkr: number;
   originalPricePkr?: number;
   discountPercent?: number;
@@ -41,6 +43,8 @@ export function ProductCard({
   storeName,
   sellerCity,
   sellerRating,
+  isStoreVerified,
+  hasInstallments,
   pricePkr,
   originalPricePkr,
   discountPercent,
@@ -57,6 +61,9 @@ export function ProductCard({
   const [added, setAdded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
+  const isVerifiedMerchant = isExpress || sellerType === SellerType.FIRST_PARTY || Boolean(isStoreVerified);
+  const hasRealDiscount = originalPricePkr !== undefined && originalPricePkr > pricePkr;
+  const savings = hasRealDiscount ? originalPricePkr - pricePkr : 0;
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -74,7 +81,6 @@ export function ProductCard({
     setTimeout(() => setAdded(false), 1600);
   };
 
-  const savings = originalPricePkr ? originalPricePkr - pricePkr : 0;
   const displayTitle = isUrdu && titleUrdu ? titleUrdu : title;
 
   return (
@@ -98,7 +104,7 @@ export function ProductCard({
 
           {/* Top Badges Row */}
           <div className="absolute top-2 left-2 flex flex-col gap-1.5 z-10">
-            {discountPercent && (
+            {hasRealDiscount && discountPercent && discountPercent > 0 && (
               <span className="bg-amber-400 text-slate-950 text-xs font-black px-2 py-1 rounded-md shadow-sm w-fit">
                 -{discountPercent}% OFF
               </span>
@@ -142,7 +148,9 @@ export function ProductCard({
         {/* ── 2. Seller Identity (Multi-Vendor Trust) ────────────────── */}
         <div className="flex items-center justify-between gap-1 mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            {isVerifiedMerchant && (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            )}
             <span className="text-xs font-bold text-slate-700 truncate">
               {storeName}
             </span>
@@ -162,22 +170,28 @@ export function ProductCard({
         </Link>
 
         {/* ── 4. Ratings & Social Proof ───────────────────────────────── */}
-        <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
-          <div className="flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/60">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span className="text-xs sm:text-sm font-black text-slate-900">
-              {rating}
+        <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm min-h-[22px]">
+          {reviewsCount > 0 && rating > 0 ? (
+            <div className="flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/60">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span className="text-xs sm:text-sm font-black text-slate-900">
+                {rating}
+              </span>
+              <span className="text-xs text-slate-400 font-semibold">
+                ({reviewsCount})
+              </span>
+            </div>
+          ) : (
+            <span className="text-[11px] font-semibold text-slate-400">
+              New
             </span>
-            <span className="text-xs text-slate-400 font-semibold">
-              ({reviewsCount})
-            </span>
-          </div>
+          )}
 
-          {soldCount && (
+          {soldCount && soldCount > 0 ? (
             <span className="text-xs text-slate-500 font-semibold">
               {soldCount.toLocaleString()}+ sold
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -188,7 +202,7 @@ export function ProductCard({
             <div className="text-lg sm:text-xl font-black text-slate-950 tracking-tight leading-none">
               PKR {pricePkr.toLocaleString()}
             </div>
-            {originalPricePkr && (
+            {hasRealDiscount && (
               <div className="text-xs sm:text-sm text-slate-400 line-through mt-1 font-semibold">
                 PKR {originalPricePkr.toLocaleString()}
               </div>
@@ -202,8 +216,8 @@ export function ProductCard({
           )}
         </div>
 
-        {/* BNPL Badge */}
-        {pricePkr >= 15000 && pricePkr <= 70000 && (
+        {/* BNPL Badge (Only when verified attribute exists) */}
+        {hasInstallments && (
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2 py-1 font-bold w-fit">
             <Sparkles className="w-3 h-3" />
             Bank Installments Available

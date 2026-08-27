@@ -31,10 +31,11 @@ export class ProductService {
     let dbQuery = supabaseAdmin
       .from("products")
       .select(
-        `id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, is_featured, is_sponsored, sold_count, merchandising_rank, created_at, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), ${storeSelect}, category:categories(id, name, name_urdu, slug)`,
+        `id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, status, is_featured, is_sponsored, sold_count, merchandising_rank, created_at, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), ${storeSelect}, category:categories(id, name, name_urdu, slug)`,
         { count: "exact" },
       )
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("status", "ACTIVE");
 
     if (hasCityFilter) {
       dbQuery = dbQuery.ilike("store.city", `%${query.city}%`);
@@ -113,10 +114,11 @@ export class ProductService {
     const { data: product, error } = await supabaseAdmin
       .from("products")
       .select(
-        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, is_featured, is_sponsored, sold_count, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug), reviews(id, rating, comment, created_at, is_verified_purchase)",
+        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, status, is_featured, is_sponsored, sold_count, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug), reviews(id, rating, comment, created_at, is_verified_purchase)",
       )
       .or(`slug.eq.${slug},id.eq.${slug}`)
       .eq("is_active", true)
+      .eq("status", "ACTIVE")
       .maybeSingle();
 
     if (error) {
@@ -182,6 +184,10 @@ export class ProductService {
       data.isFirstParty ??
       (data.storeId === null || data.storeId === undefined);
 
+    const isDirectActive = isFirstParty || (user && user.role === "ADMIN");
+    const listingStatus = isDirectActive ? "ACTIVE" : "PENDING_REVIEW";
+    const isActive = isDirectActive;
+
     const price = data.basePricePkr ?? data.pricePkr ?? 0;
     const rawImages = Array.isArray(data.images) && data.images.length > 0
       ? data.images
@@ -207,8 +213,8 @@ export class ProductService {
         thumbnail: rawImages[0] || null,
         seller_type: isFirstParty ? "FIRST_PARTY" : "THIRD_PARTY",
         is_first_party: isFirstParty,
-        is_active: true,
-        status: "ACTIVE",
+        is_active: isActive,
+        status: listingStatus,
         weight_kg: data.weightKg || 1.0,
         created_at: new Date().toISOString(),
       })
@@ -218,27 +224,29 @@ export class ProductService {
     if (error)
       throw new Error(`Supabase product creation failed: ${error.message}`);
 
-    // Insert variants if provided, or insert single default variant with stock
+    // Insert variants with explicit inventory (default stock is 0 if not provided)
+    const defaultStock = data.stockQuantity ?? 0;
     if (data.variants && data.variants.length > 0) {
-      const variantInserts = data.variants.map((v, idx) => ({
-        id: `var_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 5)}`,
+      const variantInserts = data.variants.map((v, i) => ({
+        id: `var_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 5)}`,
         product_id: product.id,
-        sku: v.sku || `${product.id}-VAR-${idx + 1}`,
-        price_adjustment_pkr: v.priceAdjustmentPkr ?? (v.pricePkr ? v.pricePkr - price : 0),
-        stock_quantity: v.stockQuantity ?? v.stock ?? 0,
-        is_active: true,
+        sku: v.sku || `${product.slug}-v${i + 1}`,
+        title: v.title || `Variant ${i + 1}`,
+        price_adjustment_pkr: v.priceAdjustmentPkr ?? 0,
+        stock_quantity: v.stockQuantity ?? v.stock ?? defaultStock,
+        is_active: isActive,
       }));
       await supabaseAdmin.from("product_variants").insert(variantInserts);
     } else {
-      const defaultStock = data.stockQuantity ?? 100;
-      const defaultSku = data.sku || `SKU-${product.id.slice(-6).toUpperCase()}`;
+      // Default single variant with explicit stock
       await supabaseAdmin.from("product_variants").insert({
-        id: `var_${Date.now()}_def`,
+        id: `var_${Date.now()}_0_${Math.random().toString(36).substring(2, 5)}`,
         product_id: product.id,
-        sku: defaultSku,
+        sku: data.sku || `${product.slug}-std`,
+        title: "Standard",
         price_adjustment_pkr: 0,
         stock_quantity: defaultStock,
-        is_active: true,
+        is_active: isActive,
       });
     }
 

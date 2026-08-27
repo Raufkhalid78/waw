@@ -18,17 +18,19 @@ if (typeof window !== "undefined") {
 
 function mapApiProductToDetail(p: any): ProductDetail {
   const basePrice = Number(p.base_price_pkr ?? p.price_pkr ?? p.basePricePkr ?? p.pricePkr ?? 0);
-  const comparePrice = p.compare_at_price_pkr ?? p.comparePricePkr ?? p.compareAtPricePkr ?? (basePrice > 0 ? basePrice : undefined);
-  const discountPercent =
-    comparePrice && comparePrice > basePrice
-      ? Math.round(((comparePrice - basePrice) / comparePrice) * 100)
-      : 0;
+  const comparePrice = (p.compare_at_price_pkr ?? p.comparePricePkr ?? p.compareAtPricePkr) 
+    ? Number(p.compare_at_price_pkr ?? p.comparePricePkr ?? p.compareAtPricePkr) 
+    : undefined;
+  const hasRealDiscount = comparePrice !== undefined && comparePrice > basePrice;
+  const discountPercent = hasRealDiscount
+    ? Math.round(((comparePrice - basePrice) / comparePrice) * 100)
+    : 0;
 
   // Derive stock by summing up active variants stock, or fallback to root property
   const activeVariants = Array.isArray(p.variants) ? p.variants.filter((v: any) => v.is_active !== false) : [];
   const stockCount = activeVariants.length > 0 
     ? activeVariants.reduce((sum: number, v: any) => sum + (v.stock_quantity ?? v.stockQuantity ?? 0), 0)
-    : Number(p.stock_quantity ?? p.stockQuantity ?? 100);
+    : Number(p.stock_quantity ?? p.stockQuantity ?? 0);
 
   const rawImages = Array.isArray(p.images) && p.images.length > 0
     ? p.images
@@ -44,10 +46,10 @@ function mapApiProductToDetail(p: any): ProductDetail {
     categorySlug: p.category?.slug || p.categorySlug || "",
     categoryId: p.category_id || p.categoryId || p.category?.id || "",
     pricePkr: basePrice,
-    originalPricePkr: comparePrice || basePrice,
-    discountPercent,
-    rating: Number(p.rating_average ?? p.ratingAverage ?? p.rating ?? 0),
-    reviewsCount: Number(p.rating_count ?? p.ratingCount ?? p.reviewsCount ?? (Array.isArray(p.reviews) ? p.reviews.length : 0)),
+    originalPricePkr: hasRealDiscount ? comparePrice : undefined,
+    discountPercent: hasRealDiscount ? discountPercent : 0,
+    rating: p.rating_average !== undefined && p.rating_average !== null ? Number(p.rating_average) : (p.ratingAverage !== undefined ? Number(p.ratingAverage) : 0),
+    reviewsCount: p.rating_count !== undefined && p.rating_count !== null ? Number(p.rating_count) : (p.ratingCount !== undefined ? Number(p.ratingCount) : (Array.isArray(p.reviews) ? p.reviews.length : 0)),
     soldCount: Number(p.sold_count ?? p.soldCount ?? 0),
     isExpress: Boolean(p.is_first_party ?? p.isFirstParty ?? false),
     sellerType: p.is_first_party || p.isFirstParty
@@ -67,13 +69,13 @@ function mapApiProductToDetail(p: any): ProductDetail {
     sku: p.sku || (activeVariants[0]?.sku ?? ""),
     reviews: Array.isArray(p.reviews) ? p.reviews.map((r: any) => ({
       id: r.id,
-      author: r.author || r.profiles?.full_name || "Verified Buyer",
-      city: r.city || "Pakistan",
-      rating: r.rating || 5,
-      date: r.created_at ? new Date(r.created_at).toLocaleDateString() : (r.date || "Recent"),
+      author: r.author || r.profiles?.full_name || "",
+      city: r.city || "",
+      rating: Number(r.rating || 0),
+      date: r.created_at ? new Date(r.created_at).toLocaleDateString() : (r.date || ""),
       comment: r.comment || "",
-      verifiedPurchase: r.is_verified_purchase ?? r.verifiedPurchase ?? true,
-      is_verified_purchase: r.is_verified_purchase ?? r.verifiedPurchase ?? true,
+      verifiedPurchase: Boolean(r.is_verified_purchase ?? r.verifiedPurchase ?? false),
+      is_verified_purchase: Boolean(r.is_verified_purchase ?? r.verifiedPurchase ?? false),
       created_at: r.created_at,
     })) : [],
   };
@@ -174,7 +176,7 @@ export async function fetchProducts(params?: {
     
     return {
       items: items.map(mapApiProductToDetail),
-      facets: data.facets || { minPrice: 0, maxPrice: 15000, cities: [], sellerTypes: [] }
+      facets: data.facets || { minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] }
     };
   } catch (error) {
     return { items: [] };
@@ -215,21 +217,21 @@ export async function fetchStoreBySlug(
       city: data.city || "Pakistan",
       location: data.address || data.city || "Pakistan",
       category: data.seller_type === "FIRST_PARTY" ? "Official Retail" : "Verified Merchant",
-      rating: Number(data.rating_average ?? data.ratingAverage ?? 5.0),
-      rating_average: Number(data.rating_average ?? data.ratingAverage ?? 5.0),
+      rating: data.rating_average !== undefined && data.rating_average !== null ? Number(data.rating_average) : undefined,
+      rating_average: data.rating_average !== undefined && data.rating_average !== null ? Number(data.rating_average) : undefined,
       reviewsCount: Number(data.rating_count ?? data.ratingCount ?? 0),
       salesCount: 0,
-      responseRate: "99%",
-      joinedYear: data.created_at ? new Date(data.created_at).getFullYear().toString() : "2026",
-      bannerImage: data.banner_url || data.bannerImage || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop&q=80",
-      banner_url: data.banner_url || data.bannerImage,
-      logoImage: data.logo_url || data.logoImage || "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=150&auto=format&fit=crop&q=80",
-      logo_url: data.logo_url || data.logoImage,
-      about: data.description || "A trusted seller on Waw Marketplace.",
+      responseRate: data.response_rate || undefined,
+      joinedYear: data.created_at ? new Date(data.created_at).getFullYear().toString() : undefined,
+      bannerImage: data.banner_url || data.bannerImage || "",
+      banner_url: data.banner_url || data.bannerImage || "",
+      logoImage: data.logo_url || data.logoImage || "",
+      logo_url: data.logo_url || data.logoImage || "",
+      about: data.description || "",
       description: data.description,
-      kycVerified: data.is_verified ?? (data.status === "ACTIVE"),
-      is_verified: data.is_verified ?? (data.status === "ACTIVE"),
-      isVerified: data.is_verified ?? (data.status === "ACTIVE"),
+      kycVerified: Boolean(data.is_verified ?? (data.status === "ACTIVE")),
+      is_verified: Boolean(data.is_verified ?? (data.status === "ACTIVE")),
+      isVerified: Boolean(data.is_verified ?? (data.status === "ACTIVE")),
       status: data.status,
       seller_type: data.seller_type,
       sellerType: data.seller_type,

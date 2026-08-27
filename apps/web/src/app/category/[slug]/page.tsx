@@ -33,7 +33,7 @@ export default function CategoryPage() {
   const [selectedSellerType, setSelectedSellerType] = useState<
     "ALL" | "1P" | "3P"
   >("ALL");
-  const [maxPrice, setMaxPrice] = useState<number>(15000);
+  const [userMaxPrice, setUserMaxPrice] = useState<number | undefined>(undefined);
   const [minRating, setMinRating] = useState<number>(0);
   const [sortBy, setSortBy] = useState<
     "featured" | "price-asc" | "price-desc" | "rating"
@@ -51,7 +51,7 @@ export default function CategoryPage() {
             categorySlug: slug,
             city: selectedCity !== "All Cities" ? selectedCity : undefined,
             sellerType: selectedSellerType,
-            maxPrice,
+            maxPrice: userMaxPrice,
             sortBy,
           }),
         ]);
@@ -67,7 +67,7 @@ export default function CategoryPage() {
       }
     }
     loadCategoryData();
-  }, [slug, selectedCity, selectedSellerType, maxPrice, sortBy]);
+  }, [slug, selectedCity, selectedSellerType, userMaxPrice, sortBy]);
 
   // Fallback category metadata if database lookup is pending/offline
   const categoryTitle = isUrdu
@@ -149,8 +149,9 @@ export default function CategoryPage() {
             <button
               onClick={() => {
                 setSelectedSellerType("ALL");
-                setMaxPrice(500000);
+                setUserMaxPrice(undefined);
                 setMinRating(0);
+                setSelectedCity("All Cities");
               }}
               className="text-[11px] font-bold text-amber-600 hover:text-amber-700 cursor-pointer"
             >
@@ -182,15 +183,17 @@ export default function CategoryPage() {
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between text-xs font-bold text-slate-700">
                 <span>{isUrdu ? "زیادہ سے زیادہ قیمت:" : "Max Price:"}</span>
-                <span className="text-amber-600">Rs. {maxPrice.toLocaleString()}</span>
+                <span className="text-amber-600">
+                  Rs. {(userMaxPrice !== undefined ? userMaxPrice : facets.maxPrice).toLocaleString()}
+                </span>
               </div>
               <input
                 type="range"
                 min={facets.minPrice || 0}
                 max={facets.maxPrice || 500000}
                 step={500}
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(Number(e.target.value))}
+                value={userMaxPrice !== undefined ? userMaxPrice : facets.maxPrice}
+                onChange={(e) => setUserMaxPrice(Number(e.target.value))}
                 className="w-full accent-amber-500"
               />
             </div>

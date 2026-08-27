@@ -44,6 +44,8 @@ app.use(helmet());
 const TRUSTED_ORIGINS = [
   "https://www.waw.com.pk",
   "https://waw.com.pk",
+  "https://admin.waw.com.pk",
+  "https://seller.waw.com.pk",
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:4000",
@@ -58,11 +60,8 @@ const allowedOriginSet = new Set([...TRUSTED_ORIGINS, ...dynamicOrigins]);
 const isAllowedOrigin = (origin?: string): boolean => {
   if (!origin) return true; // Allow non-browser, server-to-server, curl, Postman requests
   if (allowedOriginSet.has(origin)) return true;
-  // Allow all WAW subdomains
-  if (/^https:\/\/([a-zA-Z0-9-]+\.)*waw\.com\.pk$/.test(origin)) return true;
-  // Allow Vercel preview deployments for WAW
-  if (/^https:\/\/waw-[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)) return true;
-  if (/^https:\/\/waw\.vercel\.app$/.test(origin)) return true;
+  // Allow official WAW subdomains only
+  if (/^https:\/\/(www|admin|seller|api)\.waw\.com\.pk$/.test(origin)) return true;
   return false;
 };
 

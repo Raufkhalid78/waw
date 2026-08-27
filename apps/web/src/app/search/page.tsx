@@ -39,8 +39,8 @@ function SearchContent() {
   const [selectedSellerType, setSelectedSellerType] = useState<
     "ALL" | "1P" | "3P"
   >("ALL");
-  const [minPrice, setMinPrice] = useState<number>(0);
-  const [maxPrice, setMaxPrice] = useState<number>(10000);
+  const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
+  const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
   const [minRating, setMinRating] = useState<number>(0);
   const [sortBy, setSortBy] = useState<
     "featured" | "price_asc" | "price_desc" | "rating" | "popular"
@@ -88,7 +88,8 @@ function SearchContent() {
         // Category filter
         if (
           selectedCategory !== "All Categories" &&
-          prod.category !== selectedCategory
+          prod.category.toLowerCase() !== selectedCategory.toLowerCase() &&
+          prod.categorySlug?.toLowerCase() !== selectedCategory.toLowerCase()
         ) {
           return false;
         }
@@ -96,7 +97,7 @@ function SearchContent() {
         // City filter
         if (
           selectedCity !== "All Cities" &&
-          !prod.sellerCity.includes(selectedCity)
+          prod.sellerCity.toLowerCase() !== selectedCity.toLowerCase()
         ) {
           return false;
         }
@@ -116,12 +117,15 @@ function SearchContent() {
         }
 
         // Price filter
-        if (prod.pricePkr < minPrice || prod.pricePkr > maxPrice) {
+        if (minPrice !== undefined && prod.pricePkr < minPrice) {
+          return false;
+        }
+        if (maxPrice !== undefined && prod.pricePkr > maxPrice) {
           return false;
         }
 
         // Rating filter
-        if (minRating > 0 && prod.rating < minRating) {
+        if (minRating > 0 && (prod.rating ?? 0) < minRating) {
           return false;
         }
 
@@ -130,8 +134,8 @@ function SearchContent() {
       .sort((a, b) => {
         if (sortBy === "price_asc") return a.pricePkr - b.pricePkr;
         if (sortBy === "price_desc") return b.pricePkr - a.pricePkr;
-        if (sortBy === "rating") return b.rating - a.rating;
-        if (sortBy === "popular") return b.soldCount - a.soldCount;
+        if (sortBy === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
+        if (sortBy === "popular") return (b.soldCount ?? 0) - (a.soldCount ?? 0);
         return 0; // 'featured'
       });
   }, [
@@ -150,8 +154,8 @@ function SearchContent() {
     setSelectedCategory("All Categories");
     setSelectedCity("All Cities");
     setSelectedSellerType("ALL");
-    setMinPrice(0);
-    setMaxPrice(10000);
+    setMinPrice(undefined);
+    setMaxPrice(undefined);
     setMinRating(0);
     setSortBy("featured");
     setSearchQuery("");
@@ -161,8 +165,8 @@ function SearchContent() {
     selectedCategory !== "All Categories" ||
     selectedCity !== "All Cities" ||
     selectedSellerType !== "ALL" ||
-    minPrice > 0 ||
-    maxPrice < 10000 ||
+    minPrice !== undefined ||
+    maxPrice !== undefined ||
     minRating > 0 ||
     searchQuery !== "";
 
@@ -334,8 +338,8 @@ function SearchContent() {
                   type="number"
                   min="0"
                   max={facets.maxPrice || 100000}
-                  value={minPrice}
-                  onChange={(e) => setMinPrice(Number(e.target.value))}
+                  value={minPrice !== undefined ? minPrice : ""}
+                  onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
                   placeholder="Min"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-400"
                 />
@@ -344,8 +348,8 @@ function SearchContent() {
                   type="number"
                   min="0"
                   max={facets.maxPrice || 100000}
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  value={maxPrice !== undefined ? maxPrice : ""}
+                  onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
                   placeholder="Max"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-400"
                 />
@@ -355,13 +359,13 @@ function SearchContent() {
                 min={facets.minPrice || 0}
                 max={facets.maxPrice || 100000}
                 step="250"
-                value={maxPrice}
+                value={maxPrice !== undefined ? maxPrice : (facets.maxPrice || 100000)}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
                 className="w-full accent-amber-500 cursor-pointer"
               />
               <div className="flex justify-between text-[10px] font-bold text-slate-500">
                 <span>PKR {facets.minPrice || 0}</span>
-                <span>PKR {maxPrice.toLocaleString()}</span>
+                <span>PKR {(maxPrice !== undefined ? maxPrice : (facets.maxPrice || 100000)).toLocaleString()}</span>
               </div>
             </div>
 

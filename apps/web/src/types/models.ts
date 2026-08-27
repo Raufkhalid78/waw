@@ -10,10 +10,10 @@ export interface ProductDetail {
   categorySlug?: string;
   categoryId?: string;
   pricePkr: number;
-  originalPricePkr: number;
-  discountPercent: number;
-  rating: number;
-  reviewsCount: number;
+  originalPricePkr?: number;
+  discountPercent?: number;
+  rating?: number;
+  reviewsCount?: number;
   soldCount: number;
   isExpress: boolean;
   sellerType: SellerType;

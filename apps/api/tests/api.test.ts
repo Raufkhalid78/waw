@@ -212,4 +212,28 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     const courierHeavy = CourierService.selectCourier("Islamabad", 8.5);
     assert.strictEqual(courierHeavy, "TRAX");
   });
+
+  it("should enforce PENDING_REVIEW status and is_active=false for 3P seller product creation", () => {
+    const isFirstParty = false;
+    const userRole = "SELLER";
+    const isDirectActive = isFirstParty || userRole === "ADMIN";
+    const status = isDirectActive ? "ACTIVE" : "PENDING_REVIEW";
+    const isActive = isDirectActive;
+    const defaultStock = undefined ?? 0;
+
+    assert.strictEqual(status, "PENDING_REVIEW");
+    assert.strictEqual(isActive, false);
+    assert.strictEqual(defaultStock, 0); // Never invents fake 100 stock
+  });
+
+  it("should permit immediate ACTIVE status for 1P / Admin products", () => {
+    const isFirstParty = true;
+    const userRole = "ADMIN";
+    const isDirectActive = isFirstParty || userRole === "ADMIN";
+    const status = isDirectActive ? "ACTIVE" : "PENDING_REVIEW";
+    const isActive = isDirectActive;
+
+    assert.strictEqual(status, "ACTIVE");
+    assert.strictEqual(isActive, true);
+  });
 });

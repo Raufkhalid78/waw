@@ -130,7 +130,7 @@ export default function ProductDetailPage() {
             />
 
             {/* Discount Badge */}
-            {product.discountPercent > 0 && (
+            {Boolean(product.discountPercent && product.discountPercent > 0) && (
               <div className="absolute top-4 left-4 bg-rose-600 text-white font-black text-xs px-3 py-1.5 rounded-full shadow-md">
                 SAVE {product.discountPercent}%
               </div>
@@ -269,13 +269,13 @@ export default function ProductDetailPage() {
               <span className="text-3xl sm:text-4xl font-black text-slate-950">
                 PKR {product.pricePkr.toLocaleString()}
               </span>
-              {product.originalPricePkr > product.pricePkr && (
+              {Boolean(product.originalPricePkr && product.originalPricePkr > product.pricePkr) && (
                 <>
                   <span className="text-base text-slate-400 line-through font-medium">
-                    PKR {product.originalPricePkr.toLocaleString()}
+                    PKR {product.originalPricePkr!.toLocaleString()}
                   </span>
                   <span className="bg-rose-100 text-rose-700 text-xs font-black px-2 py-0.5 rounded-md">
-                    Save PKR {(product.originalPricePkr - product.pricePkr).toLocaleString()} ({product.discountPercent}% OFF)
+                    Save PKR {(product.originalPricePkr! - product.pricePkr).toLocaleString()}{product.discountPercent ? ` (${product.discountPercent}% OFF)` : ''}
                   </span>
                 </>
               )}
