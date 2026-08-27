@@ -23,13 +23,22 @@ export class ProductService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    const hasCityFilter = Boolean(query.city && query.city !== "All Cities");
+    const storeSelect = hasCityFilter
+      ? "store:stores!inner(id, name, slug, logo_url, city, rating_average)"
+      : "store:stores(id, name, slug, logo_url, city, rating_average)";
+
     let dbQuery = supabaseAdmin
       .from("products")
       .select(
-        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug)",
+        `id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, is_featured, is_sponsored, sold_count, merchandising_rank, created_at, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), ${storeSelect}, category:categories(id, name, name_urdu, slug)`,
         { count: "exact" },
       )
       .eq("is_active", true);
+
+    if (hasCityFilter) {
+      dbQuery = dbQuery.ilike("store.city", `%${query.city}%`);
+    }
 
     if (query.categoryId) {
       dbQuery = dbQuery.eq("category_id", query.categoryId);
@@ -98,15 +107,16 @@ export class ProductService {
   }
 
   /**
-   * Fetches a product by slug from Supabase.
+   * Fetches a product by slug or UUID from Supabase.
    */
   static async getProductBySlug(slug: string) {
     const { data: product, error } = await supabaseAdmin
       .from("products")
       .select(
-        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug), reviews(id, rating, comment, created_at, is_verified_purchase)",
+        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, is_featured, is_sponsored, sold_count, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug), reviews(id, rating, comment, created_at, is_verified_purchase)",
       )
-      .eq("slug", slug)
+      .or(`slug.eq.${slug},id.eq.${slug}`)
+      .eq("is_active", true)
       .maybeSingle();
 
     if (error) {
@@ -117,25 +127,33 @@ export class ProductService {
   }
 
   /**
-   * Creates a product in Supabase.
+   * Creates a product and default variant in Supabase.
    */
   static async createProduct(
     data: {
       storeId?: string | null;
       title: string;
       titleUrdu?: string;
-      slug: string;
+      slug?: string;
       description: string;
-      pricePkr: number;
+      pricePkr?: number;
+      basePricePkr?: number;
       compareAtPricePkr?: number;
+      costPricePkr?: number;
       categoryId: string;
-      images: string[];
+      images?: string[];
+      imageUrl?: string;
       isFirstParty?: boolean;
+      sku?: string;
+      stockQuantity?: number;
+      weightKg?: number;
       variants?: {
-        sku: string;
-        title: string;
-        pricePkr: number;
-        stock: number;
+        sku?: string;
+        title?: string;
+        priceAdjustmentPkr?: number;
+        pricePkr?: number;
+        stock?: number;
+        stockQuantity?: number;
       }[];
     },
     user?: { id: string; role: string; phone?: string },
@@ -164,6 +182,14 @@ export class ProductService {
       data.isFirstParty ??
       (data.storeId === null || data.storeId === undefined);
 
+    const price = data.basePricePkr ?? data.pricePkr ?? 0;
+    const rawImages = Array.isArray(data.images) && data.images.length > 0
+      ? data.images
+      : data.imageUrl ? [data.imageUrl] : [];
+
+    const generatedSlug = data.slug ||
+      `${data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}-${Date.now().toString().slice(-4)}`;
+
     const { data: product, error } = await supabaseAdmin
       .from("products")
       .insert({
@@ -171,13 +197,19 @@ export class ProductService {
         store_id: isFirstParty ? null : data.storeId,
         title: data.title,
         title_urdu: data.titleUrdu,
-        slug: data.slug,
+        slug: generatedSlug,
         description: data.description,
-        price_pkr: data.pricePkr,
-        compare_at_price_pkr: data.compareAtPricePkr,
+        base_price_pkr: price,
+        compare_at_price_pkr: data.compareAtPricePkr || null,
+        cost_price_pkr: data.costPricePkr || null,
         category_id: data.categoryId,
-        images: data.images,
+        images: rawImages,
+        thumbnail: rawImages[0] || null,
+        seller_type: isFirstParty ? "FIRST_PARTY" : "THIRD_PARTY",
         is_first_party: isFirstParty,
+        is_active: true,
+        status: "ACTIVE",
+        weight_kg: data.weightKg || 1.0,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -186,17 +218,28 @@ export class ProductService {
     if (error)
       throw new Error(`Supabase product creation failed: ${error.message}`);
 
-    // Insert variants if provided
+    // Insert variants if provided, or insert single default variant with stock
     if (data.variants && data.variants.length > 0) {
-      const variantInserts = data.variants.map((v) => ({
-        id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      const variantInserts = data.variants.map((v, idx) => ({
+        id: `var_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 5)}`,
         product_id: product.id,
-        sku: v.sku,
-        title: v.title,
-        price_pkr: v.pricePkr,
-        stock: v.stock,
+        sku: v.sku || `${product.id}-VAR-${idx + 1}`,
+        price_adjustment_pkr: v.priceAdjustmentPkr ?? (v.pricePkr ? v.pricePkr - price : 0),
+        stock_quantity: v.stockQuantity ?? v.stock ?? 0,
+        is_active: true,
       }));
       await supabaseAdmin.from("product_variants").insert(variantInserts);
+    } else {
+      const defaultStock = data.stockQuantity ?? 100;
+      const defaultSku = data.sku || `SKU-${product.id.slice(-6).toUpperCase()}`;
+      await supabaseAdmin.from("product_variants").insert({
+        id: `var_${Date.now()}_def`,
+        product_id: product.id,
+        sku: defaultSku,
+        price_adjustment_pkr: 0,
+        stock_quantity: defaultStock,
+        is_active: true,
+      });
     }
 
     return product;

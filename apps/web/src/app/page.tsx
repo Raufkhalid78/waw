@@ -89,7 +89,7 @@ export default function HomePage() {
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
-                Verified products from local sellers with nationwide delivery.
+                Discover authentic products from verified merchants across Pakistan.
               </p>
             </div>
 
@@ -220,7 +220,7 @@ export default function HomePage() {
               Shop with Confidence on WAW
             </h3>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
-              Your payments are held securely until you confirm delivery.
+              Direct from verified Pakistani sellers with doorstep delivery, easy returns, and dedicated customer care.
             </p>
           </div>
 

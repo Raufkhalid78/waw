@@ -57,22 +57,24 @@ export class SearchService {
         const { data: products } = await supabaseAdmin
           .from("products")
           .select(
-            "*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)",
+            "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, is_featured, is_sponsored, sold_count, merchandising_rank, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug)",
           )
-          .in("id", productIds);
+          .in("id", productIds)
+          .eq("is_active", true);
 
         hits = products || [];
       }
     } catch (err: any) {
-      // Fallback to Supabase PostgreSQL full-text search
+      // Fallback to Supabase PostgreSQL search
       let dbQuery = supabaseAdmin
         .from("products")
         .select(
-          "*, variants:product_variants(*), store:stores(id, name, logo_url, rating_average), category:categories(*)",
+          "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, is_featured, is_sponsored, sold_count, merchandising_rank, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug)",
           { count: "exact" },
-        );
+        )
+        .eq("is_active", true);
 
-      if (params.query) {
+      if (params.query && params.query !== "*") {
         dbQuery = dbQuery.or(
           `title.ilike.%${params.query}%,description.ilike.%${params.query}%`,
         );
@@ -80,11 +82,15 @@ export class SearchService {
       if (params.categoryId)
         dbQuery = dbQuery.eq("category_id", params.categoryId);
       if (params.storeId) dbQuery = dbQuery.eq("store_id", params.storeId);
+      if (params.minPrice !== undefined)
+        dbQuery = dbQuery.gte("base_price_pkr", params.minPrice);
+      if (params.maxPrice !== undefined)
+        dbQuery = dbQuery.lte("base_price_pkr", params.maxPrice);
 
-      const { data: fallbackProducts, count } = await dbQuery.range(
-        (page - 1) * perPage,
-        page * perPage - 1,
-      );
+      const { data: fallbackProducts, count } = await dbQuery
+        .order("merchandising_rank", { ascending: false })
+        .order("sold_count", { ascending: false })
+        .range((page - 1) * perPage, page * perPage - 1);
 
       hits = fallbackProducts || [];
       found = count || hits.length;

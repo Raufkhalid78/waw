@@ -103,20 +103,21 @@ export function CategoryCircles() {
         >
           {categories.map((cat) => {
             const displayName =
-              isUrdu && cat.nameUrdu ? cat.nameUrdu : cat.name;
+              isUrdu ? (cat.nameUrdu || cat.name_urdu || cat.name) : cat.name;
+            const imgUrl = cat.imageUrl || cat.image_url;
 
             return (
               <Link
-                key={cat.id}
+                key={cat.id || cat.slug}
                 href={`/category/${cat.slug}`}
                 className="group flex flex-col items-center text-center shrink-0 w-26 sm:w-32 transition-transform duration-200 hover:-translate-y-1.5"
               >
                 {/* Circular Image Frame with Gradient Ring */}
                 <div className="relative w-22 h-22 sm:w-28 sm:h-28 rounded-full p-1.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 shadow-md group-hover:shadow-xl transition-all group-hover:scale-105">
                   <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5 border-2 border-white flex items-center justify-center bg-slate-50">
-                    {cat.imageUrl ? (
+                    {imgUrl ? (
                       <img
-                        src={cat.imageUrl}
+                        src={imgUrl}
                         alt={cat.name}
                         loading="lazy"
                         className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"

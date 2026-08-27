@@ -5,10 +5,13 @@ export const ENV = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: parseInt(process.env.PORT || "4000", 10),
   CORS_ORIGIN: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+    ? process.env.CORS_ORIGIN.split(",")
+        .map((o) => o.trim())
+        .filter(Boolean)
     : [
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:4000",
         "https://www.waw.com.pk",
         "https://waw.com.pk",
       ],

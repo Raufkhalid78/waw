@@ -41,11 +41,49 @@ export const app = express();
 
 app.use(requestTracer);
 app.use(helmet());
-const corsOptions = {
-  origin: ENV.CORS_ORIGIN,
+const TRUSTED_ORIGINS = [
+  "https://www.waw.com.pk",
+  "https://waw.com.pk",
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:4000",
+];
+
+const dynamicOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
+  : [];
+
+const allowedOriginSet = new Set([...TRUSTED_ORIGINS, ...dynamicOrigins]);
+
+const isAllowedOrigin = (origin?: string): boolean => {
+  if (!origin) return true; // Allow non-browser, server-to-server, curl, Postman requests
+  if (allowedOriginSet.has(origin)) return true;
+  // Allow all WAW subdomains
+  if (/^https:\/\/([a-zA-Z0-9-]+\.)*waw\.com\.pk$/.test(origin)) return true;
+  // Allow Vercel preview deployments for WAW
+  if (/^https:\/\/waw-[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)) return true;
+  if (/^https:\/\/waw\.vercel\.app$/.test(origin)) return true;
+  return false;
+};
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
+  exposedHeaders: ["Content-Range", "X-Total-Count"],
 };
 
 app.use(cors(corsOptions));
@@ -184,7 +222,6 @@ app.post(
   "/api/products",
   requireAuth,
   requireRole(UserRole.SELLER, UserRole.ADMIN),
-  requireActiveStore,
   requireActiveStore,
   validateBody(CreateProductSchema),
   ProductController.create,

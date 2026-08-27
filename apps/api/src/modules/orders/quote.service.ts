@@ -32,8 +32,8 @@ export class QuoteService {
         .select(
           "id, title, base_price_pkr, is_active, store_id, is_first_party, stores(id, name, commission_rate_percentage)",
         )
-        .eq("id", item.productId)
-        .single();
+        .or(`id.eq.${item.productId},slug.eq.${item.productId}`)
+        .maybeSingle();
 
       if (prodErr || !product) {
         throw new Error(
@@ -54,8 +54,8 @@ export class QuoteService {
           .from("product_variants")
           .select("id, sku, price_adjustment_pkr, stock_quantity, is_active")
           .eq("id", item.variantId)
-          .eq("product_id", item.productId)
-          .single();
+          .eq("product_id", product.id)
+          .maybeSingle();
 
         if (varErr || !variant || !variant.is_active) {
           throw new Error(

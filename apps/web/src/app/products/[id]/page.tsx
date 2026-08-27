@@ -34,7 +34,13 @@ export default function ProductDetailPage() {
       const data = await fetchProductById(productId);
       if (data) {
         setProduct(data);
-        const related = await fetchProducts({ category: data.category });
+        const related = await fetchProducts(
+          data.categorySlug
+            ? { categorySlug: data.categorySlug }
+            : data.categoryId
+              ? { category: data.categoryId }
+              : undefined
+        );
         setRelatedProducts((related.items || []).filter(p => p.productId !== data.productId).slice(0, 4));
       }
       setIsLoading(false);

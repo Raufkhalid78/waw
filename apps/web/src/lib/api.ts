@@ -17,44 +17,65 @@ if (typeof window !== "undefined") {
 }
 
 function mapApiProductToDetail(p: any): ProductDetail {
-  const basePrice = p.base_price_pkr || p.price_pkr || p.pricePkr;
-  const comparePrice = p.compare_at_price_pkr || p.comparePricePkr || basePrice;
+  const basePrice = Number(p.base_price_pkr ?? p.price_pkr ?? p.basePricePkr ?? p.pricePkr ?? 0);
+  const comparePrice = p.compare_at_price_pkr ?? p.comparePricePkr ?? p.compareAtPricePkr ?? (basePrice > 0 ? basePrice : undefined);
   const discountPercent =
-    comparePrice > basePrice
+    comparePrice && comparePrice > basePrice
       ? Math.round(((comparePrice - basePrice) / comparePrice) * 100)
       : 0;
 
   // Derive stock by summing up active variants stock, or fallback to root property
-  const activeVariants = Array.isArray(p.variants) ? p.variants.filter((v: any) => v.is_active) : [];
+  const activeVariants = Array.isArray(p.variants) ? p.variants.filter((v: any) => v.is_active !== false) : [];
   const stockCount = activeVariants.length > 0 
-    ? activeVariants.reduce((sum: number, v: any) => sum + (v.stock_quantity || 0), 0)
-    : (p.stock_quantity ?? p.stockQuantity ?? 0);
+    ? activeVariants.reduce((sum: number, v: any) => sum + (v.stock_quantity ?? v.stockQuantity ?? 0), 0)
+    : Number(p.stock_quantity ?? p.stockQuantity ?? 100);
+
+  const rawImages = Array.isArray(p.images) && p.images.length > 0
+    ? p.images
+    : (p.thumbnail ? [p.thumbnail] : (p.imageUrl ? [p.imageUrl] : []));
 
   return {
+    id: p.id,
     productId: p.slug || p.id || p.productId,
-    title: p.title,
-    category: p.category?.name || p.categoryName || p.category || "Unknown",
+    slug: p.slug || p.id,
+    title: p.title || "Product",
+    titleUrdu: p.title_urdu || p.titleUrdu,
+    category: p.category?.name || p.categoryName || p.category || "General",
+    categorySlug: p.category?.slug || p.categorySlug || "",
+    categoryId: p.category_id || p.categoryId || p.category?.id || "",
     pricePkr: basePrice,
-    originalPricePkr: comparePrice,
+    originalPricePkr: comparePrice || basePrice,
     discountPercent,
-    rating: p.rating_average || p.ratingAverage || p.rating || 0,
-    reviewsCount: p.rating_count || p.ratingCount || p.reviewsCount || (Array.isArray(p.reviews) ? p.reviews.length : 0),
-    soldCount: p.sold_count || p.soldCount || 0,
-    isExpress: p.is_first_party ?? p.isFirstParty ?? false,
-    sellerType: p.is_first_party
+    rating: Number(p.rating_average ?? p.ratingAverage ?? p.rating ?? 0),
+    reviewsCount: Number(p.rating_count ?? p.ratingCount ?? p.reviewsCount ?? (Array.isArray(p.reviews) ? p.reviews.length : 0)),
+    soldCount: Number(p.sold_count ?? p.soldCount ?? 0),
+    isExpress: Boolean(p.is_first_party ?? p.isFirstParty ?? false),
+    sellerType: p.is_first_party || p.isFirstParty
       ? SellerType.FIRST_PARTY
       : SellerType.THIRD_PARTY,
-    storeName: p.store?.name || p.storeName || "Unknown Store",
-    storeSlug: p.store?.slug || p.storeSlug || "unknown-store",
-    sellerCity: p.store?.city || p.sellerCity || "Unknown",
-    images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [],
+    storeId: p.store_id || p.storeId || p.store?.id,
+    storeName: p.store?.name || p.storeName || "Waw Official Store",
+    storeSlug: p.store?.slug || p.storeSlug || "waw-official",
+    sellerCity: p.store?.city || p.sellerCity || "Pakistan",
+    imageUrl: rawImages[0] || "",
+    images: rawImages,
     description: p.description || "",
     highlights: p.attributes?.highlights || [],
     specifications: p.attributes?.specifications || {},
     inStock: stockCount > 0,
     stockCount: stockCount,
-    sku: p.sku || "",
-    reviews: Array.isArray(p.reviews) ? p.reviews : [],
+    sku: p.sku || (activeVariants[0]?.sku ?? ""),
+    reviews: Array.isArray(p.reviews) ? p.reviews.map((r: any) => ({
+      id: r.id,
+      author: r.author || r.profiles?.full_name || "Verified Buyer",
+      city: r.city || "Pakistan",
+      rating: r.rating || 5,
+      date: r.created_at ? new Date(r.created_at).toLocaleDateString() : (r.date || "Recent"),
+      comment: r.comment || "",
+      verifiedPurchase: r.is_verified_purchase ?? r.verifiedPurchase ?? true,
+      is_verified_purchase: r.is_verified_purchase ?? r.verifiedPurchase ?? true,
+      created_at: r.created_at,
+    })) : [],
   };
 }
 
@@ -95,6 +116,7 @@ export async function fetchProducts(params?: {
   q?: string;
   category?: string;
   categorySlug?: string;
+  storeId?: string;
   city?: string;
   sellerType?: string;
   minPrice?: number;
@@ -105,7 +127,7 @@ export async function fetchProducts(params?: {
 }): Promise<{ items: ProductDetail[]; facets?: any }> {
   try {
     if (params?.q) {
-      // Query Typesense Search Route
+      // Query Search Route
       const res = await fetch(
         `${API_BASE_URL}/api/search?q=${encodeURIComponent(params.q)}`,
         {
@@ -124,6 +146,7 @@ export async function fetchProducts(params?: {
     const query = new URLSearchParams();
     if (params?.category) query.append("categoryId", params.category);
     if (params?.categorySlug) query.append("categorySlug", params.categorySlug);
+    if (params?.storeId) query.append("storeId", params.storeId);
     if (params?.city && params.city !== "All Cities")
       query.append("city", params.city);
     if (params?.sellerType && params.sellerType !== "ALL")
@@ -167,7 +190,7 @@ export async function fetchProductById(
     });
     if (res.ok) {
       const data = await res.json();
-      if (data?.id) return mapApiProductToDetail(data);
+      if (data?.id || data?.slug) return mapApiProductToDetail(data);
     }
     return undefined;
   } catch (error) {
@@ -183,7 +206,36 @@ export async function fetchStoreBySlug(
       cache: "no-store",
     });
     if (!res.ok) return undefined;
-    return await res.json();
+    const data = await res.json();
+    if (!data) return undefined;
+    return {
+      id: data.id,
+      slug: data.slug,
+      name: data.name,
+      city: data.city || "Pakistan",
+      location: data.address || data.city || "Pakistan",
+      category: data.seller_type === "FIRST_PARTY" ? "Official Retail" : "Verified Merchant",
+      rating: Number(data.rating_average ?? data.ratingAverage ?? 5.0),
+      rating_average: Number(data.rating_average ?? data.ratingAverage ?? 5.0),
+      reviewsCount: Number(data.rating_count ?? data.ratingCount ?? 0),
+      salesCount: 0,
+      responseRate: "99%",
+      joinedYear: data.created_at ? new Date(data.created_at).getFullYear().toString() : "2026",
+      bannerImage: data.banner_url || data.bannerImage || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop&q=80",
+      banner_url: data.banner_url || data.bannerImage,
+      logoImage: data.logo_url || data.logoImage || "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=150&auto=format&fit=crop&q=80",
+      logo_url: data.logo_url || data.logoImage,
+      about: data.description || "A trusted seller on Waw Marketplace.",
+      description: data.description,
+      kycVerified: data.is_verified ?? (data.status === "ACTIVE"),
+      is_verified: data.is_verified ?? (data.status === "ACTIVE"),
+      isVerified: data.is_verified ?? (data.status === "ACTIVE"),
+      status: data.status,
+      seller_type: data.seller_type,
+      sellerType: data.seller_type,
+      specialties: [],
+      created_at: data.created_at,
+    };
   } catch (error) {
     console.error("Failed to fetch store:", error);
     return undefined;

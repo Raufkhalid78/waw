@@ -36,13 +36,14 @@ export default function StoreProfilePage() {
         
         if (storeData) {
           setStore(storeData);
-          const data = await fetchProducts();
+          const data = await fetchProducts(storeData.id ? { storeId: storeData.id } : undefined);
           const matching = (data.items || []).filter(
             (p) =>
               p.storeSlug === storeData.slug ||
-              p.storeName?.toLowerCase() === storeData.name?.toLowerCase(),
+              p.storeName?.toLowerCase() === storeData.name?.toLowerCase() ||
+              (storeData.id && p.storeId === storeData.id)
           );
-          setProducts(matching);
+          setProducts(matching.length > 0 ? matching : (data.items || []));
         }
       } catch (err) {
         console.error("Failed to load store:", err);
@@ -62,6 +63,7 @@ export default function StoreProfilePage() {
   }
 
   const displayProducts = products;
+  const isVerifiedStore = Boolean(store.isVerified ?? store.is_verified ?? store.kycVerified ?? (store.status === "ACTIVE"));
 
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-6 space-y-8">
@@ -86,7 +88,7 @@ export default function StoreProfilePage() {
         {/* Banner Graphic */}
         <div className="h-44 sm:h-56 w-full relative overflow-hidden bg-slate-900">
           <img
-            src={store.bannerImage}
+            src={store.bannerImage || store.banner_url || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop&q=80"}
             alt={store.name}
             className="w-full h-full object-cover opacity-60"
           />
@@ -100,7 +102,7 @@ export default function StoreProfilePage() {
             <div className="flex items-end gap-5">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white shrink-0">
                 <img
-                  src={store.logoImage}
+                  src={store.logoImage || store.logo_url || "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=150&auto=format&fit=crop&q=80"}
                   alt={store.name}
                   className="w-full h-full object-cover"
                 />
@@ -111,10 +113,10 @@ export default function StoreProfilePage() {
                   <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
                     {store.name}
                   </h1>
-                  {store.kycVerified && (
+                  {isVerifiedStore && (
                     <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" />
-                      Identity Verified
+                      Verified Merchant
                     </span>
                   )}
                 </div>

@@ -108,6 +108,7 @@ export function Header() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [rawCategories, setRawCategories] = useState<any[]>([]);
   const [categoryLinks, setCategoryLinks] = useState<any[]>([
     { label: "⚡ Waw Express", href: "/search?sellerType=1P", highlight: "express" },
     { label: "🔥 Mega Deals", href: "/search", highlight: "deals" },
@@ -142,8 +143,9 @@ export function Header() {
       try {
         const { fetchCategories } = await import('@/lib/api');
         const cats = await fetchCategories(language.toLowerCase());
+        setRawCategories(cats);
         const dynamicLinks = cats.map(c => ({
-          label: language === "UR" ? (c.nameUrdu || c.name) : c.name,
+          label: language === "UR" ? (c.nameUrdu || (c as any).name_urdu || c.name) : c.name,
           href: `/category/${c.slug}`
         }));
         
@@ -653,14 +655,14 @@ export function Header() {
                       Top Categories
                     </h4>
                     <ul className="space-y-2">
-                      {SEARCH_CATEGORIES.slice(1).map((cat) => (
-                        <li key={cat} className="group/item">
+                      {(rawCategories.length > 0 ? rawCategories.slice(0, 8) : SEARCH_CATEGORIES.slice(1).map(name => ({ name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-") }))).map((cat: any) => (
+                        <li key={cat.slug || cat.id} className="group/item">
                           <Link
-                            href={`/category/${cat.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                            href={`/category/${cat.slug}`}
                             className="text-sm font-bold text-slate-600 hover:text-amber-600 flex items-center gap-2 transition-colors"
                           >
                             <ArrowRight className="w-3 h-3 text-slate-300 group-hover/item:text-amber-500 transition-colors" />
-                            {cat}
+                            {language === "UR" ? (cat.nameUrdu || cat.name_urdu || cat.name) : cat.name}
                           </Link>
                         </li>
                       ))}
