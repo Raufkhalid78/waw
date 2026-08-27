@@ -32,26 +32,31 @@ GRANT USAGE ON SCHEMA public TO authenticated;
 INSERT INTO categories (id, name, name_urdu, slug, parent_id, sort_order, is_active, image_url, description) VALUES
 ('cat-100', 'Mobiles & Tech', 'موبائل اور ٹیک', 'mobiles-tech', NULL, 1, true, NULL, 'Smartphones, gadgets, and accessories'),
 ('cat-101', 'Fashion', 'فیشن', 'fashion', NULL, 2, true, NULL, 'Clothing, lawn collections, and footwear'),
-('cat-102', 'Beauty & Fragrance', 'خوبصورتی اور عطر', 'beauty-fragrance', NULL, 3, true, NULL, 'Perfumes, attar, and cosmetics');
+('cat-102', 'Beauty & Fragrance', 'خوبصورتی اور عطر', 'beauty-fragrance', NULL, 3, true, NULL, 'Perfumes, attar, and cosmetics')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, name_urdu = EXCLUDED.name_urdu, slug = EXCLUDED.slug, sort_order = EXCLUDED.sort_order, description = EXCLUDED.description;
 
 INSERT INTO categories (id, name, name_urdu, slug, parent_id, sort_order, is_active) VALUES
 ('cat-101-1', 'Lawn 2026', 'لان 2026', 'lawn-2026', 'cat-101', 1, true),
-('cat-101-2', 'Peshawari Chappal', 'پشاوری چپل', 'peshawari-chappal', 'cat-101', 2, true);
+('cat-101-2', 'Peshawari Chappal', 'پشاوری چپل', 'peshawari-chappal', 'cat-101', 2, true)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
 
 -- 5. Seed Managed Metadata: Configs (Step 3)
 INSERT INTO serviceability_locations (id, city_name, city_name_urdu, is_active, estimated_days) VALUES
 ('loc-1', 'Lahore', 'لاہور', true, 2),
 ('loc-2', 'Karachi', 'کراچی', true, 3),
-('loc-3', 'Islamabad', 'اسلام آباد', true, 2);
+('loc-3', 'Islamabad', 'اسلام آباد', true, 2)
+ON CONFLICT (id) DO UPDATE SET estimated_days = EXCLUDED.estimated_days;
 
 INSERT INTO search_suggestions (id, term, score, is_active) VALUES
 ('ss-1', 'Khaadi Lawn 2026', 100, true),
 ('ss-2', 'Peshawari Chappal', 90, true),
-('ss-3', 'AirPods Pro ANC', 85, true);
+('ss-3', 'AirPods Pro ANC', 85, true)
+ON CONFLICT (id) DO UPDATE SET score = EXCLUDED.score;
 
 INSERT INTO campaigns (id, tag, title, link_url, link_text, campaign_type, sort_order) VALUES
 ('camp-1', '⚡ MEGA DEALS', 'Azadi Celebration: Up to 50% OFF with voucher AZADI2026 at checkout!', '/category/mobiles-tech', 'Shop Deals', 'PROMO_STRIP', 1),
-('camp-2', '🚚 FREE DELIVERY', 'Zero shipping charges on all orders above PKR 5,000 nationwide across Pakistan.', '/cart', 'Learn More', 'PROMO_STRIP', 2);
+('camp-2', '🚚 FREE DELIVERY', 'Zero shipping charges on all orders above PKR 5,000 nationwide across Pakistan.', '/cart', 'Learn More', 'PROMO_STRIP', 2)
+ON CONFLICT (id) DO UPDATE SET tag = EXCLUDED.tag, title = EXCLUDED.title, link_url = EXCLUDED.link_url, sort_order = EXCLUDED.sort_order;
 
 -- 6. Seed Real Commerce Data (Step 4)
 
