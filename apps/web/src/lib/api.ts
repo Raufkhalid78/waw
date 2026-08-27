@@ -12,6 +12,10 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
 ).replace(/\/+$/, "");
 
+if (typeof window !== "undefined") {
+  console.log(`[WAW] Client API Origin: ${API_BASE_URL}`);
+}
+
 function mapApiProductToDetail(p: any): ProductDetail {
   const basePrice = p.base_price_pkr || p.price_pkr || p.pricePkr;
   const comparePrice = p.compare_at_price_pkr || p.comparePricePkr || basePrice;
@@ -70,11 +74,14 @@ export async function fetchCategoryBySlug(
     const res = await fetch(`${API_BASE_URL}/api/categories/${slug}`, {
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error(`Failed to fetch category, status: ${res.status}`);
+    }
     return await res.json();
   } catch (error) {
-    console.warn(`Failed to fetch category ${slug}:`, error);
-    return null;
+    console.error(`[API Error] fetchCategoryBySlug ${slug}:`, error);
+    throw error;
   }
 }
 

@@ -22,17 +22,10 @@ GRANT ALL PRIVILEGES ON ALL ROUTINES IN SCHEMA public TO service_role;
 -- Allow anonymous access where RLS permits it
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
-
+-- (Note: Broad grants were revoked in a subsequent migration 20260827130000_audit_fixes)
 
 -- 3. Cleanup Existing Mock/Conflicting Data
-DELETE FROM campaigns;
-DELETE FROM search_suggestions;
-DELETE FROM serviceability_locations;
-DELETE FROM product_variants;
-DELETE FROM products;
-DELETE FROM stores;
-DELETE FROM categories;
+-- Removed destructive DELETE statements to preserve production data safely.
 
 
 -- 4. Seed Managed Metadata: Categories (Step 3)

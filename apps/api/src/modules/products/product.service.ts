@@ -26,7 +26,7 @@ export class ProductService {
     let dbQuery = supabaseAdmin
       .from("products")
       .select(
-        "*, variants:product_variants(*), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(*)",
+        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug)",
         { count: "exact" },
       )
       .eq("is_active", true);
@@ -60,8 +60,10 @@ export class ProductService {
       dbQuery = dbQuery.order("rating_average", { ascending: false });
     } else {
       dbQuery = dbQuery
-        .order("is_sponsored", { ascending: false })
-        .order("sold_count", { ascending: false });
+        .order("merchandising_rank", { ascending: false })
+        .order("is_featured", { ascending: false })
+        .order("sold_count", { ascending: false })
+        .order("created_at", { ascending: false });
     }
 
     const {
@@ -69,6 +71,10 @@ export class ProductService {
       count,
       error,
     } = await dbQuery.range(from, to);
+
+    if (error) {
+      throw new Error(`Database error fetching products: ${error.message}`);
+    }
 
     const total = count || 0;
     
@@ -95,13 +101,17 @@ export class ProductService {
    * Fetches a product by slug from Supabase.
    */
   static async getProductBySlug(slug: string) {
-    const { data: product } = await supabaseAdmin
+    const { data: product, error } = await supabaseAdmin
       .from("products")
       .select(
-        "*, variants:product_variants(*), store:stores(*), category:categories(*), reviews(*)",
+        "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug), reviews(id, rating, comment, created_at, user_name)",
       )
       .eq("slug", slug)
       .maybeSingle();
+
+    if (error) {
+      throw new Error(`Database error fetching product details: ${error.message}`);
+    }
 
     return product;
   }
