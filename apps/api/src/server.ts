@@ -28,9 +28,7 @@ io.on("connection", (socket) => {
 });
 
 async function bootstrap() {
-  await initTypesenseCollections();
-  startReconciliationCron();
-
+  // Start HTTP server first so Railway health checks pass immediately
   server.listen(ENV.PORT, () => {
     console.log(`
 ====================================================
@@ -42,6 +40,13 @@ async function bootstrap() {
 ====================================================
     `);
   });
+
+  // Initialize optional services in the background (non-blocking)
+  initTypesenseCollections().catch((err) => {
+    console.warn("⚠️ Typesense unavailable — search will fall back to database:", err?.message || err);
+  });
+
+  startReconciliationCron();
 }
 
 bootstrap().catch((err) => {

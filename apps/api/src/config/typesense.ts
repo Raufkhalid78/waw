@@ -10,7 +10,8 @@ export const typesenseClient = new Typesense.Client({
     },
   ],
   apiKey: ENV.TYPESENSE_API_KEY,
-  connectionTimeoutSeconds: 3,
+  connectionTimeoutSeconds: 2,
+  numRetries: 0, // Fail fast — do not retry on startup; Typesense is optional at boot
 });
 
 export const PRODUCT_SCHEMA = {
