@@ -31,7 +31,7 @@ function mapApiProductToDetail(p: any): ProductDetail {
     : (p.stock_quantity ?? p.stockQuantity ?? 0);
 
   return {
-    productId: p.id || p.productId,
+    productId: p.slug || p.id || p.productId,
     title: p.title,
     category: p.category?.name || p.categoryName || p.category || "Unknown",
     pricePkr: basePrice,

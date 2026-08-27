@@ -2,41 +2,19 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { HeroBanner } from "@/components/home/HeroBanner";
 import { CategoryCircles } from "@/components/home/CategoryCircles";
 import { ProductCard } from "@/components/ui/ProductCard";
-import {
-  Flame,
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  ShieldCheck,
-} from "lucide-react";
-import { SellerType } from "@waw/types";
-import { fetchProducts } from "@/lib/api";
-
-const MARKETPLACE_TABS = [
-  "All Products",
-  "Mobiles & Tech",
-  "Women's Lawn",
-  "Leather & Footwear",
-  "Sialkot Sports",
-  "Fragrances & Attar",
-  "Smart Watches",
-  "Power & Chargers",
-] as const;
-
-type MarketTab = (typeof MARKETPLACE_TABS)[number];
-
-
+import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package } from "lucide-react";
+import { fetchProducts, fetchCategories } from "@/lib/api";
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<MarketTab>("All Products");
   const tabScrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [liveProducts, setLiveProducts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [dbCategories, setDbCategories] = useState<{ name: string; slug: string }[]>([]);
 
   const checkTabScroll = () => {
     if (tabScrollRef.current) {
@@ -46,6 +24,16 @@ export default function HomePage() {
     }
   };
 
+  // Load DB-backed categories for tabs
+  useEffect(() => {
+    fetchCategories("en")
+      .then((cats) => {
+        const flat = cats.flatMap((c: any) => [c, ...(c.children || [])]);
+        setDbCategories(flat.map((c: any) => ({ name: c.name, slug: c.slug })));
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     checkTabScroll();
     const el = tabScrollRef.current;
@@ -53,42 +41,25 @@ export default function HomePage() {
       el.addEventListener("scroll", checkTabScroll);
       return () => el.removeEventListener("scroll", checkTabScroll);
     }
-  }, []);
+  }, [dbCategories]);
 
   useEffect(() => {
     async function loadCatalog() {
+      setLoading(true);
       try {
-        const data = await fetchProducts();
-        const products = Array.isArray(data) ? data : data?.items || [];
-        
-        setLiveProducts(
-          products.map((p: any) => ({
-            productId: p.id,
-            title: p.title,
-            category: p.categoryName || "Mobiles & Tech",
-            pricePkr: p.pricePkr || 0,
-            originalPricePkr: p.compareAtPricePkr,
-            discountPercent: p.compareAtPricePkr && p.pricePkr
-              ? Math.round(((p.compareAtPricePkr - p.pricePkr) / p.compareAtPricePkr) * 100)
-              : undefined,
-            rating: p.ratingAverage || 0,
-            reviewsCount: p.reviewsCount || 0,
-            soldCount: p.soldCount || 0,
-            isExpress: p.isFirstParty ?? false,
-            sellerType: p.isFirstParty ? SellerType.FIRST_PARTY : SellerType.THIRD_PARTY,
-            storeName: p.storeName || "Waw Official Hub",
-            sellerCity: p.sellerCity || "Pakistan",
-            imageUrl: p.imageUrl || p.images?.[0] || "",
-          })),
+        const data = await fetchProducts(
+          activeCategory ? { categorySlug: activeCategory } : undefined
         );
+        // fetchProducts returns already-transformed ProductDetail objects (camelCase)
+        setLiveProducts(data.items || []);
       } catch (err) {
-        console.error("Failed to load catalog:", err);
+        console.error("[Homepage] Failed to load catalog:", err);
       } finally {
         setLoading(false);
       }
     }
     loadCatalog();
-  }, []);
+  }, [activeCategory]);
 
   const scrollTabs = (direction: "left" | "right") => {
     if (tabScrollRef.current) {
@@ -98,25 +69,15 @@ export default function HomePage() {
     }
   };
 
-  const allProductsList = liveProducts;
-
-  const filteredProducts =
-    activeTab === "All Products"
-      ? allProductsList
-      : allProductsList.filter((p) => p.category === activeTab);
-
   return (
     <div className="space-y-3 pb-20">
-      {/* 1. Dynamic Hero Banner */}
-      <HeroBanner />
-
-      {/* 2. Circular Category Story Bubbles */}
+      {/* 1. DB-backed Category Circles */}
       <CategoryCircles />
 
-      {/* 7. Trending Marketplace Catalog with Multi-Tab Filtering */}
+      {/* 2. Live Marketplace Catalog */}
       <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
         <div className="bg-white border border-slate-200/90 rounded-[36px] p-6 sm:p-9 shadow-xs space-y-7">
-          {/* Section Heading & Category Tabs with Scroll Chevrons */}
+          {/* Section Heading & Category Tabs */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-slate-100 pb-6">
             <div>
               <div className="flex items-center gap-2.5">
@@ -128,52 +89,63 @@ export default function HomePage() {
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
-                Top rated products with verified buyer reviews and fast
-                nationwide shipping from local sellers.
+                Verified products from local sellers with nationwide delivery.
               </p>
             </div>
 
-            {/* Filter Tabs with Left & Right Chevrons */}
-            <div className="flex items-center gap-2 max-w-full md:max-w-md relative">
-              {canScrollLeft && (
-                <button
-                  onClick={() => scrollTabs("left")}
-                  className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
-                  aria-label="Scroll left"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-              )}
-
-              <div
-                ref={tabScrollRef}
-                className="flex items-center gap-2.5 overflow-x-auto no-scrollbar scroll-smooth py-1"
-              >
-                {MARKETPLACE_TABS.map((tab) => (
+            {/* DB-backed Category Filter Tabs */}
+            {dbCategories.length > 0 && (
+              <div className="flex items-center gap-2 max-w-full md:max-w-md relative">
+                {canScrollLeft && (
                   <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4.5 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                      activeTab === tab
-                        ? "bg-slate-950 text-amber-400 shadow-md scale-102"
+                    onClick={() => scrollTabs("left")}
+                    className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
+                    aria-label="Scroll left"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                )}
+
+                <div
+                  ref={tabScrollRef}
+                  className="flex items-center gap-2.5 overflow-x-auto no-scrollbar scroll-smooth py-1"
+                >
+                  <button
+                    onClick={() => setActiveCategory(null)}
+                    className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                      activeCategory === null
+                        ? "bg-slate-950 text-amber-400 shadow-md"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                     }`}
                   >
-                    {tab}
+                    All Products
                   </button>
-                ))}
-              </div>
+                  {dbCategories.map((cat) => (
+                    <button
+                      key={cat.slug}
+                      onClick={() => setActiveCategory(cat.slug)}
+                      className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                        activeCategory === cat.slug
+                          ? "bg-slate-950 text-amber-400 shadow-md"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
 
-              {canScrollRight && (
-                <button
-                  onClick={() => scrollTabs("right")}
-                  className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
-                  aria-label="Scroll right"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+                {canScrollRight && (
+                  <button
+                    onClick={() => scrollTabs("right")}
+                    className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Product Grid */}
@@ -181,11 +153,26 @@ export default function HomePage() {
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
             </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-20 text-slate-500 font-bold">No products found.</div>
+          ) : liveProducts.length === 0 ? (
+            <div className="text-center py-20 space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <Package className="w-7 h-7" />
+              </div>
+              <p className="text-slate-500 font-bold">
+                No products found in this category yet.
+              </p>
+              {activeCategory && (
+                <button
+                  onClick={() => setActiveCategory(null)}
+                  className="text-xs font-black text-amber-600 underline"
+                >
+                  View all products
+                </button>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-              {filteredProducts.map((prod) => (
+              {liveProducts.map((prod) => (
                 <ProductCard
                   key={prod.productId}
                   productId={prod.productId}
@@ -206,7 +193,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* View More Button */}
+          {/* View More */}
           <div className="text-center pt-5">
             <Link
               href="/category/mobiles-tech"
@@ -219,7 +206,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 8. VIP Perks & Buyer Protection Banner */}
+      {/* 3. Buyer Protection Banner */}
       <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
         <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white rounded-[36px] p-7 sm:p-12 border border-slate-800 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-8 relative overflow-hidden">
           <div className="absolute right-0 top-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
@@ -230,10 +217,10 @@ export default function HomePage() {
               <span>Secure Payments</span>
             </div>
             <h3 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-              Shop with 100% Peace of Mind on Waw
+              Shop with Confidence on WAW
             </h3>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
-              Your payments are protected. Enjoy a transparent delivery process.
+              Your payments are held securely until you confirm delivery.
             </p>
           </div>
 
@@ -249,7 +236,7 @@ export default function HomePage() {
               href="/help"
               className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-black px-7 py-4 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all"
             >
-              <span>24/7 Support Desk</span>
+              <span>Help & Support</span>
             </Link>
           </div>
         </div>
