@@ -5,8 +5,13 @@ export const ENV = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: parseInt(process.env.PORT || "4000", 10),
   CORS_ORIGIN: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(",")
-    : ["http://localhost:3000", "http://localhost:3001"],
+    ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+    : [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://www.waw.com.pk",
+        "https://waw.com.pk",
+      ],
 
   // Supabase Managed Auth & PostgreSQL
   SUPABASE_URL: process.env.SUPABASE_URL || "https://placeholder.supabase.co",

@@ -41,7 +41,16 @@ export const app = express();
 
 app.use(requestTracer);
 app.use(helmet());
-app.use(cors({ origin: ENV.CORS_ORIGIN, credentials: true }));
+const corsOptions = {
+  origin: ENV.CORS_ORIGIN,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+};
+
+app.use(cors(corsOptions));
+// Handle preflight OPTIONS requests for all routes (required for credentialed cross-origin requests)
+app.options("*", cors(corsOptions));
 app.use(
   express.json({
     verify: (req: any, res, buf) => {
