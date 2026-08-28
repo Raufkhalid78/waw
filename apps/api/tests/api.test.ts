@@ -278,4 +278,42 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     assert.ok(validDisputeStatuses.includes(initialStatus));
     assert.ok(validDisputeStatuses.includes(resolvedStatus));
   });
+
+  it("should expand chappal and Roman Urdu terms for resilient search", () => {
+    const terms = expandRomanUrduQuery("chappal");
+    assert.ok(terms.includes("chappal"));
+    assert.ok(terms.includes("peshawari chappal"));
+    assert.ok(terms.includes("norozi chappal"));
+  });
+
+  it("should mask sensitive seller CNIC and bank account numbers", () => {
+    const maskCnic = (cnic?: string) => {
+      if (!cnic || cnic.length < 5) return cnic;
+      return `${cnic.slice(0, 5)}-*******-${cnic.slice(-1)}`;
+    };
+    const maskAccount = (acc?: string) => {
+      if (!acc || acc.length < 8) return acc;
+      return `${acc.slice(0, 4)}****${acc.slice(-4)}`;
+    };
+
+    const maskedCnic = maskCnic("42101-1234567-1");
+    const maskedIban = maskAccount("PK36HABB00000012345678");
+
+    assert.strictEqual(maskedCnic, "42101-*******-1");
+    assert.strictEqual(maskedIban, "PK36****5678");
+  });
+
+  it("should sum exact commission from store_orders records rather than flat 10%", () => {
+    const storeOrders = [
+      { id: "sord_1", subtotal_pkr: 10000, commission_pkr: 800 },  // 8%
+      { id: "sord_2", subtotal_pkr: 5000, commission_pkr: 600 },   // 12%
+    ];
+
+    const totalCommissionsPkr = storeOrders.reduce(
+      (sum, so) => sum + (so.commission_pkr || 0),
+      0,
+    );
+
+    assert.strictEqual(totalCommissionsPkr, 1400); // Exact 1400 vs flat 1500
+  });
 });

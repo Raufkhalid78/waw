@@ -12,6 +12,7 @@ export class AdminService {
       { count: totalSellers },
       { count: totalProducts },
       { data: orders },
+      { data: storeOrders },
     ] = await Promise.all([
       supabaseAdmin.from("orders").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("stores").select("*", { count: "exact", head: true }),
@@ -21,15 +22,22 @@ export class AdminService {
       supabaseAdmin
         .from("orders")
         .select("total_pkr, cod_fee_pkr, payment_status, order_status"),
+      supabaseAdmin
+        .from("store_orders")
+        .select("commission_pkr"),
     ]);
 
     const orderList = orders || [];
+    const storeOrderList = storeOrders || [];
     const gmvPkr = orderList.reduce((sum, o) => sum + (o.total_pkr || 0), 0);
     const codFeesCollectedPkr = orderList.reduce(
       (sum, o) => sum + (o.cod_fee_pkr || 0),
       0,
     );
-    const totalCommissionsPkr = Math.round(gmvPkr * 0.1);
+    const totalCommissionsPkr = storeOrderList.reduce(
+      (sum, so) => sum + (so.commission_pkr || 0),
+      0,
+    );
 
     return {
       gmvPkr,

@@ -307,6 +307,7 @@ app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, Use
     const { status, courier, trackingNumber } = req.body;
     const { supabaseAdmin } = await import("./config/supabase.js");
     const { AuditService } = await import("./modules/audit/audit.service.js");
+    const user = (req as any).user;
 
     const { data: previousOrder } = await supabaseAdmin
       .from("orders")
@@ -316,6 +317,35 @@ app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, Use
 
     if (!previousOrder) {
       return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Tenant check: If seller, verify store ownership
+    if (user.role === "SELLER") {
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+
+      if (!store) {
+        return res.status(403).json({ error: "Unauthorized: No active seller store found" });
+      }
+
+      const { data: storeOrder } = await supabaseAdmin
+        .from("store_orders")
+        .select("id")
+        .eq("order_id", req.params.id)
+        .eq("store_id", store.id)
+        .maybeSingle();
+
+      if (!storeOrder) {
+        return res.status(403).json({ error: "Forbidden: You can only update orders belonging to your store" });
+      }
+
+      await supabaseAdmin
+        .from("store_orders")
+        .update({ order_status: status, updated_at: new Date().toISOString() })
+        .eq("id", storeOrder.id);
     }
 
     const { data, error } = await supabaseAdmin
@@ -334,14 +364,14 @@ app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, Use
       await supabaseAdmin.from("shipments").insert({
         order_id: req.params.id,
         tracking_number: trackingNumber,
-        courier_name: courier,
+        courier_name: courier || "PostEx",
         status: "BOOKED"
       });
     }
 
     await AuditService.logAction({
-      actorId: (req as any).user?.id || "SYSTEM",
-      actorRole: "ADMIN_OR_SELLER",
+      actorId: user.id || "SYSTEM",
+      actorRole: user.role || "ADMIN_OR_SELLER",
       action: "ORDER_STATUS_CHANGED",
       targetResourceType: "order",
       targetResourceId: req.params.id,
@@ -352,7 +382,7 @@ app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, Use
 
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -370,7 +400,7 @@ app.post("/api/orders/:id/cancel", requireAuth, async (req, res) => {
   }
 });
 
-// â”€â”€ Coupon Validation (Phase 2: Promo Engine) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Coupon Validation (Phase 2: Promo Engine) ───────────────────────────────
 app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
   try {
     const { couponCode, items } = req.body;
@@ -457,7 +487,27 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
               .eq("owner_id", user.id)
               .maybeSingle(),
         );
-        res.json(store || { message: "No store found for this seller" });
+
+        if (!store) {
+          res.json({ message: "No store found for this seller" });
+          return;
+        }
+
+        // Mask sensitive KYC & banking information in general response
+        const maskCnic = (cnic?: string) => {
+          if (!cnic || cnic.length < 5) return cnic;
+          return `${cnic.slice(0, 5)}-*******-${cnic.slice(-1)}`;
+        };
+        const maskAccount = (acc?: string) => {
+          if (!acc || acc.length < 8) return acc;
+          return `${acc.slice(0, 4)}****${acc.slice(-4)}`;
+        };
+
+        res.json({
+          ...store,
+          cnic_number: maskCnic(store.cnic_number),
+          bank_account_number: maskAccount(store.bank_account_number),
+        });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -493,6 +543,40 @@ app.get(
         .order("created_at", { ascending: false });
 
       res.json(storeOrders || []);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.get(
+  "/api/seller/products",
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN),
+  requireActiveStore,
+  async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { supabaseAdmin } = await import("./config/supabase.js");
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+
+      if (!store) {
+        res.json([]);
+        return;
+      }
+
+      const { data: products, error } = await supabaseAdmin
+        .from("products")
+        .select("*, category:categories(name, slug), variants:product_variants(*)")
+        .eq("store_id", store.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      res.json(products || []);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

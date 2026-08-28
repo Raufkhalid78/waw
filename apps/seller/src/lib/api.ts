@@ -194,14 +194,7 @@ export async function updateStoreOrderStatus(
 
 export async function fetchSellerProducts(): Promise<SellerProduct[]> {
   try {
-    const storeId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("waw_store_id")
-        : null;
-    const url = storeId
-      ? API_BASE + "/api/products?storeId=" + storeId
-      : API_BASE + "/api/products";
-    const res = await fetch(url, {
+    const res = await fetch(API_BASE + "/api/seller/products", {
       headers: getAuthHeader(),
       cache: "no-store",
     });
@@ -218,7 +211,8 @@ export async function fetchSellerProducts(): Promise<SellerProduct[]> {
       basePricePkr: p.price_pkr || p.basePricePkr || 0,
       compareAtPricePkr: p.compare_at_price_pkr || p.compareAtPricePkr,
       stockQuantity: p.stock_quantity ?? p.stockQuantity ?? 0,
-      isActive: p.is_active ?? p.isActive ?? true,
+      isActive: p.is_active ?? p.isActive ?? false,
+      status: p.status || "PENDING_REVIEW",
       sku: p.sku || "SKU-" + p.id.slice(-6),
       images: p.images || [],
       weightKg: p.weight_kg || 1.0,
@@ -242,14 +236,11 @@ export async function createSellerProduct(productData: {
   description: string;
   weightKg?: number;
 }): Promise<any> {
-  const storeId =
-    typeof window !== "undefined" ? localStorage.getItem("waw_store_id") : null;
   const res = await fetch(API_BASE + "/api/products", {
     method: "POST",
     headers: getAuthHeader(),
     body: JSON.stringify({
       ...productData,
-      storeId: storeId || undefined,
       sellerType: SellerType.THIRD_PARTY,
     }),
   });

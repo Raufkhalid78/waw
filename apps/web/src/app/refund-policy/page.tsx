@@ -86,10 +86,10 @@ export default function RefundPolicyPage() {
             You never have to visit a courier franchise or pay return shipping
             fees. When you initiate a return via your account or{" "}
             <Link
-              href="/orders/WAW-PK-88492/return"
+              href="/account"
               className="text-amber-600 font-bold hover:underline"
             >
-              Self-Service Return Wizard
+              Order Returns Portal
             </Link>
             , a PostEx courier rider will collect the parcel directly from your
             doorstep within 24 hours.

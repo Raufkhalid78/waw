@@ -556,13 +556,23 @@ export function Header() {
               </span>
 
               {/* Orders */}
-              <Link
-                href="/orders/WAW-PK-98213"
-                className="hidden md:flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all"
-              >
-                <Package className="w-4 h-4 text-slate-900" />
-                <span>{t.orders}</span>
-              </Link>
+              {user ? (
+                <Link
+                  href="/account"
+                  className="hidden md:flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all"
+                >
+                  <Package className="w-4 h-4 text-slate-900" />
+                  <span>{t.orders}</span>
+                </Link>
+              ) : (
+                <button
+                  onClick={() => setAuthModalOpen(true)}
+                  className="hidden md:flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <Package className="w-4 h-4 text-slate-900" />
+                  <span>{t.orders}</span>
+                </button>
+              )}
 
               <span className="text-slate-900/20 hidden md:inline font-light">
                 |
