@@ -3,16 +3,21 @@
 -- ============================================================================
 
 -- 1. Ensure system profile exists for store ownership
--- Handle both id and email unique constraints (email may already exist under a different id)
-INSERT INTO public.profiles (id, full_name, phone, email, role, is_whatsapp_verified)
-VALUES ('profile_sys_admin', 'WAW System Admin', '+923000000000', 'system@waw.com.pk', 'ADMIN', true)
-ON CONFLICT (id) DO UPDATE SET 
-    full_name = EXCLUDED.full_name,
-    is_whatsapp_verified = true;
-
--- If email already existed under a different id, just update that row's role
-UPDATE public.profiles SET role = 'ADMIN', is_whatsapp_verified = true
-WHERE email = 'system@waw.com.pk' AND id <> 'profile_sys_admin';
+-- Uses a DO block so we handle both id AND email unique constraints safely.
+-- If a profile with this email already exists (different id), we elevate its role.
+-- If no profile with this email exists, we insert one.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.profiles WHERE email = 'system@waw.com.pk') THEN
+        UPDATE public.profiles
+        SET role = 'ADMIN', is_whatsapp_verified = true, full_name = 'WAW System Admin'
+        WHERE email = 'system@waw.com.pk';
+    ELSE
+        INSERT INTO public.profiles (id, full_name, phone, email, role, is_whatsapp_verified)
+        VALUES ('profile_sys_admin', 'WAW System Admin', '+923000000000', 'system@waw.com.pk', 'ADMIN', true)
+        ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, is_whatsapp_verified = true;
+    END IF;
+END $$;
 
 -- 2. Ensure default categories exist if not already present, handling slug conflicts safely
 INSERT INTO public.categories (id, name, name_urdu, slug, is_active) VALUES
