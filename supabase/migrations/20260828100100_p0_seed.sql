@@ -2,13 +2,13 @@
 -- WAW COMMERCE SEED DATA (IDEMPOTENT & PRODUCTION-SAFE)
 -- ============================================================================
 
--- Ensure default category exists if not already present
+-- Ensure default categories exist if not already present, handling slug conflicts safely
 INSERT INTO public.categories (id, name, name_urdu, slug, is_active) VALUES
-('cat_audio', 'Mobiles & Tech', 'موبائل اور ٹیک', 'mobiles-tech', true),
+('cat_electronics', 'Mobiles & Tech', 'موبائل اور ٹیک', 'mobiles-tech', true),
 ('cat_shoes', 'Shoes & Footwear', 'جوتے اور پشاوری چپل', 'shoes-footwear', true)
-ON CONFLICT (id) DO UPDATE SET 
+ON CONFLICT (slug) DO UPDATE SET 
     name = EXCLUDED.name,
-    slug = EXCLUDED.slug,
+    name_urdu = EXCLUDED.name_urdu,
     is_active = true;
 
 -- Ensure default store exists
@@ -20,10 +20,30 @@ ON CONFLICT (id) DO UPDATE SET
     status = 'ACTIVE',
     is_verified = true;
 
--- Seed Master Catalog
+-- Seed Master Catalog dynamically referencing the live category ID by slug
 INSERT INTO public.catalog_products (id, category_id, title, title_urdu, slug, description, images, thumbnail, is_active) VALUES
-('cat_prod_1', 'cat_audio', 'Apple AirPods Pro 2nd Gen (ANC)', 'ایپل ایئر پوڈز پرو 2nd Gen', 'airpods-pro-2', 'Premium true wireless earbuds with Active Noise Cancellation.', '{"https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=800"}', 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=400', true),
-('cat_prod_2', 'cat_shoes', 'Premium Norozi Peshawari Chappal', 'پریمیم نوروزی پشاوری چپل', 'norozi-chappal', 'Handmade leather Peshawari chappal with double tyre sole.', '{"https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=800"}', 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=400', true)
+(
+    'cat_prod_1', 
+    COALESCE((SELECT id FROM public.categories WHERE slug = 'mobiles-tech' LIMIT 1), 'cat_electronics'), 
+    'Apple AirPods Pro 2nd Gen (ANC)', 
+    'ایپل ایئر پوڈز پرو 2nd Gen', 
+    'airpods-pro-2', 
+    'Premium true wireless earbuds with Active Noise Cancellation.', 
+    '{"https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=800"}', 
+    'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=400', 
+    true
+),
+(
+    'cat_prod_2', 
+    COALESCE((SELECT id FROM public.categories WHERE slug = 'shoes-footwear' OR slug = 'traditional-clothing' LIMIT 1), (SELECT id FROM public.categories LIMIT 1)), 
+    'Premium Norozi Peshawari Chappal', 
+    'پریمیم نوروزی پشاوری چپل', 
+    'norozi-chappal', 
+    'Handmade leather Peshawari chappal with double tyre sole.', 
+    '{"https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=800"}', 
+    'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=400', 
+    true
+)
 ON CONFLICT (id) DO UPDATE SET 
     title = EXCLUDED.title,
     title_urdu = EXCLUDED.title_urdu,
