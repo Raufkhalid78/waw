@@ -5,7 +5,8 @@ import { expandRomanUrduQuery } from "./roman-urdu-dict.js";
 
 export class SearchService {
   /**
-   * Searches products across title, titleUrdu, slug, description with Roman Urdu synonym expansion and resilient fallback.
+   * Searches seller offers & catalog products across title, titleUrdu, slug, description 
+   * with Roman Urdu synonym expansion and resilient Postgres fallback.
    */
   static async search(params: {
     query?: string;
@@ -60,42 +61,66 @@ export class SearchService {
         const productIds = searchResult.hits.map((h: any) => h.document.id);
         found = searchResult.found;
 
-        const { data: products } = await supabaseAdmin
-          .from("products")
-          .select(
-            "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, status, is_featured, is_sponsored, sold_count, merchandising_rank, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug)",
-          )
-          .in("id", productIds)
-          .eq("is_active", true)
-          .eq("status", "ACTIVE");
+        const { data: offers } = await supabaseAdmin
+          .from("seller_offers")
+          .select(`
+            id, price_pkr, original_price_pkr, condition, is_express, status,
+            catalog_product:catalog_products!inner(id, title, title_urdu, slug, description, attributes, images, thumbnail, category_id, is_active, category:categories(id, name, name_urdu, slug)),
+            store:stores!inner(id, name, slug, logo_url, city, rating_average, seller_type),
+            variants:offer_variants(id, variant_name, price_adjustment_pkr)
+          `)
+          .in("catalog_product.id", productIds)
+          .eq("status", "ACTIVE")
+          .eq("catalog_product.is_active", true);
 
-        hits = products || [];
+        hits = (offers || []).map((offer: any) => ({
+          id: offer.id,
+          productId: offer.catalog_product?.id,
+          title: offer.catalog_product?.title,
+          titleUrdu: offer.catalog_product?.title_urdu,
+          slug: offer.catalog_product?.slug,
+          description: offer.catalog_product?.description,
+          pricePkr: offer.price_pkr,
+          originalPricePkr: offer.original_price_pkr,
+          imageUrl: offer.catalog_product?.thumbnail || offer.catalog_product?.images?.[0],
+          images: offer.catalog_product?.images,
+          thumbnail: offer.catalog_product?.thumbnail,
+          storeId: offer.store?.id,
+          storeName: offer.store?.name,
+          sellerCity: offer.store?.city,
+          sellerType: offer.store?.seller_type,
+          rating: offer.store?.rating_average,
+          category: offer.catalog_product?.category,
+          variants: offer.variants,
+          isExpress: offer.is_express,
+        }));
       }
     } catch {
       // Typesense failed or offline; will fallback to Postgres below
     }
 
-    // 2. Fallback to Supabase Postgres Full/ILIKE Search if Typesense yielded 0 hits
+    // 2. Fallback to Supabase Postgres ILIKE Search across catalog_products & seller_offers
     if (hits.length === 0) {
       let dbQuery = supabaseAdmin
-        .from("products")
-        .select(
-          "id, title, title_urdu, slug, description, base_price_pkr, compare_at_price_pkr, images, thumbnail, seller_type, is_first_party, category_id, store_id, is_active, status, is_featured, is_sponsored, sold_count, merchandising_rank, variants:product_variants(id, sku, price_adjustment_pkr, stock_quantity, is_active), store:stores(id, name, slug, logo_url, city, rating_average), category:categories(id, name, name_urdu, slug)",
-          { count: "exact" },
-        )
-        .eq("is_active", true)
-        .eq("status", "ACTIVE");
+        .from("seller_offers")
+        .select(`
+          id, price_pkr, original_price_pkr, condition, is_express, status,
+          catalog_product:catalog_products!inner(id, title, title_urdu, slug, description, attributes, images, thumbnail, category_id, is_active, category:categories(id, name, name_urdu, slug)),
+          store:stores!inner(id, name, slug, logo_url, city, rating_average, seller_type),
+          variants:offer_variants(id, variant_name, price_adjustment_pkr)
+        `, { count: "exact" })
+        .eq("status", "ACTIVE")
+        .eq("catalog_product.is_active", true);
 
       if (!isWildcard) {
-        // Build OR clauses for query and all synonyms
         const orClauses: string[] = [];
         for (const term of searchTerms) {
           const cleanTerm = term.replace(/[%_,]/g, "").trim();
           if (cleanTerm) {
-            orClauses.push(`title.ilike.%${cleanTerm}%`);
-            orClauses.push(`title_urdu.ilike.%${cleanTerm}%`);
-            orClauses.push(`slug.ilike.%${cleanTerm}%`);
-            orClauses.push(`description.ilike.%${cleanTerm}%`);
+            orClauses.push(`catalog_product.title.ilike.%${cleanTerm}%`);
+            orClauses.push(`catalog_product.title_urdu.ilike.%${cleanTerm}%`);
+            orClauses.push(`catalog_product.slug.ilike.%${cleanTerm}%`);
+            orClauses.push(`catalog_product.description.ilike.%${cleanTerm}%`);
           }
         }
         if (orClauses.length > 0) {
@@ -104,19 +129,39 @@ export class SearchService {
       }
 
       if (params.categoryId)
-        dbQuery = dbQuery.eq("category_id", params.categoryId);
+        dbQuery = dbQuery.eq("catalog_product.category_id", params.categoryId);
       if (params.storeId) dbQuery = dbQuery.eq("store_id", params.storeId);
       if (params.minPrice !== undefined)
-        dbQuery = dbQuery.gte("base_price_pkr", params.minPrice);
+        dbQuery = dbQuery.gte("price_pkr", params.minPrice);
       if (params.maxPrice !== undefined)
-        dbQuery = dbQuery.lte("base_price_pkr", params.maxPrice);
+        dbQuery = dbQuery.lte("price_pkr", params.maxPrice);
 
-      const { data: fallbackProducts, count } = await dbQuery
-        .order("merchandising_rank", { ascending: false })
-        .order("sold_count", { ascending: false })
+      const { data: fallbackOffers, count } = await dbQuery
+        .order("created_at", { ascending: false })
         .range((page - 1) * perPage, page * perPage - 1);
 
-      hits = fallbackProducts || [];
+      const rawOffers = fallbackOffers || [];
+      hits = rawOffers.map((offer: any) => ({
+        id: offer.id,
+        productId: offer.catalog_product?.id,
+        title: offer.catalog_product?.title,
+        titleUrdu: offer.catalog_product?.title_urdu,
+        slug: offer.catalog_product?.slug,
+        description: offer.catalog_product?.description,
+        pricePkr: offer.price_pkr,
+        originalPricePkr: offer.original_price_pkr,
+        imageUrl: offer.catalog_product?.thumbnail || offer.catalog_product?.images?.[0],
+        images: offer.catalog_product?.images,
+        thumbnail: offer.catalog_product?.thumbnail,
+        storeId: offer.store?.id,
+        storeName: offer.store?.name,
+        sellerCity: offer.store?.city,
+        sellerType: offer.store?.seller_type,
+        rating: offer.store?.rating_average,
+        category: offer.catalog_product?.category,
+        variants: offer.variants,
+        isExpress: offer.is_express,
+      }));
       found = count || hits.length;
     }
 
@@ -148,15 +193,17 @@ export class SearchController {
     try {
       const { q, categoryId, storeId, minPrice, maxPrice, page, limit } =
         req.query;
+
       const results = await SearchService.search({
         query: q as string,
         categoryId: categoryId as string,
         storeId: storeId as string,
-        minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
+        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 20,
       });
+
       res.json(results);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

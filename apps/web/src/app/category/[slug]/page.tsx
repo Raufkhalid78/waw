@@ -15,6 +15,7 @@ import {
   Truck,
   Package,
   ArrowRight,
+  AlertCircle,
 } from "lucide-react";
 
 
@@ -41,31 +42,36 @@ export default function CategoryPage() {
 
   const [facets, setFacets] = useState<any>({ minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] });
 
-  useEffect(() => {
-    async function loadCategoryData() {
-      setLoading(true);
-      try {
-        const [catData, prodData] = await Promise.all([
-          fetchCategoryBySlug(slug),
-          fetchProducts({
-            categorySlug: slug,
-            city: selectedCity !== "All Cities" ? selectedCity : undefined,
-            sellerType: selectedSellerType,
-            maxPrice: userMaxPrice,
-            sortBy,
-          }),
-        ]);
-        setCategory(catData);
-        if (prodData) {
-          setProducts(prodData.items || []);
-          if (prodData.facets) setFacets(prodData.facets);
-        }
-      } catch (err) {
-        console.error("Failed to load category data:", err);
-      } finally {
-        setLoading(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadCategoryData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [catData, prodData] = await Promise.all([
+        fetchCategoryBySlug(slug),
+        fetchProducts({
+          categorySlug: slug,
+          city: selectedCity !== "All Cities" ? selectedCity : undefined,
+          sellerType: selectedSellerType,
+          maxPrice: userMaxPrice,
+          sortBy,
+        }),
+      ]);
+      setCategory(catData);
+      if (prodData) {
+        setProducts(prodData.items || []);
+        if (prodData.facets) setFacets(prodData.facets);
       }
+    } catch (err: any) {
+      console.error("Failed to load category data:", err);
+      setError("Unable to load category offers from the database. Please retry.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadCategoryData();
   }, [slug, selectedCity, selectedSellerType, userMaxPrice, sortBy]);
 
@@ -267,6 +273,26 @@ export default function CategoryPage() {
               <p className="text-xs font-bold text-slate-400">
                 {isUrdu ? "مصنوعات لوڈ ہو رہی ہیں..." : "Loading products..."}
               </p>
+            </div>
+          ) : error ? (
+            <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-4 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-950">
+                  {isUrdu ? "زمرہ کی تفصیلات حاصل کرنے میں مسئلہ پیش آیا" : "Catalog Temporarily Unavailable"}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {error}
+                </p>
+              </div>
+              <button
+                onClick={loadCategoryData}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all cursor-pointer"
+              >
+                <span>{isUrdu ? "دوبارہ کوشش کریں" : "Retry Connection"}</span>
+              </button>
             </div>
           ) : products.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

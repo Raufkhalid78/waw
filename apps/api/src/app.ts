@@ -585,8 +585,8 @@ app.get(
       }
 
       const { data: products, error } = await supabaseAdmin
-        .from("products")
-        .select("*, category:categories(name, slug), variants:product_variants(*)")
+        .from("seller_offers")
+        .select("*, catalog_product:catalog_products(*, category:categories(name, slug)), variants:offer_variants(*)")
         .eq("store_id", store.id)
         .order("created_at", { ascending: false });
 
@@ -626,11 +626,11 @@ app.get(
       // 1. Fetch store orders
       const { data: storeOrders } = await supabaseAdmin
         .from("store_orders")
-        .select("subtotal_pkr, order_status")
+        .select("subtotal_pkr, status")
         .eq("store_id", store.id);
 
       const validOrders = (storeOrders || []).filter(
-        (o: any) => o.order_status !== "CANCELLED",
+        (o: any) => o.status !== "CANCELLED",
       );
       const totalRevenuePkr = validOrders.reduce(
         (sum: number, o: any) => sum + (o.subtotal_pkr || 0),
@@ -651,10 +651,10 @@ app.get(
 
       // 3. Fetch active products count
       const { count: activeProducts } = await supabaseAdmin
-        .from("products")
+        .from("seller_offers")
         .select("id", { count: "exact", head: true })
         .eq("store_id", store.id)
-        .eq("is_active", true);
+        .eq("status", "ACTIVE");
 
       res.json({
         totalRevenuePkr,
@@ -975,10 +975,9 @@ app.post("/api/products/:id/reviews", requireAuth, async (req, res) => {
       const avg =
         allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
       await supabaseAdmin
-        .from("products")
+        .from("catalog_products")
         .update({
-          rating_average: Math.round(avg * 10) / 10,
-          rating_count: allReviews.length,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", productId);
     }

@@ -17,23 +17,19 @@ export class AdminService {
       supabaseAdmin.from("orders").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("stores").select("*", { count: "exact", head: true }),
       supabaseAdmin
-        .from("products")
+        .from("catalog_products")
         .select("*", { count: "exact", head: true }),
       supabaseAdmin
         .from("orders")
-        .select("total_pkr, cod_fee_pkr, payment_status, order_status"),
+        .select("total_amount_pkr, payment_status, global_status"),
       supabaseAdmin
         .from("store_orders")
         .select("commission_pkr"),
     ]);
 
-    const orderList = orders || [];
-    const storeOrderList = storeOrders || [];
-    const gmvPkr = orderList.reduce((sum, o) => sum + (o.total_pkr || 0), 0);
-    const codFeesCollectedPkr = orderList.reduce(
-      (sum, o) => sum + (o.cod_fee_pkr || 0),
-      0,
-    );
+    const orderList: any[] = orders || [];
+    const storeOrderList: any[] = storeOrders || [];
+    const gmvPkr = orderList.reduce((sum, o) => sum + (o.total_amount_pkr || o.total_pkr || 0), 0);
     const totalCommissionsPkr = storeOrderList.reduce(
       (sum, so) => sum + (so.commission_pkr || 0),
       0,
@@ -45,86 +41,85 @@ export class AdminService {
       totalSellers: totalSellers || 0,
       totalProducts: totalProducts || 0,
       totalCommissionsPkr,
-      codFeesCollectedPkr,
-      netPlatformRevenuePkr: totalCommissionsPkr + codFeesCollectedPkr,
+      codFeesCollectedPkr: 0,
+      netPlatformRevenuePkr: totalCommissionsPkr,
     };
   }
 
   /**
-   * Lists products awaiting catalog/admin approval.
+   * Lists offers awaiting catalog/admin approval.
    */
   static async listPendingProducts() {
-    const { data: products, error } = await supabaseAdmin
-      .from("products")
-      .select("*, store:stores(name, city), category:categories(name)")
-      .eq("status", "PENDING_REVIEW")
+    const { data: offers, error } = await supabaseAdmin
+      .from("seller_offers")
+      .select("*, catalog_product:catalog_products(*), store:stores(name, city)")
+      .eq("status", "PENDING")
       .order("created_at", { ascending: true });
 
     if (error) throw error;
-    return products || [];
+    return offers || [];
   }
 
   /**
-   * Approves a pending seller product and makes it live in the public catalog.
+   * Approves a pending seller offer and makes it live in the public catalog.
    */
-  static async approveProduct(productId: string, adminId?: string) {
-    const { data: previousProduct } = await supabaseAdmin
-      .from("products")
-      .select("*")
-      .eq("id", productId)
+  static async approveProduct(offerId: string, adminId?: string) {
+    const { data: previousOffer } = await supabaseAdmin
+      .from("seller_offers")
+      .select("*, catalog_product:catalog_products(*)")
+      .eq("id", offerId)
       .single();
 
-    const { data: updatedProduct, error } = await supabaseAdmin
-      .from("products")
+    const { data: updatedOffer, error } = await supabaseAdmin
+      .from("seller_offers")
       .update({
         status: "ACTIVE",
-        is_active: true,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", productId)
+      .eq("id", offerId)
       .select()
       .single();
 
     if (error) throw error;
 
-    // Activate default product variants
-    await supabaseAdmin
-      .from("product_variants")
-      .update({ is_active: true })
-      .eq("product_id", productId);
+    if (previousOffer?.catalog_product_id) {
+      await supabaseAdmin
+        .from("catalog_products")
+        .update({ is_active: true, updated_at: new Date().toISOString() })
+        .eq("id", previousOffer.catalog_product_id);
+    }
 
     await AuditService.logAction({
       actorId: adminId || "SYSTEM",
       actorRole: "SUPER_ADMIN",
       action: "PRODUCT_APPROVED",
-      targetResourceType: "product",
-      targetResourceId: productId,
-      previousState: previousProduct,
-      newState: updatedProduct,
-      reason: "Product listing approved for public marketplace catalog",
+      targetResourceType: "offer",
+      targetResourceId: offerId,
+      previousState: previousOffer,
+      newState: updatedOffer,
+      reason: "Product offer listing approved for public marketplace catalog",
     });
 
-    return updatedProduct;
+    return updatedOffer;
   }
 
   /**
-   * Rejects a pending seller product with reason.
+   * Rejects a pending seller offer with reason.
    */
-  static async rejectProduct(productId: string, reason: string, adminId?: string) {
-    const { data: previousProduct } = await supabaseAdmin
-      .from("products")
+  static async rejectProduct(offerId: string, reason: string, adminId?: string) {
+    const { data: previousOffer } = await supabaseAdmin
+      .from("seller_offers")
       .select("*")
-      .eq("id", productId)
+      .eq("id", offerId)
       .single();
 
-    const { data: updatedProduct, error } = await supabaseAdmin
-      .from("products")
+    const { data: updatedOffer, error } = await supabaseAdmin
+      .from("seller_offers")
       .update({
         status: "REJECTED",
-        is_active: false,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", productId)
+      .eq("id", offerId)
       .select()
       .single();
 
@@ -134,14 +129,14 @@ export class AdminService {
       actorId: adminId || "SYSTEM",
       actorRole: "SUPER_ADMIN",
       action: "PRODUCT_REJECTED",
-      targetResourceType: "product",
-      targetResourceId: productId,
-      previousState: previousProduct,
-      newState: updatedProduct,
+      targetResourceType: "offer",
+      targetResourceId: offerId,
+      previousState: previousOffer,
+      newState: updatedOffer,
       reason: reason || "Listing does not meet catalog quality or policy standards",
     });
 
-    return updatedProduct;
+    return updatedOffer;
   }
 
   /**
@@ -150,7 +145,7 @@ export class AdminService {
   static async listPendingReviews() {
     const { data: reviews, error } = await supabaseAdmin
       .from("reviews")
-      .select("*, product:products(title, slug)")
+      .select("*, product:catalog_products(title, slug)")
       .eq("status", "PENDING")
       .order("created_at", { ascending: true });
 

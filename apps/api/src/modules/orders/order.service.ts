@@ -70,20 +70,10 @@ export class OrderService {
 
     const buyerId = authenticatedUser?.id;
 
-    const rpcItems = quote.items.map((i: any) => {
-      const commissionRate = i.commissionRatePercentage || 10;
-      const commission = Math.round(i.totalPricePkr * (commissionRate / 100));
-      return {
-        offer_variant_id: i.variantId || 'var_default',
-        quantity: i.quantity,
-        store_id: i.storeId,
-        price_pkr: i.unitPricePkr,
-        product_title: i.title || 'Product',
-        variant_name: 'Default',
-        commission_pkr: commission,
-        seller_payout_pkr: i.totalPricePkr - commission
-      };
-    });
+    const rpcItems = quote.items.map((i: any) => ({
+      offer_variant_id: i.variantId,
+      quantity: i.quantity,
+    }));
 
     const { data: result, error } = await supabaseAdmin.rpc('checkout_transaction', {
       p_buyer_id: buyerId || null,
@@ -92,7 +82,8 @@ export class OrderService {
       p_shipping_address: input.shippingAddress,
       p_shipping_city: input.shippingCity,
       p_payment_method: input.paymentMethod,
-      p_items: rpcItems
+      p_items: rpcItems,
+      p_coupon_code: input.couponCode || null,
     });
 
     if (error || !result?.success) {
@@ -102,6 +93,7 @@ export class OrderService {
     const response = {
       orderId: result.order_id,
       orderNumber: result.order_number,
+      totalAmountPkr: result.total_amount_pkr,
       status: "CONFIRMED"
     };
 
@@ -115,7 +107,7 @@ export class OrderService {
     WhatsAppService.sendOrderConfirmed(
       input.buyerPhone,
       result.order_number,
-      quote.totalPkr,
+      result.total_amount_pkr || quote.totalPkr,
       input.paymentMethod === PaymentMethod.COD
     ).catch(console.error);
 
@@ -128,7 +120,7 @@ export class OrderService {
   static async getOrder(id: string) {
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("*, order_items(*), store_orders(*, order_items(*), shipments(*)), payments(*)")
+      .select("*, store_orders(*, order_items(*, offer_variants(*, seller_offers(*, catalog_products(*)))), shipments(*))")
       .eq("id", id)
       .maybeSingle();
 
@@ -198,7 +190,7 @@ export class OrderService {
         reason: input.reason,
         status: "REVERSE_PICKUP_BOOKED",
         reverse_courier_cn: reversePickupResult.reverseTrackingNumber,
-        refund_amount_pkr: order.total_pkr,
+        refund_amount_pkr: order.total_amount_pkr || order.total_pkr || 0,
         staff_notes: input.comments
           ? `Buyer notes: ${input.comments}. Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`
           : `Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`,
@@ -222,7 +214,7 @@ export class OrderService {
     await supabaseAdmin
       .from("orders")
       .update({
-        order_status: OrderStatus.RETURN_REQUESTED,
+        global_status: "RETURN_REQUESTED",
         updated_at: new Date().toISOString(),
       })
       .eq("id", order.id);
@@ -235,9 +227,9 @@ export class OrderService {
       action: "RETURN_REQUESTED",
       targetResourceType: "order",
       targetResourceId: order.id,
-      previousState: { orderStatus: order.order_status },
+      previousState: { orderStatus: order.global_status || order.order_status },
       newState: {
-        orderStatus: OrderStatus.RETURN_REQUESTED,
+        orderStatus: "RETURN_REQUESTED",
         returnRequestId: returnReq.id,
         reverseCn: reversePickupResult.reverseTrackingNumber,
       },
@@ -261,7 +253,7 @@ export class OrderService {
   ) {
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("*, order_items(*), store_orders(*)")
+      .select("*, store_orders(*, order_items(*))")
       .eq("id", id)
       .single();
 
@@ -279,34 +271,40 @@ export class OrderService {
     await supabaseAdmin
       .from("orders")
       .update({
-        order_status: OrderStatus.CANCELLED,
-        notes: reason ? `Cancelled: ${reason}` : "Cancelled by customer",
+        global_status: "CANCELLED",
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
 
-    // Cancel all child store_orders
+    // Cancel all child store_orders and release inventory in ledger
     if (order.store_orders?.length > 0) {
       await supabaseAdmin
         .from("store_orders")
         .update({
-          order_status: OrderStatus.CANCELLED,
+          status: "CANCELLED",
           updated_at: new Date().toISOString(),
         })
         .eq("order_id", id);
+
+      for (const storeOrder of order.store_orders) {
+        if (storeOrder.order_items?.length > 0) {
+          for (const item of storeOrder.order_items) {
+            if (item.offer_variant_id) {
+              await supabaseAdmin.from("inventory_ledger").insert({
+                offer_variant_id: item.offer_variant_id,
+                store_id: storeOrder.store_id,
+                transaction_type: "RELEASE",
+                quantity: item.quantity,
+                reference_id: id,
+                notes: `Order cancellation stock release (${reason || "Customer cancelled"})`,
+              });
+            }
+          }
+        }
+      }
     }
 
-    // Release inventory reservation locks
-    if (order.order_items?.length > 0) {
-      const lockItems = order.order_items.map((i: any) => ({
-        productId: i.product_id,
-        variantId: i.variant_id,
-        quantity: i.quantity,
-      }));
-      await InventoryLockService.releaseStockLocks(id, lockItems);
-    }
-
-    return { success: true, orderId: id, status: OrderStatus.CANCELLED };
+    return { success: true, orderId: id, status: "CANCELLED" };
   }
 
   /**

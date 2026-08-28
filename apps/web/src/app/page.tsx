@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { CategoryCircles } from "@/components/home/CategoryCircles";
 import { ProductCard } from "@/components/ui/ProductCard";
-import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package } from "lucide-react";
+import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package, AlertCircle } from "lucide-react";
 import { fetchProducts, fetchCategories } from "@/lib/api";
 
 export default function HomePage() {
@@ -44,21 +44,25 @@ export default function HomePage() {
     }
   }, [dbCategories]);
 
-  useEffect(() => {
-    async function loadCatalog() {
-      setLoading(true);
-      try {
-        const data = await fetchProducts(
-          activeCategory ? { categorySlug: activeCategory } : undefined
-        );
-        // fetchProducts returns already-transformed ProductDetail objects (camelCase)
-        setLiveProducts(data.items || []);
-      } catch (err) {
-        console.error("[Homepage] Failed to load catalog:", err);
-      } finally {
-        setLoading(false);
-      }
+  const [error, setError] = useState<string | null>(null);
+
+  const loadCatalog = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchProducts(
+        activeCategory ? { categorySlug: activeCategory } : undefined
+      );
+      setLiveProducts(data.items || []);
+    } catch (err: any) {
+      console.error("[Homepage] Failed to load catalog:", err);
+      setError("Unable to load latest offers from the marketplace catalog. Please check your connection or retry.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadCatalog();
   }, [activeCategory]);
 
@@ -165,6 +169,22 @@ export default function HomePage() {
           {loading ? (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-16 space-y-4 max-w-md mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-black text-slate-900">Catalog Temporarily Unavailable</h3>
+              <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                {error}
+              </p>
+              <button
+                onClick={loadCatalog}
+                className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 px-6 py-2.5 rounded-full font-black text-xs uppercase tracking-wider shadow-xs transition-all cursor-pointer"
+              >
+                <span>Retry Connection</span>
+              </button>
             </div>
           ) : liveProducts.length === 0 ? (
             <div className="text-center py-20 space-y-3">
