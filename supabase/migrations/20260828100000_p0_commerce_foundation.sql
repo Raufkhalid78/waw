@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS inventory_ledger (
 -- Orders
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
-    buyer_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    buyer_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
     buyer_name TEXT NOT NULL,
     buyer_phone TEXT NOT NULL,
     shipping_address TEXT NOT NULL,
