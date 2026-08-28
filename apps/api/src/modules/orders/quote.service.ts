@@ -49,17 +49,18 @@ export class QuoteService {
         .eq("catalog_product.slug", item.productId) // Assuming frontend passes slug as productId
         .maybeSingle();
 
-      if (offerErr || !offer || offer.status !== "ACTIVE" || !offer.catalog_product.is_active) {
+      const offerData: any = offer;
+      if (offerErr || !offerData || offerData.status !== "ACTIVE" || !offerData.catalog_product.is_active) {
         throw new Error(`Product not found or unavailable: ${item.productId}`);
       }
 
-      let unitPrice = offer.price_pkr;
+      let unitPrice = offerData.price_pkr;
       let stockAvailable = 0;
       let variantName = 'Default';
       let offerVariantId = null;
 
       // Find variant
-      let variantQuery = supabaseAdmin.from("offer_variants").select("id, variant_name, price_adjustment_pkr").eq("offer_id", offer.id);
+      let variantQuery = supabaseAdmin.from("offer_variants").select("id, variant_name, price_adjustment_pkr").eq("offer_id", offerData.id);
       if (item.variantId) {
         variantQuery = variantQuery.eq("id", item.variantId);
       }
@@ -82,7 +83,7 @@ export class QuoteService {
       stockAvailable = (invData || []).reduce((sum: number, row: any) => sum + row.quantity, 0);
 
       if (stockAvailable < item.quantity) {
-        throw new Error(`Insufficient stock for ${offer.catalog_product.title}. Only ${stockAvailable} available.`);
+        throw new Error(`Insufficient stock for ${offerData.catalog_product.title}. Only ${stockAvailable} available.`);
       }
 
       const itemTotal = unitPrice * item.quantity;
@@ -92,10 +93,10 @@ export class QuoteService {
         productId: item.productId,
         variantId: offerVariantId,
         variantName: variantName,
-        title: offer.catalog_product.title,
-        storeId: offer.store_id,
-        storeName: offer.store.name,
-        commissionRatePercentage: offer.store.commission_rate_percentage || 10,
+        title: offerData.catalog_product.title,
+        storeId: offerData.store_id,
+        storeName: offerData.store.name,
+        commissionRatePercentage: offerData.store.commission_rate_percentage || 10,
         sellerType: SellerType.THIRD_PARTY,
         unitPricePkr: unitPrice,
         quantity: item.quantity,
@@ -112,7 +113,7 @@ export class QuoteService {
 
     // 4. Coupon Calculation (simplified)
     const couponDiscountPkr = 0;
-    const appliedCoupon = null;
+    const appliedCoupon = undefined;
 
     const totalPkr = subtotalPkr + shippingFeePkr + codFeePkr - couponDiscountPkr;
 
@@ -139,7 +140,6 @@ export class QuoteService {
       codFeePkr,
       couponDiscountPkr,
       totalPkr,
-      appliedCoupon,
       items: verifiedItems,
       expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
     };

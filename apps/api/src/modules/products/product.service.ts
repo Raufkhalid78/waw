@@ -117,22 +117,23 @@ export class ProductService {
       throw new Error(`Product not found or database error: ${error?.message}`);
     }
 
+    const offerData: any = offer;
     return {
-      id: offer.id,
-      productId: offer.catalog_product.id,
-      slug: offer.catalog_product.slug,
-      title: offer.catalog_product.title,
-      title_urdu: offer.catalog_product.title_urdu,
-      description: offer.catalog_product.description,
-      images: offer.catalog_product.images,
-      thumbnail: offer.catalog_product.thumbnail,
-      pricePkr: offer.price_pkr,
-      originalPricePkr: offer.original_price_pkr,
-      condition: offer.condition,
-      isExpress: offer.is_express,
-      store: offer.store,
-      category: offer.catalog_product.category,
-      variants: offer.variants
+      id: offerData.id,
+      productId: offerData.catalog_product.id,
+      slug: offerData.catalog_product.slug,
+      title: offerData.catalog_product.title,
+      title_urdu: offerData.catalog_product.title_urdu,
+      description: offerData.catalog_product.description,
+      images: offerData.catalog_product.images,
+      thumbnail: offerData.catalog_product.thumbnail,
+      pricePkr: offerData.price_pkr,
+      originalPricePkr: offerData.original_price_pkr,
+      condition: offerData.condition,
+      isExpress: offerData.is_express,
+      store: offerData.store,
+      category: offerData.catalog_product.category,
+      variants: offerData.variants
     };
   }
 

@@ -21,8 +21,6 @@ export class ProductController {
         categorySlug: categorySlug as string,
         storeId: storeId as string,
         city: city as string,
-        isFirstParty:
-          isFirstParty !== undefined ? isFirstParty === "true" : undefined,
         minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
         maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
         sortBy: sortBy as any,
