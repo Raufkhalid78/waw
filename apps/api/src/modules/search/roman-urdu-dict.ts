@@ -19,6 +19,9 @@ export const ROMAN_URDU_DICTIONARY: Record<string, string[]> = {
   joota: ["shoes", "peshawari", "chappal", "leather footwear"],
   jootay: ["shoes", "peshawari", "chappal", "footwear"],
   chappal: [
+    "peshawari chappal",
+    "norozi chappal",
+    "kaptaan chappal",
     "chappal",
     "peshawari",
     "norozi",
