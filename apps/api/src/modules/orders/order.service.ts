@@ -44,41 +44,22 @@ export class OrderService {
    * + PostEx shipment per distinct seller.
    */
   static async createOrder(input: CreateOrderInput, authenticatedUser?: any) {
-    // 0. Idempotency Key check: if already processed, return cached order result
     if (input.idempotencyKey) {
       try {
         const cached = await redis.get(`idempotency:${input.idempotencyKey}`);
-        if (cached) {
-          return JSON.parse(cached);
-        }
-      } catch {
-        // Continue if redis is unavailable
-      }
+        if (cached) return JSON.parse(cached);
+      } catch {}
     }
 
     let quote: any;
-
     if (input.quoteToken) {
-      // Idempotency check: Ensure quoteToken is only used once
       const isUsed = await redis.get(`quote_used:${input.quoteToken}`);
-      if (isUsed) {
-        throw new Error(
-          "This checkout session has already been processed. Please return to your cart.",
-        );
-      }
-
+      if (isUsed) throw new Error("This checkout session has already been processed.");
       quote = QuoteService.verifyQuoteToken(input.quoteToken);
-
-      // Mark as used (expires in 24 hours to keep Redis clean)
       await redis.set(`quote_used:${input.quoteToken}`, "1", "EX", 86400);
     } else if (input.items && input.items.length > 0) {
-      // Derive server-authoritative quote on the fly
       quote = await QuoteService.generateQuote({
-        items: input.items.map((i) => ({
-          productId: i.productId,
-          variantId: i.variantId,
-          quantity: i.quantity,
-        })),
+        items: input.items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
         shippingCity: input.shippingCity,
         paymentMethod: input.paymentMethod,
         couponCode: input.couponCode,
@@ -87,213 +68,58 @@ export class OrderService {
       throw new Error("Order must contain a valid quoteToken or items list");
     }
 
-    const orderNumber = `WAW-${Math.floor(100000 + Math.random() * 900000)}`;
-    const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const isCod = input.paymentMethod === PaymentMethod.COD;
     const buyerId = authenticatedUser?.id;
 
-    if (!buyerId) {
-      throw new Error("Unauthorized: buyer ID required");
+    const rpcItems = quote.items.map((i: any) => {
+      const commissionRate = i.commissionRatePercentage || 10;
+      const commission = Math.round(i.totalPricePkr * (commissionRate / 100));
+      return {
+        offer_variant_id: i.variantId || 'var_default',
+        quantity: i.quantity,
+        store_id: i.storeId,
+        price_pkr: i.unitPricePkr,
+        product_title: i.title || 'Product',
+        variant_name: 'Default',
+        commission_pkr: commission,
+        seller_payout_pkr: i.totalPricePkr - commission
+      };
+    });
+
+    const { data: result, error } = await supabaseAdmin.rpc('checkout_transaction', {
+      p_buyer_id: buyerId || null,
+      p_buyer_name: input.buyerName,
+      p_buyer_phone: input.buyerPhone,
+      p_shipping_address: input.shippingAddress,
+      p_shipping_city: input.shippingCity,
+      p_payment_method: input.paymentMethod,
+      p_items: rpcItems
+    });
+
+    if (error || !result?.success) {
+      throw new Error(`Checkout transaction failed: ${error?.message || 'Unknown error'}`);
     }
 
-    const lockItems = quote.items.map((i: any) => ({
-      productId: i.productId,
-      variantId: i.variantId,
-      quantity: i.quantity,
-    }));
-
-    // 1. Acquire Redis Inventory Reservation Locks (15-min TTL)
-    const lockAcquired = await InventoryLockService.acquireStockLocks(
-      orderId,
-      lockItems,
-    );
-    if (!lockAcquired) {
-      throw new Error(
-        "Unable to reserve stock. One or more items are currently out of stock.",
-      );
-    }
-
-    const finalTotal = quote.totalPkr;
-    const couponDiscount = quote.couponDiscountPkr || 0;
-
-    // 2. Insert Parent Order Record into Supabase
-    const { data: order, error: orderError } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        id: orderId,
-        order_number: orderNumber,
-        buyer_id: buyerId,
-        buyer_name: input.buyerName,
-        buyer_phone: input.buyerPhone,
-        shipping_address: input.shippingAddress,
-        shipping_city: input.shippingCity,
-        shipping_province: input.shippingProvince,
-        subtotal_pkr: quote.subtotalPkr,
-        shipping_fee_pkr: quote.shippingFeePkr,
-        cod_fee_pkr: quote.codFeePkr,
-        total_pkr: finalTotal,
-        payment_method: input.paymentMethod,
-        payment_status: isCod
-          ? PaymentStatus.COD_PENDING
-          : PaymentStatus.PENDING,
-        order_status: OrderStatus.CONFIRMED,
-        notes: input.notes,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (orderError) {
-      await InventoryLockService.releaseStockLocks(orderId, lockItems);
-      throw new Error(`Failed to create order: ${orderError.message}`);
-    }
-
-    // 3. Group items by store_id for split-order creation
-    const itemsByStore: Record<string, any[]> = {};
-    for (const item of quote.items) {
-      if (!itemsByStore[item.storeId]) itemsByStore[item.storeId] = [];
-      itemsByStore[item.storeId].push(item);
-    }
-
-    const storeOrders: any[] = [];
-    const shipments: any[] = [];
-
-    // 4. For each seller — create a store_order + order_items + PostEx shipment
-    for (const [storeId, storeItems] of Object.entries(itemsByStore)) {
-      const storeSubtotal = (storeItems as any[]).reduce(
-        (s, i) => s + i.totalPricePkr,
-        0,
-      );
-      const storeShippingFee = quote.shippingFeePkr === 0 ? 0 : 200;
-      const commissionRate =
-        (storeItems as any[])[0].commissionRatePercentage || 10;
-      const commissionPkr = Math.round(storeSubtotal * (commissionRate / 100));
-      const sellerPayoutPkr = storeSubtotal - commissionPkr;
-
-      const storeOrderId = `sord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-
-      const { data: storeOrder } = await supabaseAdmin
-        .from("store_orders")
-        .insert({
-          id: storeOrderId,
-          order_id: orderId,
-          store_id: storeId,
-          subtotal_pkr: storeSubtotal,
-          shipping_fee_pkr: storeShippingFee,
-          commission_pkr: commissionPkr,
-          seller_payout_pkr: sellerPayoutPkr,
-          order_status: OrderStatus.CONFIRMED,
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      storeOrders.push(storeOrder);
-
-      // 5. Insert order_items linked to this store_order
-      const storeItemInserts = (storeItems as any[]).map((item) => ({
-        id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        order_id: orderId,
-        store_order_id: storeOrderId,
-        product_id: item.productId,
-        variant_id: item.variantId || null,
-        quantity: item.quantity,
-        unit_price_pkr: item.unitPricePkr,
-        total_price_pkr: item.totalPricePkr,
-        created_at: new Date().toISOString(),
-      }));
-
-      await supabaseAdmin.from("order_items").insert(storeItemInserts);
-
-      // 6. Book shipment and create payout only if COD. For prepaid, wait for XPay webhook.
-      if (isCod) {
-        const shipment = await CourierService.bookCourierShipment({
-          orderId: storeOrderId,
-          orderNumber: `${orderNumber}-${storeId.slice(-4).toUpperCase()}`,
-          customerName: input.buyerName,
-          customerPhone: input.buyerPhone,
-          deliveryAddress: input.shippingAddress,
-          destinationCity: input.shippingCity,
-          codAmountPkr: storeSubtotal,
-          isCod: true,
-          itemsCount: (storeItems as any[]).reduce((s, i) => s + i.quantity, 0),
-        });
-        shipments.push(shipment);
-
-        // 7. Create payout record for seller
-        await supabaseAdmin.from("payouts").insert({
-          id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          store_id: storeId,
-          order_id: orderId,
-          store_order_id: storeOrderId,
-          amount_pkr: sellerPayoutPkr,
-          commission_pkr: commissionPkr,
-          status: "SCHEDULED",
-          scheduled_for: new Date(
-            Date.now() + 7 * 24 * 60 * 60 * 1000,
-          ).toISOString(),
-          created_at: new Date().toISOString(),
-        });
-      }
-    }
-
-    // 8. Decrement coupon usage if applied
-    if (quote.appliedCoupon?.code) {
-      const { data: c } = await supabaseAdmin
-        .from("coupons")
-        .select("id, current_uses")
-        .eq("code", quote.appliedCoupon.code)
-        .single();
-      if (c) {
-        await supabaseAdmin
-          .from("coupons")
-          .update({ current_uses: c.current_uses + 1 })
-          .eq("id", c.id);
-      }
-    }
-
-    // 9. For COD orders, commit inventory deductions immediately
-    if (isCod) {
-      await InventoryLockService.commitStockDecrement(orderId, lockItems);
-    }
-
-    // 10. WhatsApp Order Confirmation
-    await WhatsAppService.sendOrderConfirmed(
-      input.buyerPhone,
-      orderNumber,
-      finalTotal,
-      isCod,
-    );
-
-    const result = {
-      orderId,
-      orderNumber,
-      summary: {
-        subtotalPkr: quote.subtotalPkr,
-        shippingPkr: quote.shippingFeePkr,
-        codFeePkr: quote.codFeePkr,
-        couponDiscountPkr: couponDiscount,
-        totalPkr: finalTotal,
-      },
-      storeOrders,
-      shipments,
-      status: OrderStatus.CONFIRMED,
+    const response = {
+      orderId: result.order_id,
+      orderNumber: result.order_number,
+      status: "CONFIRMED"
     };
 
     if (input.idempotencyKey) {
       try {
-        await redis.set(
-          `idempotency:${input.idempotencyKey}`,
-          JSON.stringify(result),
-          "EX",
-          86400,
-        );
-      } catch {
-        // Continue if Redis is unavailable
-      }
+        await redis.set(`idempotency:${input.idempotencyKey}`, JSON.stringify(response), "EX", 86400);
+      } catch {}
     }
 
-    return result;
+    // WhatsApp Order Confirmation (fire and forget)
+    WhatsAppService.sendOrderConfirmed(
+      input.buyerPhone,
+      result.order_number,
+      quote.totalPkr,
+      input.paymentMethod === PaymentMethod.COD
+    ).catch(console.error);
+
+    return response;
   }
 
   /**

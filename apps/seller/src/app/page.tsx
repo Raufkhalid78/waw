@@ -36,18 +36,29 @@ export default function SellerDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("waw_seller_token") : null;
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
     async function loadData() {
-      const [s, o, p, a] = await Promise.all([
-        fetchSellerStore(),
-        fetchSellerOrders(),
-        fetchSellerProducts(),
-        fetchSellerAnalytics(),
-      ]);
-      setStore(s);
-      setOrders(o);
-      setProducts(p);
-      setAnalytics(a);
-      setLoading(false);
+      try {
+        const [s, o, p, a] = await Promise.all([
+          fetchSellerStore(),
+          fetchSellerOrders(),
+          fetchSellerProducts(),
+          fetchSellerAnalytics(),
+        ]);
+        setStore(s);
+        setOrders(o);
+        setProducts(p);
+        setAnalytics(a);
+      } catch (err) {
+        console.error("Failed to load seller data:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);

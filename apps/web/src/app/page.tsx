@@ -15,6 +15,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [dbCategories, setDbCategories] = useState<{ name: string; slug: string }[]>([]);
+  const [cmsContent, setCmsContent] = useState<any>(null);
 
   const checkTabScroll = () => {
     if (tabScrollRef.current) {
@@ -60,6 +61,18 @@ export default function HomePage() {
     }
     loadCatalog();
   }, [activeCategory]);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/content`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.content) {
+          const claim = data.content.find((c: any) => c.key_slug === 'buyer-protection-claim');
+          if (claim) setCmsContent(claim);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const scrollTabs = (direction: "left" | "right") => {
     if (tabScrollRef.current) {
@@ -214,13 +227,13 @@ export default function HomePage() {
           <div className="space-y-3 relative z-10 max-w-2xl">
             <div className="flex items-center gap-2 text-amber-400 text-xs sm:text-sm font-black uppercase tracking-wider">
               <ShieldCheck className="w-5 h-5" />
-              <span>Secure Payments</span>
+              <span>{cmsContent?.title || "Secure Payments"}</span>
             </div>
             <h3 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
               Shop with Confidence on WAW
             </h3>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
-              Direct from verified Pakistani sellers with doorstep delivery, easy returns, and dedicated customer care.
+              {cmsContent?.content_html || "Direct from verified Pakistani sellers with doorstep delivery, easy returns, and dedicated customer care."}
             </p>
           </div>
 

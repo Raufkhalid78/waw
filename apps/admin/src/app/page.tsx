@@ -302,6 +302,12 @@ export default function AdminDashboardPage() {
     return true;
   });
 
+  if (authenticated === null) {
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-amber-400/20 border-t-amber-400 rounded-full animate-spin"></div>
+    </div>;
+  }
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-950 text-slate-100 font-sans">
       {/* â”€â”€ TOP TOAST NOTIFICATION â”€â”€ */}

@@ -186,6 +186,21 @@ app.post("/api/auth/oauth/sync", AuthController.syncOAuth);
 
 // ── Storefront Config (Dynamic UI Metadata) ───────────────
 import { ConfigController } from "./modules/config/config.controller.js";
+// CMS Content Route
+app.get("/api/content", async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("cms_content")
+      .select("*")
+      .eq("is_active", true);
+
+    if (error) throw error;
+    res.json({ content: data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/config/storefront", ConfigController.getStorefrontConfig);
 
 // ── Category Taxonomy Routes (Hierarchical Database Tree) ───────────────

@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { ClientAuthGuard } from "@/components/ClientAuthGuard";
 
 export const metadata: Metadata = {
   title: "Waw Admin Control Center — Pakistan Marketplace Operations",
@@ -23,7 +24,9 @@ export default function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </head>
       <body className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
-        {children}
+        <ClientAuthGuard tokenKey="waw_admin_token">
+          {children}
+        </ClientAuthGuard>
       </body>
     </html>
   );
