@@ -190,7 +190,7 @@ export class OrderService {
         reason: input.reason,
         status: "REVERSE_PICKUP_BOOKED",
         reverse_courier_cn: reversePickupResult.reverseTrackingNumber,
-        refund_amount_pkr: order.total_amount_pkr || order.total_pkr || 0,
+        refund_amount_pkr: order.total_amount_pkr || 0,
         staff_notes: input.comments
           ? `Buyer notes: ${input.comments}. Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`
           : `Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`,
@@ -227,7 +227,7 @@ export class OrderService {
       action: "RETURN_REQUESTED",
       targetResourceType: "order",
       targetResourceId: order.id,
-      previousState: { orderStatus: order.global_status || order.order_status },
+      previousState: { orderStatus: order.global_status },
       newState: {
         orderStatus: "RETURN_REQUESTED",
         returnRequestId: returnReq.id,
@@ -400,7 +400,7 @@ export class OrderService {
         buyer_id: buyerId,
         reason: input.reason,
         status: "DISPUTE_OPENED",
-        refund_amount_pkr: input.claimedAmountPkr || order.total_pkr,
+        refund_amount_pkr: input.claimedAmountPkr || order.total_amount_pkr || 0,
         staff_notes: `Buyer dispute: ${input.description}. Evidence: ${input.evidenceUrls?.join(", ") || "None provided"}`,
       })
       .select()

@@ -163,7 +163,13 @@ BEGIN
         v_order_id, v_order_number, p_buyer_id, p_buyer_name, p_buyer_phone, p_shipping_address, p_shipping_city,
         v_final_total, p_payment_method, 
         CASE WHEN p_payment_method = 'COD' THEN 'COD_PENDING' ELSE 'PENDING' END,
-        'CONFIRMED', NOW()
+        -- global_status follows payment: COD orders are PENDING_COD until delivery agent confirms cash;
+        -- online payments are PENDING_PAYMENT until gateway webhook confirms settlement.
+        CASE 
+            WHEN p_payment_method = 'COD' THEN 'PENDING_COD'
+            ELSE 'PENDING_PAYMENT'
+        END,
+        NOW()
     );
 
     -- 5. Split Sub-Orders by Seller Store
@@ -256,4 +262,10 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Checkout transaction failed: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql
+   SECURITY DEFINER
+   SET search_path = public, pg_temp;
+
+-- Restrict EXECUTE to only authenticated callers and the service role
+REVOKE ALL ON FUNCTION public.checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO authenticated, anon, service_role;
