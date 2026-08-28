@@ -771,3 +771,137 @@ app.patch(
   },
 );
 
+// ── Admin Product Listing Approvals ─────────────────────────────────────────
+app.get(
+  "/api/admin/products/pending",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listPendingProducts,
+);
+app.patch(
+  "/api/admin/products/:id/approve",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.approveProduct,
+);
+app.patch(
+  "/api/admin/products/:id/reject",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.rejectProduct,
+);
+
+// ── Admin Review Moderation ─────────────────────────────────────────────────
+app.get(
+  "/api/admin/reviews/pending",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listPendingReviews,
+);
+app.patch(
+  "/api/admin/reviews/:id/approve",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.approveReview,
+);
+app.patch(
+  "/api/admin/reviews/:id/reject",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.rejectReview,
+);
+
+// ── Admin Dispute Resolution ────────────────────────────────────────────────
+app.get(
+  "/api/admin/disputes",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listDisputes,
+);
+app.patch(
+  "/api/admin/disputes/:id/resolve",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.resolveDispute,
+);
+
+// ── Buyer Product Review Submission (Account & Purchase Verified) ───────────
+app.post("/api/products/:id/reviews", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { rating, comment } = req.body;
+    const productId = req.params.id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      res.status(400).json({ error: "Rating must be between 1 and 5 stars" });
+      return;
+    }
+
+    const { supabaseAdmin } = await import("./config/supabase.js");
+
+    // Check if buyer has an ordered/delivered item for this product
+    const { data: userOrderItems } = await supabaseAdmin
+      .from("order_items")
+      .select("id, order:orders(buyer_id, order_status)")
+      .eq("product_id", productId);
+
+    const isVerifiedPurchase = (userOrderItems || []).some(
+      (item: any) => item.order?.buyer_id === user.id,
+    );
+
+    const { data: review, error } = await supabaseAdmin
+      .from("reviews")
+      .insert({
+        id: `rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        product_id: productId,
+        user_id: user.id,
+        rating: Math.round(rating),
+        comment: comment || "",
+        is_verified_purchase: isVerifiedPurchase,
+        status: "APPROVED", // Auto-approved unless flagged
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Recalculate and update product rating average
+    const { data: allReviews } = await supabaseAdmin
+      .from("reviews")
+      .select("rating")
+      .eq("product_id", productId);
+
+    if (allReviews && allReviews.length > 0) {
+      const avg =
+        allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+      await supabaseAdmin
+        .from("products")
+        .update({
+          rating_average: Math.round(avg * 10) / 10,
+          rating_count: allReviews.length,
+        })
+        .eq("id", productId);
+    }
+
+    res.status(201).json(review);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Buyer Order Dispute Submission ──────────────────────────────────────────
+app.post("/api/orders/:id/dispute", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const result = await OrderService.createDispute(
+      req.params.id,
+      user.id,
+      req.body,
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+

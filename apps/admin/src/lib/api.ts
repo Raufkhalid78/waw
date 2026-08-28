@@ -291,3 +291,93 @@ export async function settlePayout(
   if (!res.ok) throw new Error("Failed to settle payout");
   return await res.json();
 }
+
+export async function fetchPendingProducts(): Promise<AdminProduct[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/products/pending`, {
+      headers: getAdminHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Failed to fetch pending products");
+    return await res.json();
+  } catch (err) {
+    throw err;
+  }
+}
+
+export async function approveProduct(productId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/admin/products/${productId}/approve`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to approve product");
+  return await res.json();
+}
+
+export async function rejectProduct(productId: string, reason: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/admin/products/${productId}/reject`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) throw new Error("Failed to reject product");
+  return await res.json();
+}
+
+export async function fetchPendingReviews(): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/reviews/pending`, {
+      headers: getAdminHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Failed to fetch pending reviews");
+    return await res.json();
+  } catch (err) {
+    throw err;
+  }
+}
+
+export async function approveReview(reviewId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/admin/reviews/${reviewId}/approve`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to approve review");
+  return await res.json();
+}
+
+export async function rejectReview(reviewId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/admin/reviews/${reviewId}/reject`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to reject review");
+  return await res.json();
+}
+
+export async function fetchDisputes(): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/disputes`, {
+      headers: getAdminHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Failed to fetch disputes");
+    return await res.json();
+  } catch (err) {
+    throw err;
+  }
+}
+
+export async function resolveDispute(
+  disputeId: string,
+  resolution: string,
+  refundAmountPkr?: number,
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/admin/disputes/${disputeId}/resolve`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+    body: JSON.stringify({ resolution, refundAmountPkr }),
+  });
+  if (!res.ok) throw new Error("Failed to resolve dispute");
+  return await res.json();
+}

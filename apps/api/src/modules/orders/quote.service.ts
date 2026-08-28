@@ -30,7 +30,7 @@ export class QuoteService {
       const { data: product, error: prodErr } = await supabaseAdmin
         .from("products")
         .select(
-          "id, title, base_price_pkr, is_active, store_id, is_first_party, stores(id, name, commission_rate_percentage)",
+          "id, title, base_price_pkr, is_active, status, store_id, is_first_party, stores(id, name, commission_rate_percentage)",
         )
         .or(`id.eq.${item.productId},slug.eq.${item.productId}`)
         .maybeSingle();
@@ -41,12 +41,12 @@ export class QuoteService {
         );
       }
 
-      if (!product.is_active) {
-        throw new Error(`Product is currently inactive: ${product.title}`);
+      if (!product.is_active || product.status !== "ACTIVE") {
+        throw new Error(`Product is currently inactive or under review: ${product.title}`);
       }
 
       let unitPrice = product.base_price_pkr;
-      let stockAvailable = 100; // default product-level
+      let stockAvailable = 0;
       let variantSku: string | undefined;
 
       if (item.variantId) {
@@ -72,6 +72,27 @@ export class QuoteService {
         unitPrice += variant.price_adjustment_pkr || 0;
         stockAvailable = variant.stock_quantity;
         variantSku = variant.sku;
+      } else {
+        // Query active variants for base product
+        const { data: variants } = await supabaseAdmin
+          .from("product_variants")
+          .select("id, sku, price_adjustment_pkr, stock_quantity, is_active")
+          .eq("product_id", product.id)
+          .eq("is_active", true);
+
+        const totalStock = (variants || []).reduce(
+          (sum: number, v: any) => sum + (v.stock_quantity || 0),
+          0,
+        );
+
+        if (totalStock < item.quantity) {
+          throw new Error(
+            `Insufficient stock for ${product.title}. Only ${totalStock} units currently available.`,
+          );
+        }
+
+        stockAvailable = totalStock;
+        variantSku = variants?.[0]?.sku;
       }
 
       const itemTotal = unitPrice * item.quantity;

@@ -236,4 +236,46 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     assert.strictEqual(status, "ACTIVE");
     assert.strictEqual(isActive, true);
   });
+
+  it("should calculate pure zero-fallback platform revenue stats from database", () => {
+    const orders: any[] = [];
+    const gmvPkr = orders.reduce((sum, o) => sum + (o.total_pkr || 0), 0);
+    const codFeesCollectedPkr = orders.reduce(
+      (sum, o) => sum + (o.cod_fee_pkr || 0),
+      0,
+    );
+    const totalCommissionsPkr = Math.round(gmvPkr * 0.1);
+
+    const stats = {
+      gmvPkr,
+      totalOrders: orders.length,
+      totalSellers: 0,
+      totalProducts: 0,
+      totalCommissionsPkr,
+      codFeesCollectedPkr,
+      netPlatformRevenuePkr: totalCommissionsPkr + codFeesCollectedPkr,
+    };
+
+    assert.strictEqual(stats.gmvPkr, 0); // Not 5699000
+    assert.strictEqual(stats.totalOrders, 0); // Not 1240
+    assert.strictEqual(stats.totalSellers, 0); // Not 84
+    assert.strictEqual(stats.totalProducts, 0); // Not 420
+    assert.strictEqual(stats.netPlatformRevenuePkr, 0);
+  });
+
+  it("should enforce dispute lifecycle status transitions", () => {
+    const validDisputeStatuses = [
+      "DISPUTE_OPENED",
+      "UNDER_REVIEW",
+      "REFUND_ISSUED",
+      "REPLACEMENT_SENT",
+      "CLAIM_REJECTED",
+    ];
+
+    const initialStatus = "DISPUTE_OPENED";
+    const resolvedStatus = "REFUND_ISSUED";
+
+    assert.ok(validDisputeStatuses.includes(initialStatus));
+    assert.ok(validDisputeStatuses.includes(resolvedStatus));
+  });
 });

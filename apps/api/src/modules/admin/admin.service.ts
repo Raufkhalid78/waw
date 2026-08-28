@@ -32,15 +32,223 @@ export class AdminService {
     const totalCommissionsPkr = Math.round(gmvPkr * 0.1);
 
     return {
-      gmvPkr: gmvPkr || 5699000,
-      totalOrders: totalOrders || 1240,
-      totalSellers: totalSellers || 84,
-      totalProducts: totalProducts || 420,
-      totalCommissionsPkr: totalCommissionsPkr || 569900,
-      codFeesCollectedPkr: codFeesCollectedPkr || 124000,
-      netPlatformRevenuePkr:
-        (totalCommissionsPkr || 569900) + (codFeesCollectedPkr || 124000),
+      gmvPkr,
+      totalOrders: totalOrders || 0,
+      totalSellers: totalSellers || 0,
+      totalProducts: totalProducts || 0,
+      totalCommissionsPkr,
+      codFeesCollectedPkr,
+      netPlatformRevenuePkr: totalCommissionsPkr + codFeesCollectedPkr,
     };
+  }
+
+  /**
+   * Lists products awaiting catalog/admin approval.
+   */
+  static async listPendingProducts() {
+    const { data: products, error } = await supabaseAdmin
+      .from("products")
+      .select("*, store:stores(name, city), category:categories(name)")
+      .eq("status", "PENDING_REVIEW")
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return products || [];
+  }
+
+  /**
+   * Approves a pending seller product and makes it live in the public catalog.
+   */
+  static async approveProduct(productId: string, adminId?: string) {
+    const { data: previousProduct } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("id", productId)
+      .single();
+
+    const { data: updatedProduct, error } = await supabaseAdmin
+      .from("products")
+      .update({
+        status: "ACTIVE",
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Activate default product variants
+    await supabaseAdmin
+      .from("product_variants")
+      .update({ is_active: true })
+      .eq("product_id", productId);
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "PRODUCT_APPROVED",
+      targetResourceType: "product",
+      targetResourceId: productId,
+      previousState: previousProduct,
+      newState: updatedProduct,
+      reason: "Product listing approved for public marketplace catalog",
+    });
+
+    return updatedProduct;
+  }
+
+  /**
+   * Rejects a pending seller product with reason.
+   */
+  static async rejectProduct(productId: string, reason: string, adminId?: string) {
+    const { data: previousProduct } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("id", productId)
+      .single();
+
+    const { data: updatedProduct, error } = await supabaseAdmin
+      .from("products")
+      .update({
+        status: "REJECTED",
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "PRODUCT_REJECTED",
+      targetResourceType: "product",
+      targetResourceId: productId,
+      previousState: previousProduct,
+      newState: updatedProduct,
+      reason: reason || "Listing does not meet catalog quality or policy standards",
+    });
+
+    return updatedProduct;
+  }
+
+  /**
+   * Lists reviews awaiting moderation.
+   */
+  static async listPendingReviews() {
+    const { data: reviews, error } = await supabaseAdmin
+      .from("reviews")
+      .select("*, product:products(title, slug)")
+      .eq("status", "PENDING")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      // If status column not present on legacy table, return empty
+      return [];
+    }
+    return reviews || [];
+  }
+
+  /**
+   * Approves a customer review for public display.
+   */
+  static async approveReview(reviewId: string, adminId?: string) {
+    const { data: review, error } = await supabaseAdmin
+      .from("reviews")
+      .update({ status: "APPROVED", is_approved: true })
+      .eq("id", reviewId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "REVIEW_APPROVED",
+      targetResourceType: "review",
+      targetResourceId: reviewId,
+      reason: "Customer review approved by moderator",
+    });
+
+    return review;
+  }
+
+  /**
+   * Rejects / removes a review.
+   */
+  static async rejectReview(reviewId: string, adminId?: string) {
+    const { data: review, error } = await supabaseAdmin
+      .from("reviews")
+      .update({ status: "REJECTED", is_approved: false })
+      .eq("id", reviewId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "REVIEW_REJECTED",
+      targetResourceType: "review",
+      targetResourceId: reviewId,
+      reason: "Customer review rejected by moderator",
+    });
+
+    return review;
+  }
+
+  /**
+   * Lists customer disputes and escalated return requests.
+   */
+  static async listDisputes() {
+    const { data: disputes, error } = await supabaseAdmin
+      .from("return_requests")
+      .select("*, order:orders(*), buyer:profiles(full_name, phone, email)")
+      .order("created_at", { ascending: false });
+
+    if (error) return [];
+    return disputes || [];
+  }
+
+  /**
+   * Resolves a customer dispute / return case.
+   */
+  static async resolveDispute(
+    disputeId: string,
+    resolution: "REFUND_ISSUED" | "REPLACEMENT_SENT" | "CLAIM_REJECTED",
+    refundAmountPkr?: number,
+    adminId?: string
+  ) {
+    const { data: dispute, error } = await supabaseAdmin
+      .from("return_requests")
+      .update({
+        status: resolution,
+        refund_amount_pkr: refundAmountPkr,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", disputeId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "DISPUTE_RESOLVED",
+      targetResourceType: "dispute",
+      targetResourceId: disputeId,
+      newState: dispute,
+      reason: `Dispute resolved with status: ${resolution}`,
+    });
+
+    return dispute;
   }
 
   /**

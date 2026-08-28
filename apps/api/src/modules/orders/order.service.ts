@@ -23,6 +23,7 @@ export interface CartItem {
 }
 
 export interface CreateOrderInput {
+  idempotencyKey?: string;
   quoteToken?: string;
   buyerId?: string;
   buyerName: string;
@@ -43,6 +44,18 @@ export class OrderService {
    * + PostEx shipment per distinct seller.
    */
   static async createOrder(input: CreateOrderInput, authenticatedUser?: any) {
+    // 0. Idempotency Key check: if already processed, return cached order result
+    if (input.idempotencyKey) {
+      try {
+        const cached = await redis.get(`idempotency:${input.idempotencyKey}`);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch {
+        // Continue if redis is unavailable
+      }
+    }
+
     let quote: any;
 
     if (input.quoteToken) {
@@ -252,7 +265,7 @@ export class OrderService {
       isCod,
     );
 
-    return {
+    const result = {
       orderId,
       orderNumber,
       summary: {
@@ -266,6 +279,21 @@ export class OrderService {
       shipments,
       status: OrderStatus.CONFIRMED,
     };
+
+    if (input.idempotencyKey) {
+      try {
+        await redis.set(
+          `idempotency:${input.idempotencyKey}`,
+          JSON.stringify(result),
+          "EX",
+          86400,
+        );
+      } catch {
+        // Continue if Redis is unavailable
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -514,5 +542,59 @@ export class OrderService {
       discountPkr: discount,
       finalTotal: Math.max(0, cartTotal - discount),
     };
+  }
+
+  /**
+   * Opens an account-linked customer dispute for an order.
+   */
+  static async createDispute(
+    orderId: string,
+    buyerId: string,
+    input: {
+      reason: string;
+      description: string;
+      evidenceUrls?: string[];
+      claimedAmountPkr?: number;
+    },
+  ) {
+    const { data: order, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .select("*, store_orders(*)")
+      .eq("id", orderId)
+      .single();
+
+    if (orderErr || !order) throw new Error("Order not found");
+    if (order.buyer_id && order.buyer_id !== buyerId) {
+      throw new Error("Unauthorized to file a dispute for this order");
+    }
+
+    const { data: dispute, error: dispErr } = await supabaseAdmin
+      .from("return_requests")
+      .insert({
+        order_id: order.id,
+        store_order_id: order.store_orders?.[0]?.id || null,
+        buyer_id: buyerId,
+        reason: input.reason,
+        status: "DISPUTE_OPENED",
+        refund_amount_pkr: input.claimedAmountPkr || order.total_pkr,
+        staff_notes: `Buyer dispute: ${input.description}. Evidence: ${input.evidenceUrls?.join(", ") || "None provided"}`,
+      })
+      .select()
+      .single();
+
+    if (dispErr) throw dispErr;
+
+    const { AuditService } = await import("../audit/audit.service.js");
+    await AuditService.logAction({
+      actorId: buyerId,
+      actorRole: "BUYER",
+      action: "DISPUTE_OPENED",
+      targetResourceType: "order",
+      targetResourceId: order.id,
+      newState: dispute,
+      reason: `Buyer opened dispute: ${input.reason}`,
+    });
+
+    return dispute;
   }
 }
