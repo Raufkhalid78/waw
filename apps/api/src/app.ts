@@ -359,14 +359,14 @@ app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, Use
 
       await supabaseAdmin
         .from("store_orders")
-        .update({ order_status: status, updated_at: new Date().toISOString() })
+        .update({ status: status, updated_at: new Date().toISOString() })
         .eq("id", storeOrder.id);
     }
 
     const { data, error } = await supabaseAdmin
       .from("orders")
       .update({
-        order_status: status,
+        global_status: status,
         updated_at: new Date().toISOString(),
       })
       .eq("id", req.params.id)
@@ -939,13 +939,20 @@ app.post("/api/products/:id/reviews", requireAuth, async (req, res) => {
     const { supabaseAdmin } = await import("./config/supabase.js");
 
     // Check if buyer has an ordered/delivered item for this product
-    const { data: userOrderItems } = await supabaseAdmin
-      .from("order_items")
-      .select("id, order:orders(buyer_id, order_status)")
-      .eq("product_id", productId);
+    const { data: userOrders } = await supabaseAdmin
+      .from("orders")
+      .select("id, global_status, store_orders(order_items(offer_variant_id, product_title))")
+      .eq("buyer_id", user.id);
 
-    const isVerifiedPurchase = (userOrderItems || []).some(
-      (item: any) => item.order?.buyer_id === user.id,
+    const isVerifiedPurchase = (userOrders || []).some(
+      (ord: any) =>
+        ord.store_orders?.some((so: any) =>
+          so.order_items?.some(
+            (item: any) =>
+              item.offer_variant_id === productId ||
+              item.product_title?.toLowerCase().includes(productId.toLowerCase()),
+          ),
+        ),
     );
 
     const { data: review, error } = await supabaseAdmin

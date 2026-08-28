@@ -84,17 +84,18 @@ try {
           ).toISOString();
           const { data: expiredOrders } = await supabaseAdmin
             .from("orders")
-            .select("id, order_items(*)")
+            .select("id, store_orders(order_items(*))")
             .eq("payment_status", PaymentStatus.PENDING)
-            .eq("order_status", OrderStatus.CONFIRMED)
+            .eq("global_status", "PENDING_PAYMENT")
             .lt("created_at", fifteenMinutesAgo);
 
           if (expiredOrders && expiredOrders.length > 0) {
             for (const ord of expiredOrders) {
-              if (ord.order_items && ord.order_items.length > 0) {
-                const lockItems = ord.order_items.map((i: any) => ({
-                  productId: i.product_id,
-                  variantId: i.variant_id,
+              const allItems = (ord.store_orders || []).flatMap((so: any) => so.order_items || []);
+              if (allItems.length > 0) {
+                const lockItems = allItems.map((i: any) => ({
+                  productId: i.offer_variant_id || i.id,
+                  variantId: i.offer_variant_id,
                   quantity: i.quantity,
                 }));
                 await InventoryLockService.releaseStockLocks(ord.id, lockItems);
@@ -103,7 +104,7 @@ try {
               await supabaseAdmin
                 .from("orders")
                 .update({
-                  order_status: OrderStatus.CANCELLED,
+                  global_status: OrderStatus.CANCELLED,
                   notes:
                     "Cancelled automatically due to 15-minute payment expiration.",
                   updated_at: new Date().toISOString(),
@@ -119,7 +120,7 @@ try {
 
         case "ESCROW_PAYOUT":
           console.log(
-            `🏦 [Escrow Payout Job] Reconciling SBP Escrow release for vendor ${payload.storeId}`,
+            `🏦 [Escrow Payout Job] Reconciling Merchant Settlement release for vendor ${payload.storeId}`,
           );
           break;
 

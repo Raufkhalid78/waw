@@ -40,8 +40,9 @@ export class PostExXPayService {
       throw new Error(`Order not found: ${orderId}`);
     }
 
+    const totalAmount = order.total_amount_pkr || 0;
     const intentId = `xpay_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    let checkoutUrl = `${this.baseUrl}/checkout/${intentId}?amount=${order.total_pkr}&currency=PKR&orderRef=${order.order_number}`;
+    let checkoutUrl = `${this.baseUrl}/checkout/${intentId}?amount=${totalAmount}&currency=PKR&orderRef=${order.order_number}`;
     let qrPayload: string | undefined;
 
     // Record payment intent in database
@@ -51,7 +52,7 @@ export class PostExXPayService {
       payment_method: method,
       status: PaymentStatus.PENDING,
       gateway_reference: intentId,
-      amount_pkr: order.total_pkr,
+      amount_pkr: totalAmount,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -60,7 +61,7 @@ export class PostExXPayService {
       intentId,
       checkoutUrl,
       orderNumber: order.order_number,
-      amountPkr: order.total_pkr,
+      amountPkr: totalAmount,
       qrPayload,
     };
   }
@@ -162,7 +163,7 @@ export class PostExXPayService {
       .from("orders")
       .update({
         payment_status: PaymentStatus.PAID,
-        order_status: OrderStatus.CONFIRMED,
+        global_status: OrderStatus.CONFIRMED,
         updated_at: new Date().toISOString(),
       })
       .eq("id", order.id);
@@ -172,8 +173,8 @@ export class PostExXPayService {
       await InventoryLockService.commitStockDecrement(
         order.id,
         order.items.map((it: any) => ({
-          productId: it.product_id,
-          variantId: it.variant_id,
+          productId: it.offer_variant_id || it.product_id || it.id,
+          variantId: it.offer_variant_id || it.variant_id,
           quantity: it.quantity,
         })),
       );
@@ -201,7 +202,7 @@ export class PostExXPayService {
       await WhatsAppService.sendOrderConfirmed(
         order.buyer_phone,
         order.order_number,
-        order.total_pkr,
+        order.total_amount_pkr || 0,
         false,
       );
     } catch (notifErr) {

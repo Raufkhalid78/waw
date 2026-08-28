@@ -82,8 +82,7 @@ export default function AdminLoginPage() {
             Waw Operations Command
           </h1>
           <p className="text-xs text-slate-400">
-            Sign in to access real-time dispatch, KYC moderation, and SBP escrow
-            settlements.
+            Sign in to access real-time dispatch, KYC moderation, and merchant settlements.
           </p>
         </div>
 

@@ -84,6 +84,7 @@ export class OrderService {
       p_payment_method: input.paymentMethod,
       p_items: rpcItems,
       p_coupon_code: input.couponCode || null,
+      p_idempotency_key: input.idempotencyKey || null,
     });
 
     if (error || !result?.success) {
@@ -94,7 +95,7 @@ export class OrderService {
       orderId: result.order_id,
       orderNumber: result.order_number,
       totalAmountPkr: result.total_amount_pkr,
-      status: "CONFIRMED"
+      status: input.paymentMethod === PaymentMethod.COD ? "PENDING_COD" : "PENDING_PAYMENT"
     };
 
     if (input.idempotencyKey) {

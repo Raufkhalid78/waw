@@ -33,8 +33,8 @@ export function startReconciliationCron() {
 }
 
 /**
- * 1. SBP Escrow Payout Settlement
- * Transitions all SCHEDULED payouts past their T+7 escrow maturity date to COMPLETED/PROCESSING.
+ * 1. Verified Merchant Milestone Payout Settlement
+ * Transitions all SCHEDULED payouts past their T+7 return window maturity date to COMPLETED.
  */
 async function runPayoutReconciliation() {
   try {
@@ -47,13 +47,13 @@ async function runPayoutReconciliation() {
 
     if (error || !maturedPayouts || maturedPayouts.length === 0) {
       console.log(
-        "✅ Payout Reconciliation: No matured escrow payouts pending release.",
+        "✅ Payout Reconciliation: No matured vendor payouts pending release.",
       );
       return;
     }
 
     console.log(
-      `💰 Reconciling ${maturedPayouts.length} matured SBP escrow payouts...`,
+      `💰 Reconciling ${maturedPayouts.length} matured merchant settlement payouts...`,
     );
 
     for (const payout of maturedPayouts) {

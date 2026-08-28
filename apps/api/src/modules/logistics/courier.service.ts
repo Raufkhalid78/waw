@@ -203,10 +203,10 @@ export class CourierService {
       .select()
       .maybeSingle();
 
-    // 2. Update Associated Order Record
+    // 2. Update Associated Order Record & Store Order
     if (shipment && shipment.order_id) {
       const orderUpdate: any = {
-        order_status: targetOrderStatus,
+        global_status: targetOrderStatus,
         updated_at: new Date().toISOString(),
       };
       if (shipment.is_cod && targetPaymentStatus) {
@@ -217,6 +217,37 @@ export class CourierService {
         .from("orders")
         .update(orderUpdate)
         .eq("id", shipment.order_id);
+
+      if (shipment.store_order_id) {
+        await supabaseAdmin
+          .from("store_orders")
+          .update({ status: targetOrderStatus, updated_at: new Date().toISOString() })
+          .eq("id", shipment.store_order_id);
+      }
+
+      // If delivered, schedule payout maturity for 7-day returns SLA window
+      if (targetOrderStatus === OrderStatus.DELIVERED) {
+        const maturityDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        if (shipment.store_order_id) {
+          const { data: storeOrder } = await supabaseAdmin
+            .from("store_orders")
+            .select("store_id")
+            .eq("id", shipment.store_order_id)
+            .maybeSingle();
+
+          if (storeOrder?.store_id) {
+            await supabaseAdmin
+              .from("payouts")
+              .update({
+                status: "SCHEDULED",
+                scheduled_for: maturityDate,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("store_id", storeOrder.store_id)
+              .eq("status", "HELD_PENDING_DELIVERY");
+          }
+        }
+      }
 
       console.log(
         `✅ Order ${shipment.order_id} updated to ${targetOrderStatus} via PostEx Webhook`,

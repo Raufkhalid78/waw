@@ -179,7 +179,8 @@ export async function fetchProducts(params?: {
       facets: data.facets || { minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] }
     };
   } catch (error) {
-    return { items: [] };
+    console.error("[fetchProducts] API Error:", error);
+    throw error;
   }
 }
 

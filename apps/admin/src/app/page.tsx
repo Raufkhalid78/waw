@@ -485,7 +485,7 @@ export default function AdminDashboardPage() {
             >
               <div className="flex items-center gap-3">
                 <Banknote className="w-4 h-4" />
-                <span>SBP Escrow Payouts</span>
+                <span>Merchant Settlements</span>
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
             </button>
@@ -593,8 +593,8 @@ export default function AdminDashboardPage() {
                     Waw Executive Command Center
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-400">
-                    Real-time monitoring of PostEx courier dispatches, SBP
-                    escrow commission splits, seller KYC onboarding, and
+                    Real-time monitoring of PostEx courier dispatches, merchant
+                    commission splits, seller KYC onboarding, and
                     national catalog stock.
                   </p>
                 </div>
@@ -1175,7 +1175,7 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-black text-white">
-                    SBP Escrow Vendor Settlements
+                    Merchant Settlements & Remittances
                   </h2>
                   <p className="text-xs text-slate-400">
                     Automated 1Link / Raast vendor remittances with 10%
@@ -1707,7 +1707,7 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-black text-base text-white flex items-center gap-2">
                 <Banknote className="w-5 h-5 text-emerald-400" />
-                <span>Settle SBP Escrow Vendor Payout</span>
+                <span>Settle Merchant Vendor Payout</span>
               </h3>
               <button
                 onClick={() => setShowSettlePayoutModal(null)}

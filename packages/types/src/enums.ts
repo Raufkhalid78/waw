@@ -28,7 +28,7 @@ export enum PaymentStatus {
   PENDING = "PENDING",
   AUTHORIZED = "AUTHORIZED",
   PAID = "PAID",
-  ESCROW_HELD = "ESCROW_HELD", // SBP Escrow holding period
+  ESCROW_HELD = "ESCROW_HELD", // Marketplace Escrow holding period
   COD_PENDING = "COD_PENDING",
   COD_COLLECTED = "COD_COLLECTED",
   FAILED = "FAILED",

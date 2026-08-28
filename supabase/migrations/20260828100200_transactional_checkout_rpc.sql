@@ -10,7 +10,8 @@ CREATE OR REPLACE FUNCTION public.checkout_transaction(
     p_shipping_city TEXT,
     p_payment_method TEXT,
     p_items JSONB, -- Array of { offer_variant_id: TEXT, quantity: INTEGER }
-    p_coupon_code TEXT DEFAULT NULL
+    p_coupon_code TEXT DEFAULT NULL,
+    p_idempotency_key TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
     v_order_id TEXT;
@@ -33,7 +34,6 @@ DECLARE
     v_store_subtotal INTEGER;
     v_store_commission INTEGER;
     v_store_payout INTEGER;
-    v_commission_rate NUMERIC;
     v_store_order_id TEXT;
     v_outbox_id TEXT;
 BEGIN
@@ -172,19 +172,18 @@ BEGIN
         NOW()
     );
 
-    -- 5. Split Sub-Orders by Seller Store
+    -- 5. Split Sub-Orders by Seller Store (Line-by-line commission calculation)
     FOR v_store_id IN SELECT DISTINCT store_id FROM temp_checkout_items
     LOOP
         v_store_order_id := 'sord_' || extract(epoch from now())::bigint || '_' || substr(md5(random()::text), 1, 4);
 
         SELECT 
             SUM(total_price),
-            MAX(commission_rate)
-        INTO v_store_subtotal, v_commission_rate
+            SUM(round(total_price * (commission_rate / 100.0)))
+        INTO v_store_subtotal, v_store_commission
         FROM temp_checkout_items
         WHERE store_id = v_store_id;
 
-        v_store_commission := round(v_store_subtotal * (v_commission_rate / 100.0));
         v_store_payout := v_store_subtotal - v_store_commission;
 
         INSERT INTO public.store_orders (
@@ -229,9 +228,9 @@ BEGIN
         (v_store_id, 'SALE', v_store_subtotal, 'CREDIT', v_store_order_id, 'Store order subtotal gross value'),
         (v_store_id, 'COMMISSION', v_store_commission, 'DEBIT', v_store_order_id, 'Marketplace commission fee');
 
-        -- Payout record initialized in SCHEDULED state pending delivery & returns SLA
+        -- Payout record held until delivery confirmation + 7-day return SLA window
         INSERT INTO public.payouts (store_id, amount_pkr, status, scheduled_for)
-        VALUES (v_store_id, v_store_payout, 'SCHEDULED', NOW() + INTERVAL '7 days');
+        VALUES (v_store_id, v_store_payout, 'HELD_PENDING_DELIVERY', NOW() + INTERVAL '30 days');
 
     END LOOP;
 
@@ -266,6 +265,7 @@ $$ LANGUAGE plpgsql
    SECURITY DEFINER
    SET search_path = public, pg_temp;
 
--- Restrict EXECUTE to only authenticated callers and the service role
-REVOKE ALL ON FUNCTION public.checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO authenticated, anon, service_role;
+-- Restrict EXECUTE to authenticated users and service_role (revoke from anonymous)
+REVOKE ALL ON FUNCTION public.checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) FROM anon;
+GRANT EXECUTE ON FUNCTION public.checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) TO authenticated, service_role;
