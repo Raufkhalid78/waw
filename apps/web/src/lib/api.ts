@@ -81,37 +81,132 @@ function mapApiProductToDetail(p: any): ProductDetail {
   };
 }
 
-export async function fetchCategories(locale = "en"): Promise<Category[]> {
-  try {
-    const res = await fetch(
-      `${API_BASE_URL}/api/categories?locale=${encodeURIComponent(locale)}`,
-      { cache: "no-store" },
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    console.warn("Failed to fetch categories:", error);
-    return [];
+export class ApiError extends Error {
+  public status?: number;
+  public correlationId?: string;
+  public isTimeout?: boolean;
+  public isNetwork?: boolean;
+
+  constructor(
+    message: string,
+    opts?: {
+      status?: number;
+      correlationId?: string;
+      isTimeout?: boolean;
+      isNetwork?: boolean;
+    }
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = opts?.status;
+    this.correlationId = opts?.correlationId;
+    this.isTimeout = opts?.isTimeout;
+    this.isNetwork = opts?.isNetwork;
   }
+}
+
+/**
+ * Safe, abortable fetch with bounded exponential retries and correlation tracking.
+ */
+export async function safeFetch<T>(
+  url: string,
+  options?: RequestInit & { timeoutMs?: number; retries?: number }
+): Promise<{ ok: boolean; status: number; data?: T; error?: ApiError }> {
+  const timeoutMs = options?.timeoutMs ?? 8000;
+  const maxRetries = options?.method && options.method !== "GET" ? 0 : (options?.retries ?? 2);
+  const correlationId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const headers = new Headers(options?.headers || {});
+      headers.set("X-Correlation-Id", correlationId);
+
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers,
+      });
+
+      clearTimeout(timer);
+
+      if (res.status === 404) {
+        return {
+          ok: false,
+          status: 404,
+          error: new ApiError("Resource not found", { status: 404, correlationId }),
+        };
+      }
+
+      if (!res.ok) {
+        // Retry on 502, 503, 504 server unavailability
+        if ([502, 503, 504].includes(res.status) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 300;
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+
+        let errMsg = `Request failed with HTTP status ${res.status}`;
+        try {
+          const errBody = await res.json();
+          if (errBody?.error) errMsg = errBody.error;
+        } catch {}
+
+        return {
+          ok: false,
+          status: res.status,
+          error: new ApiError(errMsg, { status: res.status, correlationId }),
+        };
+      }
+
+      const data = await res.json();
+      return { ok: true, status: res.status, data };
+    } catch (err: any) {
+      clearTimeout(timer);
+      const isTimeout = err.name === "AbortError";
+      lastError = new ApiError(
+        isTimeout ? "Request timed out after 8 seconds" : (err.message || "Network error"),
+        { correlationId, isTimeout, isNetwork: !isTimeout }
+      );
+
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 300;
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+    }
+  }
+
+  return { ok: false, status: 0, error: lastError };
+}
+
+export async function fetchCategories(locale = "en"): Promise<Category[]> {
+  const res = await safeFetch<Category[]>(
+    `${API_BASE_URL}/api/categories?locale=${encodeURIComponent(locale)}`,
+    { cache: "no-store", timeoutMs: 6000 }
+  );
+  if (res.ok && Array.isArray(res.data)) {
+    return res.data;
+  }
+  return [];
 }
 
 export async function fetchCategoryBySlug(
   slug: string,
 ): Promise<Category | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/categories/${slug}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error(`Failed to fetch category, status: ${res.status}`);
-    }
-    return await res.json();
-  } catch (error) {
-    console.error(`[API Error] fetchCategoryBySlug ${slug}:`, error);
-    throw error;
-  }
+  const res = await safeFetch<Category>(
+    `${API_BASE_URL}/api/categories/${encodeURIComponent(slug)}`,
+    { cache: "no-store", timeoutMs: 6000 }
+  );
+
+  if (res.status === 404) return null;
+  if (res.ok && res.data) return res.data;
+  if (res.error) throw res.error;
+  return null;
 }
 
 export async function fetchProducts(params?: {
@@ -127,97 +222,94 @@ export async function fetchProducts(params?: {
   page?: number;
   limit?: number;
 }): Promise<{ items: ProductDetail[]; facets?: any }> {
-  try {
-    if (params?.q) {
-      // Query Search Route
-      const res = await fetch(
-        `${API_BASE_URL}/api/search?q=${encodeURIComponent(params.q)}`,
-        {
-          cache: "no-store",
-        },
-      );
-      if (res.ok) {
-        const searchData = await res.json();
-        const hits = searchData.hits || searchData.results || [];
-        if (hits.length > 0) {
-          return { items: hits.map((h: any) => mapApiProductToDetail(h.document || h)) };
-        }
+  if (params?.q) {
+    const searchRes = await safeFetch<any>(
+      `${API_BASE_URL}/api/search?q=${encodeURIComponent(params.q)}`,
+      { cache: "no-store", timeoutMs: 6000 }
+    );
+    if (searchRes.ok && searchRes.data) {
+      const hits = searchRes.data.hits || searchRes.data.results || [];
+      if (hits.length > 0) {
+        return { items: hits.map((h: any) => mapApiProductToDetail(h.document || h)) };
       }
     }
-
-    const query = new URLSearchParams();
-    if (params?.category) query.append("categoryId", params.category);
-    if (params?.categorySlug) query.append("categorySlug", params.categorySlug);
-    if (params?.storeId) query.append("storeId", params.storeId);
-    if (params?.city && params.city !== "All Cities")
-      query.append("city", params.city);
-    if (params?.sellerType && params.sellerType !== "ALL")
-      query.append(
-        "isFirstParty",
-        params.sellerType === "1P" ? "true" : "false",
-      );
-    if (params?.minPrice !== undefined)
-      query.append("minPrice", params.minPrice.toString());
-    if (params?.maxPrice !== undefined)
-      query.append("maxPrice", params.maxPrice.toString());
-    if (params?.sortBy) query.append("sortBy", params.sortBy);
-    if (params?.page) query.append("page", params.page.toString());
-    if (params?.limit) query.append("limit", params.limit.toString());
-
-    const res = await fetch(
-      `${API_BASE_URL}/api/products?${query.toString()}`,
-      {
-        cache: "no-store",
-      },
-    );
-    if (!res.ok) throw new Error("API request failed");
-    const data = await res.json();
-    const items = Array.isArray(data) ? data : data.items || [];
-    
-    return {
-      items: items.map(mapApiProductToDetail),
-      facets: data.facets || { minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] }
-    };
-  } catch (error) {
-    console.error("[fetchProducts] API Error:", error);
-    throw error;
   }
+
+  const query = new URLSearchParams();
+  if (params?.category) query.append("categoryId", params.category);
+  if (params?.categorySlug) query.append("categorySlug", params.categorySlug);
+  if (params?.storeId) query.append("storeId", params.storeId);
+  if (params?.city && params.city !== "All Cities")
+    query.append("city", params.city);
+  if (params?.sellerType && params.sellerType !== "ALL")
+    query.append(
+      "isFirstParty",
+      params.sellerType === "1P" ? "true" : "false",
+    );
+  if (params?.minPrice !== undefined)
+    query.append("minPrice", params.minPrice.toString());
+  if (params?.maxPrice !== undefined)
+    query.append("maxPrice", params.maxPrice.toString());
+  if (params?.sortBy) query.append("sortBy", params.sortBy);
+  if (params?.page) query.append("page", params.page.toString());
+  if (params?.limit) query.append("limit", params.limit.toString());
+
+  const res = await safeFetch<any>(
+    `${API_BASE_URL}/api/products?${query.toString()}`,
+    { cache: "no-store", timeoutMs: 8000 }
+  );
+
+  if (!res.ok) {
+    if (res.error) throw res.error;
+    throw new ApiError("Failed to fetch marketplace products", { status: res.status });
+  }
+
+  const data = res.data;
+  const items = Array.isArray(data) ? data : data?.items || [];
+
+  return {
+    items: items.map(mapApiProductToDetail),
+    facets: data?.facets || { minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] }
+  };
 }
 
 export async function fetchProductById(
   productId: string,
 ): Promise<ProductDetail | undefined> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(productId)}`, {
-      cache: "no-store",
-    });
-    if (res.status === 404) return undefined;
-    if (!res.ok) throw new Error(`Product fetch failed with status: ${res.status}`);
-    const data = await res.json();
-    if (data?.id || data?.slug || data?.productId) return mapApiProductToDetail(data);
-    return undefined;
-  } catch (error) {
-    console.error(`[fetchProductById] Error loading product ${productId}:`, error);
-    throw error;
+  const res = await safeFetch<any>(
+    `${API_BASE_URL}/api/products/${encodeURIComponent(productId)}`,
+    { cache: "no-store", timeoutMs: 8000 }
+  );
+
+  if (res.status === 404) return undefined;
+  if (!res.ok) {
+    if (res.error) throw res.error;
+    throw new ApiError(`Product fetch failed with status: ${res.status}`, { status: res.status });
   }
+
+  const data = res.data;
+  if (data?.id || data?.slug || data?.productId) return mapApiProductToDetail(data);
+  return undefined;
 }
 
 export async function fetchStoreBySlug(
   slug: string,
 ): Promise<StoreDetail | undefined> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/stores/${slug}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return undefined;
-    const data = await res.json();
-    if (!data) return undefined;
-    return {
-      id: data.id,
-      slug: data.slug,
-      name: data.name,
-      city: data.city || "Pakistan",
-      location: data.address || data.city || "Pakistan",
+  const res = await safeFetch<any>(
+    `${API_BASE_URL}/api/stores/${encodeURIComponent(slug)}`,
+    { cache: "no-store", timeoutMs: 6000 }
+  );
+
+  if (res.status === 404 || !res.ok) return undefined;
+  const data = res.data;
+  if (!data) return undefined;
+
+  return {
+    id: data.id,
+    slug: data.slug,
+    name: data.name,
+    city: data.city || "Pakistan",
+    location: data.address || data.city || "Pakistan",
       category: data.seller_type === "FIRST_PARTY" ? "Official Retail" : "Verified Merchant",
       rating: data.rating_average !== undefined && data.rating_average !== null ? Number(data.rating_average) : undefined,
       rating_average: data.rating_average !== undefined && data.rating_average !== null ? Number(data.rating_average) : undefined,
@@ -240,25 +332,21 @@ export async function fetchStoreBySlug(
       specialties: [],
       created_at: data.created_at,
     };
-  } catch (error) {
-    console.error("Failed to fetch store:", error);
-    return undefined;
-  }
 }
 
 export async function fetchCheckoutQuote(
   input: CheckoutQuoteRequest,
 ): Promise<CheckoutQuoteResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/checkout/quote`, {
+  const res = await safeFetch<CheckoutQuoteResponse>(`${API_BASE_URL}/api/checkout/quote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+    timeoutMs: 10000,
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to generate checkout quote");
+  if (!res.ok || !res.data) {
+    throw res.error || new Error("Failed to generate checkout quote");
   }
-  return await res.json();
+  return res.data;
 }
 
 export async function createOrderApi(orderInput: any): Promise<any> {
@@ -271,16 +359,16 @@ export async function createOrderApi(orderInput: any): Promise<any> {
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}/api/orders`, {
+  const res = await safeFetch<any>(`${API_BASE_URL}/api/orders`, {
     method: "POST",
     headers,
     body: JSON.stringify(orderInput),
+    timeoutMs: 12000,
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to place order");
+  if (!res.ok || !res.data) {
+    throw res.error || new Error("Failed to place order");
   }
-  return await res.json();
+  return res.data;
 }
 
 export async function fetchOrderById(orderId: string): Promise<any> {

@@ -103,8 +103,10 @@ export class ProductService {
   static async getProductBySlug(slugOrId: string) {
     if (!slugOrId) return null;
 
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+
     // 1. Try resolving by catalog product slug or ID first
-    const { data: catProduct, error: catError } = await supabaseAdmin
+    let catQuery = supabaseAdmin
       .from("catalog_products")
       .select(`
         id, title, title_urdu, slug, description, attributes, images, thumbnail, is_active,
@@ -115,9 +117,15 @@ export class ProductService {
           variants:offer_variants(id, variant_name, price_adjustment_pkr)
         )
       `)
-      .or(`slug.eq.${slugOrId},id.eq.${slugOrId}`)
-      .eq("is_active", true)
-      .maybeSingle();
+      .eq("is_active", true);
+
+    if (isUUID) {
+      catQuery = catQuery.or(`slug.eq.${slugOrId},id.eq.${slugOrId}`);
+    } else {
+      catQuery = catQuery.eq("slug", slugOrId);
+    }
+
+    const { data: catProduct, error: catError } = await catQuery.maybeSingle();
 
     if (catProduct) {
       const activeOffers = (catProduct.offers || []).filter((o: any) => o.status === "ACTIVE");
@@ -144,17 +152,23 @@ export class ProductService {
       }
     }
 
-    // 2. Fallback: Try resolving directly by offer ID
-    const { data: offer } = await supabaseAdmin
+    // 2. Fallback: Try resolving directly by offer ID or SKU
+    let offerQuery = supabaseAdmin
       .from("seller_offers")
       .select(`
         id, sku, price_pkr, original_price_pkr, condition, is_express, status,
         catalog_product:catalog_products(id, title, title_urdu, slug, description, attributes, images, thumbnail, category:categories(id, name, name_urdu, slug)),
         store:stores(id, name, slug, logo_url, city, rating_average, seller_type),
         variants:offer_variants(id, variant_name, price_adjustment_pkr)
-      `)
-      .eq("id", slugOrId)
-      .maybeSingle();
+      `);
+
+    if (isUUID) {
+      offerQuery = offerQuery.eq("id", slugOrId);
+    } else {
+      offerQuery = offerQuery.eq("sku", slugOrId);
+    }
+
+    const { data: offer } = await offerQuery.maybeSingle();
 
     if (offer && offer.catalog_product) {
       const offerData: any = offer;

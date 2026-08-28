@@ -33,17 +33,24 @@ export class QuoteService {
 
     // 2. Validate against canonical schema (seller_offers, catalog_products, inventory_ledger)
     for (const item of input.items) {
-      // Find offer by slug, offer id, or catalog product id
-      const { data: offer, error: offerErr } = await supabaseAdmin
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.productId);
+
+      let offerQuery = supabaseAdmin
         .from("seller_offers")
         .select(`
           id, price_pkr, status, store_id, is_express,
           catalog_product:catalog_products!inner(id, title, slug, is_active),
           store:stores!inner(id, name, city, commission_rate_percentage)
         `)
-        .or(`id.eq.${item.productId},catalog_product_id.eq.${item.productId},catalog_product.slug.eq.${item.productId}`)
-        .eq("status", "ACTIVE")
-        .maybeSingle();
+        .eq("status", "ACTIVE");
+
+      if (isUUID) {
+        offerQuery = offerQuery.or(`id.eq.${item.productId},catalog_product_id.eq.${item.productId}`);
+      } else {
+        offerQuery = offerQuery.eq("catalog_product.slug", item.productId);
+      }
+
+      const { data: offer, error: offerErr } = await offerQuery.maybeSingle();
 
       const offerData: any = offer;
       if (offerErr || !offerData || !offerData.catalog_product?.is_active) {

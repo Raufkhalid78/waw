@@ -137,7 +137,7 @@ app.get("/readyz", async (req, res) => {
   // 2. Redis Ping
   const startRedis = Date.now();
   try {
-    await redis.set("healthcheck", "1", "EX", 10);
+    await redis.set("healthcheck", "1", { ex: 10 });
     checks.redis = { status: "healthy", latencyMs: Date.now() - startRedis };
   } catch {
     checks.redis = {

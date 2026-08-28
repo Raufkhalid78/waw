@@ -22,11 +22,22 @@ class MemoryCacheFallback {
   async set(
     key: string,
     value: string,
-    mode?: string,
+    optsOrMode?: any,
     durationSeconds?: number,
   ): Promise<string> {
-    const expiresAt = durationSeconds
-      ? Date.now() + durationSeconds * 1000
+    let ttlSeconds: number | undefined = undefined;
+
+    if (typeof optsOrMode === "object" && optsOrMode !== null) {
+      if (optsOrMode.ex) ttlSeconds = optsOrMode.ex;
+      else if (optsOrMode.px) ttlSeconds = Math.ceil(optsOrMode.px / 1000);
+    } else if (typeof optsOrMode === "string" && durationSeconds) {
+      ttlSeconds = durationSeconds;
+    } else if (typeof durationSeconds === "number") {
+      ttlSeconds = durationSeconds;
+    }
+
+    const expiresAt = ttlSeconds
+      ? Date.now() + ttlSeconds * 1000
       : Infinity;
     this.store.set(key, { value, expiresAt });
     return "OK";

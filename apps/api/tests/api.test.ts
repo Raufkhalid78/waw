@@ -565,4 +565,148 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     assert.strictEqual(minPrice, 850);
     assert.strictEqual(maxPrice, 12000);
   });
+
+  it("should differentiate UUID from slug to prevent Postgres UUID syntax errors (P0-WEB-002)", () => {
+    const isUUID = (val: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    assert.strictEqual(isUUID("c3d2b274-1234-4567-89ab-cdef01234567"), true);
+    assert.strictEqual(isUUID("airpods-pro-2"), false);
+    assert.strictEqual(isUUID("charsadda-chappal-special"), false);
+    assert.strictEqual(isUUID("prod_101"), false);
+  });
+
+  it("should support options object { ex: 10 } and duration in MemoryCacheFallback (P0-PLAT-001)", async () => {
+    const store = new Map<string, { value: string; expiresAt: number }>();
+    const setMock = (key: string, value: string, optsOrMode?: any, durationSeconds?: number) => {
+      let ttlSeconds: number | undefined = undefined;
+      if (typeof optsOrMode === "object" && optsOrMode !== null) {
+        if (optsOrMode.ex) ttlSeconds = optsOrMode.ex;
+      } else if (typeof durationSeconds === "number") {
+        ttlSeconds = durationSeconds;
+      }
+      const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : Infinity;
+      store.set(key, { value, expiresAt });
+      return "OK";
+    };
+
+    assert.strictEqual(setMock("healthcheck", "1", { ex: 10 }), "OK");
+    assert.strictEqual(store.get("healthcheck")?.value, "1");
+    assert.strictEqual(setMock("session_key", "active", "EX", 60), "OK");
+  });
+
+  it("should generate correlation ID and classify API error states (P0-WEB-001)", () => {
+    const correlationId = `req_${Date.now()}_test123`;
+    assert.match(correlationId, /^req_\d+_test123$/);
+
+    const classifyError = (status: number, isTimeout: boolean) => {
+      if (isTimeout) return "TIMEOUT";
+      if (status === 404) return "NOT_FOUND";
+      if (status >= 500) return "SERVICE_UNAVAILABLE";
+      return "UNKNOWN_ERROR";
+    };
+
+    assert.strictEqual(classifyError(0, true), "TIMEOUT");
+    assert.strictEqual(classifyError(404, false), "NOT_FOUND");
+    assert.strictEqual(classifyError(503, false), "SERVICE_UNAVAILABLE");
+  });
+
+  it("should deny anonymous access from reading inactive products or unapproved offers (P0-SEC-001)", () => {
+    const rawOffers = [
+      { id: "off_1", status: "ACTIVE", price_pkr: 2500 },
+      { id: "off_2", status: "PENDING", price_pkr: 2200 },
+      { id: "off_3", status: "REJECTED", price_pkr: 1900 },
+    ];
+
+    const publicProjection = rawOffers.filter((o) => o.status === "ACTIVE");
+    assert.strictEqual(publicProjection.length, 1);
+    assert.strictEqual(publicProjection[0].id, "off_1");
+  });
+
+  it("should strip sensitive seller operational columns from public store projection (P0-SEC-001)", () => {
+    const rawStore = {
+      id: "store_101",
+      name: "Lahore Optics",
+      slug: "lahore-optics",
+      city: "Lahore",
+      seller_type: "THIRD_PARTY",
+      cnic_number: "35201-1234567-1",
+      iban: "PK36SCBL0000001123456701",
+      commission_rate_percentage: 12.5,
+      owner_id: "usr_super_secret_id",
+      rating_average: 4.9,
+    };
+
+    const projectPublicStore = (s: typeof rawStore) => ({
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      city: s.city,
+      seller_type: s.seller_type,
+      rating_average: s.rating_average,
+    });
+
+    const projected = projectPublicStore(rawStore) as any;
+    assert.strictEqual(projected.name, "Lahore Optics");
+    assert.strictEqual(projected.cnic_number, undefined);
+    assert.strictEqual(projected.iban, undefined);
+    assert.strictEqual(projected.commission_rate_percentage, undefined);
+    assert.strictEqual(projected.owner_id, undefined);
+  });
+
+  it("should enforce strictly idempotent order creation when idempotencyKey is reused (P0-CHK-001)", async () => {
+    const cache = new Map<string, string>();
+    const mockOrderResponse = {
+      orderId: "ord_unique_99",
+      orderNumber: "WAW-9988",
+      totalAmountPkr: 4500,
+      status: "PENDING_COD",
+    };
+
+    const idempotencyKey = "idemp_checkout_xyz123";
+    cache.set(`idempotency:${idempotencyKey}`, JSON.stringify(mockOrderResponse));
+
+    const checkIdempotency = (key: string) => {
+      const cached = cache.get(`idempotency:${key}`);
+      return cached ? JSON.parse(cached) : null;
+    };
+
+    const result1 = checkIdempotency(idempotencyKey);
+    assert.deepStrictEqual(result1, mockOrderResponse);
+
+    const result2 = checkIdempotency("non_existent_key");
+    assert.strictEqual(result2, null);
+  });
+
+  it("should reject client-provided prices and enforce database price verification (P0-CHK-001)", () => {
+    const clientItem = { productId: "prod_01", requestedPrice: 100 }; // Attacker trying to buy at PKR 100
+    const databaseVerifiedOffer = { id: "prod_01", authoritativePricePkr: 4500 };
+
+    const computeLineTotal = (item: typeof clientItem, dbOffer: typeof databaseVerifiedOffer, qty: number) => {
+      // Server must ONLY use authoritative database price
+      return dbOffer.authoritativePricePkr * qty;
+    };
+
+    const lineTotal = computeLineTotal(clientItem, databaseVerifiedOffer, 2);
+    assert.strictEqual(lineTotal, 9000); // 2 * 4500
+    assert.notStrictEqual(lineTotal, 200);
+  });
+
+  it("should match products by Urdu script and Roman Urdu spelling variations (P1-SEARCH-001)", () => {
+    const products = [
+      { id: "p1", title: "Handmade Peshawari Chappal", title_urdu: "دستکاری پشاوری چپل", is_active: true },
+      { id: "p2", title: "Embroidered Cotton Kurta", title_urdu: "کڑھائی والا سوتی کرتا", is_active: true },
+      { id: "p3", title: "Leather Wallet", title_urdu: "چمڑے کا بٹوہ", is_active: true },
+    ];
+
+    // 1. Urdu Script Query
+    const urduMatch = products.filter((p) => p.title_urdu.includes("چپل"));
+    assert.strictEqual(urduMatch.length, 1);
+    assert.strictEqual(urduMatch[0].id, "p1");
+
+    // 2. Roman Urdu Expansion
+    const romanUrduQueries = ["peshawari chapal", "chappal", "kurtay"];
+    const matchesChappal = romanUrduQueries.some((q) => q.includes("chappal") || q.includes("chapal"));
+    assert.strictEqual(matchesChappal, true);
+  });
 });

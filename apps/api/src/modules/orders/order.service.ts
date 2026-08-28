@@ -56,7 +56,7 @@ export class OrderService {
       const isUsed = await redis.get(`quote_used:${input.quoteToken}`);
       if (isUsed) throw new Error("This checkout session has already been processed.");
       quote = QuoteService.verifyQuoteToken(input.quoteToken);
-      await redis.set(`quote_used:${input.quoteToken}`, "1", "EX", 86400);
+      await redis.set(`quote_used:${input.quoteToken}`, "1", { ex: 86400 });
     } else if (input.items && input.items.length > 0) {
       quote = await QuoteService.generateQuote({
         items: input.items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
@@ -100,7 +100,7 @@ export class OrderService {
 
     if (input.idempotencyKey) {
       try {
-        await redis.set(`idempotency:${input.idempotencyKey}`, JSON.stringify(response), "EX", 86400);
+        await redis.set(`idempotency:${input.idempotencyKey}`, JSON.stringify(response), { ex: 86400 });
       } catch {}
     }
 
