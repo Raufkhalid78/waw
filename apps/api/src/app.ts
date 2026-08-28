@@ -316,6 +316,23 @@ app.post("/api/orders/:id/return", requireAuth, async (req, res) => {
   }
 });
 
+app.get("/api/orders/:id/return", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const returnData = await OrderService.getOrderReturn(
+      req.params.id,
+      user.role === UserRole.ADMIN ? undefined : user.id,
+    );
+    if (!returnData) {
+      res.status(404).json({ error: "No return request found for this order" });
+      return;
+    }
+    res.json(returnData);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, UserRole.SELLER), async (req, res) => {
   try {
@@ -431,6 +448,48 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
 });
 
   // 🚀🚀 Seller Portal Routes 🚀🚀
+  // Helper: Pakistani CNIC validation & normalization (XXXXX-XXXXXXX-X)
+  const formatAndValidateCnic = (rawCnic?: string): string => {
+    if (!rawCnic) throw new Error("Pakistani CNIC is required");
+    const cleaned = rawCnic.replace(/\D/g, "");
+    if (cleaned.length !== 13) {
+      throw new Error("Invalid Pakistani CNIC: Must be exactly 13 digits (format: XXXXX-XXXXXXX-X)");
+    }
+    return `${cleaned.slice(0, 5)}-${cleaned.slice(5, 12)}-${cleaned.slice(12)}`;
+  };
+
+  // Helper: Pakistani IBAN & Bank Account validation
+  const validateIbanOrAccount = (rawIban?: string): string => {
+    if (!rawIban) throw new Error("Bank Account Number or IBAN is required");
+    const cleaned = rawIban.replace(/[\s-]/g, "").toUpperCase();
+    if (cleaned.startsWith("PK")) {
+      if (cleaned.length !== 24) {
+        throw new Error("Invalid Pakistani IBAN: Must be 24 characters starting with PK (e.g. PK36HABB00000012345678)");
+      }
+      return cleaned;
+    }
+    if (cleaned.length < 8 || cleaned.length > 24) {
+      throw new Error("Invalid Bank Account Number: Must be between 8 and 24 characters");
+    }
+    return cleaned;
+  };
+
+  // Helper: Masking sensitive KYC data
+  const maskCnic = (cnic?: string) => {
+    if (!cnic || cnic.length < 5) return cnic;
+    const clean = cnic.replace(/\D/g, "");
+    if (clean.length === 13) {
+      return `${clean.slice(0, 5)}-*******-${clean.slice(12)}`;
+    }
+    return `${cnic.slice(0, 5)}-*******-${cnic.slice(-1)}`;
+  };
+
+  const maskAccount = (acc?: string) => {
+    if (!acc || acc.length < 8) return acc;
+    return `${acc.slice(0, 4)}****${acc.slice(-4)}`;
+  };
+
+  // 🚀🚀 Seller Portal Routes 🚀🚀
   app.post(
     "/api/seller/apply",
     requireAuth,
@@ -438,6 +497,7 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
       try {
         const user = (req as any).user;
         const { supabaseAdmin } = await import("./config/supabase.js");
+        const { AuditService } = await import("./modules/audit/audit.service.js");
 
         // 1. Ensure user does not already have a store
         const { data: existingStore } = await supabaseAdmin
@@ -447,27 +507,43 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
           .maybeSingle();
 
         if (existingStore) {
-          return res.status(400).json({ error: "Store application already exists for this user." });
+          return res.status(400).json({ error: "A store application already exists for your account." });
         }
 
-        // 2. Generate slug
-        const baseSlug = req.body.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        const slug = `${baseSlug}-${Math.floor(Math.random() * 1000)}`;
+        const { storeName, city, address, businessAddress, cnic, bankTitle, accountTitle, bankAccount, iban, bankName, ntnNumber } = req.body;
+
+        if (!storeName || storeName.trim().length < 3) {
+          return res.status(400).json({ error: "Store name must be at least 3 characters" });
+        }
+
+        const validCnic = formatAndValidateCnic(cnic);
+        const validAccount = validateIbanOrAccount(iban || bankAccount);
+        const resolvedAccountTitle = accountTitle || bankTitle || storeName;
+        const resolvedAddress = address || businessAddress || "Lahore, Pakistan";
+
+        // 2. Generate clean slug
+        const baseSlug = storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        const slug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
 
         // 3. Create Store record
         const { data: store, error: storeError } = await supabaseAdmin
           .from("stores")
           .insert({
             owner_id: user.id,
-            name: req.body.storeName,
+            name: storeName.trim(),
             slug,
-            city: req.body.city,
-            address: req.body.address || req.body.businessAddress,
-            cnic_number: req.body.cnic,
-            bank_account_title: req.body.bankTitle || req.body.accountTitle,
-            bank_account_number: req.body.bankAccount || req.body.iban,
-            bank_name: req.body.bankName,
-            status: "PENDING_KYC"
+            city: city || "Lahore",
+            address: resolvedAddress,
+            cnic: validCnic,
+            cnic_number: validCnic,
+            account_title: resolvedAccountTitle,
+            bank_account_title: resolvedAccountTitle,
+            account_number: validAccount,
+            bank_account_number: validAccount,
+            bank_name: bankName || "Standard Chartered / HBL",
+            ntn_number: ntnNumber || null,
+            status: "PENDING_KYC",
+            is_verified: false,
           })
           .select()
           .single();
@@ -480,7 +556,142 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
           .update({ role: "SELLER" })
           .eq("id", user.id);
 
-        res.json({ success: true, store });
+        await AuditService.logAction({
+          actorId: user.id,
+          actorRole: "SELLER",
+          action: "SELLER_APPLIED",
+          targetResourceType: "store",
+          targetResourceId: store.id,
+          reason: "New merchant onboarding application submitted",
+        });
+
+        res.status(201).json({
+          success: true,
+          message: "Store application submitted successfully for KYC review",
+          store: {
+            ...store,
+            cnic: maskCnic(store.cnic),
+            cnic_number: maskCnic(store.cnic_number),
+            account_number: maskAccount(store.account_number),
+            bank_account_number: maskAccount(store.bank_account_number),
+          },
+        });
+      } catch (err: any) {
+        res.status(400).json({ error: err.message });
+      }
+    }
+  );
+
+  // Seller KYC Document / Banking Update
+  app.post(
+    "/api/seller/kyc",
+    requireAuth,
+    requireRole(UserRole.SELLER, UserRole.ADMIN),
+    async (req, res) => {
+      try {
+        const user = (req as any).user;
+        const { supabaseAdmin } = await import("./config/supabase.js");
+        const { AuditService } = await import("./modules/audit/audit.service.js");
+
+        const { data: store } = await supabaseAdmin
+          .from("stores")
+          .select("*")
+          .eq("owner_id", user.id)
+          .maybeSingle();
+
+        if (!store) {
+          return res.status(404).json({ error: "Store not found for this seller" });
+        }
+
+        const { cnic, accountTitle, bankTitle, bankAccount, iban, bankName, branchCity, ntnNumber, address } = req.body;
+
+        const validCnic = formatAndValidateCnic(cnic || store.cnic || store.cnic_number);
+        const validAccount = validateIbanOrAccount(iban || bankAccount || store.account_number || store.bank_account_number);
+        const resolvedTitle = accountTitle || bankTitle || store.account_title || store.name;
+        const resolvedBankName = bankName || store.bank_name || "Bank";
+
+        const { data: updatedStore, error: updateError } = await supabaseAdmin
+          .from("stores")
+          .update({
+            cnic: validCnic,
+            cnic_number: validCnic,
+            account_title: resolvedTitle,
+            bank_account_title: resolvedTitle,
+            account_number: validAccount,
+            bank_account_number: validAccount,
+            bank_name: resolvedBankName,
+            city: branchCity || store.city,
+            address: address || store.address,
+            ntn_number: ntnNumber || store.ntn_number,
+            status: store.status === "ACTIVE" ? "ACTIVE" : "PENDING_KYC",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", store.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+
+        await AuditService.logAction({
+          actorId: user.id,
+          actorRole: "SELLER",
+          action: "KYC_DETAILS_UPDATED",
+          targetResourceType: "store",
+          targetResourceId: store.id,
+          reason: "Seller submitted updated KYC credentials and banking details",
+        });
+
+        res.json({
+          success: true,
+          message: "KYC details updated successfully",
+          store: {
+            ...updatedStore,
+            cnic: maskCnic(updatedStore.cnic),
+            cnic_number: maskCnic(updatedStore.cnic_number),
+            account_number: maskAccount(updatedStore.account_number),
+            bank_account_number: maskAccount(updatedStore.bank_account_number),
+          },
+        });
+      } catch (err: any) {
+        res.status(400).json({ error: err.message });
+      }
+    }
+  );
+
+  // Seller KYC Status Check
+  app.get(
+    "/api/seller/kyc/status",
+    requireAuth,
+    requireRole(UserRole.SELLER, UserRole.ADMIN),
+    async (req, res) => {
+      try {
+        const user = (req as any).user;
+        const { supabaseAdmin } = await import("./config/supabase.js");
+
+        const { data: store } = await supabaseAdmin
+          .from("stores")
+          .select("id, name, slug, status, is_verified, cnic, cnic_number, account_title, bank_account_title, account_number, bank_account_number, bank_name, city, address, created_at, updated_at")
+          .eq("owner_id", user.id)
+          .maybeSingle();
+
+        if (!store) {
+          return res.status(404).json({ error: "No store associated with this account" });
+        }
+
+        res.json({
+          storeId: store.id,
+          storeName: store.name,
+          status: store.status,
+          isVerified: Boolean(store.is_verified),
+          cnicMasked: maskCnic(store.cnic || store.cnic_number),
+          accountTitle: store.account_title || store.bank_account_title,
+          accountMasked: maskAccount(store.account_number || store.bank_account_number),
+          bankName: store.bank_name,
+          city: store.city,
+          address: store.address,
+          submittedAt: store.created_at,
+          lastUpdatedAt: store.updated_at,
+        });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -508,20 +719,12 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
           return;
         }
 
-        // Mask sensitive KYC & banking information in general response
-        const maskCnic = (cnic?: string) => {
-          if (!cnic || cnic.length < 5) return cnic;
-          return `${cnic.slice(0, 5)}-*******-${cnic.slice(-1)}`;
-        };
-        const maskAccount = (acc?: string) => {
-          if (!acc || acc.length < 8) return acc;
-          return `${acc.slice(0, 4)}****${acc.slice(-4)}`;
-        };
-
         res.json({
           ...store,
-          cnic_number: maskCnic(store.cnic_number),
-          bank_account_number: maskAccount(store.bank_account_number),
+          cnic: maskCnic(store.cnic || store.cnic_number),
+          cnic_number: maskCnic(store.cnic || store.cnic_number),
+          account_number: maskAccount(store.account_number || store.bank_account_number),
+          bank_account_number: maskAccount(store.account_number || store.bank_account_number),
         });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -757,7 +960,86 @@ app.post(
   },
 );
 
-// â”€â”€ Logistics Webhook (PostEx Live Milestone Updates) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Destination Serviceability Routes ─────────────────────────────────────────
+app.get("/api/serviceability/cities", async (req, res) => {
+  try {
+    const { ServiceabilityService } = await import("./modules/logistics/serviceability.service.js");
+    const cities = await ServiceabilityService.listServiceableCities();
+    res.json(cities);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/serviceability/check", async (req, res) => {
+  try {
+    const { city, sellerCity, paymentMethod } = req.query;
+    const { ServiceabilityService } = await import("./modules/logistics/serviceability.service.js");
+    const result = await ServiceabilityService.checkDestination(
+      city as string,
+      sellerCity as string,
+      paymentMethod as any,
+    );
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Customer Support & Dispute Routes ───────────────────────────────────────
+app.post("/api/support/tickets", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { SupportService } = await import("./modules/support/support.service.js");
+    const ticket = await SupportService.createTicket(user.id, req.body);
+    res.status(201).json(ticket);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/support/tickets", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { SupportService } = await import("./modules/support/support.service.js");
+    const tickets = await SupportService.getBuyerTickets(user.id);
+    res.json(tickets);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/support/tickets/:id", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { SupportService } = await import("./modules/support/support.service.js");
+    const details = await SupportService.getTicketDetails(req.params.id, user.id, user.role);
+    res.json(details);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post("/api/support/tickets/:id/messages", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { message, attachments } = req.body;
+    const { SupportService } = await import("./modules/support/support.service.js");
+    const msg = await SupportService.addMessage(
+      req.params.id,
+      user.id,
+      user.role,
+      user.name || user.email || "User",
+      message,
+      attachments,
+    );
+    res.status(201).json(msg);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Logistics Webhook (PostEx Live Milestone Updates) ─────────────────────────
 app.post("/api/logistics/postex/webhook", async (req, res) => {
   try {
     const result = await CourierService.handlePostExWebhook(req.body);
@@ -810,64 +1092,41 @@ app.post(
   AdminController.settlePayout,
 );
 
-// â”€â”€ Admin KYC Approval Routes (Phase 5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.get(
-  "/api/admin/kyc/pending",
+app.post(
+  "/api/admin/reconciliation/run",
   requireAuth,
   requireRole(UserRole.ADMIN),
   async (req, res) => {
     try {
-      const { supabaseAdmin } = await import("./config/supabase.js");
-      const { data } = await supabaseAdmin
-        .from("stores")
-        .select("*, profiles(full_name, phone, email)")
-        .eq("status", "PENDING_KYC")
-        .order("created_at", { ascending: true });
-      res.json(data || []);
+      const { executeReconciliationJob } = await import("./jobs/reconciliation.cron.js");
+      const report = await executeReconciliationJob();
+      res.json({ success: true, ...report });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   },
+);
+
+// ── Admin KYC Approval Routes ───────────────────────────────────────────────
+app.get(
+  "/api/admin/kyc/pending",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listPendingKyc,
 );
 
 app.patch(
   "/api/admin/kyc/:storeId/approve",
   requireAuth,
   requireRole(UserRole.ADMIN),
-  async (req, res) => {
-    try {
-      const { supabaseAdmin } = await import("./config/supabase.js");
-      await supabaseAdmin
-        .from("stores")
-        .update({
-          status: "ACTIVE",
-          is_verified: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", req.params.storeId);
-      res.json({ success: true, message: "Store approved and activated" });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
+  AdminController.approveKyc,
 );
 
 app.patch(
   "/api/admin/kyc/:storeId/reject",
   requireAuth,
   requireRole(UserRole.ADMIN),
-  async (req, res) => {
-    try {
-      const { supabaseAdmin } = await import("./config/supabase.js");
-      await supabaseAdmin
-        .from("stores")
-        .update({ status: "REJECTED", updated_at: new Date().toISOString() })
-        .eq("id", req.params.storeId);
-      res.json({ success: true, message: "Store application rejected" });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
+  AdminController.rejectKyc,
 );
 
 // ── Admin Product Listing Approvals ─────────────────────────────────────────
@@ -922,6 +1181,32 @@ app.patch(
   requireAuth,
   requireRole(UserRole.ADMIN),
   AdminController.resolveDispute,
+);
+
+// ── Admin Return & Reverse Logistics Management ─────────────────────────────
+app.get(
+  "/api/admin/returns",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listReturns,
+);
+app.patch(
+  "/api/admin/returns/:id/receive",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.receiveReturn,
+);
+app.patch(
+  "/api/admin/returns/:id/refund",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.approveReturnRefund,
+);
+app.patch(
+  "/api/admin/returns/:id/reject",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.rejectReturn,
 );
 
 // ── Buyer Product Review Submission (Account & Purchase Verified) ───────────

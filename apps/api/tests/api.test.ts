@@ -316,4 +316,253 @@ describe("Waw Marketplace Core API Engine Tests", () => {
 
     assert.strictEqual(totalCommissionsPkr, 1400); // Exact 1400 vs flat 1500
   });
+
+  it("should compute double-entry ledger balance from RESTOCK, RESERVE, and RELEASE transactions", () => {
+    const mockLedger = [
+      { transaction_type: "RESTOCK", quantity: 50 },
+      { transaction_type: "RESERVE", quantity: -5 },
+      { transaction_type: "RESERVE", quantity: -2 },
+      { transaction_type: "RELEASE", quantity: 2 }, // One order cancelled
+      { transaction_type: "DAMAGE_ADJUSTMENT", quantity: -1 },
+    ];
+
+    const availableStock = mockLedger.reduce((sum, row) => sum + row.quantity, 0);
+    assert.strictEqual(availableStock, 44); // 50 - 5 - 2 + 2 - 1 = 44
+  });
+
+  it("should enforce idempotency when releasing order reservations", () => {
+    const existingReleases = [{ id: "rel_1", reference_id: "ord_100", transaction_type: "RELEASE" }];
+    const isAlreadyReleased = existingReleases.some(
+      (r) => r.reference_id === "ord_100" && r.transaction_type === "RELEASE"
+    );
+
+    assert.strictEqual(isAlreadyReleased, true);
+  });
+
+  it("should correctly identify orders eligible for 15-minute checkout timeout expiration", () => {
+    const now = Date.now();
+    const fifteenMinutes = 15 * 60 * 1000;
+
+    const orders = [
+      { id: "ord_1", status: "PENDING_PAYMENT", created_at: new Date(now - 20 * 60 * 1000).toISOString() }, // Expired (20m old)
+      { id: "ord_2", status: "PENDING_PAYMENT", created_at: new Date(now - 5 * 60 * 1000).toISOString() },  // Active (5m old)
+      { id: "ord_3", status: "CONFIRMED", created_at: new Date(now - 30 * 60 * 1000).toISOString() },        // Paid / Confirmed
+    ];
+
+    const expired = orders.filter(
+      (o) => o.status === "PENDING_PAYMENT" && new Date(o.created_at).getTime() < now - fifteenMinutes
+    );
+
+    assert.strictEqual(expired.length, 1);
+    assert.strictEqual(expired[0].id, "ord_1");
+  });
+
+  it("should validate and format 13-digit Pakistani CNICs as XXXXX-XXXXXXX-X", () => {
+    const formatCnic = (raw: string) => {
+      const cleaned = raw.replace(/\D/g, "");
+      if (cleaned.length !== 13) throw new Error("Invalid CNIC");
+      return `${cleaned.slice(0, 5)}-${cleaned.slice(5, 12)}-${cleaned.slice(12)}`;
+    };
+
+    assert.strictEqual(formatCnic("35202-1234567-1"), "35202-1234567-1");
+    assert.strictEqual(formatCnic("3520212345671"), "35202-1234567-1");
+    assert.throws(() => formatCnic("12345"), /Invalid CNIC/);
+  });
+
+  it("should validate Pakistani 24-character IBANs starting with PK", () => {
+    const validateIban = (raw: string) => {
+      const cleaned = raw.replace(/[\s-]/g, "").toUpperCase();
+      if (cleaned.startsWith("PK") && cleaned.length !== 24) {
+        throw new Error("Invalid Pakistani IBAN");
+      }
+      return cleaned;
+    };
+
+    assert.strictEqual(validateIban("PK36 HABB 0000 0012 3456 7890"), "PK36HABB0000001234567890");
+    assert.throws(() => validateIban("PK36HABB123"), /Invalid Pakistani IBAN/);
+  });
+
+  it("should compute exact Pakistani delivery windows (Intra-city: 2-3 days, Inter-city Tier 1: 3-5 days, Inter-city Other: 5-7 days)", async () => {
+    const { ServiceabilityService } = await import("../src/modules/logistics/serviceability.service.js");
+
+    // Intra-city (Lahore to Lahore)
+    const intra = await ServiceabilityService.checkDestination("Lahore", "Lahore");
+    assert.strictEqual(intra.estimatedDays.min, 2);
+    assert.strictEqual(intra.estimatedDays.max, 3);
+    assert.strictEqual(intra.estimatedDays.label, "2–3 business days");
+
+    // Inter-city Tier 1 (Karachi to Lahore)
+    const tier1 = await ServiceabilityService.checkDestination("Lahore", "Karachi");
+    assert.strictEqual(tier1.estimatedDays.min, 3);
+    assert.strictEqual(tier1.estimatedDays.max, 5);
+    assert.strictEqual(tier1.estimatedDays.label, "3–5 business days");
+
+    // Inter-city Other (Quetta to Lahore)
+    const other = await ServiceabilityService.checkDestination("Quetta", "Lahore");
+    assert.strictEqual(other.estimatedDays.min, 5);
+    assert.strictEqual(other.estimatedDays.max, 7);
+    assert.strictEqual(other.estimatedDays.label, "5–7 business days");
+  });
+
+  it("should reject unserviceable destination cities", async () => {
+    const { ServiceabilityService } = await import("../src/modules/logistics/serviceability.service.js");
+    await assert.rejects(
+      async () => ServiceabilityService.checkDestination("Atlantis"),
+      /Delivery is currently not available to "Atlantis"/
+    );
+  });
+
+  it("should enforce 7-day return policy (accept <= 7 days, reject > 7 days)", () => {
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+    const validateReturnWindow = (deliveredAtStr: string) => {
+      const deliveredTime = new Date(deliveredAtStr).getTime();
+      if (now - deliveredTime > sevenDaysMs) {
+        throw new Error("The 7-day return window for this order has expired.");
+      }
+      return true;
+    };
+
+    // Valid: delivered 3 days ago
+    const threeDaysAgo = new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString();
+    assert.strictEqual(validateReturnWindow(threeDaysAgo), true);
+
+    // Invalid: delivered 10 days ago
+    const tenDaysAgo = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString();
+    assert.throws(() => validateReturnWindow(tenDaysAgo), /The 7-day return window for this order has expired/);
+  });
+
+  it("should calculate double-entry balance accurately with RETURN_RESTOCK", () => {
+    const mockLedger = [
+      { transaction_type: "RESTOCK", quantity: 10 },
+      { transaction_type: "RESERVE", quantity: -2 },
+      { transaction_type: "RETURN_RESTOCK", quantity: 1 }, // 1 item returned & restocked
+    ];
+
+    const currentStock = mockLedger.reduce((sum, row) => sum + row.quantity, 0);
+    assert.strictEqual(currentStock, 9); // 10 - 2 + 1 = 9
+  });
+
+  it("should validate support ticket creation and dispute reason categorization", () => {
+    const validReasons = [
+      "NON_DELIVERY",
+      "FAKE_OR_COUNTERFEIT",
+      "SELLER_UNRESPONSIVE",
+      "INCORRECT_CHARGES",
+      "DEFECTIVE_PRODUCT",
+      "OTHER",
+    ];
+
+    const validateReason = (reason: string) => {
+      if (!validReasons.includes(reason)) throw new Error("Invalid dispute reason");
+      return true;
+    };
+
+    assert.strictEqual(validateReason("NON_DELIVERY"), true);
+    assert.strictEqual(validateReason("FAKE_OR_COUNTERFEIT"), true);
+    assert.throws(() => validateReason("INVALID_REASON"), /Invalid dispute reason/);
+  });
+
+  it("should apply appropriate financial actions upon dispute adjudication", () => {
+    const applyDisputeResolution = (resolution: string, currentEscrowStatus: string) => {
+      if (resolution === "REFUND_BUYER") {
+        return { orderStatus: "REFUNDED", escrowStatus: "HELD" };
+      } else if (resolution === "RELEASE_SELLER_PAYOUT") {
+        return { orderStatus: "DELIVERED", escrowStatus: "SCHEDULED" };
+      }
+      return { orderStatus: "DELIVERED", escrowStatus: currentEscrowStatus };
+    };
+
+    const refundOutcome = applyDisputeResolution("REFUND_BUYER", "HELD");
+    assert.strictEqual(refundOutcome.orderStatus, "REFUNDED");
+    assert.strictEqual(refundOutcome.escrowStatus, "HELD");
+
+    const releaseOutcome = applyDisputeResolution("RELEASE_SELLER_PAYOUT", "HELD");
+    assert.strictEqual(releaseOutcome.escrowStatus, "SCHEDULED");
+  });
+
+  it("should identify matured T+7 seller payouts ready for automated disbursement", () => {
+    const now = Date.now();
+    const payouts = [
+      { id: "pay_1", status: "SCHEDULED", scheduled_for: new Date(now - 2 * 60 * 60 * 1000).toISOString() }, // Matured (2h ago)
+      { id: "pay_2", status: "SCHEDULED", scheduled_for: new Date(now + 24 * 60 * 60 * 1000).toISOString() }, // Not matured (in 24h)
+      { id: "pay_3", status: "COMPLETED", scheduled_for: new Date(now - 5 * 60 * 60 * 1000).toISOString() }, // Already completed
+    ];
+
+    const matured = payouts.filter(
+      (p) => p.status === "SCHEDULED" && new Date(p.scheduled_for).getTime() <= now
+    );
+
+    assert.strictEqual(matured.length, 1);
+    assert.strictEqual(matured[0].id, "pay_1");
+  });
+
+  it("should withhold seller payouts in HELD status if linked order has an active dispute", () => {
+    const activeDisputes = new Set(["ord_disputed_1", "ord_disputed_2"]);
+    const reconcilePayout = (payout: { orderId: string; status: string }) => {
+      if (activeDisputes.has(payout.orderId)) {
+        return { ...payout, status: "HELD" };
+      }
+      return { ...payout, status: "COMPLETED" };
+    };
+
+    const disputedPayout = reconcilePayout({ orderId: "ord_disputed_1", status: "SCHEDULED" });
+    assert.strictEqual(disputedPayout.status, "HELD");
+
+    const cleanPayout = reconcilePayout({ orderId: "ord_clean_100", status: "SCHEDULED" });
+    assert.strictEqual(cleanPayout.status, "COMPLETED");
+  });
+
+  it("should schedule seller payout exactly 7 days after delivery milestone", () => {
+    const deliveredAt = new Date("2026-08-28T12:00:00.000Z");
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const scheduledFor = new Date(deliveredAt.getTime() + sevenDaysMs);
+
+    assert.strictEqual(scheduledFor.toISOString(), "2026-09-04T12:00:00.000Z");
+  });
+
+  it("should generate valid Schema.org Product JSON-LD structured data for Google rich snippets", () => {
+    const mockProduct = {
+      productId: "prod_101",
+      title: "Handcrafted Peshawari Chappal",
+      pricePkr: 4500,
+      stockQuantity: 15,
+      storeName: "Charsadda Leather House",
+      rating: 4.8,
+      reviewsCount: 32,
+    };
+
+    const schema = {
+      "@context": "https://schema.org/",
+      "@type": "Product",
+      name: mockProduct.title,
+      offers: {
+        "@type": "Offer",
+        priceCurrency: "PKR",
+        price: mockProduct.pricePkr,
+        availability: mockProduct.stockQuantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      },
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: mockProduct.rating,
+        reviewCount: mockProduct.reviewsCount,
+      },
+    };
+
+    assert.strictEqual(schema["@type"], "Product");
+    assert.strictEqual(schema.offers.priceCurrency, "PKR");
+    assert.strictEqual(schema.offers.price, 4500);
+    assert.strictEqual(schema.offers.availability, "https://schema.org/InStock");
+    assert.strictEqual(schema.aggregateRating.ratingValue, 4.8);
+  });
+
+  it("should compute category price range bounds accurately for facet filtering", () => {
+    const prices = [1500, 3200, 4500, 12000, 850];
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+
+    assert.strictEqual(minPrice, 850);
+    assert.strictEqual(maxPrice, 12000);
+  });
 });

@@ -1,5 +1,5 @@
 import { redis } from "../../config/redis.js";
-import { supabaseAdmin } from "../../config/supabase.js";
+import { InventoryService } from "./inventory.service.js";
 
 export interface LockItemRequest {
   productId: string;
@@ -11,7 +11,7 @@ export class InventoryLockService {
   private static readonly LOCK_EXPIRY_SECONDS = 900; // 15 minutes checkout reservation
 
   /**
-   * Acquires an atomic lock on multiple product SKUs for 15 minutes during checkout.
+   * Acquires an atomic Redis marker on product SKUs for 15 minutes during checkout.
    */
   static async acquireStockLocks(
     orderId: string,
@@ -21,56 +21,44 @@ export class InventoryLockService {
       const lockKey = `LOCK:SKU:${item.productId}:${item.variantId || "default"}`;
       const reservationKey = `RESERVED:ORDER:${orderId}`;
 
-      // Set lock marker with 15-min TTL
-      await redis.set(
-        `${reservationKey}:${lockKey}`,
-        item.quantity.toString(),
-        "EX",
-        this.LOCK_EXPIRY_SECONDS,
-      );
+      try {
+        await redis.set(
+          `${reservationKey}:${lockKey}`,
+          item.quantity.toString(),
+          "EX",
+          this.LOCK_EXPIRY_SECONDS,
+        );
+      } catch {}
     }
-    console.log(
-      `🔒 Acquired 15-min flash-sale stock locks for Order ${orderId} (${items.length} SKUs)`,
-    );
     return true;
   }
 
   /**
-   * Atomically decrements product variant stock upon successful payment confirmation.
+   * Finalizes stock deductions and cleans up lock markers upon confirmed payment.
    */
   static async commitStockDecrement(orderId: string, items: LockItemRequest[]) {
-    for (const item of items) {
-      if (item.variantId) {
-        // Decrement variant stock atomically in Supabase via RPC
-        const { data: success, error } = await supabaseAdmin.rpc(
-          "deduct_inventory",
-          {
-            p_variant_id: item.variantId,
-            qty: item.quantity,
-          },
-        );
-
-        if (error || !success) {
-          console.error(
-            `❌ Failed to deduct inventory for variant ${item.variantId}. Error:`,
-            error,
-          );
-        }
-      }
-    }
+    // In canonical commerce architecture, checkout_transaction already inserted the RESERVE
+    // entry into inventory_ledger. When payment succeeds, we simply release the ephemeral Redis locks.
     await this.releaseStockLocks(orderId, items);
-    console.log(`📦 Stock decremented and locks released for Order ${orderId}`);
+    console.log(`📦 Stock reservation confirmed and locks finalized for Order ${orderId}`);
   }
 
   /**
    * Releases stock reservation if buyer cancels or payment expires.
    */
-  static async releaseStockLocks(orderId: string, items: LockItemRequest[]) {
-    for (const item of items) {
-      const lockKey = `LOCK:SKU:${item.productId}:${item.variantId || "default"}`;
-      const reservationKey = `RESERVED:ORDER:${orderId}:${lockKey}`;
-      await redis.del(reservationKey);
+  static async releaseStockLocks(orderId: string, items?: LockItemRequest[]) {
+    // 1. Release in double-entry inventory ledger
+    await InventoryService.releaseOrderReservation(orderId);
+
+    // 2. Clean up Redis markers
+    if (items) {
+      for (const item of items) {
+        const lockKey = `LOCK:SKU:${item.productId}:${item.variantId || "default"}`;
+        const reservationKey = `RESERVED:ORDER:${orderId}:${lockKey}`;
+        try {
+          await redis.del(reservationKey);
+        } catch {}
+      }
     }
-    console.log(`🔓 Released flash-sale stock locks for Order ${orderId}`);
   }
 }

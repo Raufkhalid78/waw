@@ -29,7 +29,7 @@ export class AdminService {
 
     const orderList: any[] = orders || [];
     const storeOrderList: any[] = storeOrders || [];
-    const gmvPkr = orderList.reduce((sum, o) => sum + (o.total_amount_pkr || o.total_pkr || 0), 0);
+    const gmvPkr = orderList.reduce((sum, o) => sum + (o.total_amount_pkr || 0), 0);
     const totalCommissionsPkr = storeOrderList.reduce(
       (sum, so) => sum + (so.commission_pkr || 0),
       0,
@@ -255,6 +255,95 @@ export class AdminService {
   }
 
   /**
+   * Lists merchant applications awaiting KYC verification.
+   */
+  static async listPendingKyc() {
+    const { data: stores, error } = await supabaseAdmin
+      .from("stores")
+      .select("*, owner:profiles(full_name, phone, email)")
+      .in("status", ["PENDING_KYC", "PENDING"])
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return stores || [];
+  }
+
+  /**
+   * Approves a merchant KYC application, marks verified, and sets custom commission.
+   */
+  static async approveKyc(storeId: string, commissionRatePercentage?: number, adminId?: string) {
+    const { data: previousStore } = await supabaseAdmin
+      .from("stores")
+      .select("*")
+      .eq("id", storeId)
+      .single();
+
+    const { data: updatedStore, error } = await supabaseAdmin
+      .from("stores")
+      .update({
+        status: "ACTIVE",
+        is_verified: true,
+        commission_rate_percentage: commissionRatePercentage ?? 10,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", storeId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "SELLER_KYC_APPROVED",
+      targetResourceType: "store",
+      targetResourceId: storeId,
+      previousState: previousStore,
+      newState: updatedStore,
+      reason: `Seller KYC verified and store activated with ${commissionRatePercentage ?? 10}% commission`,
+    });
+
+    return updatedStore;
+  }
+
+  /**
+   * Rejects a merchant KYC application with a recorded reason.
+   */
+  static async rejectKyc(storeId: string, reason: string, adminId?: string) {
+    const { data: previousStore } = await supabaseAdmin
+      .from("stores")
+      .select("*")
+      .eq("id", storeId)
+      .single();
+
+    const { data: updatedStore, error } = await supabaseAdmin
+      .from("stores")
+      .update({
+        status: "REJECTED",
+        is_verified: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", storeId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "SELLER_KYC_REJECTED",
+      targetResourceType: "store",
+      targetResourceId: storeId,
+      previousState: previousStore,
+      newState: updatedStore,
+      reason: reason || "KYC documents or banking details did not pass verification",
+    });
+
+    return updatedStore;
+  }
+
+  /**
    * Lists sellers with KYC status from Supabase.
    */
   static async listSellers(status?: StoreStatus) {
@@ -367,6 +456,180 @@ export class AdminService {
     });
 
     return payout;
+  }
+
+  /**
+   * Lists customer return requests with order and buyer details.
+   */
+  static async listReturns(status?: string) {
+    let query = supabaseAdmin
+      .from("return_requests")
+      .select("*, order:orders(*), return_items(*), buyer:profiles(full_name, phone, email)")
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data: returns, error } = await query;
+    if (error) throw error;
+    return returns || [];
+  }
+
+  /**
+   * Marks a returned parcel as received at the central warehouse.
+   */
+  static async receiveReturn(returnId: string, adminId?: string, staffNotes?: string) {
+    const { data: previousReturn } = await supabaseAdmin
+      .from("return_requests")
+      .select("*")
+      .eq("id", returnId)
+      .single();
+
+    const { data: updatedReturn, error } = await supabaseAdmin
+      .from("return_requests")
+      .update({
+        status: "RECEIVED",
+        staff_notes: staffNotes || previousReturn?.staff_notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", returnId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "RETURN_PARCEL_RECEIVED",
+      targetResourceType: "return_request",
+      targetResourceId: returnId,
+      previousState: previousReturn,
+      newState: updatedReturn,
+      reason: "Warehouse staff marked return package as received and inspected",
+    });
+
+    return updatedReturn;
+  }
+
+  /**
+   * Approves a customer return, issues double-entry RETURN_RESTOCK in inventory,
+   * freezes/cancels the seller payout, and marks order as REFUNDED.
+   */
+  static async approveReturnRefund(returnId: string, adminId?: string, staffNotes?: string) {
+    const { data: returnReq, error: retErr } = await supabaseAdmin
+      .from("return_requests")
+      .select("*, return_items(*), order:orders(*, store_orders(*, order_items(*)))")
+      .eq("id", returnId)
+      .single();
+
+    if (retErr || !returnReq) throw new Error("Return request not found");
+
+    // 1. Update return request status
+    const { data: updatedReturn, error: updateErr } = await supabaseAdmin
+      .from("return_requests")
+      .update({
+        status: "REFUNDED",
+        staff_notes: staffNotes || returnReq.staff_notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", returnId)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    // 2. Restock inventory in ledger
+    const { InventoryService } = await import("../products/inventory.service.js");
+    const storeOrders = returnReq.order?.store_orders || [];
+    for (const so of storeOrders) {
+      for (const item of so.order_items || []) {
+        if (item.offer_variant_id && item.quantity > 0) {
+          await InventoryService.recordReturnRestock({
+            storeId: so.store_id,
+            offerVariantId: item.offer_variant_id,
+            quantity: item.quantity,
+            returnRequestId: returnId,
+            actorId: adminId || "ADMIN",
+            notes: `Restocked upon return refund approval #${returnId}`,
+          });
+        }
+      }
+    }
+
+    // 3. Freeze / Cancel seller escrow payouts
+    if (returnReq.store_order_id) {
+      await supabaseAdmin
+        .from("payouts")
+        .update({
+          status: PayoutStatus.HELD,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("store_order_id", returnReq.store_order_id);
+    }
+
+    // 4. Update parent order status
+    if (returnReq.order_id) {
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          global_status: "REFUNDED",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", returnReq.order_id);
+    }
+
+    // 5. Immutable Audit Log
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "RETURN_REFUND_APPROVED",
+      targetResourceType: "return_request",
+      targetResourceId: returnId,
+      previousState: returnReq,
+      newState: updatedReturn,
+      reason: `Return refund approved for PKR ${returnReq.refund_amount_pkr}. Stock restored and seller payout held.`,
+    });
+
+    return updatedReturn;
+  }
+
+  /**
+   * Rejects a return request with recorded reason.
+   */
+  static async rejectReturn(returnId: string, reason: string, adminId?: string) {
+    const { data: previousReturn } = await supabaseAdmin
+      .from("return_requests")
+      .select("*")
+      .eq("id", returnId)
+      .single();
+
+    const { data: updatedReturn, error } = await supabaseAdmin
+      .from("return_requests")
+      .update({
+        status: "REJECTED",
+        staff_notes: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", returnId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "RETURN_REJECTED",
+      targetResourceType: "return_request",
+      targetResourceId: returnId,
+      previousState: previousReturn,
+      newState: updatedReturn,
+      reason: reason || "Return package rejected upon warehouse inspection",
+    });
+
+    return updatedReturn;
   }
 }
 

@@ -188,16 +188,17 @@ export async function fetchProductById(
   productId: string,
 ): Promise<ProductDetail | undefined> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
+    const res = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(productId)}`, {
       cache: "no-store",
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.id || data?.slug) return mapApiProductToDetail(data);
-    }
+    if (res.status === 404) return undefined;
+    if (!res.ok) throw new Error(`Product fetch failed with status: ${res.status}`);
+    const data = await res.json();
+    if (data?.id || data?.slug || data?.productId) return mapApiProductToDetail(data);
     return undefined;
   } catch (error) {
-    return undefined;
+    console.error(`[fetchProductById] Error loading product ${productId}:`, error);
+    throw error;
   }
 }
 

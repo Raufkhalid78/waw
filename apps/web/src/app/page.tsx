@@ -1,11 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { CategoryCircles } from "@/components/home/CategoryCircles";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package, AlertCircle } from "lucide-react";
 import { fetchProducts, fetchCategories } from "@/lib/api";
+
+function ProductCardSkeleton() {
+  return (
+    <div className="bg-white border border-slate-200/90 rounded-3xl p-4 space-y-4 animate-pulse shadow-xs">
+      <div className="w-full aspect-square bg-slate-100 rounded-2xl" />
+      <div className="space-y-2 pt-1">
+        <div className="h-3.5 bg-slate-100 rounded-full w-4/5" />
+        <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+        <div className="h-4.5 bg-slate-200 rounded-full w-2/5 pt-1" />
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const tabScrollRef = useRef<HTMLDivElement>(null);
@@ -46,7 +59,7 @@ export default function HomePage() {
 
   const [error, setError] = useState<string | null>(null);
 
-  const loadCatalog = async () => {
+  const loadCatalog = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -60,11 +73,11 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCategory]);
 
   useEffect(() => {
     loadCatalog();
-  }, [activeCategory]);
+  }, [loadCatalog]);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/content`)
@@ -167,8 +180,10 @@ export default function HomePage() {
 
           {/* Product Grid */}
           {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+              {[...Array(8)].map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
             </div>
           ) : error ? (
             <div className="text-center py-16 space-y-4 max-w-md mx-auto">

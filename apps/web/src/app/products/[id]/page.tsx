@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { fetchProductById, fetchProducts } from '@/lib/api';
@@ -21,6 +21,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<ProductDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -28,31 +29,61 @@ export default function ProductDetailPage() {
 
   const { addItem, selectedCity, toggleWishlist, isInWishlist } = useCartStore();
 
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
       const data = await fetchProductById(productId);
       if (data) {
         setProduct(data);
-        const related = await fetchProducts(
-          data.categorySlug
-            ? { categorySlug: data.categorySlug }
-            : data.categoryId
-              ? { category: data.categoryId }
-              : undefined
-        );
-        setRelatedProducts((related.items || []).filter(p => p.productId !== data.productId).slice(0, 4));
+        try {
+          const related = await fetchProducts(
+            data.categorySlug
+              ? { categorySlug: data.categorySlug }
+              : data.categoryId
+                ? { category: data.categoryId }
+                : undefined
+          );
+          setRelatedProducts((related.items || []).filter(p => p.productId !== data.productId).slice(0, 4));
+        } catch {}
+      } else {
+        setProduct(null);
       }
+    } catch (err: any) {
+      console.error("[PDP] Failed to load product:", err);
+      setError("Unable to load product information. Please check your connection and retry.");
+    } finally {
       setIsLoading(false);
     }
-    loadData();
   }, [productId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
         <p className="text-slate-500 font-medium">Loading product details...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 max-w-md mx-auto text-center px-4">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center">
+          <Loader2 className="w-7 h-7" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900">Service Temporarily Unavailable</h2>
+        <p className="text-xs text-slate-500">{error}</p>
+        <button
+          onClick={loadData}
+          className="bg-amber-400 text-slate-950 hover:bg-amber-500 font-bold px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs text-xs"
+        >
+          Retry Loading Product
+        </button>
       </div>
     );
   }
@@ -106,8 +137,75 @@ export default function ProductDetailPage() {
     window.open(`https://wa.me/923001234567?text=${text}`, '_blank');
   };
 
+  const jsonLdProduct = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": product.title,
+    "image": product.images || [product.imageUrl],
+    "description": product.description || product.title,
+    "sku": product.sku || product.productId,
+    "brand": {
+      "@type": "Brand",
+      "name": product.storeName || "Waw Official"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": typeof window !== "undefined" ? window.location.href : `https://waw.com.pk/products/${product.productId}`,
+      "priceCurrency": "PKR",
+      "price": product.pricePkr,
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": product.inStock !== false ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "seller": {
+        "@type": "Organization",
+        "name": product.storeName || "Waw Official Retail"
+      }
+    },
+    ...(product.rating ? {
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": product.rating,
+        "reviewCount": product.reviewsCount || 1
+      }
+    } : {})
+  };
+
+  const jsonLdBreadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://waw.com.pk"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": product.category || "Products",
+        "item": `https://waw.com.pk/category/${product.categorySlug || 'all'}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": product.title,
+        "item": `https://waw.com.pk/products/${product.productId}`
+      }
+    ]
+  };
+
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-6 space-y-10">
+      {/* ── JSON-LD Structured Data for SEO ──────────────────────────────── */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdProduct) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+      />
+
       {/* ── Breadcrumb Navigation ────────────────────────────────────────── */}
       <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500 overflow-x-auto whitespace-nowrap scrollbar-none">
         <Link href="/" className="hover:text-amber-600 transition-colors">Home</Link>

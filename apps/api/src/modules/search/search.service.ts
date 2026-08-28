@@ -102,25 +102,28 @@ export class SearchService {
     // 2. Fallback to Supabase Postgres ILIKE Search across catalog_products & seller_offers
     if (hits.length === 0) {
       let dbQuery = supabaseAdmin
-        .from("seller_offers")
+        .from("catalog_products")
         .select(`
-          id, price_pkr, original_price_pkr, condition, is_express, status,
-          catalog_product:catalog_products!inner(id, title, title_urdu, slug, description, attributes, images, thumbnail, category_id, is_active, category:categories(id, name, name_urdu, slug)),
-          store:stores!inner(id, name, slug, logo_url, city, rating_average, seller_type),
-          variants:offer_variants(id, variant_name, price_adjustment_pkr)
+          id, title, title_urdu, slug, description, attributes, images, thumbnail, is_active, category_id,
+          category:categories(id, name, name_urdu, slug),
+          offers:seller_offers!inner(
+            id, sku, price_pkr, original_price_pkr, condition, is_express, status, store_id,
+            store:stores!inner(id, name, slug, logo_url, city, rating_average, seller_type),
+            variants:offer_variants(id, variant_name, price_adjustment_pkr)
+          )
         `, { count: "exact" })
-        .eq("status", "ACTIVE")
-        .eq("catalog_product.is_active", true);
+        .eq("is_active", true)
+        .eq("offers.status", "ACTIVE");
 
       if (!isWildcard) {
         const orClauses: string[] = [];
         for (const term of searchTerms) {
-          const cleanTerm = term.replace(/[%_,]/g, "").trim();
+          const cleanTerm = term.replace(/[%_,()]/g, "").trim();
           if (cleanTerm) {
-            orClauses.push(`catalog_product.title.ilike.%${cleanTerm}%`);
-            orClauses.push(`catalog_product.title_urdu.ilike.%${cleanTerm}%`);
-            orClauses.push(`catalog_product.slug.ilike.%${cleanTerm}%`);
-            orClauses.push(`catalog_product.description.ilike.%${cleanTerm}%`);
+            orClauses.push(`title.ilike.%${cleanTerm}%`);
+            orClauses.push(`title_urdu.ilike.%${cleanTerm}%`);
+            orClauses.push(`slug.ilike.%${cleanTerm}%`);
+            orClauses.push(`description.ilike.%${cleanTerm}%`);
           }
         }
         if (orClauses.length > 0) {
@@ -128,40 +131,49 @@ export class SearchService {
         }
       }
 
-      if (params.categoryId)
-        dbQuery = dbQuery.eq("catalog_product.category_id", params.categoryId);
-      if (params.storeId) dbQuery = dbQuery.eq("store_id", params.storeId);
-      if (params.minPrice !== undefined)
-        dbQuery = dbQuery.gte("price_pkr", params.minPrice);
-      if (params.maxPrice !== undefined)
-        dbQuery = dbQuery.lte("price_pkr", params.maxPrice);
+      if (params.categoryId) {
+        dbQuery = dbQuery.eq("category_id", params.categoryId);
+      }
+      if (params.storeId) {
+        dbQuery = dbQuery.eq("offers.store_id", params.storeId);
+      }
+      if (params.minPrice !== undefined) {
+        dbQuery = dbQuery.gte("offers.price_pkr", params.minPrice);
+      }
+      if (params.maxPrice !== undefined) {
+        dbQuery = dbQuery.lte("offers.price_pkr", params.maxPrice);
+      }
 
-      const { data: fallbackOffers, count } = await dbQuery
+      const { data: fallbackProducts, count } = await dbQuery
         .order("created_at", { ascending: false })
         .range((page - 1) * perPage, page * perPage - 1);
 
-      const rawOffers = fallbackOffers || [];
-      hits = rawOffers.map((offer: any) => ({
-        id: offer.id,
-        productId: offer.catalog_product?.id,
-        title: offer.catalog_product?.title,
-        titleUrdu: offer.catalog_product?.title_urdu,
-        slug: offer.catalog_product?.slug,
-        description: offer.catalog_product?.description,
-        pricePkr: offer.price_pkr,
-        originalPricePkr: offer.original_price_pkr,
-        imageUrl: offer.catalog_product?.thumbnail || offer.catalog_product?.images?.[0],
-        images: offer.catalog_product?.images,
-        thumbnail: offer.catalog_product?.thumbnail,
-        storeId: offer.store?.id,
-        storeName: offer.store?.name,
-        sellerCity: offer.store?.city,
-        sellerType: offer.store?.seller_type,
-        rating: offer.store?.rating_average,
-        category: offer.catalog_product?.category,
-        variants: offer.variants,
-        isExpress: offer.is_express,
-      }));
+      const rawProducts = fallbackProducts || [];
+      hits = rawProducts.map((prod: any) => {
+        const activeOffers = (prod.offers || []).filter((o: any) => o.status === "ACTIVE");
+        const bestOffer = activeOffers[0] || prod.offers?.[0] || {};
+        return {
+          id: bestOffer.id || prod.id,
+          productId: prod.id,
+          title: prod.title,
+          titleUrdu: prod.title_urdu,
+          slug: prod.slug,
+          description: prod.description,
+          pricePkr: bestOffer.price_pkr || 0,
+          originalPricePkr: bestOffer.original_price_pkr,
+          imageUrl: prod.thumbnail || prod.images?.[0] || "",
+          images: prod.images || [],
+          thumbnail: prod.thumbnail,
+          storeId: bestOffer.store?.id,
+          storeName: bestOffer.store?.name,
+          sellerCity: bestOffer.store?.city,
+          sellerType: bestOffer.store?.seller_type,
+          rating: bestOffer.store?.rating_average,
+          category: prod.category,
+          variants: bestOffer.variants || [],
+          isExpress: bestOffer.is_express,
+        };
+      });
       found = count || hits.length;
     }
 

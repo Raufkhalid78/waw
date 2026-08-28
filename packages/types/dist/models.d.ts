@@ -188,6 +188,11 @@ export interface CheckoutQuoteResponse {
     codFeePkr: number;
     couponDiscountPkr: number;
     totalPkr: number;
+    estimatedDeliveryDays?: {
+        min: number;
+        max: number;
+        label: string;
+    };
     items: {
         productId: string;
         variantId?: string;

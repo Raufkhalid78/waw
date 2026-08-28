@@ -4,6 +4,7 @@ import { app } from "./app.js";
 import { ENV } from "./config/env.js";
 import { initTypesenseCollections } from "./config/typesense.js";
 import { startReconciliationCron } from "./jobs/reconciliation.cron.js";
+import { startInventoryCleanupCron } from "./jobs/inventory-cleanup.cron.js";
 
 const server = http.createServer(app);
 
@@ -47,6 +48,7 @@ async function bootstrap() {
   });
 
   startReconciliationCron();
+  startInventoryCleanupCron();
 }
 
 bootstrap().catch((err) => {

@@ -100,41 +100,85 @@ export class ProductService {
     };
   }
 
-  static async getProductBySlug(slug: string) {
-    const { data: offer, error } = await supabaseAdmin
+  static async getProductBySlug(slugOrId: string) {
+    if (!slugOrId) return null;
+
+    // 1. Try resolving by catalog product slug or ID first
+    const { data: catProduct, error: catError } = await supabaseAdmin
+      .from("catalog_products")
+      .select(`
+        id, title, title_urdu, slug, description, attributes, images, thumbnail, is_active,
+        category:categories(id, name, name_urdu, slug),
+        offers:seller_offers(
+          id, sku, price_pkr, original_price_pkr, condition, is_express, status,
+          store:stores(id, name, slug, logo_url, city, rating_average, seller_type),
+          variants:offer_variants(id, variant_name, price_adjustment_pkr)
+        )
+      `)
+      .or(`slug.eq.${slugOrId},id.eq.${slugOrId}`)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (catProduct) {
+      const activeOffers = (catProduct.offers || []).filter((o: any) => o.status === "ACTIVE");
+      const bestOffer = activeOffers[0] || catProduct.offers?.[0];
+      if (bestOffer) {
+        return {
+          id: bestOffer.id,
+          productId: catProduct.id,
+          slug: catProduct.slug,
+          title: catProduct.title,
+          title_urdu: catProduct.title_urdu,
+          description: catProduct.description,
+          attributes: catProduct.attributes,
+          images: catProduct.images || [],
+          thumbnail: catProduct.thumbnail,
+          pricePkr: bestOffer.price_pkr,
+          originalPricePkr: bestOffer.original_price_pkr,
+          condition: bestOffer.condition,
+          isExpress: bestOffer.is_express,
+          store: bestOffer.store,
+          category: catProduct.category,
+          variants: bestOffer.variants || []
+        };
+      }
+    }
+
+    // 2. Fallback: Try resolving directly by offer ID
+    const { data: offer } = await supabaseAdmin
       .from("seller_offers")
       .select(`
         id, sku, price_pkr, original_price_pkr, condition, is_express, status,
-        catalog_product:catalog_products!inner(id, title, title_urdu, slug, description, attributes, images, thumbnail, category:categories(id, name, name_urdu, slug)),
-        store:stores!inner(id, name, slug, logo_url, city, rating_average, seller_type),
+        catalog_product:catalog_products(id, title, title_urdu, slug, description, attributes, images, thumbnail, category:categories(id, name, name_urdu, slug)),
+        store:stores(id, name, slug, logo_url, city, rating_average, seller_type),
         variants:offer_variants(id, variant_name, price_adjustment_pkr)
       `)
-      .eq("catalog_product.slug", slug)
-      .eq("status", "ACTIVE")
+      .eq("id", slugOrId)
       .maybeSingle();
 
-    if (error || !offer) {
-      throw new Error(`Product not found or database error: ${error?.message}`);
+    if (offer && offer.catalog_product) {
+      const offerData: any = offer;
+      return {
+        id: offerData.id,
+        productId: offerData.catalog_product.id,
+        slug: offerData.catalog_product.slug,
+        title: offerData.catalog_product.title,
+        title_urdu: offerData.catalog_product.title_urdu,
+        description: offerData.catalog_product.description,
+        attributes: offerData.catalog_product.attributes,
+        images: offerData.catalog_product.images || [],
+        thumbnail: offerData.catalog_product.thumbnail,
+        pricePkr: offerData.price_pkr,
+        originalPricePkr: offerData.original_price_pkr,
+        condition: offerData.condition,
+        isExpress: offerData.is_express,
+        store: offerData.store,
+        category: offerData.catalog_product.category,
+        variants: offerData.variants || []
+      };
     }
 
-    const offerData: any = offer;
-    return {
-      id: offerData.id,
-      productId: offerData.catalog_product.id,
-      slug: offerData.catalog_product.slug,
-      title: offerData.catalog_product.title,
-      title_urdu: offerData.catalog_product.title_urdu,
-      description: offerData.catalog_product.description,
-      images: offerData.catalog_product.images,
-      thumbnail: offerData.catalog_product.thumbnail,
-      pricePkr: offerData.price_pkr,
-      originalPricePkr: offerData.original_price_pkr,
-      condition: offerData.condition,
-      isExpress: offerData.is_express,
-      store: offerData.store,
-      category: offerData.catalog_product.category,
-      variants: offerData.variants
-    };
+    return null;
   }
 
   static async createProduct(
@@ -166,6 +210,8 @@ export class ProductService {
     const rawImages = Array.isArray(data.images) && data.images.length > 0 ? data.images : data.imageUrl ? [data.imageUrl] : [];
     const generatedSlug = data.slug || `${data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}-${Date.now().toString().slice(-4)}`;
 
+    const isPrivileged = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+
     // 1. Create Catalog Product
     const { data: catalogProduct, error: catError } = await supabaseAdmin
       .from("catalog_products")
@@ -177,7 +223,7 @@ export class ProductService {
         description: data.description,
         images: rawImages,
         thumbnail: rawImages[0] || null,
-        is_active: true
+        is_active: isPrivileged,
       }).select().single();
 
     if (catError) throw new Error(`Catalog creation failed: ${catError.message}`);
@@ -191,7 +237,7 @@ export class ProductService {
         sku: data.sku || `SKU-${Date.now()}`,
         price_pkr: data.pricePkr || 0,
         original_price_pkr: data.originalPricePkr || null,
-        status: user?.role === "ADMIN" ? 'ACTIVE' : 'PENDING'
+        status: isPrivileged ? "ACTIVE" : "PENDING",
       }).select().single();
 
     if (offerError) throw new Error(`Offer creation failed: ${offerError.message}`);

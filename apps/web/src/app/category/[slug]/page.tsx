@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { fetchCategoryBySlug, fetchProducts } from "@/lib/api";
@@ -18,7 +18,18 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-
+function ProductCardSkeleton() {
+  return (
+    <div className="bg-white border border-slate-200/90 rounded-3xl p-4 space-y-4 animate-pulse shadow-xs">
+      <div className="w-full aspect-square bg-slate-100 rounded-2xl" />
+      <div className="space-y-2 pt-1">
+        <div className="h-3.5 bg-slate-100 rounded-full w-4/5" />
+        <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+        <div className="h-4.5 bg-slate-200 rounded-full w-2/5 pt-1" />
+      </div>
+    </div>
+  );
+}
 
 export default function CategoryPage() {
   const params = useParams();
@@ -41,10 +52,9 @@ export default function CategoryPage() {
   >("featured");
 
   const [facets, setFacets] = useState<any>({ minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] });
-
   const [error, setError] = useState<string | null>(null);
 
-  const loadCategoryData = async () => {
+  const loadCategoryData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -69,26 +79,22 @@ export default function CategoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [slug, selectedCity, selectedSellerType, userMaxPrice, sortBy]);
 
   useEffect(() => {
     loadCategoryData();
-  }, [slug, selectedCity, selectedSellerType, userMaxPrice, sortBy]);
+  }, [loadCategoryData]);
 
   // Fallback category metadata if database lookup is pending/offline
   const categoryTitle = isUrdu
-    ? category?.nameUrdu || category?.name
-    : category?.name;
+    ? category?.nameUrdu || category?.name || slug.replace(/-/g, " ").toUpperCase()
+    : category?.name || slug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
   const categoryDesc = isUrdu
-    ? category?.descriptionUrdu || category?.description
-    : category?.description;
+    ? category?.descriptionUrdu || category?.description || "پاکستان کی تصدیق شدہ مصنوعات"
+    : category?.description || "Verified authentic marketplace collection from Pakistan.";
 
-  if (loading) {
-    return <div className="p-10 text-center text-slate-500 font-bold">Loading Category...</div>;
-  }
-
-  if (!category) {
+  if (!loading && !category && products.length === 0 && error) {
     return (
       <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-20 text-center space-y-4">
         <h1 className="text-2xl font-black text-slate-900">Category Not Found</h1>
@@ -268,11 +274,10 @@ export default function CategoryPage() {
 
           {/* Products Grid */}
           {loading ? (
-            <div className="p-16 text-center">
-              <div className="w-8 h-8 border-4 border-amber-400/20 border-t-amber-400 rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-xs font-bold text-slate-400">
-                {isUrdu ? "مصنوعات لوڈ ہو رہی ہیں..." : "Loading products..."}
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[...Array(6)].map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
             </div>
           ) : error ? (
             <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-4 shadow-xs">

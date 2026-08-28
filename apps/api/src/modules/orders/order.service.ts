@@ -1,4 +1,9 @@
 import { supabaseAdmin } from "../../config/supabase.js";
+import { redis } from "../../config/redis.js";
+import { WhatsAppService } from "../notifications/whatsapp.service.js";
+import { CourierService } from "../logistics/courier.service.js";
+import { QuoteService } from "./quote.service.js";
+import { InventoryService } from "../products/inventory.service.js";
 import {
   calculateOrderSummary,
   OrderItemPricingInput,
@@ -8,11 +13,6 @@ import {
   ReturnReason,
   SellerType,
 } from "../../types/index.js";
-import { WhatsAppService } from "../notifications/whatsapp.service.js";
-import { CourierService } from "../logistics/courier.service.js";
-import { InventoryLockService } from "../products/inventory-lock.service.js";
-import { QuoteService } from "./quote.service.js";
-import { redis } from "../../config/redis.js";
 
 export interface CartItem {
   productId: string;
@@ -151,6 +151,7 @@ export class OrderService {
     input: {
       reason: string;
       comments?: string;
+      evidenceImages?: string[];
       refundPreference?: string;
       pickupAddress?: string;
       pickupCity?: string;
@@ -169,7 +170,17 @@ export class OrderService {
       throw new Error("Unauthorized to return this order");
     }
 
-    // 2. Book reverse pickup via CourierService
+    // 2. Enforce 7-Day Return Policy
+    const baselineDateStr = order.delivered_at || order.created_at;
+    if (baselineDateStr) {
+      const deliveredTime = new Date(baselineDateStr).getTime();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      if (Date.now() - deliveredTime > sevenDaysMs) {
+        throw new Error("The 7-day return window for this order has expired.");
+      }
+    }
+
+    // 3. Book reverse pickup via CourierService
     const reversePickupResult = await CourierService.bookPostExReversePickup({
       orderId: order.id,
       orderNumber: order.order_number || order.id,
@@ -181,7 +192,7 @@ export class OrderService {
       itemsDescription: input.comments || "Customer Return",
     });
 
-    // 3. Create return_requests record
+    // 4. Create return_requests record
     const { data: returnReq, error: retErr } = await supabaseAdmin
       .from("return_requests")
       .insert({
@@ -189,6 +200,7 @@ export class OrderService {
         store_order_id: order.store_orders?.[0]?.id || null,
         buyer_id: buyerId,
         reason: input.reason,
+        evidence_images: input.evidenceImages || [],
         status: "REVERSE_PICKUP_BOOKED",
         reverse_courier_cn: reversePickupResult.reverseTrackingNumber,
         refund_amount_pkr: order.total_amount_pkr || 0,
@@ -201,7 +213,7 @@ export class OrderService {
 
     if (retErr) throw retErr;
 
-    // 4. If specific items, insert into return_items
+    // 5. If specific items, insert into return_items
     if (input.items && input.items.length > 0) {
       const returnItemsData = input.items.map((i) => ({
         return_request_id: returnReq.id,
@@ -211,7 +223,7 @@ export class OrderService {
       await supabaseAdmin.from("return_items").insert(returnItemsData);
     }
 
-    // 5. Update order status
+    // 6. Update order status
     await supabaseAdmin
       .from("orders")
       .update({
@@ -220,7 +232,7 @@ export class OrderService {
       })
       .eq("id", order.id);
 
-    // 6. Immutable Audit Log
+    // 7. Immutable Audit Log
     const { AuditService } = await import("../audit/audit.service.js");
     await AuditService.logAction({
       actorId: buyerId,
@@ -242,6 +254,24 @@ export class OrderService {
       returnRequest: returnReq,
       reverseShipment: reversePickupResult,
     };
+  }
+
+  /**
+   * Fetches return details and reverse tracking for an order.
+   */
+  static async getOrderReturn(orderId: string, buyerId?: string) {
+    let query = supabaseAdmin
+      .from("return_requests")
+      .select("*, order:orders(*), return_items(*)")
+      .eq("order_id", orderId);
+
+    if (buyerId) {
+      query = query.eq("buyer_id", buyerId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    return data;
   }
 
   /**
@@ -287,22 +317,11 @@ export class OrderService {
         })
         .eq("order_id", id);
 
-      for (const storeOrder of order.store_orders) {
-        if (storeOrder.order_items?.length > 0) {
-          for (const item of storeOrder.order_items) {
-            if (item.offer_variant_id) {
-              await supabaseAdmin.from("inventory_ledger").insert({
-                offer_variant_id: item.offer_variant_id,
-                store_id: storeOrder.store_id,
-                transaction_type: "RELEASE",
-                quantity: item.quantity,
-                reference_id: id,
-                notes: `Order cancellation stock release (${reason || "Customer cancelled"})`,
-              });
-            }
-          }
-        }
-      }
+      await InventoryService.releaseOrderReservation(
+        id,
+        reason || "Customer cancelled",
+        authenticatedUser?.id || "CUSTOMER",
+      );
     }
 
     return { success: true, orderId: id, status: "CANCELLED" };

@@ -57,6 +57,43 @@ export class AdminController {
     }
   }
 
+  static async listPendingKyc(req: Request, res: Response): Promise<void> {
+    try {
+      const stores = await AdminService.listPendingKyc();
+      res.json(stores);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async approveKyc(req: Request, res: Response): Promise<void> {
+    try {
+      const { storeId } = req.params;
+      const { commissionRatePercentage } = req.body;
+      const adminId = (req as any).user?.id;
+      const approved = await AdminService.approveKyc(
+        storeId,
+        commissionRatePercentage,
+        adminId
+      );
+      res.json(approved);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async rejectKyc(req: Request, res: Response): Promise<void> {
+    try {
+      const { storeId } = req.params;
+      const { reason } = req.body;
+      const adminId = (req as any).user?.id;
+      const rejected = await AdminService.rejectKyc(storeId, reason, adminId);
+      res.json(rejected);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
   static async listPendingProducts(req: Request, res: Response): Promise<void> {
     try {
       const products = await AdminService.listPendingProducts();
@@ -122,7 +159,8 @@ export class AdminController {
 
   static async listDisputes(req: Request, res: Response): Promise<void> {
     try {
-      const disputes = await AdminService.listDisputes();
+      const { SupportService } = await import("../support/support.service.js");
+      const disputes = await SupportService.listAllDisputes(req.query.status as string);
       res.json(disputes);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -132,15 +170,61 @@ export class AdminController {
   static async resolveDispute(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { resolution, refundAmountPkr } = req.body;
+      const { resolution, refundAmountPkr, staffNotes } = req.body;
       const adminId = (req as any).user?.id;
-      const resolved = await AdminService.resolveDispute(
+      const { SupportService } = await import("../support/support.service.js");
+      const resolved = await SupportService.resolveDispute(
         id,
-        resolution,
-        refundAmountPkr,
+        { resolution, refundAmountPkr, staffNotes },
         adminId
       );
       res.json(resolved);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async listReturns(req: Request, res: Response): Promise<void> {
+    try {
+      const { status } = req.query;
+      const returns = await AdminService.listReturns(status as string);
+      res.json(returns);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async receiveReturn(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { staffNotes } = req.body;
+      const adminId = (req as any).user?.id;
+      const received = await AdminService.receiveReturn(id, adminId, staffNotes);
+      res.json(received);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async approveReturnRefund(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { staffNotes } = req.body;
+      const adminId = (req as any).user?.id;
+      const approved = await AdminService.approveReturnRefund(id, adminId, staffNotes);
+      res.json(approved);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async rejectReturn(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const adminId = (req as any).user?.id;
+      const rejected = await AdminService.rejectReturn(id, reason, adminId);
+      res.json(rejected);
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
