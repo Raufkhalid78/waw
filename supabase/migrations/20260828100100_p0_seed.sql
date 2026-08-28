@@ -29,26 +29,28 @@ ON CONFLICT (slug) DO UPDATE SET
     is_active = true;
 
 -- 3. Ensure default store exists with valid owner_id
-INSERT INTO public.stores (id, owner_id, name, slug, city, rating_average, seller_type, commission_rate_percentage, status, is_verified) VALUES
+INSERT INTO public.stores (id, owner_id, name, slug, address, city, rating_average, seller_type, commission_rate_percentage, status, is_verified) VALUES
 (
-    'store_1', 
+    'store_1',
     COALESCE(
         (SELECT id FROM public.profiles WHERE email = 'system@waw.com.pk' LIMIT 1),
         (SELECT id FROM public.profiles WHERE role IN ('ADMIN', 'SELLER') ORDER BY created_at ASC LIMIT 1)
-    ), 
-    'Waw Official Retail', 
-    'waw-official', 
-    'Lahore', 
-    4.9, 
-    'FIRST_PARTY', 
-    10, 
-    'ACTIVE', 
+    ),
+    'Waw Official Retail',
+    'waw-official',
+    '24-A, MM Alam Road, Gulberg III, Lahore',
+    'Lahore',
+    4.9,
+    'FIRST_PARTY',
+    10,
+    'ACTIVE',
     true
 )
-ON CONFLICT (id) DO UPDATE SET 
-    name = EXCLUDED.name,
-    city = EXCLUDED.city,
-    status = 'ACTIVE',
+ON CONFLICT (id) DO UPDATE SET
+    name       = EXCLUDED.name,
+    city       = EXCLUDED.city,
+    address    = EXCLUDED.address,
+    status     = 'ACTIVE',
     is_verified = true;
 
 -- 4. Seed Master Catalog dynamically referencing live category IDs
