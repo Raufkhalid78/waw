@@ -116,21 +116,17 @@ if (ENV.NODE_ENV === "production") {
     );
   }
 
+  // PostEx logistics — optional, warn instead of throw
   if (ENV.POSTEX_API_TOKEN === "ptx_live_test_token_2026" || !process.env.POSTEX_API_TOKEN) {
-    throw new Error(
-      "FATAL: POSTEX_API_TOKEN is required in production mode for logistics integration.",
-    );
+    console.warn("⚠️  POSTEX_API_TOKEN not set — courier booking will be disabled.");
   }
 
+  // XPay payments — optional, warn instead of throw
   if (ENV.POSTEX_XPAY_TOKEN === "xpay_live_test_token_2026" || !process.env.POSTEX_XPAY_TOKEN) {
-    throw new Error(
-      "FATAL: POSTEX_XPAY_TOKEN is required in production mode for payment processing.",
-    );
+    console.warn("⚠️  POSTEX_XPAY_TOKEN not set — XPay card payments will be disabled.");
   }
 
   if (ENV.POSTEX_XPAY_SECRET_KEY === "xpay_sec_test_secret_key_2026" || !process.env.POSTEX_XPAY_SECRET_KEY) {
-    throw new Error(
-      "FATAL: POSTEX_XPAY_SECRET_KEY is required in production mode for payment signing.",
-    );
+    console.warn("⚠️  POSTEX_XPAY_SECRET_KEY not set — XPay webhook verification will be disabled.");
   }
 }
