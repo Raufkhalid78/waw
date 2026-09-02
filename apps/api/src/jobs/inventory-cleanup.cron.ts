@@ -29,7 +29,7 @@ export async function runInventoryCleanup() {
     // Find orders still awaiting payment older than 15 minutes
     const { data: expiredOrders, error } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, buyer_phone, created_at")
+      .select("id, buyer_phone, created_at")
       .eq("global_status", "PENDING_PAYMENT")
       .lt("created_at", fifteenMinutesAgo);
 
@@ -80,7 +80,7 @@ export async function runInventoryCleanup() {
         reason: "Unpaid checkout session expired after 15 minutes",
       });
 
-      logger.info(`✅ [InventoryCleanup] Auto-cancelled expired Order ${order.order_number || order.id} and restored inventory balance`);
+      logger.info(`✅ [InventoryCleanup] Auto-cancelled expired Order ${order.id} and restored inventory balance`);
     }
   } catch (err: any) {
     logger.error("❌ [InventoryCleanup] Unexpected error in inventory cleanup job:", err.message);

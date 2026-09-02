@@ -5,7 +5,7 @@ export class ConfigController {
   static async getStorefrontConfig(req: Request, res: Response): Promise<void> {
     try {
       const [citiesRes, searchesRes, campaignsRes] = await Promise.all([
-        supabaseAdmin.from('serviceability_locations').select('city_name').eq('is_active', true).order('city_name'),
+        supabaseAdmin.from('serviceable_cities').select('city_name').eq('is_active', true).order('city_name'),
         supabaseAdmin.from('search_suggestions').select('term').eq('is_active', true).order('score', { ascending: false }).limit(10),
         supabaseAdmin.from('campaigns').select('*').eq('is_active', true).eq('campaign_type', 'PROMO_STRIP').order('sort_order', { ascending: true })
       ]);

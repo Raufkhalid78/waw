@@ -649,7 +649,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_ledger_reference ON inventory_ledger(re
 
 -- Orders
 CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(order_status, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(global_status, created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_global_status ON orders(global_status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_buyer_id ON orders(buyer_id);
@@ -742,10 +742,8 @@ ALTER TABLE xpay_webhooks_log ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 DROP POLICY IF EXISTS "Stores are publicly readable" ON stores;
-DROP POLICY IF EXISTS "Store owners can update their store" ON stores;
 DROP POLICY IF EXISTS "Products are publicly readable" ON products;
 DROP POLICY IF EXISTS "Variants are publicly readable" ON product_variants;
-DROP POLICY IF EXISTS "Serviceability readable by all" ON serviceability_locations;
 DROP POLICY IF EXISTS "Search suggestions readable by all" ON search_suggestions;
 DROP POLICY IF EXISTS "Campaigns readable by all" ON campaigns;
 

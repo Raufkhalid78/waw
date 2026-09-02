@@ -52,10 +52,10 @@ function mapApiProductToDetail(p: any): ProductDetail {
     rating: p.rating_average !== undefined && p.rating_average !== null ? Number(p.rating_average) : (p.ratingAverage !== undefined ? Number(p.ratingAverage) : 0),
     reviewsCount: p.rating_count !== undefined && p.rating_count !== null ? Number(p.rating_count) : (p.ratingCount !== undefined ? Number(p.ratingCount) : (Array.isArray(p.reviews) ? p.reviews.length : 0)),
     soldCount: Number(p.sold_count ?? p.soldCount ?? 0),
-    isExpress: Boolean(p.is_first_party ?? p.isFirstParty ?? false),
-    sellerType: p.is_first_party || p.isFirstParty
+    isExpress: Boolean(p.isExpress ?? p.is_first_party ?? p.isFirstParty ?? false),
+    sellerType: p.sellerType || (p.is_first_party || p.isFirstParty
       ? SellerType.FIRST_PARTY
-      : SellerType.THIRD_PARTY,
+      : SellerType.THIRD_PARTY),
     storeId: p.store_id || p.storeId || p.store?.id,
     storeName: p.store?.name || p.storeName || "Waw Official Store",
     storeSlug: p.store?.slug || p.storeSlug || "waw-official",

@@ -40,6 +40,8 @@ import { AdminController } from "./modules/admin/admin.controller.js";
 
 export const app = express();
 
+app.set("trust proxy", 1);
+
 app.use(requestTracer);
 app.use(helmet({
   contentSecurityPolicy: {
