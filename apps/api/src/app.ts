@@ -104,6 +104,7 @@ const corsOptions: cors.CorsOptions = {
     "X-Requested-With",
     "Accept",
     "Origin",
+    "X-Correlation-Id",
   ],
   exposedHeaders: ["Content-Range", "X-Total-Count"],
 };
