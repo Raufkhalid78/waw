@@ -15,50 +15,87 @@ export class InventoryLockService {
   /**
    * Acquires stock locks by validating available inventory and reserving in Redis.
    * Returns false if any item has insufficient stock.
+   *
+   * NOTE: This implements a two-phase approach — pessimistic per-item Redis locks
+   * prevent concurrent checkouts on the same product, reducing TOCTOU risk.
+   * A post-lock secondary stock check provides an additional safety net.
    */
   static async acquireStockLocks(
     orderId: string,
     items: LockItemRequest[],
   ): Promise<boolean> {
-    // First, validate all items have sufficient stock
+    // Phase 1: Acquire pessimistic per-item Redis locks to serialize concurrent checkouts
+    const productLockKeys: string[] = [];
     for (const item of items) {
-      const stockAvailable = await InventoryService.getAvailableStock(
-        item.productId,
-      );
-      if (stockAvailable < item.quantity) {
-        logger.warn(
-          `Insufficient stock for ${item.productId}: available=${stockAvailable}, requested=${item.quantity}`,
-        );
-        return false;
-      }
-    }
-
-    // All items have sufficient stock — acquire Redis locks
-    const lockKeys: string[] = [];
-    for (const item of items) {
-      const lockKey = `LOCK:SKU:${item.productId}:${item.variantId || "default"}`;
-      const reservationKey = `RESERVED:ORDER:${orderId}:${lockKey}`;
-
-      try {
-        await redis.set(
-          reservationKey,
-          item.quantity.toString(),
-          "EX",
-          this.LOCK_EXPIRY_SECONDS,
-        );
-        lockKeys.push(reservationKey);
-      } catch (err) {
-        logger.warn("Redis lock acquisition failed:", err);
-        // Clean up any locks we already acquired
-        if (lockKeys.length > 0) {
-          try {
-            await redis.del(...lockKeys);
-          } catch {}
+      const productLockKey = `LOCK:CHECKOUT:${item.productId}:${item.variantId || "default"}`;
+      const acquired = await redis.set(productLockKey, "1", "NX", "EX", 5);
+      if (!acquired) {
+        logger.warn(`Could not acquire checkout lock for product ${item.productId} — concurrent checkout in progress`);
+        if (productLockKeys.length > 0) {
+          try { await redis.del(...productLockKeys); } catch {}
         }
         return false;
       }
+      productLockKeys.push(productLockKey);
     }
-    return true;
+
+    try {
+      // Phase 2: Validate all items have sufficient stock (now protected by pessimistic lock)
+      for (const item of items) {
+        const stockAvailable = await InventoryService.getAvailableStock(
+          item.productId,
+        );
+        if (stockAvailable < item.quantity) {
+          logger.warn(
+            `Insufficient stock for ${item.productId}: available=${stockAvailable}, requested=${item.quantity}`,
+          );
+          return false;
+        }
+      }
+
+      // Phase 3: Acquire reservation locks
+      const reservationKeys: string[] = [];
+      for (const item of items) {
+        const lockKey = `LOCK:SKU:${item.productId}:${item.variantId || "default"}`;
+        const reservationKey = `RESERVED:ORDER:${orderId}:${lockKey}`;
+
+        try {
+          await redis.set(
+            reservationKey,
+            item.quantity.toString(),
+            "EX",
+            this.LOCK_EXPIRY_SECONDS,
+          );
+          reservationKeys.push(reservationKey);
+        } catch (err) {
+          logger.warn("Redis lock acquisition failed:", err);
+          if (reservationKeys.length > 0) {
+            try { await redis.del(...reservationKeys); } catch {}
+          }
+          return false;
+        }
+      }
+
+      // Phase 4: Secondary stock validation after locks acquired (TOCTOU safety net)
+      for (const item of items) {
+        const stockAvailable = await InventoryService.getAvailableStock(
+          item.productId,
+        );
+        if (stockAvailable < item.quantity) {
+          logger.warn(
+            `Post-lock stock check failed for ${item.productId}: available=${stockAvailable}, requested=${item.quantity}`,
+          );
+          // Release reservation locks we just acquired
+          try { await redis.del(...reservationKeys); } catch {}
+          return false;
+        }
+      }
+
+      return true;
+    } finally {
+      // Release pessimistic checkout locks (short-lived, but release early)
+      try { await redis.del(...productLockKeys); } catch {}
+    }
   }
 
   /**

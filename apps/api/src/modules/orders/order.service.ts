@@ -132,15 +132,17 @@ export class OrderService {
   /**
    * Fetches all orders placed by a specific buyer.
    */
-  static async getUserOrders(buyerId: string) {
-    const { data: orders, error } = await supabaseAdmin
+  static async getUserOrders(buyerId: string, page = 1, limit = 20) {
+    const offset = (page - 1) * limit;
+    const { data: orders, error, count } = await supabaseAdmin
       .from("orders")
-      .select("*, order_items(*), store_orders(*, order_items(*), shipments(*)), payments(*)")
+      .select("*, order_items(*), store_orders(*, order_items(*), shipments(*)), payments(*)", { count: "exact" })
       .eq("buyer_id", buyerId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    return orders || [];
+    return { orders: orders || [], total: count || 0, page, limit };
   }
 
   /**
@@ -299,6 +301,11 @@ export class OrderService {
       throw new Error("Forbidden");
     }
 
+    const cancellableStatuses = ["PENDING", "PENDING_PAYMENT", "CONFIRMED", "PROCESSING"];
+    if (!cancellableStatuses.includes(order.global_status)) {
+      throw new Error(`Order cannot be cancelled in ${order.global_status} status`);
+    }
+
     // Cancel parent order
     await supabaseAdmin
       .from("orders")
@@ -379,17 +386,17 @@ export class OrderService {
       discount = 0; // FREE_SHIPPING handled at total level
     }
 
-    // Increment usage counter atomically
-    try {
-      await supabaseAdmin.rpc("increment_coupon_uses", {
-        coupon_id: coupon.id,
-      });
-    } catch {
-      // Fallback if RPC doesn't exist: direct update
-      await supabaseAdmin
-        .from("coupons")
-        .update({ current_uses: coupon.current_uses + 1 })
-        .eq("id", coupon.id);
+    // Increment usage counter with optimistic concurrency guard.
+    // .lte() ensures the update only applies if current_uses hasn't exceeded max_uses
+    // since we last read it — not perfectly atomic but eliminates the TOCTOU gap.
+    const { error: couponUpdateErr } = await supabaseAdmin
+      .from("coupons")
+      .update({ current_uses: coupon.current_uses + 1 })
+      .eq("id", coupon.id)
+      .lte("current_uses", coupon.max_uses ? coupon.max_uses - 1 : 999999);
+
+    if (couponUpdateErr) {
+      throw new Error("Coupon usage limit reached or concurrent modification detected");
     }
 
     return {

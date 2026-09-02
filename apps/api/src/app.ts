@@ -346,8 +346,10 @@ app.post("/api/orders", requireAuth, validateBody(CreateOrderSchema), async (req
 app.get("/api/orders", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
-    const orders = await OrderService.getUserOrders(user.id);
-    res.json(orders);
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const result = await OrderService.getUserOrders(user.id, page, limit);
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1242,6 +1244,19 @@ app.post(
 
       if (order.buyer_id !== (req as any).user.id && (req as any).user.role !== "ADMIN") {
         return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Idempotency: return existing PENDING Raast payment reference if one exists
+      const { data: existingPayment } = await supabaseAdmin
+        .from("payments")
+        .select("id, gateway_reference, amount_pkr")
+        .eq("order_id", order.id)
+        .eq("payment_method", "RAAST")
+        .eq("status", "PENDING")
+        .maybeSingle();
+
+      if (existingPayment?.gateway_reference) {
+        return res.json({ referenceId: existingPayment.gateway_reference, amountPkr: existingPayment.amount_pkr });
       }
 
       const result = await RaastService.generateDynamicQr({

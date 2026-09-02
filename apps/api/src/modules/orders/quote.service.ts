@@ -32,29 +32,91 @@ export class QuoteService {
     const verifiedItems: any[] = [];
     let subtotalPkr = 0;
 
-    // 2. Validate against canonical schema (seller_offers, catalog_products, inventory_ledger)
-    for (const item of input.items) {
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.productId);
+    // 2. Batch-fetch all offers, variants, and inventory in 3 queries (instead of N*3)
+    const productIds = input.items.map((i) => i.productId);
+    const isUUID = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
-      let offerQuery = supabaseAdmin
-        .from("seller_offers")
-        .select(`
-          id, price_pkr, status, store_id, is_express,
-          catalog_product:catalog_products!inner(id, title, slug, is_active),
-          store:stores!inner(id, name, city, commission_rate_percentage)
-        `)
-        .eq("status", "ACTIVE");
+    const uuidIds = productIds.filter(isUUID);
+    const slugIds = productIds.filter((id) => !isUUID(id));
 
-      if (isUUID) {
-        offerQuery = offerQuery.or(`id.eq.${item.productId},catalog_product_id.eq.${item.productId}`);
-      } else {
-        offerQuery = offerQuery.eq("catalog_product.slug", item.productId);
+    let offerQuery = supabaseAdmin
+      .from("seller_offers")
+      .select(`
+        id, price_pkr, status, store_id, catalog_product_id, is_express,
+        catalog_product:catalog_products!inner(id, title, slug, is_active),
+        store:stores!inner(id, name, city, commission_rate_percentage)
+      `)
+      .eq("status", "ACTIVE");
+
+    if (uuidIds.length > 0 && slugIds.length > 0) {
+      offerQuery = offerQuery.or(
+        `id.in.(${uuidIds.join(",")}),catalog_product_id.in.(${uuidIds.join(",")}),catalog_product.slug.in.(${slugIds.join(",")})`,
+      );
+    } else if (uuidIds.length > 0) {
+      offerQuery = offerQuery.or(
+        `id.in.(${uuidIds.join(",")}),catalog_product_id.in.(${uuidIds.join(",")})`,
+      );
+    } else {
+      offerQuery = offerQuery.in("catalog_product.slug", slugIds);
+    }
+
+    const { data: allOffers } = await offerQuery;
+
+    // Build a lookup map: productId (input key) -> offer
+    const offerMap = new Map<string, any>();
+    for (const offer of allOffers || []) {
+      const cp = Array.isArray(offer.catalog_product) ? offer.catalog_product[0] : offer.catalog_product;
+      for (const pid of productIds) {
+        if (isUUID(pid)) {
+          if (offer.id === pid || offer.catalog_product_id === pid) {
+            offerMap.set(pid, offer);
+          }
+        } else {
+          if (cp?.slug === pid) {
+            offerMap.set(pid, offer);
+          }
+        }
       }
+    }
 
-      const { data: offer, error: offerErr } = await offerQuery.maybeSingle();
+    // Batch fetch all variants
+    const offerIds = (allOffers || []).map((o: any) => o.id);
+    const { data: allVariants } = offerIds.length > 0
+      ? await supabaseAdmin
+          .from("offer_variants")
+          .select("id, offer_id, variant_name, price_adjustment_pkr")
+          .in("offer_id", offerIds)
+      : { data: [] };
 
-      const offerData: any = offer;
-      if (offerErr || !offerData || !offerData.catalog_product?.is_active) {
+    // Build variant lookup: offer_id -> variants[]
+    const variantMap = new Map<string, any[]>();
+    for (const v of allVariants || []) {
+      if (!variantMap.has(v.offer_id)) variantMap.set(v.offer_id, []);
+      variantMap.get(v.offer_id)!.push(v);
+    }
+
+    // Batch fetch all inventory
+    const allVariantIds = (allVariants || []).map((v: any) => v.id);
+    const { data: allInventory } = allVariantIds.length > 0
+      ? await supabaseAdmin
+          .from("inventory_ledger")
+          .select("offer_variant_id, quantity")
+          .in("offer_variant_id", allVariantIds)
+      : { data: [] };
+
+    // Build inventory lookup: offer_variant_id -> total stock
+    const inventoryMap = new Map<string, number>();
+    for (const row of allInventory || []) {
+      inventoryMap.set(
+        row.offer_variant_id,
+        (inventoryMap.get(row.offer_variant_id) || 0) + (row.quantity || 0),
+      );
+    }
+
+    // Match pre-fetched data to input items
+    for (const item of input.items) {
+      const offerData = offerMap.get(item.productId);
+      if (!offerData || !offerData.catalog_product?.is_active) {
         throw new Error(`Product not found or unavailable: ${item.productId}`);
       }
 
@@ -63,32 +125,20 @@ export class QuoteService {
       let variantName = "Default";
       let offerVariantId = null;
 
-      // Find variant
-      let variantQuery = supabaseAdmin
-        .from("offer_variants")
-        .select("id, variant_name, price_adjustment_pkr")
-        .eq("offer_id", offerData.id);
+      const variants = variantMap.get(offerData.id) || [];
+      const matchedVariants = item.variantId
+        ? variants.filter((v: any) => v.id === item.variantId)
+        : variants;
 
-      if (item.variantId) {
-        variantQuery = variantQuery.eq("id", item.variantId);
-      }
-      const { data: variants } = await variantQuery;
-
-      if (!variants || variants.length === 0) {
+      if (!matchedVariants || matchedVariants.length === 0) {
         throw new Error(`Variant not found for product ${offerData.catalog_product.title}`);
       }
-      const variant = variants[0];
+      const variant = matchedVariants[0];
       offerVariantId = variant.id;
       variantName = variant.variant_name;
       unitPrice += variant.price_adjustment_pkr || 0;
 
-      // Check stock via inventory_ledger sum
-      const { data: invData } = await supabaseAdmin
-        .from("inventory_ledger")
-        .select("quantity")
-        .eq("offer_variant_id", variant.id);
-
-      stockAvailable = (invData || []).reduce((sum: number, row: any) => sum + (row.quantity || 0), 0);
+      stockAvailable = inventoryMap.get(variant.id) || 0;
 
       if (stockAvailable < item.quantity) {
         throw new Error(`Insufficient stock for ${offerData.catalog_product.title}. Only ${stockAvailable} available.`);

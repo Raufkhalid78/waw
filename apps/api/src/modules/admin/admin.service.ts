@@ -21,10 +21,12 @@ export class AdminService {
         .select("*", { count: "exact", head: true }),
       supabaseAdmin
         .from("orders")
-        .select("total_amount_pkr, payment_status, global_status"),
+        .select("total_amount_pkr, payment_status, global_status")
+        .limit(10000), // TODO: replace with database-side SUM via RPC once available
       supabaseAdmin
         .from("store_orders")
-        .select("commission_pkr"),
+        .select("commission_pkr")
+        .limit(10000),
     ]);
 
     const orderList: any[] = orders || [];
