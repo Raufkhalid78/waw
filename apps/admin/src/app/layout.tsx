@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import { Sidebar } from "@/components/Sidebar";
 import { AdminProvider } from "@/components/AdminProvider";
 import { ClientAuthGuard } from "@/components/ClientAuthGuard";
+import { AdminShell } from "@/components/AdminShell";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,12 +23,7 @@ export default function AdminLayout({
       <body className={inter.className}>
         <AdminProvider>
           <ClientAuthGuard tokenKey="admin_token">
-            <div className="flex h-screen overflow-hidden bg-gray-50">
-              <Sidebar />
-              <main className="flex-1 overflow-y-auto p-6">
-                {children}
-              </main>
-            </div>
+            <AdminShell>{children}</AdminShell>
           </ClientAuthGuard>
         </AdminProvider>
       </body>
