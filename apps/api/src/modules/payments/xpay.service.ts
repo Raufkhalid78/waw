@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import axios from "axios";
 import { ENV } from "../../config/env.js";
+import { logger } from "../../config/logger.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import {
   OrderStatus,
@@ -24,7 +25,8 @@ export class PostExXPayService {
     ENV.POSTEX_XPAY_BASE_URL || "https://xpay.postexglobal.com/api";
 
   /**
-   * Initializes a PostEx XPay Checkout Session (Cards, Raast, JazzCash, Easypaisa).
+   * Creates a real PostEx XPay checkout session via their REST API.
+   * Returns a hosted checkout URL for Card, Raast, JazzCash, or Easypaisa.
    */
   static async createPaymentIntent(
     orderId: string,
@@ -40,26 +42,85 @@ export class PostExXPayService {
       throw new Error(`Order not found: ${orderId}`);
     }
 
+    if (order.payment_status === PaymentStatus.PAID) {
+      throw new Error(`Order ${order.order_number} is already paid`);
+    }
+
     const totalAmount = order.total_amount_pkr || 0;
-    const intentId = `xpay_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    let checkoutUrl = `${this.baseUrl}/checkout/${intentId}?amount=${totalAmount}&currency=PKR&orderRef=${order.order_number}`;
-    let qrPayload: string | undefined;
+    const merchantId = ENV.POSTEX_XPAY_MERCHANT_ID;
+
+    if (!merchantId || merchantId === "WAW-POSTEX-001") {
+      throw new Error(
+        "XPay merchant ID not configured. Set POSTEX_XPAY_MERCHANT_ID in .env",
+      );
+    }
+
+    // Map internal payment method to PostEx XPay method codes
+    const methodMap: Record<string, string> = {
+      XPAY_CARD: "CARD",
+      CARD: "CARD",
+      RAAST: "RAAST",
+      JAZZCASH: "JAZZCASH",
+      EASYPAISA: "EASYPAISA",
+    };
+    const xpayMethod = methodMap[method] || "CARD";
+
+    // Call PostEx XPay API to create checkout session
+    const response = await axios.post(
+      `${this.baseUrl}/checkout/create`,
+      {
+        merchantId,
+        orderNumber: order.order_number,
+        amount: totalAmount,
+        currency: "PKR",
+        paymentMethod: xpayMethod,
+        customerName: order.buyer_name,
+        customerPhone: order.buyer_phone,
+        customerEmail: order.notes || undefined,
+        callbackUrl: `${ENV.SUPABASE_URL}/functions/v1/xpay-webhook`,
+        returnUrls: {
+          success: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/order/${order.order_number}/success`,
+          failure: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/order/${order.order_number}/failed`,
+          cancel: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/order/${order.order_number}/cancelled`,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${ENV.POSTEX_XPAY_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      },
+    );
+
+    const { checkoutUrl, sessionId, qrPayload } = response.data;
+
+    if (!checkoutUrl && !sessionId) {
+      throw new Error(
+        `PostEx XPay API returned invalid response: ${JSON.stringify(response.data)}`,
+      );
+    }
+
+    const intentId = sessionId || `xpay_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+    const finalCheckoutUrl =
+      checkoutUrl || `${this.baseUrl}/checkout/${intentId}`;
 
     // Record payment intent in database
     await supabaseAdmin.from("payments").insert({
-      id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `pay_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,
       order_id: order.id,
       payment_method: method,
       status: PaymentStatus.PENDING,
       gateway_reference: intentId,
       amount_pkr: totalAmount,
+      gateway_response: response.data,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
 
     return {
       intentId,
-      checkoutUrl,
+      checkoutUrl: finalCheckoutUrl,
       orderNumber: order.order_number,
       amountPkr: totalAmount,
       qrPayload,
@@ -74,13 +135,6 @@ export class PostExXPayService {
     signatureHeader?: string,
   ): boolean {
     if (!signatureHeader || !ENV.POSTEX_XPAY_SECRET_KEY) {
-      // In sandbox/testing mode allow fallback verification
-      if (
-        ENV.NODE_ENV !== "production" &&
-        signatureHeader === "test_xpay_signature"
-      ) {
-        return true;
-      }
       return false;
     }
 
@@ -126,29 +180,26 @@ export class PostExXPayService {
     }
 
     const orderRef = data.orderNumber || data.orderId;
-    const txId = data.transactionId || orderRef; // Use orderRef if txId is missing
+    const txId = data.transactionId || orderRef;
 
     if (!orderRef)
       throw new Error("Missing order reference in PostEx XPay webhook payload");
 
-    // Idempotency Check
-    const { data: existingLog } = await supabaseAdmin
-      .from("xpay_webhooks_log")
-      .select("id")
-      .eq("transaction_id", txId)
-      .single();
-
-    if (existingLog) {
-      return {
-        success: true,
-        message: `Webhook for tx ${txId} already processed (Idempotency Guard)`,
-      };
-    }
-
-    // Insert idempotency lock immediately
-    await supabaseAdmin
+    // Idempotency Check — single atomic insert; if transaction_id already exists, skip
+    const { error: insertErr } = await supabaseAdmin
       .from("xpay_webhooks_log")
       .insert({ transaction_id: txId, event_type: eventType });
+
+    if (insertErr) {
+      // Unique constraint violation means this webhook was already processed
+      if (insertErr.code === "23505") {
+        return {
+          success: true,
+          message: `Webhook for tx ${txId} already processed (Idempotency Guard)`,
+        };
+      }
+      throw insertErr;
+    }
 
     const { data: order } = await supabaseAdmin
       .from("orders")
@@ -194,7 +245,7 @@ export class PostExXPayService {
         itemsCount: order.items?.length || 1,
       });
     } catch (courierErr) {
-      console.warn("PostEx automatic consignment booking notice:", courierErr);
+      logger.warn("PostEx automatic consignment booking notice:", courierErr);
     }
 
     // 4. Send instant WhatsApp confirmation to Pakistani buyer
@@ -206,12 +257,12 @@ export class PostExXPayService {
         false,
       );
     } catch (notifErr) {
-      console.warn("WhatsApp alert dispatch notice:", notifErr);
+      logger.warn("WhatsApp alert dispatch notice:", notifErr);
     }
 
     return {
       success: true,
-      orderNumber: order.orderNumber,
+      orderNumber: order.order_number,
       status: PaymentStatus.PAID,
     };
   }
@@ -234,7 +285,7 @@ export class PostExXPayService {
     raw += p("00", "01"); // Format indicator
     raw += p("01", "12"); // Dynamic QR
     raw += p("26", p("00", "PK.RAAST.P2M") + p("01", params.merchantId));
-    raw += p("52", "5411"); // Merchant Category Code
+    raw += p("52", "5399"); // Merchant Category Code (General Marketplace)
     raw += p("53", "586"); // PKR Currency
     raw += p("54", params.amountPkr.toFixed(2));
     raw += p("58", "PK"); // Country

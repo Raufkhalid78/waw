@@ -164,7 +164,7 @@ export default function BuyerProtectionPage() {
           </p>
         </div>
         <a
-          href="https://wa.me/923001234567"
+          href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
           target="_blank"
           rel="noopener noreferrer"
           className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all self-start sm:self-auto"

@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { logger } from "@/lib/logger";
 import {
   CheckCircle2,
   Package,
@@ -14,7 +15,6 @@ import {
   ArrowRight,
   ShieldCheck,
   Phone,
-  Store,
   ChevronRight,
   Loader2,
 } from "lucide-react";
@@ -36,7 +36,7 @@ export default function OrderTrackingPage() {
         const data = await fetchOrderById(orderId);
         setOrder(data);
       } catch (err) {
-        console.warn("Could not load order details:", err);
+        logger.warn("Could not load order details", "Orders", err);
       } finally {
         setLoading(false);
       }

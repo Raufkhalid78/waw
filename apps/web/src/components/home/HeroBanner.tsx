@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { SellerType } from "@waw/types";
+import { fetchProducts } from "@/lib/api";
+import { ProductDetail } from "@/types/models";
 
 const HERO_SLIDES = [
   {
@@ -93,6 +95,16 @@ export function HeroBanner() {
   });
   const { addItem } = useCartStore();
   const [dealAdded, setDealAdded] = useState(false);
+  const [dealProduct, setDealProduct] = useState<ProductDetail | null>(null);
+
+  useEffect(() => {
+    fetchProducts({ sortBy: "rating", limit: 10 })
+      .then(({ items }) => {
+        const discounted = items.filter((p) => p.discountPercent && p.discountPercent > 10);
+        if (discounted.length > 0) setDealProduct(discounted[0]);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -117,15 +129,15 @@ export function HeroBanner() {
   const slide = HERO_SLIDES[currentSlide];
 
   const handleQuickAdd = () => {
+    if (!dealProduct) return;
     addItem({
-      productId: "prod_m2",
-      title: "Pro ANC Wireless Earbuds with Heavy Bass & 40h Battery",
-      imageUrl:
-        "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80",
-      pricePkr: 3200,
+      productId: dealProduct.productId,
+      title: dealProduct.title,
+      imageUrl: dealProduct.imageUrl || "",
+      pricePkr: dealProduct.pricePkr,
       quantity: 1,
-      sellerType: SellerType.THIRD_PARTY,
-      storeName: "Lahore Tech Hub",
+      sellerType: dealProduct.sellerType,
+      storeName: dealProduct.storeName,
     });
     setDealAdded(true);
     setTimeout(() => setDealAdded(false), 1600);
@@ -296,31 +308,41 @@ export function HeroBanner() {
             {/* Featured Deal Product Visual Layout */}
             <div className="flex items-center gap-3 my-2.5 bg-white/5 p-2.5 rounded-xl border border-white/10">
               <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=200&auto=format&fit=crop&q=80"
-                  alt="Pro ANC Earbuds"
-                  className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
-                />
-                <span className="absolute top-0.5 left-0.5 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
-                  -33% OFF
-                </span>
+                {dealProduct?.imageUrl ? (
+                  <img
+                    src={dealProduct.imageUrl}
+                    alt={dealProduct.title}
+                    className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-600">
+                    <ShoppingBag className="w-6 h-6" />
+                  </div>
+                )}
+                {dealProduct?.discountPercent ? (
+                  <span className="absolute top-0.5 left-0.5 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
+                    -{dealProduct.discountPercent}% OFF
+                  </span>
+                ) : null}
               </div>
 
               <div className="min-w-0 space-y-0.5">
                 <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                  <span>Lahore Tech Hub</span>
+                  <span className="truncate">{dealProduct?.storeName || "Waw Marketplace"}</span>
                 </div>
                 <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 leading-snug">
-                  Pro ANC Wireless Earbuds (40h Playtime)
+                  {dealProduct?.title || "Loading deal..."}
                 </h4>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-sm font-black text-amber-400">
-                    PKR 3,200
+                    PKR {(dealProduct?.pricePkr || 0).toLocaleString()}
                   </span>
-                  <span className="text-[10px] text-slate-500 line-through">
-                    PKR 4,800
-                  </span>
+                  {dealProduct?.originalPricePkr ? (
+                    <span className="text-[10px] text-slate-500 line-through">
+                      PKR {dealProduct.originalPricePkr.toLocaleString()}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -336,7 +358,7 @@ export function HeroBanner() {
             >
               <ShoppingBag className="w-3.5 h-3.5" />
               <span>
-                {dealAdded ? "ADDED TO CART!" : "CLAIM DEAL FOR PKR 3,200"}
+                {dealAdded ? "ADDED TO CART!" : dealProduct ? `CLAIM DEAL FOR PKR ${dealProduct.pricePkr.toLocaleString()}` : "LOADING DEAL..."}
               </span>
             </button>
           </div>

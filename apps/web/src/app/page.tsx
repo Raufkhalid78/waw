@@ -2,7 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { logger } from "@/lib/logger";
 import { CategoryCircles } from "@/components/home/CategoryCircles";
+import { HeroBanner } from "@/components/home/HeroBanner";
+import { FlashDeals } from "@/components/home/FlashDeals";
+import { FeaturedBrands } from "@/components/home/FeaturedBrands";
+import { StoreSpotlight } from "@/components/home/StoreSpotlight";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package, AlertCircle } from "lucide-react";
 import { fetchProducts, fetchCategories } from "@/lib/api";
@@ -68,7 +73,7 @@ export default function HomePage() {
       );
       setLiveProducts(data.items || []);
     } catch (err: any) {
-      console.error("[Homepage] Failed to load catalog:", err);
+      logger.error("Failed to load catalog", "Homepage", err);
       setError("Unable to load latest offers from the marketplace catalog. Please check your connection or retry.");
     } finally {
       setLoading(false);
@@ -83,12 +88,12 @@ export default function HomePage() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/content`)
       .then(res => res.json())
       .then(data => {
-        if (data.content) {
+        if (Array.isArray(data?.content)) {
           const claim = data.content.find((c: any) => c.key_slug === 'buyer-protection-claim');
           if (claim) setCmsContent(claim);
         }
       })
-      .catch(console.error);
+      .catch((err) => logger.error("Failed to load CMS content", "Homepage", err));
   }, []);
 
   const scrollTabs = (direction: "left" | "right") => {
@@ -101,7 +106,13 @@ export default function HomePage() {
 
   return (
     <div className="space-y-3 pb-20">
-      {/* 1. DB-backed Category Circles */}
+      {/* 1. Hero Banner Carousel */}
+      <HeroBanner />
+
+      {/* 2. Flash Deals */}
+      <FlashDeals />
+
+      {/* 3. DB-backed Category Circles */}
       <CategoryCircles />
 
       {/* 2. Live Marketplace Catalog */}
@@ -289,6 +300,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* 4. Featured Brand Hubs */}
+      <FeaturedBrands />
+
+      {/* 5. Store Spotlight */}
+      <StoreSpotlight />
     </div>
   );
 }

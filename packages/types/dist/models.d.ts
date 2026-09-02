@@ -34,6 +34,7 @@ export interface Category {
     id: string;
     name: string;
     nameUrdu?: string;
+    name_urdu?: string;
     slug: string;
     parentId?: string | null;
     imageUrl?: string;

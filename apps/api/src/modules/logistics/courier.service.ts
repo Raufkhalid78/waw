@@ -1,5 +1,7 @@
 import axios from "axios";
+import crypto from "crypto";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { logger } from "../../config/logger.js";
 import {
   CourierProvider,
   OrderStatus,
@@ -73,7 +75,7 @@ export class CourierService {
     const selectedProvider = this.selectCourier(input.destinationCity);
     let trackingNumber = `PTX-${input.orderNumber.replace(/[^0-9]/g, "").slice(-6) || Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     let trackingUrl = `https://postex.pk/tracking?cn=${trackingNumber}`;
-    console.log(
+    logger.info(
       `🚚 Smart Logistics Route: Selected ${selectedProvider} for delivery to ${input.destinationCity}`,
     );
 
@@ -111,7 +113,7 @@ export class CourierService {
           trackingUrl = `https://postex.pk/tracking?cn=${trackingNumber}`;
         }
       } catch (err: any) {
-        console.warn(
+        logger.warn(
           "⚠️ PostEx API call fallback to standard CN generator:",
           err.response?.data || err.message,
         );
@@ -138,7 +140,7 @@ export class CourierService {
       .select()
       .maybeSingle();
 
-    console.log(
+    logger.info(
       `📦 PostEx shipment successfully registered: CN #${trackingNumber} for Order ${input.orderNumber}`,
     );
     return (
@@ -150,6 +152,41 @@ export class CourierService {
         trackingUrl,
       }
     );
+  }
+
+  /**
+   * Verifies PostEx logistics webhook HMAC-SHA256 signature.
+   */
+  static verifyPostExWebhookSignature(
+    payload: any,
+    signatureHeader?: string,
+  ): boolean {
+    if (!signatureHeader || !ENV.POSTEX_API_TOKEN) {
+      if (
+        ENV.NODE_ENV !== "production" &&
+        signatureHeader === "test_postex_signature"
+      ) {
+        return true;
+      }
+      return false;
+    }
+
+    try {
+      const dataToSign =
+        typeof payload === "string" ? payload : JSON.stringify(payload);
+      const computed = crypto
+        .createHmac("sha256", ENV.POSTEX_API_TOKEN)
+        .update(dataToSign)
+        .digest("hex");
+
+      const sigBuffer = Buffer.from(signatureHeader, "hex");
+      const compBuffer = Buffer.from(computed, "hex");
+
+      if (sigBuffer.length !== compBuffer.length) return false;
+      return crypto.timingSafeEqual(sigBuffer, compBuffer);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -166,7 +203,7 @@ export class CourierService {
       throw new Error("Missing trackingNumber in PostEx webhook payload");
     }
 
-    console.log(
+    logger.info(
       `🚚 [PostEx Webhook] Tracking #${trackingNumber} status update: ${postexStatus}`,
     );
 
@@ -249,7 +286,7 @@ export class CourierService {
         }
       }
 
-      console.log(
+      logger.info(
         `✅ Order ${shipment.order_id} updated to ${targetOrderStatus} via PostEx Webhook`,
       );
     }
@@ -295,14 +332,14 @@ export class CourierService {
           returnTrackingUrl = `https://postex.pk/tracking?cn=${reverseCn}`;
         }
       } catch (err: any) {
-        console.warn(
+        logger.warn(
           "⚠️ PostEx Reverse Pickup fallback to CN generator:",
           err.response?.data || err.message,
         );
       }
     }
 
-    console.log(
+    logger.info(
       `🔄 PostEx Reverse Pickup registered: CN #${reverseCn} for Order ${input.orderNumber} (Reason: ${input.returnReason})`,
     );
 

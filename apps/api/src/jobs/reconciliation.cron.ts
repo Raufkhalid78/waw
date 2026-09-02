@@ -7,6 +7,7 @@ import {
 } from "../types/index.js";
 import axios from "axios";
 import { ENV } from "../config/env.js";
+import { logger } from "../config/logger.js";
 import { AuditService } from "../modules/audit/audit.service.js";
 
 export interface ReconciliationReport {
@@ -17,7 +18,7 @@ export interface ReconciliationReport {
 }
 
 export function startReconciliationCron() {
-  console.log(
+  logger.info(
     "⏱️ Financial Reconciliation & COD Settlement Cron Initialized (24h Interval)",
   );
 
@@ -31,7 +32,7 @@ export function startReconciliationCron() {
 
   // Also run 30s after server startup for immediate check
   setTimeout(async () => {
-    console.log(
+    logger.info(
       "🔄 Running initial startup payout & delivery reconciliation probe...",
     );
     await executeReconciliationJob();
@@ -72,13 +73,13 @@ async function runPayoutReconciliation(): Promise<{ settled: number; held: numbe
       .lte("scheduled_for", now);
 
     if (error || !maturedPayouts || maturedPayouts.length === 0) {
-      console.log(
+      logger.info(
         "✅ Payout Reconciliation: No matured vendor payouts pending release.",
       );
       return { settled: 0, held: 0 };
     }
 
-    console.log(
+    logger.info(
       `💰 Reconciling ${maturedPayouts.length} matured merchant settlement payouts...`,
     );
 
@@ -150,11 +151,11 @@ async function runPayoutReconciliation(): Promise<{ settled: number; held: numbe
       }
     }
 
-    console.log(
+    logger.info(
       `✅ Payout Settlement Cycle Complete: ${settled} settled, ${held} held under dispute guard.`,
     );
   } catch (err: any) {
-    console.error("❌ Error during payout reconciliation:", err.message);
+    logger.error("❌ Error during payout reconciliation:", err.message);
   }
 
   return { settled, held };
@@ -177,7 +178,7 @@ async function runShipmentReconciliation(): Promise<{ synced: number }> {
       return { synced: 0 };
     }
 
-    console.log(
+    logger.info(
       `📦 Syncing ${inTransitShipments.length} in-transit courier shipments...`,
     );
 
@@ -210,7 +211,7 @@ async function runShipmentReconciliation(): Promise<{ synced: number }> {
       }
     }
   } catch (err: any) {
-    console.error("❌ Error during shipment reconciliation:", err.message);
+    logger.error("❌ Error during shipment reconciliation:", err.message);
   }
 
   return { synced };

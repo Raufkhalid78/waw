@@ -3,6 +3,9 @@
  * Generates EMVCo & ISO 8583 compliant dynamic QR payloads for zero-fee instant merchant settlements.
  */
 
+import QRCode from "qrcode";
+import { ENV } from "../../config/env.js";
+
 export interface RaastQrPayloadInput {
   orderId: string;
   orderNumber: string;
@@ -30,25 +33,27 @@ export class RaastService {
 
   /**
    * Generates an EMVCo-compliant dynamic QR code payload with CRC16 checksum.
+   * Produces both the raw QR string and a base64 data URL for frontend rendering.
    */
-  static generateDynamicQr(input: RaastQrPayloadInput): RaastQrResult {
+  static async generateDynamicQr(
+    input: RaastQrPayloadInput,
+  ): Promise<RaastQrResult> {
     const referenceId = `RAAST-${input.orderNumber.replace(/[^A-Z0-9]/gi, "")}-${Date.now().toString().slice(-4)}`;
-    const alias = input.merchantIbanOrAlias || this.DEFAULT_MERCHANT_ALIAS;
-    const name = input.merchantName || this.DEFAULT_MERCHANT_NAME;
-    const city = input.merchantCity || this.DEFAULT_MERCHANT_CITY;
+    const alias =
+      input.merchantIbanOrAlias ||
+      process.env.RAAST_MERCHANT_ALIAS ||
+      this.DEFAULT_MERCHANT_ALIAS;
+    const name =
+      input.merchantName ||
+      process.env.RAAST_MERCHANT_NAME ||
+      this.DEFAULT_MERCHANT_NAME;
+    const city =
+      input.merchantCity ||
+      process.env.RAAST_MERCHANT_CITY ||
+      this.DEFAULT_MERCHANT_CITY;
     const formattedAmount = input.amountPkr.toFixed(2);
 
     // EMVCo Tag-Length-Value (TLV) construction
-    // Tag 00: Payload Format Indicator = "01"
-    // Tag 01: Point of Initiation Method = "12" (Dynamic QR)
-    // Tag 26: Merchant Account Information (Raast)
-    // Tag 52: Merchant Category Code = "5399" (General Marketplace)
-    // Tag 53: Transaction Currency = "586" (PKR)
-    // Tag 54: Transaction Amount
-    // Tag 58: Country Code = "PK"
-    // Tag 59: Merchant Name
-    // Tag 60: Merchant City
-    // Tag 62: Additional Data Field (Reference / Order ID)
     const tlv = (tag: string, value: string) => {
       const len = value.length.toString().padStart(2, "0");
       return `${tag}${len}${value}`;
@@ -61,8 +66,8 @@ export class RaastService {
       tlv("00", "01") +
       tlv("01", "12") +
       tlv("26", subTlvRaast) +
-      tlv("52", "5399") +
-      tlv("53", "586") +
+      tlv("52", "5399") + // General Marketplace MCC
+      tlv("53", "586") + // PKR
       tlv("54", formattedAmount) +
       tlv("58", "PK") +
       tlv("59", name.slice(0, 25)) +
@@ -73,13 +78,16 @@ export class RaastService {
     const crc = this.computeCrc16(rawPayload);
     const fullQrString = `${rawPayload}${crc}`;
 
+    // Generate QR code as base64 data URL (local, no third-party dependency)
+    const qrDataUrl = await QRCode.toDataURL(fullQrString, {
+      width: 320,
+      margin: 2,
+      color: { dark: "#0f172a", light: "#fef600" },
+      errorCorrectionLevel: "M",
+    });
+
     // Expiry timestamp: 15 minutes
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-    // SVG representation as data URL for instant frontend rendering
-    const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
-      fullQrString,
-    )}&color=0f172a&bgcolor=fef600&margin=2`;
 
     return {
       qrString: fullQrString,
@@ -104,17 +112,59 @@ export class RaastService {
   }
 
   /**
-   * Simulates/verifies inbound Raast instant settlement webhook.
+   * Verifies inbound Raast payment confirmation webhook from SBP switch.
+   * Validates the transaction reference and amount against expected values.
    */
-  static verifyRaastPayment(referenceId: string, amountPkr: number) {
+  static async verifyRaastPayment(
+    referenceId: string,
+    amountPkr: number,
+    bankTransactionId?: string,
+  ): Promise<{
+    success: boolean;
+    transactionId?: string;
+    referenceId: string;
+    amountPkr: number;
+    status: string;
+    error?: string;
+  }> {
+    // Look up the expected payment by reference ID
+    const { data: payment, error } = await supabaseAdmin
+      .from("payments")
+      .select("*, order:orders(*)")
+      .eq("gateway_reference", referenceId)
+      .single();
+
+    if (error || !payment) {
+      return {
+        success: false,
+        referenceId,
+        amountPkr,
+        status: "REJECTED",
+        error: `No pending payment found for reference: ${referenceId}`,
+      };
+    }
+
+    // Verify amount matches
+    if (payment.amount_pkr !== amountPkr) {
+      return {
+        success: false,
+        referenceId,
+        amountPkr,
+        status: "REJECTED",
+        error: `Amount mismatch: expected ${payment.amount_pkr}, got ${amountPkr}`,
+      };
+    }
+
+    // Mark payment as received (actual settlement happens via bank callback)
+    const transactionId =
+      bankTransactionId || `TXN-RAAST-${Date.now()}`;
+
     return {
       success: true,
-      transactionId: `TXN-RAAST-${Date.now()}`,
+      transactionId,
       referenceId,
       amountPkr,
       status: "ESCROW_HELD",
-      settledAt: new Date().toISOString(),
-      bankRail: "1Link 1Pay / SBP Raast Real-Time Switch",
     };
   }
 
@@ -131,3 +181,6 @@ export class RaastService {
     return crc.toString(16).toUpperCase().padStart(4, "0");
   }
 }
+
+// Need supabaseAdmin for verifyRaastPayment
+import { supabaseAdmin } from "../../config/supabase.js";

@@ -140,10 +140,13 @@ export function CartDrawer({
                     <img
                       src={
                         item.imageUrl ||
-                        "https://images.unsplash.com/photo-1627123424574-724758594e93?w=200"
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' fill='%23e2e8f0'%3E%3Crect width='80' height='80' rx='8'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='11' font-family='system-ui'%3EIMG%3C/text%3E%3C/svg%3E"
                       }
                       alt={item.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' fill='%23e2e8f0'%3E%3Crect width='80' height='80' rx='8'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='11' font-family='system-ui'%3EIMG%3C/text%3E%3C/svg%3E";
+                      }}
                     />
                   </div>
 

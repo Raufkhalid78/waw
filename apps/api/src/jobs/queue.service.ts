@@ -1,5 +1,6 @@
 import { Queue, Worker, Job } from "bullmq";
 import { ENV } from "../config/env.js";
+import { logger } from "../config/logger.js";
 import { WhatsAppService } from "../modules/notifications/whatsapp.service.js";
 import { typesenseClient } from "../config/typesense.js";
 import { supabaseAdmin } from "../config/supabase.js";
@@ -37,7 +38,7 @@ try {
     "waw-jobs-queue",
     async (job: Job) => {
       const { type, payload } = job.data;
-      console.log(`⚙️ [BullMQ Worker] Processing Job #${job.id} [${type}]`);
+      logger.info(`⚙️ [BullMQ Worker] Processing Job #${job.id} [${type}]`);
 
       switch (type) {
         case "WHATSAPP_NOTIFICATION":
@@ -69,13 +70,13 @@ try {
                   soldCount: payload.product.soldCount || 0,
                 });
             } catch (err: any) {
-              console.warn("⚠️ Typesense sync skipped:", err.message);
+              logger.warn("⚠️ Typesense sync skipped:", err.message);
             }
           }
           break;
 
         case "INVENTORY_LOCK_SWEEP": {
-          console.log(
+          logger.info(
             "🧹 [BullMQ Worker] Running scheduled inventory lock sweep...",
           );
           // Find pending unpaid orders older than 15 minutes
@@ -111,7 +112,7 @@ try {
                 })
                 .eq("id", ord.id);
             }
-            console.log(
+            logger.info(
               `🧹 Cleaned up ${expiredOrders.length} expired reservations.`,
             );
           }
@@ -119,19 +120,19 @@ try {
         }
 
         case "ESCROW_PAYOUT":
-          console.log(
+          logger.info(
             `🏦 [Escrow Payout Job] Reconciling Merchant Settlement release for vendor ${payload.storeId}`,
           );
           break;
 
         case "COD_RECONCILIATION":
-          console.log(
+          logger.info(
             `🚚 [COD Reconciliation] Reconciling PostEx delivery remittance for CN ${payload.cn}`,
           );
           break;
 
         default:
-          console.log(`ℹ️ Unknown job type: ${type}`);
+          logger.info(`ℹ️ Unknown job type: ${type}`);
       }
 
       return { status: "COMPLETED", processedAt: new Date().toISOString() };
@@ -143,16 +144,16 @@ try {
   );
 
   wawWorker.on("failed", (job, err) => {
-    console.error(
+    logger.error(
       `❌ [BullMQ Worker] Job #${job?.id} failed with error:`,
       err.message,
     );
   });
 } catch (err: any) {
-  console.warn(
-    "⚠️ Redis BullMQ initialized in memory fallback mode:",
-    err.message,
-  );
+    logger.warn(
+      "⚠️ Redis BullMQ initialized in memory fallback mode:",
+      err.message,
+    );
 }
 
 export class JobQueueManager {
@@ -178,14 +179,14 @@ export class JobQueueManager {
             removeOnFail: 5000,
           },
         );
-        console.log(`📥 [BullMQ] Enqueued Job #${jobId} [${type}]`);
+        logger.info(`📥 [BullMQ] Enqueued Job #${jobId} [${type}]`);
         return jobId;
       } catch {
         // Dev fallback if Redis connection times out
       }
     }
 
-    console.log(`📥 [Local Dev Queue] Handled Job #${jobId} [${type}]`);
+    logger.info(`📥 [Local Dev Queue] Handled Job #${jobId} [${type}]`);
     return jobId;
   }
 }

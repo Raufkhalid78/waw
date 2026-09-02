@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { redis } from "../../config/redis.js";
 import { ENV } from "../../config/env.js";
+import { logger } from "../../config/logger.js";
 import { ServiceabilityService } from "../logistics/serviceability.service.js";
 import {
   CheckoutQuoteRequest,
@@ -113,14 +114,41 @@ export class QuoteService {
     }
 
     // 3. Delivery Fee Policy (Free Delivery >= PKR 5,000)
-    const shippingFeePkr = subtotalPkr >= (ENV.FREE_DELIVERY_THRESHOLD_PKR || 5000) ? 0 : 200;
+    let shippingFeePkr = subtotalPkr >= (ENV.FREE_DELIVERY_THRESHOLD_PKR || 5000) ? 0 : 200;
 
     // 4. COD Fee Policy (+PKR 100)
     const isCod = input.paymentMethod === PaymentMethod.COD;
     const codFeePkr = isCod ? (ENV.DEFAULT_COD_FEE_PKR || 100) : 0;
 
-    const couponDiscountPkr = 0;
-    const appliedCoupon = undefined;
+    let couponDiscountPkr = 0;
+    let appliedCoupon: any = undefined;
+    let freeShipping = false;
+
+    // Apply coupon if provided
+    if (input.couponCode) {
+      try {
+        const { OrderService } = await import("./order.service.js");
+        const couponResult = await OrderService.applyCoupon(
+          input.couponCode,
+          verifiedItems.map((it: any) => ({
+            productId: it.productId,
+            quantity: it.quantity,
+            unitPricePkr: it.unitPricePkr,
+            storeId: it.storeId,
+          })),
+        );
+        appliedCoupon = couponResult.coupon;
+        couponDiscountPkr = couponResult.discountPkr;
+        freeShipping = couponResult.freeShipping || false;
+        // Override shipping if coupon grants free shipping
+        if (freeShipping && shippingFeePkr > 0) {
+          shippingFeePkr = 0;
+        }
+      } catch (couponErr: any) {
+        // Invalid coupon — proceed without discount (don't block checkout)
+        logger.warn("Coupon validation failed:", couponErr.message);
+      }
+    }
     const totalPkr = subtotalPkr + shippingFeePkr + codFeePkr - couponDiscountPkr;
 
     // 5. Generate secure quote token
@@ -138,7 +166,7 @@ export class QuoteService {
       timestamp: Date.now(),
     };
 
-    const quoteToken = jwt.sign(tokenPayload, ENV.JWT_SECRET || "waw-fallback-secret-2026", { expiresIn: "15m" });
+    const quoteToken = jwt.sign(tokenPayload, ENV.JWT_SECRET, { expiresIn: "15m" });
 
     return {
       quoteToken,
@@ -155,7 +183,7 @@ export class QuoteService {
 
   static verifyQuoteToken(token: string): any {
     try {
-      return jwt.verify(token, ENV.JWT_SECRET || 'waw-fallback-secret-2026');
+      return jwt.verify(token, ENV.JWT_SECRET);
     } catch (err: any) {
       if (err.name === "TokenExpiredError") {
         throw new Error("Checkout session expired. Please refresh your cart.");

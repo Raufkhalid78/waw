@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
+import { logger } from '@/lib/logger';
 import { fetchProductById, fetchProducts } from '@/lib/api';
 import { useCartStore } from '@/store/useCartStore';
 import { ProductCard } from '@/components/ui/ProductCard';
@@ -50,7 +52,7 @@ export default function ProductDetailPage() {
         setProduct(null);
       }
     } catch (err: any) {
-      console.error("[PDP] Failed to load product:", err);
+      logger.error("Failed to load product", "PDP", err);
       setError("Unable to load product information. Please check your connection and retry.");
     } finally {
       setIsLoading(false);
@@ -111,7 +113,7 @@ export default function ProductDetailPage() {
       quantity,
       sellerType: product.sellerType,
       storeName: product.storeName,
-      imageUrl: product.images[0],
+      imageUrl: product.images?.[0] || product.imageUrl,
     });
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 1500);
@@ -125,16 +127,17 @@ export default function ProductDetailPage() {
       quantity,
       sellerType: product.sellerType,
       storeName: product.storeName,
-      imageUrl: product.images[0],
+      imageUrl: product.images?.[0] || product.imageUrl,
     });
     router.push('/checkout');
   };
 
   const handleWhatsAppOrder = () => {
+    const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "+923001234567";
     const text = encodeURIComponent(
       `Salam Waw Customer Care! 🛍️\n\nI want to place an order for:\n📦 Product: ${product.title}\n🔖 SKU: ${product.sku}\n💵 Price: PKR ${(product.pricePkr * quantity).toLocaleString()} (Qty: ${quantity})\n📍 Delivery City: ${selectedCity}, Pakistan\n🔗 Link: ${typeof window !== 'undefined' ? window.location.href : ''}\n\nPlease confirm availability and dispatch details.`
     );
-    window.open(`https://wa.me/923001234567?text=${text}`, '_blank');
+    window.open(`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
   };
 
   const jsonLdProduct = {
@@ -150,7 +153,7 @@ export default function ProductDetailPage() {
     },
     "offers": {
       "@type": "Offer",
-      "url": typeof window !== "undefined" ? window.location.href : `https://waw.com.pk/products/${product.productId}`,
+      "url": `${process.env.NEXT_PUBLIC_SITE_URL || "https://waw.com.pk"}/products/${product.productId}`,
       "priceCurrency": "PKR",
       "price": product.pricePkr,
       "itemCondition": "https://schema.org/NewCondition",
@@ -222,7 +225,7 @@ export default function ProductDetailPage() {
           {/* Main Large Image Preview */}
           <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm group">
             <img
-              src={product.images[selectedImageIndex] || product.images[0]}
+              src={product.images?.[selectedImageIndex] || product.images?.[0] || product.imageUrl}
               alt={product.title}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
@@ -256,7 +259,7 @@ export default function ProductDetailPage() {
                       : 'border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                  <Image src={img} alt={`Preview ${idx + 1}`} width={100} height={100} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -306,7 +309,7 @@ export default function ProductDetailPage() {
                       quantity: 1,
                       sellerType: product.sellerType,
                       storeName: product.storeName,
-                      imageUrl: product.images[0],
+                      imageUrl: product.images?.[0] || product.imageUrl,
                     })
                   }
                   className={`p-2 rounded-full border transition-all cursor-pointer ${
@@ -612,7 +615,7 @@ export default function ProductDetailPage() {
                 sellerType={rel.sellerType}
                 storeName={rel.storeName}
                 sellerCity={rel.sellerCity}
-                imageUrl={rel.images[0]}
+                imageUrl={rel.images?.[0] || rel.imageUrl || ""}
               />
             ))}
           </div>

@@ -7,13 +7,9 @@ import { PaymentMethod, CheckoutQuoteResponse } from "@waw/types";
 import {
   ShieldCheck,
   Truck,
-  MessageSquare,
   CheckCircle2,
   Lock,
   ArrowLeft,
-  QrCode,
-  Sparkles,
-  Smartphone,
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -43,9 +39,9 @@ export default function CheckoutPage() {
     useCartStore();
 
   const [formData, setFormData] = useState({
-    fullName: "Ali Khan",
-    phone: "+923001234567",
-    address: "House 42, Street 8, Phase 5, DHA",
+    fullName: "",
+    phone: "",
+    address: "",
     city: selectedCity || "Lahore",
     province: "Punjab",
     notes: "",

@@ -103,6 +103,70 @@ export class AdminController {
     }
   }
 
+  static async listAllProducts(req: Request, res: Response): Promise<void> {
+    try {
+      const { page, limit, search } = req.query;
+      const result = await AdminService.listAllProducts({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search: search as string,
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async listAllOrders(req: Request, res: Response): Promise<void> {
+    try {
+      const { page, limit, status } = req.query;
+      const result = await AdminService.listAllOrders({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        status: status as string,
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async listAllUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const { page, limit, role } = req.query;
+      const result = await AdminService.listAllUsers({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        role: role as string,
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async banUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const adminId = (req as any).user?.id;
+      const banned = await AdminService.banUser(id, adminId);
+      res.json(banned);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async unbanUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const adminId = (req as any).user?.id;
+      const unbanned = await AdminService.unbanUser(id, adminId);
+      res.json(unbanned);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
   static async approveProduct(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;

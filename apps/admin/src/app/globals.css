@@ -2,7 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --gold: #FEF600;
+  --ink: #09090B;
+  --surface: #F8FAFC;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
-  background-color: #0f172a;
-  color: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #F8FAFC;
+  color: #09090B;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Status Badges */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+}
+.badge-success {
+  @apply bg-green-100 text-green-800;
+}
+.badge-warning {
+  @apply bg-amber-100 text-amber-800;
+}
+.badge-danger {
+  @apply bg-red-100 text-red-800;
+}
+.badge-info {
+  @apply bg-blue-100 text-blue-800;
+}
+.badge-neutral {
+  @apply bg-gray-100 text-gray-800;
+}
+
+/* Table styles */
+.admin-table {
+  @apply w-full text-sm text-left;
+}
+.admin-table thead {
+  @apply text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200;
+}
+.admin-table th {
+  @apply px-4 py-3 font-semibold;
+}
+.admin-table td {
+  @apply px-4 py-3 border-b border-gray-100;
+}
+.admin-table tbody tr:hover {
+  @apply bg-gray-50;
 }

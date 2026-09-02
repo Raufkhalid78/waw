@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
+import { logger } from "@/lib/logger";
 import { CartDrawer } from "./CartDrawer";
 import { AuthModal } from "./AuthModal";
 import { Logo } from "@/components/ui/Logo";
@@ -117,7 +118,7 @@ export function Header() {
   const [config, setConfig] = useState({
     cities: ["Lahore", "Karachi"],
     popularSearches: ["Smart Watches", "Lawn 2026"],
-    promotionalAnnouncements: [{ tag: "LOADING", text: "Loading offers...", link: "/", linkText: "" }] as any[]
+    promotionalAnnouncements: [{ tag: "LOADING", text: "Loading offers...", link: "/", linkText: "" }] as { tag: string; text: string; link: string; linkText: string }[]
   });
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -132,7 +133,7 @@ export function Header() {
           setConfig(data);
         }
       } catch (err) {
-        console.error("Failed to load storefront config", err);
+        logger.error("Failed to load storefront config", "Header", err);
       }
     }
     loadConfig();
@@ -145,7 +146,7 @@ export function Header() {
         const cats = await fetchCategories(language.toLowerCase());
         setRawCategories(cats);
         const dynamicLinks = cats.map(c => ({
-          label: language === "UR" ? (c.nameUrdu || (c as any).name_urdu || c.name) : c.name,
+          label: language === "UR" ? (c.nameUrdu || c.name_urdu || c.name) : c.name,
           href: `/category/${c.slug}`
         }));
         
@@ -161,7 +162,7 @@ export function Header() {
 
         setCategoryLinks([...staticLinks, ...dynamicLinks.slice(0, 8)]);
       } catch (err) {
-        console.error(err);
+        logger.error("Failed to load categories", "Header", err);
       }
     }
     loadCats();
@@ -173,15 +174,16 @@ export function Header() {
       ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)
     ) {
       const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
       const recognition = new SpeechRecognition();
       recognition.lang = language === "UR" ? "ur-PK" : "en-PK";
       recognition.interimResults = false;
 
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
+      recognition.addEventListener("start", () => setIsListening(true));
+      recognition.addEventListener("end", () => setIsListening(false));
+      recognition.addEventListener("error", () => setIsListening(false));
 
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;

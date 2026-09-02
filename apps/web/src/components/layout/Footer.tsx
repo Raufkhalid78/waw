@@ -59,7 +59,7 @@ export function Footer() {
 
             {/* WhatsApp 24/7 Helpline */}
             <a
-              href="https://wa.me/923001234567"
+              href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3.5 group text-left hover:text-emerald-600 transition-colors"

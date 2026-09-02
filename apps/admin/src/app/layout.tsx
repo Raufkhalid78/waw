@@ -1,32 +1,35 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { Sidebar } from "@/components/Sidebar";
+import { AdminProvider } from "@/components/AdminProvider";
 import { ClientAuthGuard } from "@/components/ClientAuthGuard";
 
+const inter = Inter({ subsets: ["latin"] });
+
 export const metadata: Metadata = {
-  title: "Waw Admin Control Center — Pakistan Marketplace Operations",
-  description:
-    "Enterprise control center for Waw marketplace: orders, seller KYC, inventory, PostEx logistics, and seller payouts.",
-  icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
-  },
+  title: "Waw Admin — Control Center",
+  description: "Admin dashboard for Waw marketplace management",
 };
 
-export default function RootLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-      </head>
-      <body className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
-        <ClientAuthGuard tokenKey="waw_admin_token">
-          {children}
-        </ClientAuthGuard>
+      <body className={inter.className}>
+        <AdminProvider>
+          <ClientAuthGuard tokenKey="admin_token">
+            <div className="flex h-screen overflow-hidden bg-gray-50">
+              <Sidebar />
+              <main className="flex-1 overflow-y-auto p-6">
+                {children}
+              </main>
+            </div>
+          </ClientAuthGuard>
+        </AdminProvider>
       </body>
     </html>
   );

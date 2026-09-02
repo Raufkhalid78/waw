@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { logger } from "@/lib/logger";
 import {
   User,
   Package,
@@ -19,7 +20,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { fetchUserOrders } from "@/lib/api";
+import { fetchUserOrders, fetchUserAddresses, createUserAddress, deleteUserAddress, type UserAddress } from "@/lib/api";
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -63,8 +64,14 @@ export default function AccountPage() {
     "orders" | "addresses" | "payments" | "settings"
   >("orders");
   const [orders, setOrders] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [newAddress, setNewAddress] = useState({
+    full_name: "", phone: "", street_address: "", city: "", province: "Punjab", postal_code: "", is_default: false,
+  });
+  const [addressError, setAddressError] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -78,23 +85,53 @@ export default function AccountPage() {
       }
     }
 
-    async function loadOrders() {
+    async function loadData() {
       try {
-        const data = await fetchUserOrders();
-        setOrders(data);
+        const [ordersData, addrData] = await Promise.all([
+          fetchUserOrders(),
+          fetchUserAddresses(),
+        ]);
+        setOrders(ordersData);
+        setAddresses(addrData);
       } catch (err) {
-        console.error("Failed to load user orders:", err);
+        logger.error("Failed to load account data", "Account", err);
       } finally {
         setLoading(false);
       }
     }
-    loadOrders();
+    loadData();
   }, []);
 
   const totalSpent = orders.reduce(
     (sum, o) => sum + (Number(o.total_pkr) || 0),
     0,
   );
+
+  const handleAddAddress = async () => {
+    setAddressError("");
+    if (!newAddress.full_name || !newAddress.phone || !newAddress.street_address || !newAddress.city) {
+      setAddressError("All fields are required");
+      return;
+    }
+    try {
+      const created = await createUserAddress(newAddress);
+      setAddresses((prev) => [created, ...prev]);
+      setShowAddressForm(false);
+      setNewAddress({ full_name: "", phone: "", street_address: "", city: "", province: "Punjab", postal_code: "", is_default: false });
+    } catch (err: any) {
+      setAddressError(err.message || "Failed to add address");
+    }
+  };
+
+  const handleDeleteAddress = async (id: string) => {
+    if (!confirm("Delete this address?")) return;
+    try {
+      await deleteUserAddress(id);
+      setAddresses((prev) => prev.filter((a) => a.id !== id));
+    } catch (err: any) {
+      logger.error("Failed to delete address", "Account", err);
+    }
+  };
 
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-10 space-y-8">
@@ -164,7 +201,7 @@ export default function AccountPage() {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
+              onClick={() => setActiveTab(tab.key as "orders" | "addresses" | "payments" | "settings")}
               className={`flex items-center gap-2 px-5 py-3 text-xs font-black whitespace-nowrap transition-all border-b-2 -mb-0.5 cursor-pointer ${
                 activeTab === tab.key
                   ? "border-amber-500 text-slate-950"
@@ -309,47 +346,153 @@ export default function AccountPage() {
 
       {/* ── Tab 2: Saved Addresses ───────────────────────────────────────── */}
       {activeTab === "addresses" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          <div className="bg-white border-2 border-amber-400 rounded-3xl p-6 shadow-xs space-y-3 relative">
-            <span className="absolute top-4 right-4 bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md">
-              PRIMARY DEFAULT
-            </span>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-amber-500" />
-              <h3 className="font-black text-sm text-slate-950">
-                Home Residence
-              </h3>
+        <div className="space-y-5">
+          {addresses.length === 0 && !showAddressForm ? (
+            <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-4 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <MapPin className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-950">No Saved Addresses</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Add your delivery addresses for faster checkout on future orders.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddressForm(true)}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Your First Address</span>
+              </button>
             </div>
-            <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              House 42, Street 8, Phase 5, DHA, Lahore, Punjab, 54000
-            </p>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold pt-2 border-t border-slate-100">
-              <Phone className="w-3.5 h-3.5 text-emerald-600" />
-              <span>+92 300 1234567</span>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {addresses.map((addr) => (
+                  <div
+                    key={addr.id}
+                    className={`bg-white rounded-3xl p-6 shadow-xs space-y-3 relative ${
+                      addr.is_default ? "border-2 border-amber-400" : "border border-slate-200"
+                    }`}
+                  >
+                    {addr.is_default && (
+                      <span className="absolute top-4 right-4 bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md">
+                        PRIMARY DEFAULT
+                      </span>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <MapPin className={`w-4 h-4 ${addr.is_default ? "text-amber-500" : "text-slate-400"}`} />
+                      <h3 className="font-black text-sm text-slate-950">{addr.full_name}</h3>
+                    </div>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      {addr.street_address}, {addr.city}, {addr.province}{addr.postal_code ? `, ${addr.postal_code}` : ""}
+                    </p>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{addr.phone}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteAddress(addr.id)}
+                        className="text-[10px] font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
 
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-slate-400" />
-              <h3 className="font-black text-sm text-slate-950">
-                Office / Workplace
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              Level 4, Arfa Software Technology Park, Ferozepur Road, Lahore,
-              54600
-            </p>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold pt-2 border-t border-slate-100">
-              <Phone className="w-3.5 h-3.5 text-emerald-600" />
-              <span>+92 321 9876543</span>
-            </div>
-          </div>
+                <button
+                  onClick={() => setShowAddressForm(true)}
+                  className="border-2 border-dashed border-slate-300 hover:border-amber-400 rounded-3xl p-6 text-center flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-slate-900 transition-all cursor-pointer bg-slate-50/50 min-h-[160px]"
+                >
+                  <Plus className="w-6 h-6 text-amber-500" />
+                  <span className="text-xs font-black">Add New Address</span>
+                </button>
+              </div>
 
-          <button className="border-2 border-dashed border-slate-300 hover:border-amber-400 rounded-3xl p-6 text-center flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-slate-900 transition-all cursor-pointer bg-slate-50/50 min-h-[160px]">
-            <Plus className="w-6 h-6 text-amber-500" />
-            <span className="text-xs font-black">Add New Address</span>
-          </button>
+              {showAddressForm && (
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-5 max-w-xl">
+                  <h3 className="text-base font-black text-slate-950">Add New Address</h3>
+                  {addressError && (
+                    <p className="text-xs font-bold text-rose-600 bg-rose-50 px-3 py-2 rounded-lg">{addressError}</p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <input
+                      type="text"
+                      placeholder="Full Name"
+                      value={newAddress.full_name}
+                      onChange={(e) => setNewAddress((p) => ({ ...p, full_name: e.target.value }))}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Phone (03XXXXXXXXX)"
+                      value={newAddress.phone}
+                      onChange={(e) => setNewAddress((p) => ({ ...p, phone: e.target.value }))}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Street Address"
+                      value={newAddress.street_address}
+                      onChange={(e) => setNewAddress((p) => ({ ...p, street_address: e.target.value }))}
+                      className="sm:col-span-2 px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <input
+                      type="text"
+                      placeholder="City"
+                      value={newAddress.city}
+                      onChange={(e) => setNewAddress((p) => ({ ...p, city: e.target.value }))}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <select
+                      value={newAddress.province}
+                      onChange={(e) => setNewAddress((p) => ({ ...p, province: e.target.value }))}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
+                      <option>Punjab</option>
+                      <option>Sindh</option>
+                      <option>Khyber Pakhtunkhwa</option>
+                      <option>Balochistan</option>
+                      <option>Islamabad</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Postal Code (optional)"
+                      value={newAddress.postal_code}
+                      onChange={(e) => setNewAddress((p) => ({ ...p, postal_code: e.target.value }))}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newAddress.is_default}
+                        onChange={(e) => setNewAddress((p) => ({ ...p, is_default: e.target.checked }))}
+                        className="w-4 h-4 accent-amber-500"
+                      />
+                      <span className="font-bold text-slate-700">Set as default</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleAddAddress}
+                      className="px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all cursor-pointer"
+                    >
+                      Save Address
+                    </button>
+                    <button
+                      onClick={() => { setShowAddressForm(false); setAddressError(""); }}
+                      className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

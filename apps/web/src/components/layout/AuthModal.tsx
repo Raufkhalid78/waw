@@ -51,7 +51,10 @@ export function AuthModal({
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" ");
     }
-    return "Ali Khan";
+    if (raw.startsWith("+") && raw.length > 4) {
+      return `Customer ${raw.slice(-4)}`;
+    }
+    return "Waw Customer";
   };
 
   const handleContinue = (e: React.FormEvent) => {
@@ -108,11 +111,11 @@ export function AuthModal({
       setLoading(false);
       setStep("SUCCESS");
 
-      const userName = provider === "GOOGLE" ? "Rauf Khalid" : "Rauf Khalid";
-      const userEmail =
+      const userName =
         provider === "GOOGLE"
-          ? "rauf.khalid@gmail.com"
-          : "rauf.khalid@icloud.com";
+          ? parseDisplayName(identifier)
+          : `Customer ${identifier.slice(-4)}`;
+      const userEmail = provider === "GOOGLE" ? identifier : "";
 
       login({
         name: userName,

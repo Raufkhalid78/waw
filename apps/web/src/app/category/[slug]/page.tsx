@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { fetchCategoryBySlug, fetchProducts } from "@/lib/api";
+import { logger } from "@/lib/logger";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { useCartStore } from "@/store/useCartStore";
 import { Category } from "@waw/types";
@@ -74,7 +75,7 @@ export default function CategoryPage() {
         if (prodData.facets) setFacets(prodData.facets);
       }
     } catch (err: any) {
-      console.error("Failed to load category data:", err);
+      logger.error("Failed to load category data", "Category", err);
       setError("Unable to load category offers from the database. Please retry.");
     } finally {
       setLoading(false);
@@ -224,7 +225,7 @@ export default function CategoryPage() {
               ].map((m) => (
                 <button
                   key={m.id}
-                  onClick={() => setSelectedSellerType(m.id as any)}
+                  onClick={() => setSelectedSellerType(m.id as "ALL" | "1P" | "3P")}
                   className={`py-1.5 rounded-lg transition-colors cursor-pointer ${
                     selectedSellerType === m.id
                       ? "bg-amber-400 text-slate-950 font-black shadow-xs"
@@ -261,7 +262,7 @@ export default function CategoryPage() {
               </span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as "featured" | "price-asc" | "price-desc" | "rating")}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-400"
               >
                 <option value="featured">{isUrdu ? "نمایاں" : "Featured & Best Selling"}</option>

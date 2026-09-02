@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { redis } from "../../config/redis.js";
+import { logger } from "../../config/logger.js";
 import { AuditService } from "../audit/audit.service.js";
 
 export interface RestockParams {
@@ -22,6 +23,7 @@ export class InventoryService {
   /**
    * Computes the authoritative available stock for a specific offer variant
    * by summing all double-entry movements in the inventory_ledger.
+   * Throws if stock is negative (indicates overselling).
    */
   static async getAvailableStock(offerVariantId: string): Promise<number> {
     const { data, error } = await supabaseAdmin
@@ -30,11 +32,25 @@ export class InventoryService {
       .eq("offer_variant_id", offerVariantId);
 
     if (error) {
-      console.error(`[InventoryService] Error calculating stock for variant ${offerVariantId}:`, error);
+      logger.error(
+        `[InventoryService] Error calculating stock for variant ${offerVariantId}:`,
+        error,
+      );
       return 0;
     }
 
-    const total = (data || []).reduce((sum: number, row: any) => sum + (row.quantity || 0), 0);
+    const total = (data || []).reduce(
+      (sum: number, row: any) => sum + (row.quantity || 0),
+      0,
+    );
+
+    // Log negative stock as a warning (potential overselling)
+    if (total < 0) {
+      logger.warn(
+        `[InventoryService] NEGATIVE STOCK detected for variant ${offerVariantId}: ${total}. This indicates overselling.`,
+      );
+    }
+
     return Math.max(0, total);
   }
 
@@ -56,7 +72,7 @@ export class InventoryService {
       .limit(1);
 
     if (existingReleases && existingReleases.length > 0) {
-      console.log(`ℹ️ [InventoryService] Stock already released for Order ${orderId} (Idempotent Guard)`);
+      logger.info(`ℹ️ [InventoryService] Stock already released for Order ${orderId} (Idempotent Guard)`);
       return true;
     }
 
@@ -68,7 +84,7 @@ export class InventoryService {
       .single();
 
     if (orderErr || !order) {
-      console.warn(`⚠️ [InventoryService] Cannot release stock: Order ${orderId} not found`);
+      logger.warn(`⚠️ [InventoryService] Cannot release stock: Order ${orderId} not found`);
       return false;
     }
 
@@ -91,11 +107,23 @@ export class InventoryService {
 
           // Clean up Redis lock key if present
           try {
-            const redisLockKey = `RESERVED:ORDER:${orderId}:*`;
-            const keys = await redis.keys(redisLockKey);
-            if (keys.length > 0) {
-              await redis.del(...keys);
-            }
+            const lockPattern = `RESERVED:ORDER:${orderId}:*`;
+            // Use SCAN instead of KEYS for production-safe iteration
+            let cursor = "0";
+            do {
+              const result = await redis.scan(
+                cursor,
+                "MATCH",
+                lockPattern,
+                "COUNT",
+                100,
+              );
+              cursor = result[0];
+              const keys = result[1];
+              if (keys.length > 0) {
+                await redis.del(...keys);
+              }
+            } while (cursor !== "0");
           } catch {}
 
           itemsReleasedCount++;
@@ -113,7 +141,7 @@ export class InventoryService {
       reason: `Released ${itemsReleasedCount} item lines back to catalog. Reason: ${reason}`,
     });
 
-    console.log(`🔓 [InventoryService] Successfully released stock reservations for Order ${orderId} (${itemsReleasedCount} item lines)`);
+    logger.info(`🔓 [InventoryService] Successfully released stock reservations for Order ${orderId} (${itemsReleasedCount} item lines)`);
     return true;
   }
 

@@ -552,7 +552,7 @@ export default function SellOnWawPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <a
-              href="http://localhost:3001"
+              href="/seller"
               target="_blank"
               rel="noreferrer"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-full text-xs transition-all shadow-xs"

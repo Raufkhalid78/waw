@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-
+import { logger } from "@/lib/logger";
 import { fetchProducts } from "@/lib/api";
 import { ProductCard } from "@/components/ui/ProductCard";
 import {
@@ -46,7 +46,7 @@ export default function StoreProfilePage() {
           setProducts(matching.length > 0 ? matching : (data.items || []));
         }
       } catch (err) {
-        console.error("Failed to load store:", err);
+        logger.error("Failed to load store", "Store", err);
       } finally {
         setLoading(false);
       }
@@ -88,7 +88,7 @@ export default function StoreProfilePage() {
         {/* Banner Graphic */}
         <div className="h-44 sm:h-56 w-full relative overflow-hidden bg-slate-900">
           <img
-            src={store.bannerImage || store.banner_url || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop&q=80"}
+            src={store.bannerImage || store.banner_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='400' fill='%23f1f5f9'%3E%3Crect width='1200' height='400'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='18' font-family='system-ui'%3EStore Banner%3C/text%3E%3C/svg%3E"}
             alt={store.name}
             className="w-full h-full object-cover opacity-60"
           />
@@ -102,7 +102,7 @@ export default function StoreProfilePage() {
             <div className="flex items-end gap-5">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white shrink-0">
                 <img
-                  src={store.logoImage || store.logo_url || "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=150&auto=format&fit=crop&q=80"}
+                  src={store.logoImage || store.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' fill='%23e2e8f0'%3E%3Crect width='150' height='150' rx='75'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14' font-family='system-ui'%3ESTORE%3C/text%3E%3C/svg%3E"}
                   alt={store.name}
                   className="w-full h-full object-cover"
                 />
@@ -201,7 +201,7 @@ export default function StoreProfilePage() {
                 sellerType={prod.sellerType}
                 storeName={prod.storeName}
                 sellerCity={prod.sellerCity}
-                imageUrl={prod.images[0]}
+                imageUrl={prod.images?.[0] || prod.imageUrl}
               />
             ))}
           </div>

@@ -21,6 +21,7 @@ export interface OrderCalculationResult {
     isFreeDelivery: number;
     amountNeededForFreeDeliveryPkr: number;
     codFeePkr: number;
+    couponDiscountPkr: number;
     totalPkr: number;
     savingsOnlinePaymentPkr: number;
     itemBreakdowns: {
@@ -36,6 +37,6 @@ export interface OrderCalculationResult {
 }
 /**
  * Calculates complete order totals, applying the Free Delivery rule (Subtotal >= 5000 PKR)
- * and the COD Handling Surcharge (+100 PKR).
+ * and the COD Handling Surcharge (+100 PKR). Supports coupon discounts.
  */
-export declare function calculateOrderSummary(items: OrderItemPricingInput[], paymentMethod: PaymentMethod, customShippingFee?: number, customCodFee?: number): OrderCalculationResult;
+export declare function calculateOrderSummary(items: OrderItemPricingInput[], paymentMethod: PaymentMethod, customShippingFee?: number, customCodFee?: number, couponDiscountPkr?: number, freeShipping?: boolean): OrderCalculationResult;

@@ -60,15 +60,15 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     assert.strictEqual(summary.itemBreakdowns[0].sellerPayoutPkr, 1800);
   });
 
-  it("should generate valid EMVCo dynamic Raast QR payload with CRC16 checksum", () => {
-    const qrResult = RaastService.generateDynamicQr({
+  it("should generate valid EMVCo dynamic Raast QR payload with CRC16 checksum", async () => {
+    const qrResult = await RaastService.generateDynamicQr({
       orderId: "ord_123",
       orderNumber: "WAW-PK-99120",
       amountPkr: 4500,
     });
 
     assert.ok(qrResult.qrString.startsWith("000201010212"));
-    assert.ok(qrResult.qrDataUrl.includes("api.qrserver.com"));
+    assert.ok(qrResult.qrDataUrl.includes("data:image/png;base64,"));
     assert.strictEqual(qrResult.amountPkr, 4500);
     assert.strictEqual(qrResult.merchantAlias, "waw.market@hbl");
   });

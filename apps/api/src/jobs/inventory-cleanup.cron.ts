@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase.js";
+import { logger } from "../config/logger.js";
 import { InventoryService } from "../modules/products/inventory.service.js";
 import { AuditService } from "../modules/audit/audit.service.js";
 
@@ -7,7 +8,7 @@ import { AuditService } from "../modules/audit/audit.service.js";
  * automatically releases their double-entry inventory reservations back to the catalog.
  */
 export function startInventoryCleanupCron() {
-  console.log("⏱️ Inventory Reservation Auto-Release Worker Initialized (2-min Interval)");
+  logger.info("⏱️ Inventory Reservation Auto-Release Worker Initialized (2-min Interval)");
 
   // Run every 2 minutes
   setInterval(async () => {
@@ -16,7 +17,7 @@ export function startInventoryCleanupCron() {
 
   // Also run 15s after server startup for immediate cleanup
   setTimeout(async () => {
-    console.log("🔄 Running initial startup inventory reservation timeout check...");
+    logger.info("🔄 Running initial startup inventory reservation timeout check...");
     await runInventoryCleanup();
   }, 15 * 1000);
 }
@@ -33,7 +34,7 @@ export async function runInventoryCleanup() {
       .lt("created_at", fifteenMinutesAgo);
 
     if (error) {
-      console.error("❌ [InventoryCleanup] Error querying expired orders:", error.message);
+      logger.error("❌ [InventoryCleanup] Error querying expired orders:", error.message);
       return;
     }
 
@@ -41,7 +42,7 @@ export async function runInventoryCleanup() {
       return;
     }
 
-    console.log(`🧹 [InventoryCleanup] Found ${expiredOrders.length} expired unpaid checkout reservations. Processing releases...`);
+    logger.info(`🧹 [InventoryCleanup] Found ${expiredOrders.length} expired unpaid checkout reservations. Processing releases...`);
 
     for (const order of expiredOrders) {
       // 1. Release reserved stock back to catalog via double-entry ledger
@@ -79,9 +80,9 @@ export async function runInventoryCleanup() {
         reason: "Unpaid checkout session expired after 15 minutes",
       });
 
-      console.log(`✅ [InventoryCleanup] Auto-cancelled expired Order ${order.order_number || order.id} and restored inventory balance`);
+      logger.info(`✅ [InventoryCleanup] Auto-cancelled expired Order ${order.order_number || order.id} and restored inventory balance`);
     }
   } catch (err: any) {
-    console.error("❌ [InventoryCleanup] Unexpected error in inventory cleanup job:", err.message);
+    logger.error("❌ [InventoryCleanup] Unexpected error in inventory cleanup job:", err.message);
   }
 }

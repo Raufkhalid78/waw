@@ -61,6 +61,55 @@ export class AdminService {
   }
 
   /**
+   * Lists all products (seller_offers) with pagination and search.
+   */
+  static async listAllProducts(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    const page = params?.page || 1;
+    const limit = params?.limit || 20;
+    const offset = (page - 1) * limit;
+
+    let query = supabaseAdmin
+      .from("seller_offers")
+      .select(
+        "id, sku, price_pkr, original_price_pkr, condition, status, is_active, created_at, store_id, catalog_product:catalog_products(id, title, slug, images, is_active), store:stores(name)",
+        { count: "exact" },
+      );
+
+    if (params?.search) {
+      query = query.or(
+        `sku.ilike.%${params.search}%,catalog_product.title.ilike.%${params.search}%`,
+      );
+    }
+
+    query = query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    const { data: offers, error, count } = await query;
+
+    if (error) throw error;
+
+    const products = (offers || []).map((o: any) => ({
+      id: o.id,
+      title: o.catalog_product?.title || "—",
+      slug: o.catalog_product?.slug || "—",
+      price_pkr: o.price_pkr,
+      status: o.status,
+      is_active: o.is_active,
+      store_id: o.store_id,
+      store_name: o.store?.name || "—",
+      images: o.catalog_product?.images || [],
+      created_at: o.created_at,
+    }));
+
+    return { products, total: count || 0 };
+  }
+
+  /**
    * Approves a pending seller offer and makes it live in the public catalog.
    */
   static async approveProduct(offerId: string, adminId?: string) {
@@ -456,6 +505,157 @@ export class AdminService {
     });
 
     return payout;
+  }
+
+  /**
+   * Lists all orders with pagination for admin dashboard.
+   */
+  static async listAllOrders(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) {
+    const page = params?.page || 1;
+    const limit = params?.limit || 20;
+    const offset = (page - 1) * limit;
+
+    let query = supabaseAdmin
+      .from("orders")
+      .select(
+        "*, buyer:profiles!orders_buyer_id_fkey(full_name, phone)",
+        { count: "exact" },
+      );
+
+    if (params?.status) {
+      query = query.eq("global_status", params.status);
+    }
+
+    query = query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    const { data: orders, error, count } = await query;
+    if (error) throw error;
+
+    const formatted = (orders || []).map((o: any) => ({
+      id: o.id,
+      order_number: o.order_number,
+      buyer_id: o.buyer_id,
+      buyer_name: o.buyer?.full_name || "Guest",
+      buyer_phone: o.buyer?.phone || "",
+      shipping_address: o.shipping_address,
+      shipping_city: o.shipping_city,
+      total_amount_pkr: o.total_amount_pkr,
+      payment_method: o.payment_method,
+      payment_status: o.payment_status,
+      global_status: o.global_status,
+      item_count: o.item_count,
+      created_at: o.created_at,
+    }));
+
+    return { orders: formatted, total: count || 0 };
+  }
+
+  /**
+   * Lists all users with pagination for admin dashboard.
+   */
+  static async listAllUsers(params?: {
+    page?: number;
+    limit?: number;
+    role?: string;
+  }) {
+    const page = params?.page || 1;
+    const limit = params?.limit || 20;
+    const offset = (page - 1) * limit;
+
+    let query = supabaseAdmin
+      .from("profiles")
+      .select("*", { count: "exact" });
+
+    if (params?.role) {
+      query = query.eq("role", params.role);
+    }
+
+    query = query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    const { data: users, error, count } = await query;
+    if (error) throw error;
+
+    return { users: users || [], total: count || 0 };
+  }
+
+  /**
+   * Bans a user by setting is_banned on their profile.
+   */
+  static async banUser(userId: string, adminId?: string) {
+    const { data: previousUser } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    const { data: updatedUser, error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        is_banned: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "USER_BANNED",
+      targetResourceType: "profile",
+      targetResourceId: userId,
+      previousState: previousUser,
+      newState: updatedUser,
+      reason: "User banned by admin",
+    });
+
+    return updatedUser;
+  }
+
+  /**
+   * Unbans a user by clearing is_banned on their profile.
+   */
+  static async unbanUser(userId: string, adminId?: string) {
+    const { data: previousUser } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    const { data: updatedUser, error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        is_banned: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await AuditService.logAction({
+      actorId: adminId || "SYSTEM",
+      actorRole: "SUPER_ADMIN",
+      action: "USER_UNBANNED",
+      targetResourceType: "profile",
+      targetResourceId: userId,
+      previousState: previousUser,
+      newState: updatedUser,
+      reason: "User unbanned by admin",
+    });
+
+    return updatedUser;
   }
 
   /**

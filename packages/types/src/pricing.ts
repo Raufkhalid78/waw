@@ -24,6 +24,7 @@ export interface OrderCalculationResult {
   isFreeDelivery: number; // 1 or 0
   amountNeededForFreeDeliveryPkr: number;
   codFeePkr: number;
+  couponDiscountPkr: number;
   totalPkr: number;
   savingsOnlinePaymentPkr: number;
   itemBreakdowns: {
@@ -40,13 +41,15 @@ export interface OrderCalculationResult {
 
 /**
  * Calculates complete order totals, applying the Free Delivery rule (Subtotal >= 5000 PKR)
- * and the COD Handling Surcharge (+100 PKR).
+ * and the COD Handling Surcharge (+100 PKR). Supports coupon discounts.
  */
 export function calculateOrderSummary(
   items: OrderItemPricingInput[],
   paymentMethod: PaymentMethod,
   customShippingFee = MARKETPLACE_CONFIG.DEFAULT_SHIPPING_FEE_PKR,
   customCodFee = MARKETPLACE_CONFIG.DEFAULT_COD_FEE_PKR,
+  couponDiscountPkr = 0,
+  freeShipping = false,
 ): OrderCalculationResult {
   const subtotalPkr = items.reduce(
     (sum, item) => sum + item.unitPricePkr * item.quantity,
@@ -54,7 +57,9 @@ export function calculateOrderSummary(
   );
 
   const isFreeDelivery =
-    subtotalPkr >= MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR ? 1 : 0;
+    subtotalPkr >= MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR || freeShipping
+      ? 1
+      : 0;
   const shippingPkr = isFreeDelivery ? 0 : customShippingFee;
   const amountNeededForFreeDeliveryPkr = Math.max(
     0,
@@ -65,7 +70,9 @@ export function calculateOrderSummary(
   const codFeePkr = isCod ? customCodFee : 0;
   const savingsOnlinePaymentPkr = isCod ? 0 : customCodFee;
 
-  const totalPkr = subtotalPkr + shippingPkr + codFeePkr;
+  // Coupon discount is subtracted from subtotal (before shipping/cod)
+  const effectiveSubtotal = Math.max(0, subtotalPkr - couponDiscountPkr);
+  const totalPkr = effectiveSubtotal + shippingPkr + codFeePkr;
 
   const itemBreakdowns = items.map((item) => {
     const grossAmountPkr = item.unitPricePkr * item.quantity;
@@ -103,6 +110,7 @@ export function calculateOrderSummary(
     isFreeDelivery,
     amountNeededForFreeDeliveryPkr,
     codFeePkr,
+    couponDiscountPkr,
     totalPkr,
     savingsOnlinePaymentPkr,
     itemBreakdowns,

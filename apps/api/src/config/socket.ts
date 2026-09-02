@@ -1,4 +1,5 @@
 import { io } from "../server.js";
+import { logger } from "./logger.js";
 import { OrderStatus } from "../types/index.js";
 
 export class RealtimeLogisticsService {
@@ -17,7 +18,7 @@ export class RealtimeLogisticsService {
       trackingInfo,
       timestamp: new Date().toISOString(),
     });
-    console.log(
+    logger.info(
       `📡 Broadcasted ORDER_STATUS_UPDATED for Order ${orderId} -> ${status}`,
     );
   }

@@ -1,18 +1,83 @@
-import {
-  OrderStatus,
-  PaymentMethod,
-  PaymentStatus,
-  PayoutStatus,
-  SellerType,
-  StoreStatus,
-} from "@waw/types";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://waw-production-8aca.up.railway.app"
-).replace(/\/+$/, "");
+function getAuthToken(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("admin_token") || "";
+}
 
-export interface PlatformStats {
+async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...options?.headers,
+    },
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// ── Type Definitions ───────────────────────────────────────────────────
+
+export interface AdminProduct {
+  id: string;
+  title: string;
+  slug: string;
+  price_pkr: number;
+  status: string;
+  is_active: boolean;
+  store_id: string;
+  store_name?: string;
+  images?: string[];
+  created_at: string;
+}
+
+export interface AdminOrder {
+  id: string;
+  order_number: string;
+  buyer_id: string;
+  buyer_name: string;
+  buyer_phone: string;
+  shipping_address: string;
+  shipping_city: string;
+  total_amount_pkr: number;
+  payment_method: string;
+  payment_status: string;
+  global_status: string;
+  item_count?: number;
+  created_at: string;
+}
+
+export interface AdminUser {
+  id: string;
+  full_name: string;
+  phone: string;
+  email?: string;
+  role: string;
+  is_banned?: boolean;
+  created_at: string;
+}
+
+export interface AdminStore {
+  id: string;
+  name: string;
+  slug: string;
+  owner_id: string;
+  owner_name?: string;
+  status: string;
+  city?: string;
+  commission_rate_percentage?: number;
+  created_at: string;
+}
+
+export interface AdminStats {
   gmvPkr: number;
   totalOrders: number;
   totalSellers: number;
@@ -22,362 +87,114 @@ export interface PlatformStats {
   netPlatformRevenuePkr: number;
 }
 
-export interface AdminSeller {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  logoUrl?: string;
-  sellerType: SellerType;
-  status: StoreStatus;
-  commissionRatePercentage: number;
-  cnicNumber?: string;
-  bankAccountTitle?: string;
-  bankAccountNumber?: string;
-  bankName?: string;
-  city: string;
-  address: string;
-  ratingAverage: number;
-  ratingCount: number;
-  createdAt: string;
-  owner?: {
-    full_name?: string;
-    phone?: string;
-    email?: string;
-  };
+export interface MarketplaceSettings {
+  marketplace_name?: string;
+  default_currency?: string;
+  default_commission_pct?: number;
+  free_delivery_threshold?: number;
+  default_shipping_fee?: number;
+  cod_fee?: number;
+  whatsapp_number?: string;
+  support_email?: string;
 }
 
-export interface AdminOrder {
-  id: string;
-  orderNumber: string;
-  buyerName: string;
-  buyerPhone: string;
-  shippingAddress: string;
-  shippingCity: string;
-  subtotalPkr: number;
-  shippingFeePkr: number;
-  codFeePkr: number;
-  totalPkr: number;
-  paymentMethod: PaymentMethod;
-  paymentStatus: PaymentStatus;
-  orderStatus: OrderStatus;
-  courier?: string;
-  trackingNumber?: string;
-  createdAt: string;
-  items?: {
-    id: string;
-    productTitle: string;
-    productImage?: string;
-    quantity: number;
-    unitPricePkr: number;
-    totalPricePkr: number;
-    wawCommissionPkr: number;
-    sellerPayoutPkr: number;
-    storeId?: string | null;
-  }[];
-}
+// ── API Modules ────────────────────────────────────────────────────────
 
-export interface AdminProduct {
-  id: string;
-  title: string;
-  titleUrdu?: string;
-  slug: string;
-  description?: string;
-  categoryId: string;
-  categoryName?: string;
-  isFirstParty: boolean;
-  basePricePkr: number;
-  compareAtPricePkr?: number;
-  images: string[];
-  stockQuantity: number;
-  soldCount: number;
-  ratingAverage: number;
-  sellerType: SellerType;
-  storeName?: string;
-  createdAt: string;
-}
+// Products
+export const productsApi = {
+  list: (params?: { page?: number; limit?: number; search?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.search) query.set("search", params.search);
+    return adminFetch<{ products: AdminProduct[]; total: number }>(
+      `/api/admin/products?${query}`
+    );
+  },
+  approve: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/products/${id}/approve`, {
+      method: "PATCH",
+    }),
+  reject: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/products/${id}/reject`, {
+      method: "PATCH",
+    }),
+};
 
-export interface AdminPayout {
-  id: string;
-  storeId: string;
-  storeName: string;
-  city: string;
-  bankName?: string;
-  accountTitle?: string;
-  iban?: string;
-  amountPkr: number;
-  status: PayoutStatus;
-  bankReference?: string;
-  scheduledFor: string;
-  settledAt?: string;
-  createdAt: string;
-}
+// Orders
+export const ordersApi = {
+  list: (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.status) query.set("status", params.status);
+    return adminFetch<{ orders: AdminOrder[]; total: number }>(
+      `/api/admin/orders?${query}`
+    );
+  },
+  updateStatus: (id: string, status: string) =>
+    adminFetch<{ success: boolean }>(`/api/orders/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+};
 
-// ── API CLIENT FUNCTIONS ─────────────────────────────────────────────────────
+// Users
+export const usersApi = {
+  list: (params?: { page?: number; limit?: number; role?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.role) query.set("role", params.role);
+    return adminFetch<{ users: AdminUser[]; total: number }>(
+      `/api/admin/users?${query}`
+    );
+  },
+  ban: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/users/${id}/ban`, {
+      method: "POST",
+    }),
+  unban: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/users/${id}/unban`, {
+      method: "POST",
+    }),
+};
 
-function getAdminHeaders(): Record<string, string> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("waw_admin_token")
-      : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
+// Stores
+export const storesApi = {
+  list: (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.status) query.set("status", params.status);
+    return adminFetch<{ stores: AdminStore[]; total: number }>(
+      `/api/admin/sellers?${query}`
+    );
+  },
+  approve: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/kyc/${id}/approve`, {
+      method: "PATCH",
+    }),
+  reject: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/kyc/${id}/reject`, {
+      method: "PATCH",
+    }),
+};
 
-export async function fetchPlatformStats(): Promise<PlatformStats> {
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/stats`, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`Failed to fetch stats: ${res.statusText}`);
-    return await res.json();
-  } catch (err) {
-    throw err;
-  }
-}
+// Settings
+export const settingsApi = {
+  get: () =>
+    adminFetch<{ settings: MarketplaceSettings; metadata: any[] }>(
+      "/api/admin/settings"
+    ),
+  update: (settings: Partial<MarketplaceSettings>) =>
+    adminFetch<{ success: boolean }>("/api/admin/settings", {
+      method: "PATCH",
+      body: JSON.stringify(settings),
+    }),
+};
 
-export async function fetchSellers(
-  status?: StoreStatus,
-): Promise<AdminSeller[]> {
-  try {
-    const url = status
-      ? `${API_BASE}/api/admin/sellers?status=${status}`
-      : `${API_BASE}/api/admin/sellers`;
-    const res = await fetch(url, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to fetch sellers");
-    return await res.json();
-  } catch (err) {
-    throw err;
-  }
-}
-
-export async function updateSellerStatus(
-  storeId: string,
-  status: StoreStatus,
-  commissionRatePercentage?: number,
-): Promise<AdminSeller> {
-  const res = await fetch(`${API_BASE}/api/admin/sellers/${storeId}`, {
-    method: "PATCH",
-    headers: getAdminHeaders(),
-    body: JSON.stringify({ status, commissionRatePercentage }),
-  });
-  if (!res.ok) throw new Error("Failed to update seller status");
-  return await res.json();
-}
-
-export async function fetchOrders(status?: OrderStatus): Promise<AdminOrder[]> {
-  try {
-    const url = status
-      ? `${API_BASE}/api/orders?status=${status}`
-      : `${API_BASE}/api/orders`;
-    const res = await fetch(url, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to fetch orders");
-    return await res.json();
-  } catch (err) {
-    throw err;
-  }
-}
-
-export async function updateOrderStatus(
-  orderId: string,
-  status: OrderStatus,
-  courier = "PostEx",
-  trackingNumber?: string,
-): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/orders/${orderId}/status`, {
-    method: "PATCH",
-    headers: getAdminHeaders(),
-    body: JSON.stringify({ status, courier, trackingNumber }),
-  });
-  if (!res.ok) throw new Error("Failed to update order status");
-  return await res.json();
-}
-
-export async function fetchProducts(query?: {
-  categoryId?: string;
-  storeId?: string;
-}): Promise<AdminProduct[]> {
-  try {
-    const params = new URLSearchParams();
-    if (query?.categoryId) params.append("categoryId", query.categoryId);
-    if (query?.storeId) params.append("storeId", query.storeId);
-    const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to fetch products");
-    const data = await res.json();
-    const rawItems = Array.isArray(data) ? data : data?.items || [];
-    if (!rawItems || rawItems.length === 0) return [];
-    return rawItems.map((p: any) => ({
-      id: p.id,
-      title: p.title || "Untitled Product",
-      titleUrdu: p.title_urdu || p.titleUrdu,
-      slug: p.slug,
-      categoryId: p.category_id || p.categoryId || "general",
-      categoryName: p.category?.name || p.categoryName || "General",
-      isFirstParty: p.is_first_party ?? p.isFirstParty ?? true,
-      basePricePkr: p.price_pkr || p.basePricePkr || 0,
-      compareAtPricePkr: p.compare_at_price_pkr || p.compareAtPricePkr,
-      images: p.images || [],
-      stockQuantity: p.stock_quantity ?? p.stockQuantity ?? 0,
-      soldCount: p.sold_count ?? p.soldCount ?? 0,
-      ratingAverage: p.rating_average ?? p.ratingAverage ?? 5,
-      sellerType: p.is_first_party
-        ? SellerType.FIRST_PARTY
-        : SellerType.THIRD_PARTY,
-      storeName: p.store?.name || p.storeName || "Waw Official Retail",
-      createdAt: p.created_at || p.createdAt || new Date().toISOString(),
-    }));
-  } catch (err) {
-    throw err;
-  }
-}
-
-export async function createProduct(payload: {
-  title: string;
-  titleUrdu?: string;
-  categoryId: string;
-  basePricePkr: number;
-  compareAtPricePkr?: number;
-  stockQuantity: number;
-  sku: string;
-  imageUrl: string;
-  sellerType: SellerType;
-  storeId?: string | null;
-  description: string;
-}): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/products`, {
-    method: "POST",
-    headers: getAdminHeaders(),
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error("Failed to create product in Supabase");
-  return await res.json();
-}
-
-export async function fetchPayouts(): Promise<AdminPayout[]> {
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/payouts`, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to fetch payouts");
-    return await res.json();
-  } catch (err) {
-    throw err;
-  }
-}
-
-export async function settlePayout(
-  payoutId: string,
-  bankReference: string,
-): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/admin/payouts/${payoutId}/settle`, {
-    method: "POST",
-    headers: getAdminHeaders(),
-    body: JSON.stringify({ bankReference }),
-  });
-  if (!res.ok) throw new Error("Failed to settle payout");
-  return await res.json();
-}
-
-export async function fetchPendingProducts(): Promise<AdminProduct[]> {
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/products/pending`, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to fetch pending products");
-    return await res.json();
-  } catch (err) {
-    throw err;
-  }
-}
-
-export async function approveProduct(productId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/admin/products/${productId}/approve`, {
-    method: "PATCH",
-    headers: getAdminHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to approve product");
-  return await res.json();
-}
-
-export async function rejectProduct(productId: string, reason: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/admin/products/${productId}/reject`, {
-    method: "PATCH",
-    headers: getAdminHeaders(),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error("Failed to reject product");
-  return await res.json();
-}
-
-export async function fetchPendingReviews(): Promise<any[]> {
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/reviews/pending`, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to fetch pending reviews");
-    return await res.json();
-  } catch (err) {
-    throw err;
-  }
-}
-
-export async function approveReview(reviewId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/admin/reviews/${reviewId}/approve`, {
-    method: "PATCH",
-    headers: getAdminHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to approve review");
-  return await res.json();
-}
-
-export async function rejectReview(reviewId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/admin/reviews/${reviewId}/reject`, {
-    method: "PATCH",
-    headers: getAdminHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to reject review");
-  return await res.json();
-}
-
-export async function fetchDisputes(): Promise<any[]> {
-  try {
-    const res = await fetch(`${API_BASE}/api/admin/disputes`, {
-      headers: getAdminHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to fetch disputes");
-    return await res.json();
-  } catch (err) {
-    throw err;
-  }
-}
-
-export async function resolveDispute(
-  disputeId: string,
-  resolution: string,
-  refundAmountPkr?: number,
-): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/admin/disputes/${disputeId}/resolve`, {
-    method: "PATCH",
-    headers: getAdminHeaders(),
-    body: JSON.stringify({ resolution, refundAmountPkr }),
-  });
-  if (!res.ok) throw new Error("Failed to resolve dispute");
-  return await res.json();
-}
+// Stats
+export const statsApi = {
+  get: () => adminFetch<AdminStats>("/api/admin/stats"),
+};

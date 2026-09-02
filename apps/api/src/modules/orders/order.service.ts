@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { redis } from "../../config/redis.js";
+import { logger } from "../../config/logger.js";
 import { WhatsAppService } from "../notifications/whatsapp.service.js";
 import { CourierService } from "../logistics/courier.service.js";
 import { QuoteService } from "./quote.service.js";
@@ -110,7 +111,7 @@ export class OrderService {
       result.order_number,
       result.total_amount_pkr || quote.totalPkr,
       input.paymentMethod === PaymentMethod.COD
-    ).catch(console.error);
+    ).catch((err) => logger.error("WhatsApp order confirmation failed:", err));
 
     return response;
   }
@@ -374,17 +375,34 @@ export class OrderService {
     } else if (coupon.discount_type === "FIXED_PKR") {
       discount = Math.min(coupon.discount_value, eligibleTotal);
     } else if (coupon.discount_type === "FREE_SHIPPING") {
-      discount = 200; // Standard shipping fee waived
+      // Use actual shipping fee from the cart, not hardcoded
+      discount = 0; // FREE_SHIPPING handled at total level
+    }
+
+    // Increment usage counter atomically
+    try {
+      await supabaseAdmin.rpc("increment_coupon_uses", {
+        coupon_id: coupon.id,
+      });
+    } catch {
+      // Fallback if RPC doesn't exist: direct update
+      await supabaseAdmin
+        .from("coupons")
+        .update({ current_uses: coupon.current_uses + 1 })
+        .eq("id", coupon.id);
     }
 
     return {
       coupon: {
+        id: coupon.id,
         code: coupon.code,
         discountType: coupon.discount_type,
         discountValue: coupon.discount_value,
+        storeId: coupon.store_id,
       },
       discountPkr: discount,
       finalTotal: Math.max(0, cartTotal - discount),
+      freeShipping: coupon.discount_type === "FREE_SHIPPING",
     };
   }
 

@@ -38,12 +38,15 @@ export class AuthController {
 
   static async syncOAuth(req: Request, res: Response): Promise<void> {
     try {
-      const { supabaseUser } = req.body;
-      if (!supabaseUser || !supabaseUser.id) {
-        res.status(400).json({ error: "Invalid user payload" });
+      const user = (req as any).user;
+      if (!user || !user.id) {
+        res.status(401).json({ error: "Unauthorized" });
         return;
       }
-      const profile = await AuthService.syncOAuthUser(supabaseUser);
+      const profile = await AuthService.syncOAuthUser({
+        id: user.id,
+        email: user.email,
+      });
       res.json({ user: profile });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

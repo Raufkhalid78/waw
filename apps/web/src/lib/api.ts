@@ -1,5 +1,6 @@
 import { ProductDetail } from "@/types/models";
 import { StoreDetail } from "@/types/models";
+import { logger } from "./logger";
 import {
   Category,
   CheckoutQuoteRequest,
@@ -12,8 +13,8 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
 ).replace(/\/+$/, "");
 
-if (typeof window !== "undefined") {
-  console.log(`[WAW] Client API Origin: ${API_BASE_URL}`);
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  logger.debug(`Client API Origin: ${API_BASE_URL}`, "API");
 }
 
 function mapApiProductToDetail(p: any): ProductDetail {
@@ -292,6 +293,32 @@ export async function fetchProductById(
   return undefined;
 }
 
+export interface StoreSummary {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logo_url?: string;
+  banner_url?: string;
+  seller_type?: string;
+  city?: string;
+  address?: string;
+  rating_average?: number;
+  rating_count?: number;
+  is_verified?: boolean;
+  productCount?: number;
+  topProducts?: { title: string; pricePkr: number; imageUrl: string }[];
+}
+
+export async function fetchStores(): Promise<StoreSummary[]> {
+  const res = await safeFetch<StoreSummary[]>(
+    `${API_BASE_URL}/api/stores`,
+    { cache: "no-store", timeoutMs: 6000 }
+  );
+  if (res.ok && Array.isArray(res.data)) return res.data;
+  return [];
+}
+
 export async function fetchStoreBySlug(
   slug: string,
 ): Promise<StoreDetail | undefined> {
@@ -381,15 +408,21 @@ export async function fetchOrderById(orderId: string): Promise<any> {
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
-    headers,
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Order not found");
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      let errMsg = "Order not found";
+      try { const err = await res.json(); if (err?.error) errMsg = err.error; } catch {}
+      throw new ApiError(errMsg, { status: res.status });
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(err.message || "Network error fetching order", { isNetwork: true });
   }
-  return await res.json();
 }
 
 export async function fetchUserOrders(): Promise<any[]> {
@@ -413,8 +446,87 @@ export async function fetchUserOrders(): Promise<any[]> {
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   } catch (err) {
-    console.error("Failed to fetch user orders:", err);
+    logger.error("Failed to fetch user orders", "API", err);
     return [];
+  }
+}
+
+export interface UserAddress {
+  id: string;
+  full_name: string;
+  phone: string;
+  street_address: string;
+  city: string;
+  province: string;
+  postal_code?: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+export async function fetchUserAddresses(): Promise<UserAddress[]> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("waw_auth_token")
+      : null;
+  if (!token) return [];
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/user/addresses`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function createUserAddress(addr: {
+  full_name: string;
+  phone: string;
+  street_address: string;
+  city: string;
+  province: string;
+  postal_code?: string;
+  is_default?: boolean;
+}): Promise<UserAddress> {
+  const token = localStorage.getItem("waw_auth_token");
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/user/addresses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(addr),
+    });
+    if (!res.ok) {
+      let errMsg = "Failed to add address";
+      try { const err = await res.json(); if (err?.error) errMsg = err.error; } catch {}
+      throw new Error(errMsg);
+    }
+    return res.json();
+  } catch (err: any) {
+    if (err.message === "Failed to add address") throw err;
+    throw new ApiError(err.message || "Network error adding address", { isNetwork: true });
+  }
+}
+
+export async function deleteUserAddress(id: string): Promise<void> {
+  const token = localStorage.getItem("waw_auth_token");
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/user/addresses/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      let errMsg = "Failed to delete address";
+      try { const err = await res.json(); if (err?.error) errMsg = err.error; } catch {}
+      throw new Error(errMsg);
+    }
+  } catch (err: any) {
+    if (err.message === "Failed to delete address") throw err;
+    throw new ApiError(err.message || "Network error deleting address", { isNetwork: true });
   }
 }
 
@@ -437,16 +549,22 @@ export async function submitOrderReturn(
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/return`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(returnInput),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to submit return request");
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/return`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(returnInput),
+    });
+    if (!res.ok) {
+      let errMsg = "Failed to submit return request";
+      try { const err = await res.json(); if (err?.error) errMsg = err.error; } catch {}
+      throw new Error(errMsg);
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === "Failed to submit return request") throw err;
+    throw new ApiError(err.message || "Network error submitting return", { isNetwork: true });
   }
-  return await res.json();
 }
 
 export async function initiatePaymentApi(paymentInput: {
@@ -469,15 +587,21 @@ export async function initiatePaymentApi(paymentInput: {
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}/api/payments/xpay/initiate`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(paymentInput),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to initiate payment gateway session");
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/payments/xpay/initiate`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(paymentInput),
+    });
+    if (!res.ok) {
+      let errMsg = "Failed to initiate payment gateway session";
+      try { const err = await res.json(); if (err?.error) errMsg = err.error; } catch {}
+      throw new Error(errMsg);
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === "Failed to initiate payment gateway session") throw err;
+    throw new ApiError(err.message || "Network error initiating payment", { isNetwork: true });
   }
-  return await res.json();
 }
 

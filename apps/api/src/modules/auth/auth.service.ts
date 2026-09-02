@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { redis } from "../../config/redis.js";
 import { WhatsAppService } from "../notifications/whatsapp.service.js";
@@ -15,7 +16,7 @@ export class AuthService {
     const formattedPhone = phone.startsWith("+")
       ? phone
       : `+92${phone.replace(/^0+/, "")}`;
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 999999).toString();
 
     // Cache in Redis for 5 minutes (300 seconds)
     await redis.set(`otp:${formattedPhone}`, otp, "EX", 300);
@@ -109,7 +110,7 @@ export class AuthService {
         await supabaseAdmin.from("stores").insert({
           id: `store_${Date.now()}`,
           owner_id: profile.id,
-          store_name: storeName,
+          name: storeName,
           city: city || "Unknown",
           status: "PENDING_KYC",
           seller_type: "THIRD_PARTY",
@@ -143,7 +144,7 @@ export class AuthService {
         phone: profile.phone,
         role: profile.role || UserRole.BUYER,
       },
-      ENV.JWT_SECRET || "waw_dev_jwt_secret_key_2026",
+      ENV.JWT_SECRET,
       { expiresIn: "30d" },
     );
 
@@ -156,7 +157,6 @@ export class AuthService {
   static async syncOAuthUser(supabaseUser: {
     id: string;
     email?: string;
-    user_metadata?: any;
   }): Promise<any> {
     const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
@@ -170,10 +170,8 @@ export class AuthService {
         .insert({
           id: supabaseUser.id,
           email: supabaseUser.email,
-          full_name: supabaseUser.user_metadata?.full_name || "Waw Customer",
-          avatar_url: supabaseUser.user_metadata?.avatar_url,
+          full_name: "Waw Customer",
           phone:
-            supabaseUser.user_metadata?.phone ||
             `oauth_${supabaseUser.id.substring(0, 8)}`,
           role: UserRole.BUYER,
           is_whatsapp_verified: false,

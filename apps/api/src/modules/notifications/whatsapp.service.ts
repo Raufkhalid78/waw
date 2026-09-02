@@ -1,5 +1,6 @@
 import axios from "axios";
 import { ENV } from "../../config/env.js";
+import { logger } from "../../config/logger.js";
 
 export interface WhatsAppMessagePayload {
   toPhone: string; // e.g. "+923001234567"
@@ -8,13 +9,62 @@ export interface WhatsAppMessagePayload {
 }
 
 export class WhatsAppService {
+  private static readonly META_API_VERSION = "v21.0";
+  private static readonly META_BASE_URL = "https://graph.facebook.com";
+
+  /**
+   * Sends a WhatsApp message using Meta Cloud API.
+   * Falls back to console logging in development.
+   */
+  private static async sendMetaMessage(
+    phone: string,
+    messageBody: string,
+  ): Promise<boolean> {
+    if (!ENV.META_WHATSAPP_TOKEN || !ENV.META_WHATSAPP_PHONE_NUMBER_ID) {
+      logger.info(`📱 [WhatsApp DEV] To ${phone}: ${messageBody}`);
+      return true;
+    }
+
+    try {
+      const url = `${this.META_BASE_URL}/${this.META_API_VERSION}/${ENV.META_WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+      await axios.post(
+        url,
+        {
+          messaging_product: "whatsapp",
+          to: phone.replace("+", ""),
+          type: "text",
+          text: { body: messageBody },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${ENV.META_WHATSAPP_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 10000,
+        },
+      );
+
+      return true;
+    } catch (err: any) {
+      logger.warn(
+        "WhatsApp Meta API error:",
+        err.response?.data || err.message,
+      );
+      // Still log for dev visibility
+      logger.info(`📱 [WhatsApp FALLBACK] To ${phone}: ${messageBody}`);
+      return false;
+    }
+  }
+
   /**
    * Sends a 6-digit OTP code to the user's WhatsApp number.
+   * Uses Twilio Verify if configured, otherwise falls back to Meta Cloud API.
    */
   static async sendOtp(phone: string, otpCode: string): Promise<boolean> {
-    console.log(`📱 [WhatsApp Service] Sending OTP ${otpCode} to ${phone}`);
+    logger.info(`📱 [WhatsApp Service] Sending OTP ${otpCode} to ${phone}`);
 
-    // If Twilio Verify is configured
+    // If Twilio Verify is configured, use it
     if (ENV.TWILIO_ACCOUNT_SID && ENV.TWILIO_VERIFY_SERVICE_SID) {
       try {
         const url = `https://verify.twilio.com/v2/Services/${ENV.TWILIO_VERIFY_SERVICE_SID}/Verifications`;
@@ -38,20 +88,20 @@ export class WhatsAppService {
         );
         return true;
       } catch (err: any) {
-        console.warn(
-          "⚠️ Twilio WhatsApp Verify failed, falling back to mock logger:",
+        logger.warn(
+          "Twilio WhatsApp Verify failed, falling back to Meta API:",
           err.response?.data || err.message,
         );
       }
     }
 
-    // Default development fallback: Log OTP to console for instant testing
-    console.log(`🔑 DEV MODE: WhatsApp OTP for ${phone} is: [ ${otpCode} ]`);
-    return true;
+    // Fallback: Send OTP via Meta WhatsApp Cloud API
+    const message = `Your Waw verification code is: *${otpCode}*\n\nThis code expires in 5 minutes. Do not share it with anyone.`;
+    return this.sendMetaMessage(phone, message);
   }
 
   /**
-   * Sends an order confirmation message with WhatsApp receipt.
+   * Sends an order confirmation message with payment details.
    */
   static async sendOrderConfirmed(
     phone: string,
@@ -60,8 +110,20 @@ export class WhatsAppService {
     isCod: boolean,
   ): Promise<void> {
     const paymentText = isCod ? "Cash on Delivery (COD)" : "Prepaid Online";
-    const message = `✨ *Waw (واو) Order Confirmed!*\n\nOrder Number: *${orderNumber}*\nTotal Amount: *PKR ${totalPkr.toLocaleString()}*\nPayment: *${paymentText}*\n\nTrack your order anytime at: https://waw.com.pk/orders/${orderNumber}\n\nThank you for shopping on Waw!`;
-    console.log(`📱 [WhatsApp Notification to ${phone}]:\n${message}`);
+    const message = [
+      `✨ *Waw (واو) Order Confirmed!*`,
+      ``,
+      `Order Number: *${orderNumber}*`,
+      `Total Amount: *PKR ${totalPkr.toLocaleString()}*`,
+      `Payment: *${paymentText}*`,
+      ``,
+      `Track your order anytime at:`,
+      `https://waw.com.pk/orders/${orderNumber}`,
+      ``,
+      `Thank you for shopping on Waw! 🛍️`,
+    ].join("\n");
+
+    await this.sendMetaMessage(phone, message);
   }
 
   /**
@@ -74,7 +136,46 @@ export class WhatsAppService {
     trackingNumber: string,
     trackingUrl: string,
   ): Promise<void> {
-    const message = `🚚 *Waw (واو) Shipment Dispatched!*\n\nYour order *${orderNumber}* is on its way via *${courierName}*.\nTracking Number: *${trackingNumber}*\n\nLive Tracking Link: ${trackingUrl}`;
-    console.log(`📱 [WhatsApp Notification to ${phone}]:\n${message}`);
+    const message = [
+      `🚚 *Waw (واو) Shipment Dispatched!*`,
+      ``,
+      `Your order *${orderNumber}* is on its way via *${courierName}*.`,
+      ``,
+      `Tracking Number: *${trackingNumber}*`,
+      `Live Tracking: ${trackingUrl}`,
+      ``,
+      `Estimated delivery: 2-5 business days`,
+    ].join("\n");
+
+    await this.sendMetaMessage(phone, message);
+  }
+
+  /**
+   * Sends a delivery confirmation message.
+   */
+  static async sendOrderDelivered(
+    phone: string,
+    orderNumber: string,
+    totalPkr: number,
+    isCod: boolean,
+  ): Promise<void> {
+    const paymentNote = isCod
+      ? `\nPayment of *PKR ${totalPkr.toLocaleString()}* was collected as Cash on Delivery.`
+      : "";
+
+    const message = [
+      `🎉 *Waw (واو) Order Delivered!*`,
+      ``,
+      `Your order *${orderNumber}* has been delivered successfully.`,
+      paymentNote,
+      ``,
+      `We hope you love your purchase!`,
+      `Leave a review to help other shoppers:`,
+      `https://waw.com.pk/orders/${orderNumber}/review`,
+      ``,
+      `Need help? Reply to this message or visit waw.com.pk/support`,
+    ].join("\n");
+
+    await this.sendMetaMessage(phone, message);
   }
 }

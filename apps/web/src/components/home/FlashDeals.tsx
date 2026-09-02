@@ -29,12 +29,11 @@ export function FlashDeals() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProducts().then(data => {
-      if (Array.isArray(data)) {
-        setFlashProducts(data.filter(p => p.discountPercent && p.discountPercent > 10).slice(0, 4));
-      }
+    fetchProducts({ limit: 20 }).then(({ items }) => {
+      const discounted = items.filter(p => p.discountPercent && p.discountPercent > 10);
+      setFlashProducts(discounted.slice(0, 4));
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -116,9 +115,12 @@ export function FlashDeals() {
         {/* 4 Lightning Product Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {flashProducts.map((prod) => {
-            const savings = prod.originalPricePkr - prod.pricePkr;
-            const isAdded = addedId === prod.id;
+            const savings = (prod.originalPricePkr ?? 0) - prod.pricePkr;
+            const isAdded = addedId === prod.productId;
             const wishlisted = isInWishlist(prod.productId);
+            const claimedPercent = prod.stockCount > 0
+              ? Math.min(95, Math.round((prod.soldCount / (prod.stockCount + prod.soldCount)) * 100))
+              : 50;
 
             return (
               <div
@@ -188,14 +190,14 @@ export function FlashDeals() {
                   <div className="mt-2 space-y-1">
                     <div className="flex items-center justify-between text-[10px] font-black">
                       <span className="text-rose-600">
-                        {prod.claimedPercent}% CLAIMED
+                        {claimedPercent}% CLAIMED
                       </span>
                       <span className="text-slate-400">Limited Stock</span>
                     </div>
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-amber-400 to-rose-600 rounded-full transition-all duration-700"
-                        style={{ width: `${prod.claimedPercent}%` }}
+                        style={{ width: `${claimedPercent}%` }}
                       />
                     </div>
                   </div>
@@ -209,7 +211,7 @@ export function FlashDeals() {
                         PKR {prod.pricePkr.toLocaleString()}
                       </div>
                       <div className="text-[11px] text-slate-400 line-through mt-0.5 font-medium">
-                        PKR {prod.originalPricePkr.toLocaleString()}
+                        PKR {(prod.originalPricePkr ?? 0).toLocaleString()}
                       </div>
                     </div>
 

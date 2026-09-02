@@ -60,10 +60,12 @@ function SearchContent() {
         selectedCategory !== "All Categories" ? selectedCategory : undefined,
     }).then((data) => {
       if (active) {
-        setProducts(data.items || []);
-        if (data.facets) setFacets(data.facets);
+        setProducts(data?.items || []);
+        if (data?.facets) setFacets(data.facets);
         setLoading(false);
       }
+    }).catch(() => {
+      if (active) setLoading(false);
     });
     return () => {
       active = false;
@@ -77,10 +79,10 @@ function SearchContent() {
         // Query filter
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
-          const matchesTitle = prod.title.toLowerCase().includes(q);
-          const matchesCat = prod.category.toLowerCase().includes(q);
-          const matchesStore = prod.storeName.toLowerCase().includes(q);
-          const matchesDesc = prod.description.toLowerCase().includes(q);
+          const matchesTitle = prod.title?.toLowerCase().includes(q);
+          const matchesCat = prod.category?.toLowerCase().includes(q);
+          const matchesStore = prod.storeName?.toLowerCase().includes(q);
+          const matchesDesc = prod.description?.toLowerCase().includes(q);
           if (!matchesTitle && !matchesCat && !matchesStore && !matchesDesc)
             return false;
         }
@@ -97,7 +99,7 @@ function SearchContent() {
         // City filter
         if (
           selectedCity !== "All Cities" &&
-          prod.sellerCity.toLowerCase() !== selectedCity.toLowerCase()
+          (prod.sellerCity || "").toLowerCase() !== selectedCity.toLowerCase()
         ) {
           return false;
         }
@@ -209,7 +211,7 @@ function SearchContent() {
               </span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as "featured" | "price_asc" | "price_desc" | "rating" | "popular")}
                 className="bg-slate-50 border border-slate-200 text-slate-900 font-bold px-3 py-2.5 rounded-2xl outline-none cursor-pointer text-xs focus:ring-2 focus:ring-amber-400"
               >
                 <option value="featured">Featured / Best Match</option>
@@ -382,7 +384,7 @@ function SearchContent() {
                 ].map((type) => (
                   <button
                     key={type.key}
-                    onClick={() => setSelectedSellerType(type.key as any)}
+                    onClick={() => setSelectedSellerType(type.key as "ALL" | "1P" | "3P")}
                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                       selectedSellerType === type.key
                         ? "bg-amber-400 text-slate-950 font-black shadow-xs"
@@ -467,7 +469,7 @@ function SearchContent() {
                   sellerType={prod.sellerType}
                   storeName={prod.storeName}
                   sellerCity={prod.sellerCity}
-                  imageUrl={prod.images[0]}
+                  imageUrl={prod.images?.[0] || prod.imageUrl || ""}
                 />
               ))}
             </div>

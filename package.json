@@ -11,6 +11,8 @@
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "test": "turbo run test",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "clean": "turbo run clean && rm -rf node_modules",

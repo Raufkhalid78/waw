@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../config/supabase.js";
+import { logger } from "../../config/logger.js";
 import { Category } from "../../types/index.js";
 
 export class CategoryService {
@@ -20,7 +21,7 @@ export class CategoryService {
         categoriesRaw = data;
       }
     } catch (e) {
-      console.warn("Failed to query categories table:", e);
+      logger.warn("Failed to query categories table:", e);
     }
 
     if (categoriesRaw.length === 0) {

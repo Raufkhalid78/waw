@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../config/supabase.js";
+import { logger } from "../../config/logger.js";
 
 export interface CreateAuditLogPayload {
   actorId?: string | null;
@@ -32,10 +33,10 @@ export class AuditService {
       });
 
       if (error) {
-        console.error("[AuditService] Failed to insert audit log:", error);
+        logger.error("[AuditService] Failed to insert audit log:", error);
       }
     } catch (err) {
-      console.error("[AuditService] Unexpected error inserting audit log:", err);
+      logger.error("[AuditService] Unexpected error inserting audit log:", err);
     }
   }
 }

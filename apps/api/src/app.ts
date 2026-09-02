@@ -7,7 +7,7 @@ import { UserRole, PaymentMethod } from "./types/index.js";
 import { supabaseAdmin } from "./config/supabase.js";
 import { redis } from "./config/redis.js";
 import { typesenseClient } from "./config/typesense.js";
-import { requestTracer } from "./config/logger.js";
+import { requestTracer, logger } from "./config/logger.js";
 
 // Middlewares
 import { requireAuth } from "./middleware/auth.middleware.js";
@@ -18,6 +18,7 @@ import {
   apiRateLimiter,
 } from "./middleware/rate-limit.middleware.js";
 import { validateBody } from "./middleware/validate.middleware.js";
+import { apiVersioning } from "./middleware/api-versioning.middleware.js";
 
 // Schemas
 import {
@@ -40,7 +41,26 @@ import { AdminController } from "./modules/admin/admin.controller.js";
 export const app = express();
 
 app.use(requestTracer);
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://www.googletagmanager.com", "https://www.google-analytics.com"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "data:"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      mediaSrc: ["'self'", "https:"],
+      connectSrc: ["'self'", "https://*.supabase.co", "wss://*.supabase.co", "https://api.postex.com.pk", "https://typesense.waw.com.pk"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 const TRUSTED_ORIGINS = [
   "https://www.waw.com.pk",
   "https://waw.com.pk",
@@ -57,10 +77,11 @@ const dynamicOrigins = process.env.CORS_ORIGIN
 
 const allowedOriginSet = new Set([...TRUSTED_ORIGINS, ...dynamicOrigins]);
 
+const WEBHOOK_PATHS = ["/api/logistics/postex/webhook", "/api/payments/xpay/webhook", "/api/payments/raast/webhook"];
+
 const isAllowedOrigin = (origin?: string): boolean => {
-  if (!origin) return true; // Allow non-browser, server-to-server, curl, Postman requests
+  if (!origin) return true; // Allow server-to-server (webhooks, health checks)
   if (allowedOriginSet.has(origin)) return true;
-  // Allow official WAW subdomains only
   if (/^https:\/\/(www|admin|seller|api)\.waw\.com\.pk$/.test(origin)) return true;
   return false;
 };
@@ -95,8 +116,9 @@ app.use(
     },
   }),
 );
-app.use(morgan("dev"));
+app.use(morgan(ENV.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(apiRateLimiter);
+app.use(apiVersioning);
 
 // â”€â”€ Health & Diagnostics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/health", (req, res) => {
@@ -182,7 +204,7 @@ app.post(
   AuthController.verifyOtp,
 );
 
-app.post("/api/auth/oauth/sync", AuthController.syncOAuth);
+app.post("/api/auth/oauth/sync", requireAuth, AuthController.syncOAuth);
 
 // ── Storefront Config (Dynamic UI Metadata) ───────────────
 import { ConfigController } from "./modules/config/config.controller.js";
@@ -212,6 +234,54 @@ app.get("/api/products", ProductController.list);
 app.get("/api/products/:slug", ProductController.getBySlug);
 
 // ── Store Routes ───────────────────────────────────────────────────────────
+app.get("/api/stores", async (req, res) => {
+  try {
+    const { supabaseAdmin } = await import("./config/supabase.js");
+    const { data: stores, error } = await supabaseAdmin
+      .from("stores")
+      .select("id, name, slug, description, logo_url, banner_url, seller_type, status, city, address, rating_average, rating_count, is_verified, created_at")
+      .eq("status", "ACTIVE")
+      .order("rating_count", { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    const storeIds = (stores || []).map((s: any) => s.id);
+    if (storeIds.length === 0) return res.json([]);
+
+    const { data: offers } = await supabaseAdmin
+      .from("seller_offers")
+      .select("store_id, id, price_pkr, catalog_product:catalog_products(title, slug, images, is_active)")
+      .in("store_id", storeIds)
+      .eq("status", "ACTIVE")
+      .eq("is_active", true);
+
+    const storeOfferMap: Record<string, any[]> = {};
+    for (const offer of offers || []) {
+      if (!storeOfferMap[offer.store_id]) storeOfferMap[offer.store_id] = [];
+      storeOfferMap[offer.store_id].push(offer);
+    }
+
+    const result = (stores || []).map((store: any) => {
+      const storeOffers = storeOfferMap[store.id] || [];
+      const topProducts = storeOffers.slice(0, 3).map((o: any) => ({
+        title: o.catalog_product?.title || "Product",
+        pricePkr: o.price_pkr,
+        imageUrl: o.catalog_product?.images?.[0] || "",
+      }));
+      return {
+        ...store,
+        productCount: storeOffers.length,
+        topProducts,
+      };
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/stores/:slug", async (req, res) => {
   try {
     const { supabaseAdmin } = await import("./config/supabase.js");
@@ -263,7 +333,7 @@ app.post("/api/checkout/quote", async (req, res) => {
 });
 
 // â”€â”€ Order Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.post("/api/orders", requireAuth, async (req, res) => {
+app.post("/api/orders", requireAuth, validateBody(CreateOrderSchema), async (req, res) => {
   try {
     const user = (req as any).user;
     const result = await OrderService.createOrder(req.body, user);
@@ -337,6 +407,10 @@ app.get("/api/orders/:id/return", requireAuth, async (req, res) => {
 app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, UserRole.SELLER), async (req, res) => {
   try {
     const { status, courier, trackingNumber } = req.body;
+    const validStatuses = ["PENDING","CONFIRMED","PROCESSING","SHIPPED","OUT_FOR_DELIVERY","DELIVERED","CANCELLED","RETURN_REQUESTED","RETURNED"];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+    }
     const { supabaseAdmin } = await import("./config/supabase.js");
     const { AuditService } = await import("./modules/audit/audit.service.js");
     const user = (req as any).user;
@@ -427,6 +501,73 @@ app.post("/api/orders/:id/cancel", requireAuth, async (req, res) => {
       user,
     );
     res.json(order);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── User Addresses ─────────────────────────────────────────────────────────
+app.get("/api/user/addresses", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { data, error } = await supabaseAdmin
+      .from("addresses")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/user/addresses", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { full_name, phone, street_address, city, province, postal_code, is_default } = req.body;
+    if (!full_name || !phone || !street_address || !city || !province) {
+      res.status(400).json({ error: "full_name, phone, street_address, city, and province are required" });
+      return;
+    }
+    if (is_default) {
+      await supabaseAdmin
+        .from("addresses")
+        .update({ is_default: false })
+        .eq("user_id", user.id);
+    }
+    const { data, error } = await supabaseAdmin
+      .from("addresses")
+      .insert({
+        user_id: user.id,
+        full_name,
+        phone,
+        street_address,
+        city,
+        province,
+        postal_code: postal_code || null,
+        is_default: Boolean(is_default),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/user/addresses/:id", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { error } = await supabaseAdmin
+      .from("addresses")
+      .delete()
+      .eq("id", req.params.id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -1040,8 +1181,23 @@ app.post("/api/support/tickets/:id/messages", requireAuth, async (req, res) => {
 });
 
 // ── Logistics Webhook (PostEx Live Milestone Updates) ─────────────────────────
-app.post("/api/logistics/postex/webhook", async (req, res) => {
+app.post("/api/logistics/postex/webhook", async (req: any, res) => {
   try {
+    const signature =
+      req.headers["x-postex-signature"] ||
+      req.headers["x-postex-hmac-sha256"] as string | undefined;
+    const rawBody = req.rawBody || JSON.stringify(req.body);
+
+    const { CourierService } = await import("./modules/logistics/courier.service.js");
+    const isValid = CourierService.verifyPostExWebhookSignature(
+      rawBody,
+      signature,
+    );
+    if (!isValid) {
+      res.status(401).json({ error: "Invalid PostEx webhook signature" });
+      return;
+    }
+
     const result = await CourierService.handlePostExWebhook(req.body);
     res.json(result);
   } catch (err: any) {
@@ -1057,6 +1213,195 @@ app.post(
 );
 app.post("/api/payments/xpay/webhook", PaymentController.xpayWebhook);
 
+// ── Raast P2M QR Routes ────────────────────────────────────────────────
+app.post(
+  "/api/payments/raast/qr",
+  requireAuth,
+  async (req: any, res) => {
+    try {
+      const { RaastService } = await import(
+        "./modules/payments/raast.service.js"
+      );
+      const { orderId } = req.body;
+
+      if (!orderId) {
+        return res.status(400).json({ error: "orderId is required" });
+      }
+
+      // Verify order ownership
+      const { supabaseAdmin } = await import("./config/supabase.js");
+      const { data: order, error } = await supabaseAdmin
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (error || !order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      if (order.buyer_id !== (req as any).user.id && (req as any).user.role !== "ADMIN") {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const result = await RaastService.generateDynamicQr({
+        orderId: order.id,
+        orderNumber: order.order_number,
+        amountPkr: order.total_amount_pkr || 0,
+      });
+
+      // Record payment intent
+      await supabaseAdmin.from("payments").insert({
+        id: `pay_raast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        order_id: order.id,
+        payment_method: "RAAST",
+        status: "PENDING",
+        gateway_reference: result.referenceId,
+        amount_pkr: order.total_amount_pkr || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      logger.error("Raast QR generation error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.post("/api/payments/raast/webhook", async (req: any, res) => {
+  try {
+    const rawBody = req.rawBody || JSON.stringify(req.body);
+    const raastSecret = ENV.RAAST_WEBHOOK_SECRET;
+
+    if (raastSecret) {
+      const signature = req.headers["x-raast-signature"] as string | undefined;
+      if (!signature) {
+        logger.warn("Raast webhook: missing x-raast-signature header");
+        return res.status(401).json({ error: "Missing webhook signature" });
+      }
+      const crypto = await import("crypto");
+      const computed = crypto
+        .createHmac("sha256", raastSecret)
+        .update(rawBody)
+        .digest("hex");
+      const sigBuffer = Buffer.from(signature, "hex");
+      const compBuffer = Buffer.from(computed, "hex");
+      if (sigBuffer.length !== compBuffer.length || !crypto.timingSafeEqual(sigBuffer, compBuffer)) {
+        return res.status(401).json({ error: "Invalid Raast webhook signature" });
+      }
+    } else {
+      logger.warn("RAAST_WEBHOOK_SECRET not set — skipping signature verification (dev mode)");
+    }
+
+    const { RaastService } = await import(
+      "./modules/payments/raast.service.js"
+    );
+    const { referenceId, amountPkr, transactionId, status } = req.body;
+
+    if (!referenceId || !amountPkr) {
+      return res.status(400).json({ error: "referenceId and amountPkr are required" });
+    }
+
+    const result = await RaastService.verifyRaastPayment(
+      referenceId,
+      amountPkr,
+      transactionId,
+    );
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    // Process successful Raast payment similar to XPay webhook
+    const { supabaseAdmin } = await import("./config/supabase.js");
+    const { data: payment } = await supabaseAdmin
+      .from("payments")
+      .select("*, order:orders(*)")
+      .eq("gateway_reference", referenceId)
+      .single();
+
+    if (payment?.order) {
+      const order = payment.order;
+
+      // Update order status
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          payment_status: "PAID",
+          global_status: "CONFIRMED",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id);
+
+      // Update payment record
+      await supabaseAdmin
+        .from("payments")
+        .update({
+          status: "PAID",
+          gateway_reference: result.transactionId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", payment.id);
+
+      // Book courier (non-COD)
+      try {
+        const { CourierService } = await import(
+          "./modules/logistics/courier.service.js"
+        );
+        const { data: orderItems } = await supabaseAdmin
+          .from("order_items")
+          .select("*")
+          .eq("order_id", order.id);
+
+        await CourierService.bookCourierShipment({
+          orderId: order.id,
+          orderNumber: order.order_number,
+          customerName: order.buyer_name,
+          customerPhone: order.buyer_phone,
+          deliveryAddress: order.shipping_address,
+          destinationCity: order.shipping_city,
+          codAmountPkr: 0,
+          isCod: false,
+          itemsCount: orderItems?.length || 1,
+        });
+      } catch (courierErr) {
+        logger.warn("PostEx booking notice:", courierErr);
+      }
+
+      // WhatsApp notification
+      try {
+        const { WhatsAppService } = await import(
+          "./modules/notifications/whatsapp.service.js"
+        );
+        await WhatsAppService.sendOrderConfirmed(
+          order.buyer_phone,
+          order.order_number,
+          order.total_amount_pkr || 0,
+          false,
+        );
+      } catch (notifErr) {
+        logger.warn("WhatsApp notice:", notifErr);
+      }
+    }
+
+    res.json({ received: true, ...result });
+  } catch (err: any) {
+    logger.error("Raast webhook error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// ── Server-Backed Guest Cart Routes ──────────────────────────────────────────
+import { CartController } from "./modules/cart/cart.controller.js";
+
+app.get("/api/cart", CartController.getCart);
+app.post("/api/cart/items", CartController.addItem);
+app.patch("/api/cart/items", CartController.updateItem);
+app.delete("/api/cart/items", CartController.removeItem);
+app.delete("/api/cart", CartController.clearCart);
+app.post("/api/cart/merge", requireAuth, CartController.mergeGuestCart);
+
 // â”€â”€ Search Routes (Typesense Engine) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/api/search", SearchController.search);
 
@@ -1066,6 +1411,36 @@ app.get(
   requireAuth,
   requireRole(UserRole.ADMIN),
   AdminController.getStats,
+);
+app.get(
+  "/api/admin/products",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listAllProducts,
+);
+app.get(
+  "/api/admin/orders",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listAllOrders,
+);
+app.get(
+  "/api/admin/users",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.listAllUsers,
+);
+app.post(
+  "/api/admin/users/:id/ban",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.banUser,
+);
+app.post(
+  "/api/admin/users/:id/unban",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  AdminController.unbanUser,
 );
 app.get(
   "/api/admin/sellers",
@@ -1209,6 +1584,196 @@ app.patch(
   AdminController.rejectReturn,
 );
 
+// ── Admin Marketplace Settings ─────────────────────────────────────────
+app.get(
+  "/api/admin/settings",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (_req, res) => {
+    try {
+      const { supabaseAdmin } = await import("./config/supabase.js");
+      const { data, error } = await supabaseAdmin
+        .from("marketplace_settings")
+        .select("key, value, description, updated_at");
+
+      if (error) throw error;
+
+      // Convert array of {key, value} to a flat object
+      const settings: Record<string, any> = {};
+      for (const row of data || []) {
+        settings[row.key] = row.value;
+      }
+
+      res.json({ settings, metadata: data });
+    } catch (err: any) {
+      logger.error("Admin settings fetch error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.patch(
+  "/api/admin/settings",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (req: any, res) => {
+    try {
+      const { supabaseAdmin } = await import("./config/supabase.js");
+      const updates = req.body;
+
+      if (!updates || typeof updates !== "object") {
+        return res.status(400).json({ error: "Request body must be an object" });
+      }
+
+      const userId = req.user?.id;
+
+      // Upsert each setting
+      for (const [key, value] of Object.entries(updates)) {
+        await supabaseAdmin
+          .from("marketplace_settings")
+          .upsert(
+            {
+              key,
+              value: JSON.stringify(value),
+              updated_by: userId,
+            },
+            { onConflict: "key" },
+          );
+      }
+
+      res.json({ success: true, message: "Settings updated" });
+    } catch (err: any) {
+      logger.error("Admin settings update error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+// ── Admin Orders & Users Management ───────────────────────────────────────
+app.get(
+  "/api/admin/orders",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const search = req.query.search as string | undefined;
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+
+      let query = supabaseAdmin
+        .from("orders")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false });
+
+      if (search) {
+        query = query.or(`order_number.ilike.%${search}%,buyer_name.ilike.%${search}%`);
+      }
+
+      const { data, error, count } = await query.range(from, to);
+
+      if (error) throw error;
+      res.json({ orders: data || [], total: count || 0 });
+    } catch (err: any) {
+      logger.error("Admin list orders error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.get(
+  "/api/admin/users",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const search = req.query.search as string | undefined;
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+
+      let query = supabaseAdmin
+        .from("profiles")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false });
+
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      const { data, error, count } = await query.range(from, to);
+
+      if (error) throw error;
+      res.json({ users: data || [], total: count || 0 });
+    } catch (err: any) {
+      logger.error("Admin list users error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/users/:id/ban",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (req, res) => {
+    try {
+      const { error } = await supabaseAdmin
+        .from("profiles")
+        .update({ is_active: false })
+        .eq("id", req.params.id);
+
+      if (error) throw error;
+      res.json({ success: true, message: "User banned" });
+    } catch (err: any) {
+      logger.error("Admin ban user error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/users/:id/unban",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (req, res) => {
+    try {
+      const { error } = await supabaseAdmin
+        .from("profiles")
+        .update({ is_active: true })
+        .eq("id", req.params.id);
+
+      if (error) throw error;
+      res.json({ success: true, message: "User unbanned" });
+    } catch (err: any) {
+      logger.error("Admin unban user error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.delete(
+  "/api/admin/products/:id",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  async (req, res) => {
+    try {
+      const { error } = await supabaseAdmin
+        .from("seller_offers")
+        .update({ is_active: false })
+        .eq("id", req.params.id);
+
+      if (error) throw error;
+      res.json({ success: true, message: "Product soft-deleted" });
+    } catch (err: any) {
+      logger.error("Admin delete product error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
 // ── Buyer Product Review Submission (Account & Purchase Verified) ───────────
 app.post("/api/products/:id/reviews", requireAuth, async (req, res) => {
   try {
@@ -1293,5 +1858,10 @@ app.post("/api/orders/:id/dispute", requireAuth, async (req, res) => {
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
+});
+
+app.use((err: any, req: any, res: any, _next: any) => {
+  logger.error("Unhandled Express error", { context: "ErrorHandler", message: err.message, path: req.path });
+  res.status(500).json({ error: "An internal error occurred" });
 });
 

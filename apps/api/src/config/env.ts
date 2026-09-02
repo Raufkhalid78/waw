@@ -55,10 +55,22 @@ export const ENV = {
   POSTEX_XPAY_SECRET_KEY:
     process.env.POSTEX_XPAY_SECRET_KEY || "xpay_sec_test_secret_key_2026",
 
-  // WhatsApp / Twilio
+  // WhatsApp / Twilio (OTP)
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || "",
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || "",
   TWILIO_VERIFY_SERVICE_SID: process.env.TWILIO_VERIFY_SERVICE_SID || "",
+
+  // Meta WhatsApp Cloud API (Transactional Notifications)
+  META_WHATSAPP_TOKEN: process.env.META_WHATSAPP_TOKEN || "",
+  META_WHATSAPP_PHONE_NUMBER_ID:
+    process.env.META_WHATSAPP_PHONE_NUMBER_ID || "",
+
+  // Raast P2M Configuration
+  RAAST_MERCHANT_ALIAS: process.env.RAAST_MERCHANT_ALIAS || "waw.market@hbl",
+  RAAST_MERCHANT_NAME:
+    process.env.RAAST_MERCHANT_NAME || "Waw Online Shopping PK",
+  RAAST_MERCHANT_CITY: process.env.RAAST_MERCHANT_CITY || "Lahore",
+  RAAST_WEBHOOK_SECRET: process.env.RAAST_WEBHOOK_SECRET || "",
 
   // Marketplace Economics (PKR)
   FREE_DELIVERY_THRESHOLD_PKR: parseInt(
@@ -89,6 +101,36 @@ if (ENV.NODE_ENV === "production") {
   if (!ENV.UPSTASH_REDIS_REST_URL || !ENV.UPSTASH_REDIS_REST_TOKEN) {
     throw new Error(
       "FATAL: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production mode for reliable OTP and concurrency locking.",
+    );
+  }
+
+  if (ENV.SUPABASE_URL === "https://placeholder.supabase.co" || !process.env.SUPABASE_URL) {
+    throw new Error(
+      "FATAL: SUPABASE_URL is required in production mode.",
+    );
+  }
+
+  if (ENV.SUPABASE_SERVICE_ROLE_KEY === "placeholder_service_key" || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      "FATAL: SUPABASE_SERVICE_ROLE_KEY is required in production mode.",
+    );
+  }
+
+  if (ENV.POSTEX_API_TOKEN === "ptx_live_test_token_2026" || !process.env.POSTEX_API_TOKEN) {
+    throw new Error(
+      "FATAL: POSTEX_API_TOKEN is required in production mode for logistics integration.",
+    );
+  }
+
+  if (ENV.POSTEX_XPAY_TOKEN === "xpay_live_test_token_2026" || !process.env.POSTEX_XPAY_TOKEN) {
+    throw new Error(
+      "FATAL: POSTEX_XPAY_TOKEN is required in production mode for payment processing.",
+    );
+  }
+
+  if (ENV.POSTEX_XPAY_SECRET_KEY === "xpay_sec_test_secret_key_2026" || !process.env.POSTEX_XPAY_SECRET_KEY) {
+    throw new Error(
+      "FATAL: POSTEX_XPAY_SECRET_KEY is required in production mode for payment signing.",
     );
   }
 }

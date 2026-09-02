@@ -1,5 +1,6 @@
 import Typesense from "typesense";
 import { ENV } from "./env.js";
+import { logger } from "./logger.js";
 
 export const typesenseClient = new Typesense.Client({
   nodes: [
@@ -41,10 +42,10 @@ export async function initTypesenseCollections() {
     const exists = collections.some((c) => c.name === "products");
     if (!exists) {
       await typesenseClient.collections().create(PRODUCT_SCHEMA);
-      console.log('✅ Typesense "products" collection initialized');
+      logger.info('✅ Typesense "products" collection initialized');
     }
   } catch (err: any) {
-    console.warn(
+    logger.warn(
       "⚠️ Typesense initialization info (skipping if server not yet started):",
       err.message,
     );

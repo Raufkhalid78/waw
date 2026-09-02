@@ -2,6 +2,7 @@ import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import { Redis } from "ioredis";
 import { ENV } from "../config/env.js";
+import { logger } from "../config/logger.js";
 
 // Setup ioredis client using the Upstash URL + Token with authenticated TLS
 const redisPassword = ENV.UPSTASH_REDIS_REST_TOKEN || ENV.REDIS_PASSWORD;
@@ -17,7 +18,7 @@ const redisClient =
 
 if (redisClient) {
   redisClient.connect().catch((err) => {
-    console.warn(
+    logger.warn(
       "⚠️ Rate limiter Redis connection error, will use in-memory fallback:",
       err.message,
     );

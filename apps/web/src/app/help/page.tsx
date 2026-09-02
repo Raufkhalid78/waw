@@ -135,7 +135,7 @@ export default function HelpCenterPage() {
             or English.
           </p>
           <a
-            href="https://wa.me/923001234567"
+            href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-900 underline"
