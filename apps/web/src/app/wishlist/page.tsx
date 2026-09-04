@@ -26,11 +26,8 @@ export default function WishlistPage() {
   useEffect(() => {
     async function loadWishlist() {
       try {
-        const token = localStorage.getItem("waw_auth_token");
-        if (token) {
-          const items = await fetchUserWishlist();
-          setServerWishlist(items);
-        }
+        const items = await fetchUserWishlist();
+        setServerWishlist(items);
       } catch {
         // Fall back to local wishlist
       } finally {
@@ -66,8 +63,7 @@ export default function WishlistPage() {
   };
 
   const handleRemove = async (item: any) => {
-    const token = localStorage.getItem("waw_auth_token");
-    if (token && serverWishlist.length > 0) {
+    if (serverWishlist.length > 0) {
       try {
         await removeFromWishlist(item.productId);
         setServerWishlist((prev) => prev.filter((w) => w.product_id !== item.productId));

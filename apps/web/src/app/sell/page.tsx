@@ -74,18 +74,11 @@ export default function SellOnWawPage() {
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem("waw_auth_token");
-      if (!token) {
-        throw new Error("You must be logged in to apply for a seller account.");
-      }
-      
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
       const res = await fetch(`${API_URL}/api/seller/apply`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
 

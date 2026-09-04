@@ -138,6 +138,7 @@ export async function safeFetch<T>(
         ...options,
         signal: controller.signal,
         headers,
+        credentials: "include",
       });
 
       clearTimeout(timer);
@@ -384,18 +385,9 @@ export async function fetchCheckoutQuote(
 }
 
 export async function createOrderApi(orderInput: any): Promise<any> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("waw_auth_token")
-      : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
   const res = await safeFetch<any>(`${API_BASE_URL}/api/orders`, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(orderInput),
     timeoutMs: 12000,
   });
@@ -406,18 +398,9 @@ export async function createOrderApi(orderInput: any): Promise<any> {
 }
 
 export async function fetchOrderById(orderId: string): Promise<any> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("waw_auth_token")
-      : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
   try {
     const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
-      headers,
+      credentials: "include",
       cache: "no-store",
     });
     if (!res.ok) {
@@ -433,18 +416,9 @@ export async function fetchOrderById(orderId: string): Promise<any> {
 }
 
 export async function fetchUserOrders(): Promise<any[]> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("waw_auth_token")
-      : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
   try {
     const res = await fetch(`${API_BASE_URL}/api/orders`, {
-      headers,
+      credentials: "include",
       cache: "no-store",
     });
     if (!res.ok) {
@@ -471,14 +445,9 @@ export interface UserAddress {
 }
 
 export async function fetchUserAddresses(): Promise<UserAddress[]> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("waw_auth_token")
-      : null;
-  if (!token) return [];
   try {
     const res = await fetch(`${API_BASE_URL}/api/user/addresses`, {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
       cache: "no-store",
     });
     if (!res.ok) return [];
@@ -497,14 +466,11 @@ export async function createUserAddress(addr: {
   postal_code?: string;
   is_default?: boolean;
 }): Promise<UserAddress> {
-  const token = localStorage.getItem("waw_auth_token");
   try {
     const res = await fetch(`${API_BASE_URL}/api/user/addresses`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(addr),
     });
     if (!res.ok) {
@@ -520,11 +486,10 @@ export async function createUserAddress(addr: {
 }
 
 export async function deleteUserAddress(id: string): Promise<void> {
-  const token = localStorage.getItem("waw_auth_token");
   try {
     const res = await fetch(`${API_BASE_URL}/api/user/addresses/${id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
     });
     if (!res.ok) {
       let errMsg = "Failed to delete address";
@@ -547,19 +512,11 @@ export async function submitOrderReturn(
     pickupCity?: string;
   },
 ): Promise<any> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("waw_auth_token")
-      : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
   try {
     const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/return`, {
       method: "POST",
-      headers,
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(returnInput),
     });
     if (!res.ok) {
@@ -585,19 +542,11 @@ export async function initiatePaymentApi(paymentInput: {
   transactionId?: string;
   qrPayload?: string;
 }> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("waw_auth_token")
-      : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
   try {
     const res = await fetch(`${API_BASE_URL}/api/payments/xpay/initiate`, {
       method: "POST",
-      headers,
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(paymentInput),
     });
     if (!res.ok) {
@@ -622,11 +571,9 @@ export interface WishlistItem {
 }
 
 export async function fetchUserWishlist(): Promise<WishlistItem[]> {
-  const token = localStorage.getItem("waw_auth_token");
-  if (!token) return [];
   try {
     const res = await fetch(`${API_BASE_URL}/api/user/wishlist`, {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
       cache: "no-store",
     });
     if (!res.ok) return [];
@@ -637,15 +584,11 @@ export async function fetchUserWishlist(): Promise<WishlistItem[]> {
 }
 
 export async function addToWishlist(productId: string): Promise<any> {
-  const token = localStorage.getItem("waw_auth_token");
-  if (!token) throw new ApiError("Login required to add to wishlist", { status: 401 });
   try {
     const res = await fetch(`${API_BASE_URL}/api/user/wishlist`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ product_id: productId }),
     });
     if (!res.ok) {
@@ -661,12 +604,10 @@ export async function addToWishlist(productId: string): Promise<any> {
 }
 
 export async function removeFromWishlist(productId: string): Promise<void> {
-  const token = localStorage.getItem("waw_auth_token");
-  if (!token) throw new ApiError("Login required", { status: 401 });
   try {
     const res = await fetch(`${API_BASE_URL}/api/user/wishlist/${encodeURIComponent(productId)}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
     });
     if (!res.ok) {
       let errMsg = "Failed to remove from wishlist";

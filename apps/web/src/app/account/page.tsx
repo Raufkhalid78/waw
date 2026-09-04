@@ -74,16 +74,19 @@ export default function AccountPage() {
   const [addressError, setAddressError] = useState("");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("waw_user");
-      if (stored) {
-        try {
-          setUser(JSON.parse(stored));
-        } catch (e) {
-          // ignore
+    async function loadSession() {
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const res = await fetch(`${API_URL}/api/auth/session/me`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) setUser(data.user);
         }
-      }
+      } catch {}
     }
+    loadSession();
 
     async function loadData() {
       try {

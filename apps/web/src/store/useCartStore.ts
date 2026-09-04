@@ -155,10 +155,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
     if (guestToken) {
       fetch(`${API_BASE_URL}/api/cart/merge`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("waw_auth_token") || ""}`,
-        },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ guestToken }),
       }).catch((err) => logger.error("Failed to merge guest cart on logout", "CartStore", err));
     }

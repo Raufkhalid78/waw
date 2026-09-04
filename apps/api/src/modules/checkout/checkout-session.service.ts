@@ -114,18 +114,27 @@ export class CheckoutSessionService {
     sessionId: string,
     orderId: string,
   ): Promise<void> {
-    const { error } = await supabaseAdmin
+    const { error, count } = await supabaseAdmin
       .from("checkout_sessions")
       .update({
         status: "committed",
         order_id: orderId,
         updated_at: new Date().toISOString(),
-      })
+      }, { count: "exact" })
       .eq("id", sessionId)
       .eq("status", "pending"); // Optimistic lock: only commit if still pending
 
     if (error) {
       throw new Error(`Failed to commit checkout session: ${error.message}`);
+    }
+
+    if (count === 0) {
+      // Session was already committed or doesn't exist — idempotent duplicate
+      logger.warn("Checkout session already committed (duplicate detected)", {
+        sessionId,
+        orderId,
+      });
+      return;
     }
   }
 

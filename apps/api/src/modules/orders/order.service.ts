@@ -339,7 +339,16 @@ export class OrderService {
         order_item_id: i.orderItemId,
         quantity: i.quantity,
       }));
-      await supabaseAdmin.from("return_items").insert(returnItemsData);
+      const { error: itemsErr } = await supabaseAdmin
+        .from("return_items")
+        .insert(returnItemsData);
+      if (itemsErr) {
+        logger.error("Failed to insert return items", {
+          returnRequestId: returnReq.id,
+          error: itemsErr.message,
+        });
+        throw new Error(`Return items insert failed: ${itemsErr.message}`);
+      }
 
       returnRequests.push(returnReq);
     }

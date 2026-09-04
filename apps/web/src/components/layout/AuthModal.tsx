@@ -118,9 +118,18 @@ export function AuthModal({
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Invalid OTP");
 
-        // Store token
-        localStorage.setItem("waw_auth_token", data.token);
-        localStorage.setItem("waw_user", JSON.stringify(data.user));
+        // Create httpOnly session cookie (replaces localStorage token)
+        await fetch(`${API_BASE}/api/auth/session/create`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: data.user?.id,
+            userRole: data.user?.role || "BUYER",
+            userPhone: data.user?.phone || formattedTarget,
+            userEmail: data.user?.email,
+          }),
+        });
 
         login({
           name: data.user?.full_name || parseDisplayName(identifier),

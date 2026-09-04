@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { ENV } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
+import { SessionService } from "../modules/auth/session.service.js";
 import { UserRole } from "../types/index.js";
 
 export interface AuthenticatedUser {
@@ -20,22 +21,35 @@ declare global {
 }
 
 /**
- * Verifies Bearer JWT token issued by Waw or Supabase Auth.
+ * Resolves the access token from either:
+ * 1. Authorization: Bearer <token> header (legacy/mobile)
+ * 2. waw_session httpOnly cookie (new session-based auth)
+ */
+function resolveAccessToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
+  }
+  const cookieToken = req.cookies?.waw_session;
+  if (cookieToken) return cookieToken;
+  return null;
+}
+
+/**
+ * Verifies Bearer JWT token or session cookie issued by Waw.
  */
 export async function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const token = resolveAccessToken(req);
+  if (!token) {
     res
       .status(401)
       .json({ error: "Unauthorized: Missing or invalid Authorization header" });
     return;
   }
-
-  const token = authHeader.split(" ")[1];
 
   try {
     let userId: string;
@@ -43,7 +57,36 @@ export async function requireAuth(
     let userEmail: string | undefined;
     let userRole: UserRole = UserRole.BUYER;
 
-    // 1. First try verifying with JWT Secret
+    // 1. Try Redis-backed session first (new cookie-based auth)
+    const session = await SessionService.validateSession(token);
+    if (session) {
+      userId = session.userId;
+      userPhone = session.userPhone;
+      userEmail = session.userEmail;
+      userRole = (session.userRole as UserRole) || UserRole.BUYER;
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("role, phone, email, is_banned")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.is_banned) {
+        res.status(403).json({ error: "Account has been banned" });
+        return;
+      }
+
+      if (profile) {
+        userRole = (profile.role as UserRole) || userRole;
+        userPhone = profile.phone || userPhone;
+        userEmail = profile.email || userEmail;
+      }
+
+      req.user = { id: userId, phone: userPhone, email: userEmail, role: userRole };
+      return next();
+    }
+
+    // 2. Try verifying with JWT Secret (legacy)
     if (ENV.JWT_SECRET) {
       try {
         const decoded = jwt.verify(token, ENV.JWT_SECRET) as any;
@@ -53,7 +96,6 @@ export async function requireAuth(
           userEmail = decoded.email;
           userRole = decoded.role || UserRole.BUYER;
 
-          // Fetch profile to check banned status
           const { data: profile } = await supabaseAdmin
             .from("profiles")
             .select("role, phone, email, is_banned")
@@ -79,7 +121,7 @@ export async function requireAuth(
       }
     }
 
-    // 2. Verify with Supabase Auth API
+    // 3. Verify with Supabase Auth API
     const {
       data: { user },
       error,
@@ -91,7 +133,6 @@ export async function requireAuth(
       return;
     }
 
-    // Fetch user profile from Supabase Database
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("role, phone, email, is_banned")
