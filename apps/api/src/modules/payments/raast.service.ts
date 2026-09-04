@@ -5,6 +5,7 @@
 
 import QRCode from "qrcode";
 import { ENV } from "../../config/env.js";
+import { supabaseAdmin } from "../../config/supabase.js";
 
 export interface RaastQrPayloadInput {
   orderId: string;
@@ -181,6 +182,3 @@ export class RaastService {
     return crc.toString(16).toUpperCase().padStart(4, "0");
   }
 }
-
-// Need supabaseAdmin for verifyRaastPayment
-import { supabaseAdmin } from "../../config/supabase.js";

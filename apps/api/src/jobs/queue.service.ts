@@ -157,17 +157,121 @@ try {
           break;
         }
 
-        case "ESCROW_PAYOUT":
+        case "ESCROW_PAYOUT": {
           logger.info(
             `🏦 [Escrow Payout Job] Reconciling Merchant Settlement release for vendor ${payload.storeId}`,
           );
-          break;
+          try {
+            const { data: payout } = await supabaseAdmin
+              .from("payouts")
+              .select("*, store_order:store_orders(id, order_id, store_id)")
+              .eq("id", payload.payoutId)
+              .single();
 
-        case "COD_RECONCILIATION":
+            if (!payout) {
+              logger.warn(`Payout ${payload.payoutId} not found`);
+              break;
+            }
+
+            // Verify no active disputes before releasing
+            const orderId = payout.store_order?.order_id;
+            if (orderId) {
+              const { data: disputes } = await supabaseAdmin
+                .from("support_tickets")
+                .select("id")
+                .eq("order_id", orderId)
+                .in("status", ["OPEN", "UNDER_REVIEW"])
+                .limit(1);
+
+              if (disputes && disputes.length > 0) {
+                logger.info(`Payout ${payload.payoutId} held: active dispute on order ${orderId}`);
+                await supabaseAdmin
+                  .from("payouts")
+                  .update({ status: "HELD", updated_at: new Date().toISOString() })
+                  .eq("id", payload.payoutId);
+                break;
+              }
+            }
+
+            // Release payout
+            await supabaseAdmin
+              .from("payouts")
+              .update({
+                status: "COMPLETED",
+                processed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", payload.payoutId);
+
+            logger.info(`✅ Payout ${payload.payoutId} settled for PKR ${payout.amount_pkr}`);
+          } catch (err: any) {
+            logger.error(`❌ Escrow payout failed for ${payload.payoutId}:`, err.message);
+            throw err;
+          }
+          break;
+        }
+
+        case "COD_RECONCILIATION": {
           logger.info(
             `🚚 [COD Reconciliation] Reconciling PostEx delivery remittance for CN ${payload.cn}`,
           );
+          try {
+            // Find shipment by tracking number
+            const { data: shipment } = await supabaseAdmin
+              .from("shipments")
+              .select("*, order:orders(id, buyer_id, payment_status)")
+              .eq("tracking_number", payload.cn)
+              .single();
+
+            if (!shipment) {
+              logger.warn(`Shipment not found for CN: ${payload.cn}`);
+              break;
+            }
+
+            // Mark COD as collected if delivered
+            if (shipment.is_cod && shipment.status === "DELIVERED") {
+              await supabaseAdmin
+                .from("orders")
+                .update({
+                  payment_status: "PAID",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", shipment.order_id);
+
+              // Schedule T+7 payout
+              const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+              if (shipment.store_order_id) {
+                const { data: storeOrder } = await supabaseAdmin
+                  .from("store_orders")
+                  .select("store_id, total_pkr, commission_pkr")
+                  .eq("id", shipment.store_order_id)
+                  .single();
+
+                if (storeOrder) {
+                  const netPayout = (storeOrder.total_pkr || 0) - (storeOrder.commission_pkr || 0);
+                  await supabaseAdmin.from("payouts").upsert(
+                    {
+                      store_id: storeOrder.store_id,
+                      store_order_id: shipment.store_order_id,
+                      order_id: shipment.order_id,
+                      amount_pkr: Math.max(0, netPayout),
+                      status: "SCHEDULED",
+                      scheduled_for: sevenDaysLater,
+                      created_at: new Date().toISOString(),
+                    },
+                    { onConflict: "store_order_id" },
+                  );
+                }
+              }
+
+              logger.info(`✅ COD reconciliation complete for CN ${payload.cn}`);
+            }
+          } catch (err: any) {
+            logger.error(`❌ COD reconciliation failed for ${payload.cn}:`, err.message);
+            throw err;
+          }
           break;
+        }
 
         case "REVERSE_COURIER_BOOKING": {
           logger.info(

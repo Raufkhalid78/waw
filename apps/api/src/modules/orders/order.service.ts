@@ -216,8 +216,9 @@ export class OrderService {
   }
 
   /**
-   * Submits a return request for an order, books PostEx reverse pickup, and logs audit event.
-   * Handles multi-vendor orders by grouping items by seller sub-order.
+   * Submits a return request for an order using an atomic database RPC.
+   * The RPC handles: validation, return request creation, return items insert,
+   * and order status update in a single transaction.
    */
   static async createReturnRequest(
     orderId: string,
@@ -237,141 +238,55 @@ export class OrderService {
       throw new Error("At least one item must be specified for return.");
     }
 
-    // 1. Fetch order with full item details
-    const { data: order, error: orderErr } = await supabaseAdmin
-      .from("orders")
-      .select("*, order_items(*, offer_variants(*, seller_offers(*, catalog_products(*)))), store_orders(*)")
-      .eq("id", orderId)
+    // 1. Call atomic return request RPC
+    const rpcItems = input.items.map((i) => ({
+      order_item_id: i.orderItemId,
+      quantity: i.quantity,
+    }));
+
+    const { data: result, error } = await supabaseAdmin.rpc('create_return_request', {
+      p_order_id: orderId,
+      p_buyer_id: buyerId,
+      p_reason: input.reason,
+      p_comments: input.comments || null,
+      p_evidence_images: input.evidenceImages || [],
+      p_refund_preference: input.refundPreference || 'ORIGINAL_PAYMENT',
+      p_pickup_address: input.pickupAddress || null,
+      p_pickup_city: input.pickupCity || null,
+      p_items: rpcItems,
+    });
+
+    if (error || !result?.success) {
+      throw new Error(`Return request failed: ${error?.message || result?.error || 'Unknown error'}`);
+    }
+
+    const returnRequestId = result.return_request_id;
+    const totalRefundPkr = result.total_refund_pkr;
+
+    // 2. Fetch the created return request for response
+    const { data: returnReq } = await supabaseAdmin
+      .from("return_requests")
+      .select("*")
+      .eq("id", returnRequestId)
       .single();
 
-    if (orderErr || !order) throw new Error("Order not found");
-    if (order.buyer_id && order.buyer_id !== buyerId) {
-      throw new Error("Unauthorized to return this order");
-    }
-
-    // 2. Enforce 7-Day Return Policy
-    const baselineDateStr = order.delivered_at || order.created_at;
-    if (baselineDateStr) {
-      const deliveredTime = new Date(baselineDateStr).getTime();
-      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-      if (Date.now() - deliveredTime > sevenDaysMs) {
-        throw new Error("The 7-day return window for this order has expired.");
-      }
-    }
-
-    // 3. Build a map of order_item_id -> order_item for validation
-    const orderItemMap = new Map<string, any>();
-    for (const item of order.order_items || []) {
-      orderItemMap.set(item.id, item);
-    }
-
-    // 4. Validate requested items belong to this order and cap quantities
-    const validatedItems: { orderItemId: string; quantity: number; storeOrderId: string; lineTotalPkr: number }[] = [];
-    let totalRefundPkr = 0;
-
-    for (const reqItem of input.items) {
-      const orderItem = orderItemMap.get(reqItem.orderItemId);
-      if (!orderItem) {
-        throw new Error(`Order item ${reqItem.orderItemId} does not belong to this order.`);
-      }
-
-      const deliveredQty = orderItem.quantity || 0;
-      const requestedQty = Math.min(reqItem.quantity || 1, deliveredQty);
-      if (requestedQty <= 0) {
-        throw new Error(`Invalid return quantity for item ${reqItem.orderItemId}.`);
-      }
-
-      // Calculate line-level refund from captured price
-      const unitPrice = orderItem.price_pkr || 0;
-      const lineTotal = unitPrice * requestedQty;
-      totalRefundPkr += lineTotal;
-
-      // Resolve which store_order this item belongs to
-      const storeOrderId = orderItem.store_order_id || order.store_orders?.[0]?.id || null;
-
-      validatedItems.push({
-        orderItemId: reqItem.orderItemId,
-        quantity: requestedQty,
-        storeOrderId,
-        lineTotalPkr: lineTotal,
-      });
-    }
-
-    // 5. Group validated items by store_order_id (one return per seller)
-    const itemsByStoreOrder = new Map<string, typeof validatedItems>();
-    for (const item of validatedItems) {
-      const key = item.storeOrderId || "unknown";
-      if (!itemsByStoreOrder.has(key)) {
-        itemsByStoreOrder.set(key, []);
-      }
-      itemsByStoreOrder.get(key)!.push(item);
-    }
-
-    // 6. Create return_requests FIRST (outbox pattern — durable record before external call)
-    const returnRequests: any[] = [];
-
-    for (const [storeOrderId, items] of itemsByStoreOrder) {
-      const storeRefund = items.reduce((sum, i) => sum + i.lineTotalPkr, 0);
-
-      const { data: returnReq, error: retErr } = await supabaseAdmin
-        .from("return_requests")
-        .insert({
-          order_id: order.id,
-          store_order_id: storeOrderId === "unknown" ? null : storeOrderId,
-          buyer_id: buyerId,
-          reason: input.reason,
-          evidence_images: input.evidenceImages || [],
-          status: "PENDING_COURIER_BOOKING",
-          reverse_courier_cn: null,
-          refund_amount_pkr: storeRefund,
-          staff_notes: input.comments
-            ? `Buyer notes: ${input.comments}. Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`
-            : `Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`,
-        })
-        .select()
+    // 3. Enqueue courier booking via BullMQ (async, retried, idempotent)
+    let courierJobId: string | null = null;
+    try {
+      // Fetch order details for courier booking
+      const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("buyer_name, buyer_phone, shipping_address, shipping_city, order_number")
+        .eq("id", orderId)
         .single();
 
-      if (retErr) throw retErr;
-
-      // Insert line-level return items
-      const returnItemsData = items.map((i) => ({
-        return_request_id: returnReq.id,
-        order_item_id: i.orderItemId,
-        quantity: i.quantity,
-      }));
-      const { error: itemsErr } = await supabaseAdmin
-        .from("return_items")
-        .insert(returnItemsData);
-      if (itemsErr) {
-        logger.error("Failed to insert return items", {
-          returnRequestId: returnReq.id,
-          error: itemsErr.message,
-        });
-        throw new Error(`Return items insert failed: ${itemsErr.message}`);
-      }
-
-      returnRequests.push(returnReq);
-    }
-
-    // 7. Update order status to RETURN_REQUESTED
-    await supabaseAdmin
-      .from("orders")
-      .update({
-        global_status: "RETURN_REQUESTED",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", order.id);
-
-    // 8. Enqueue courier booking via BullMQ (async, retried, idempotent)
-    const courierJobIds: string[] = [];
-    for (const returnReq of returnRequests) {
-      try {
-        const job = await JobQueueManager.addJob(
+      if (order) {
+        courierJobId = await JobQueueManager.addJob(
           "REVERSE_COURIER_BOOKING",
           {
-            returnRequestId: returnReq.id,
-            orderId: order.id,
-            orderNumber: order.order_number || order.id,
+            returnRequestId,
+            orderId,
+            orderNumber: order.order_number || orderId,
             customerName: order.buyer_name,
             customerPhone: order.buyer_phone,
             pickupAddress: input.pickupAddress || order.shipping_address,
@@ -382,42 +297,38 @@ export class OrderService {
           {
             attempts: 3,
             backoff: { type: "exponential", delay: 5000 },
-            jobId: `return_booking_${returnReq.id}`,
+            jobId: `return_booking_${returnRequestId}`,
           },
         );
-        courierJobIds.push(job);
-      } catch (err) {
-        logger.error("Failed to enqueue reverse courier booking", {
-          returnRequestId: returnReq.id,
-          error: (err as Error).message,
-        });
       }
+    } catch (err) {
+      logger.error("Failed to enqueue reverse courier booking", {
+        returnRequestId,
+        error: (err as Error).message,
+      });
     }
 
-    // 8. Immutable Audit Log
+    // 4. Immutable Audit Log
     const { AuditService } = await import("../audit/audit.service.js");
     await AuditService.logAction({
       actorId: buyerId,
       actorRole: "BUYER",
       action: "RETURN_REQUESTED",
       targetResourceType: "order",
-      targetResourceId: order.id,
-      previousState: { orderStatus: order.global_status },
+      targetResourceId: orderId,
       newState: {
-        orderStatus: "RETURN_REQUESTED",
-        returnRequestIds: returnRequests.map((r) => r.id),
+        returnRequestId,
         totalRefundPkr,
-        sellerCount: returnRequests.length,
-        courierJobsEnqueued: courierJobIds.length,
+        courierJobEnqueued: !!courierJobId,
       },
       reason: `Buyer returned ${input.items.length} item(s): ${input.reason}`,
     });
 
     return {
       success: true,
-      returnRequests,
+      returnRequest: returnReq,
       totalRefundPkr,
-      courierJobsEnqueued: courierJobIds.length,
+      courierJobEnqueued: !!courierJobId,
     };
   }
 

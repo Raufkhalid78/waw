@@ -129,12 +129,15 @@ export class PostExXPayService {
 
   /**
    * Verifies PostEx XPay timing-safe HMAC-SHA256 signature for incoming webhooks.
+   * Optionally accepts a secret override for testing.
    */
   static verifyWebhookSignature(
     payload: any,
     signatureHeader?: string,
+    secretOverride?: string,
   ): boolean {
-    if (!signatureHeader || !ENV.POSTEX_XPAY_SECRET_KEY) {
+    const secret = secretOverride || ENV.POSTEX_XPAY_SECRET_KEY;
+    if (!signatureHeader || !secret) {
       return false;
     }
 
@@ -142,7 +145,7 @@ export class PostExXPayService {
       const dataToSign =
         typeof payload === "string" ? payload : JSON.stringify(payload);
       const computed = crypto
-        .createHmac("sha256", ENV.POSTEX_XPAY_SECRET_KEY)
+        .createHmac("sha256", secret)
         .update(dataToSign)
         .digest("hex");
 
