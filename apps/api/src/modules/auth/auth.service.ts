@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { supabaseAdmin } from "../../config/supabase.js";
+import { supabaseAdmin, supabasePublic } from "../../config/supabase.js";
 import { redis } from "../../config/redis.js";
 import { WhatsAppService } from "../notifications/whatsapp.service.js";
 import { ENV } from "../../config/env.js";
+import { logger } from "../../config/logger.js";
 import { UserRole } from "../../types/index.js";
 
 export class AuthService {
@@ -146,6 +147,59 @@ export class AuthService {
       },
       ENV.JWT_SECRET,
       { expiresIn: "30d" },
+    );
+
+    return { token, user: profile };
+  }
+
+  /**
+   * Email/password login for admin users.
+   */
+  static async loginWithEmail(
+    email: string,
+    password: string,
+  ): Promise<{ token: string; user: any }> {
+    logger.info(`Attempting login for: ${email}`);
+
+    // Use Supabase Public client for auth (anon key required for signInWithPassword)
+    const { data, error } = await supabasePublic.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      logger.error(`Supabase auth error: ${error.message} (status: ${error.status})`);
+      throw new Error(`Invalid email or password: ${error.message}`);
+    }
+
+    if (!data.user) {
+      logger.error("No user returned from Supabase");
+      throw new Error("Invalid email or password");
+    }
+
+    logger.info(`Supabase auth success for user: ${data.user.id}`);
+
+    // Fetch profile from profiles table
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
+    // Issue signed JWT token
+    const token = jwt.sign(
+      {
+        sub: profile.id,
+        phone: profile.phone,
+        email: profile.email,
+        role: profile.role || UserRole.BUYER,
+      },
+      ENV.JWT_SECRET,
+      { expiresIn: "7d" },
     );
 
     return { token, user: profile };

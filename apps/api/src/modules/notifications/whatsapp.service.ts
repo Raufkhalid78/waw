@@ -178,4 +178,80 @@ export class WhatsAppService {
 
     await this.sendMetaMessage(phone, message);
   }
+
+  /**
+   * Sends an order cancellation notification.
+   */
+  static async sendOrderCancelled(
+    phone: string,
+    orderNumber: string,
+    reason?: string,
+  ): Promise<void> {
+    const reasonText = reason ? `\nReason: *${reason}*` : "";
+
+    const message = [
+      `❌ *Waw (واو) Order Cancelled*`,
+      ``,
+      `Your order *${orderNumber}* has been cancelled.`,
+      reasonText,
+      ``,
+      `If you believe this is an error, please contact support:`,
+      `https://waw.com.pk/support`,
+      ``,
+      `We're sorry for the inconvenience.`,
+    ].join("\n");
+
+    await this.sendMetaMessage(phone, message);
+  }
+
+  /**
+   * Sends a return request confirmation message.
+   */
+  static async sendReturnRequested(
+    phone: string,
+    orderNumber: string,
+    returnId: string,
+    reason: string,
+  ): Promise<void> {
+    const message = [
+      `📦 *Waw (واو) Return Request Received*`,
+      ``,
+      `Your return request for order *${orderNumber}* has been submitted.`,
+      `Return ID: *${returnId}*`,
+      `Reason: *${reason}*`,
+      ``,
+      `Our team will review your request within 24-48 hours.`,
+      `You'll receive a reverse pickup schedule shortly.`,
+      ``,
+      `Track return status: https://waw.com.pk/returns/${returnId}`,
+    ].join("\n");
+
+    await this.sendMetaMessage(phone, message);
+  }
+
+  /**
+   * Notifies a seller about a new order assignment.
+   */
+  static async sendSellerNewOrder(
+    sellerPhone: string,
+    storeName: string,
+    orderNumber: string,
+    itemSummary: string,
+    totalPkr: number,
+  ): Promise<void> {
+    const message = [
+      `🛒 *New Order for ${storeName}!*`,
+      ``,
+      `Order: *${orderNumber}*`,
+      `Items: ${itemSummary}`,
+      `Payout: *PKR ${totalPkr.toLocaleString()}*`,
+      ``,
+      `Log in to fulfill this order:`,
+      `https://seller.waw.com.pk/orders`,
+      ``,
+      `Pack and dispatch within 24 hours for best seller rating.`,
+    ].join("\n");
+
+    await this.sendMetaMessage(sellerPhone, message);
+  }
 }

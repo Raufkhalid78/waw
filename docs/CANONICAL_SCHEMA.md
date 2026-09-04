@@ -205,6 +205,38 @@ erDiagram
   - `attachments` (`TEXT[]`).
   - `created_at` (`TIMESTAMPTZ`, DEFAULT `NOW()`).
 
+### 15. `ai_usage`
+*Tracks OpenRouter API usage for subscription gating and daily limits.*
+- `id` (`UUID`, PK).
+- `user_id` (`UUID`, FK -> `auth.users.id`, NULLABLE).
+- `feature` (`TEXT`, NOT NULL): `'description_generator'` | `'chatbot'` | `'recommendations'` | `'search'`.
+- `prompt_tokens` (`INTEGER`, DEFAULT `0`).
+- `completion_tokens` (`INTEGER`, DEFAULT `0`).
+- `total_tokens` (`INTEGER`, DEFAULT `0`).
+- `model` (`TEXT`, NOT NULL).
+- `metadata` (`JSONB`, DEFAULT `'{}'`).
+- `created_at` (`TIMESTAMPTZ`, DEFAULT `NOW()`).
+- **Indexes:** `(created_at)`, `(user_id, created_at)`, `(feature, created_at)`.
+
+### 16. `reviews`
+*Buyer product reviews with verified-purchase badges.*
+- `id` (`UUID`, PK).
+- `product_id` (`UUID`, FK -> `offer_variants.id`, NOT NULL).
+- `user_id` (`UUID`, FK -> `profiles.id`, NOT NULL).
+- `rating` (`INTEGER`, NOT NULL): 1-5 stars.
+- `comment` (`TEXT`).
+- `is_verified_purchase` (`BOOLEAN`, DEFAULT `false`).
+- `status` (`VARCHAR(20)`, DEFAULT `'APPROVED'`): `'APPROVED'` | `'PENDING'` | `'REJECTED'`.
+- `created_at` (`TIMESTAMPTZ`, DEFAULT `NOW()`).
+
+### 17. `wishlist`
+*Buyer saved products for later.*
+- `id` (`UUID`, PK).
+- `user_id` (`UUID`, FK -> `profiles.id`, NOT NULL).
+- `product_id` (`TEXT`, NOT NULL).
+- `created_at` (`TIMESTAMPTZ`, DEFAULT `NOW()`).
+- **Unique constraint:** `(user_id, product_id)`.
+
 ---
 
 ## 3. RLS Security & Exposure Policy

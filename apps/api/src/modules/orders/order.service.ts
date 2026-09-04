@@ -5,6 +5,7 @@ import { WhatsAppService } from "../notifications/whatsapp.service.js";
 import { CourierService } from "../logistics/courier.service.js";
 import { QuoteService } from "./quote.service.js";
 import { InventoryService } from "../products/inventory.service.js";
+import { JobQueueManager } from "../../jobs/queue.service.js";
 import {
   calculateOrderSummary,
   OrderItemPricingInput,
@@ -49,7 +50,9 @@ export class OrderService {
       try {
         const cached = await redis.get(`idempotency:${input.idempotencyKey}`);
         if (cached) return JSON.parse(cached);
-      } catch {}
+      } catch (err) {
+        logger.warn("Failed to check idempotency cache", { key: input.idempotencyKey, error: (err as Error).message });
+      }
     }
 
     let quote: any;
@@ -102,16 +105,18 @@ export class OrderService {
     if (input.idempotencyKey) {
       try {
         await redis.set(`idempotency:${input.idempotencyKey}`, JSON.stringify(response), { ex: 86400 });
-      } catch {}
+      } catch (err) {
+        logger.warn("Failed to set idempotency cache", { key: input.idempotencyKey, error: (err as Error).message });
+      }
     }
 
-    // WhatsApp Order Confirmation (fire and forget)
-    WhatsAppService.sendOrderConfirmed(
-      input.buyerPhone,
-      result.order_number,
-      result.total_amount_pkr || quote.totalPkr,
-      input.paymentMethod === PaymentMethod.COD
-    ).catch((err) => logger.error("WhatsApp order confirmation failed:", err));
+    // WhatsApp Order Confirmation via BullMQ queue (async, retried)
+    JobQueueManager.addJob("WHATSAPP_NOTIFICATION", {
+      phone: input.buyerPhone,
+      orderNumber: result.order_number,
+      totalPkr: result.total_amount_pkr || quote.totalPkr,
+      isCod: input.paymentMethod === PaymentMethod.COD,
+    }).catch((err) => logger.error("Failed to enqueue WhatsApp notification:", err));
 
     return response;
   }

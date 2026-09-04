@@ -13,6 +13,11 @@ import {
   Truck,
   ShieldCheck,
   LogOut,
+  BarChart3,
+  Settings,
+  Menu,
+  X,
+  Sparkles,
 } from "lucide-react";
 
 export function SellerNav() {
@@ -21,6 +26,7 @@ export function SellerNav() {
   const [storeName, setStoreName] = useState("My Store");
   const [city, setCity] = useState("Pakistan");
   const [mounted, setMounted] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -42,6 +48,10 @@ export function SellerNav() {
     }
   }, [pathname, router]);
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   const handleLogout = () => {
     localStorage.removeItem("waw_seller_token");
     localStorage.removeItem("waw_store_id");
@@ -53,8 +63,20 @@ export function SellerNav() {
     return null;
   }
 
-  return (
-    <aside className="hidden lg:flex w-64 flex-col bg-[#0f172a] border-r border-slate-800/80 sticky top-0 h-screen z-30">
+  const navLinks = [
+    { href: "/", label: "Dashboard Overview", icon: LayoutDashboard, color: "text-amber-400" },
+    { href: "/orders", label: "Store Orders", icon: ShoppingBag, color: "text-emerald-400", badge: "Live" },
+    { href: "/products", label: "Catalog & Inventory", icon: Package, color: "text-blue-400" },
+    { href: "/products/bulk-upload", label: "CSV Bulk Import", icon: FileSpreadsheet, color: "text-purple-400" },
+    { href: "/ai/describe", label: "AI Description", icon: Sparkles, color: "text-amber-300" },
+    { href: "/coupons", label: "Seller Coupons", icon: Tag, color: "text-pink-400" },
+    { href: "/payouts", label: "Weekly Payouts", icon: CreditCard, color: "text-amber-500" },
+    { href: "/analytics", label: "Analytics", icon: BarChart3, color: "text-cyan-400" },
+    { href: "/settings", label: "Store Settings", icon: Settings, color: "text-slate-300" },
+  ];
+
+  const navContent = (
+    <>
       {/* Brand & Store Header */}
       <div className="p-5 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -73,6 +95,12 @@ export function SellerNav() {
             </div>
           </div>
         </div>
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 lg:hidden"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Store Verification Badge */}
@@ -83,80 +111,25 @@ export function SellerNav() {
 
       {/* Navigation Links */}
       <nav className="flex-1 px-3 py-2 space-y-1 text-xs font-semibold">
-        <Link
-          href="/"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === "/"
-              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
-              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4 text-amber-400" />
-          <span>Dashboard Overview</span>
-        </Link>
-
-        <Link
-          href="/orders"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === "/orders"
-              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
-              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
-          }`}
-        >
-          <ShoppingBag className="w-4 h-4 text-emerald-400" />
-          <span>Store Orders</span>
-          <span className="ml-auto bg-amber-400/20 text-amber-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-            Live
-          </span>
-        </Link>
-
-        <Link
-          href="/products"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === "/products"
-              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
-              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
-          }`}
-        >
-          <Package className="w-4 h-4 text-blue-400" />
-          <span>Catalog & Inventory</span>
-        </Link>
-
-        <Link
-          href="/products/bulk-upload"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === "/products/bulk-upload"
-              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
-              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4 text-purple-400" />
-          <span>CSV Bulk Import</span>
-        </Link>
-
-        <Link
-          href="/coupons"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === "/coupons"
-              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
-              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
-          }`}
-        >
-          <Tag className="w-4 h-4 text-pink-400" />
-          <span>Seller Coupons</span>
-        </Link>
-
-        <Link
-          href="/payouts"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            pathname === "/payouts"
-              ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
-              : "text-slate-300 hover:text-white hover:bg-slate-800/60"
-          }`}
-        >
-          <CreditCard className="w-4 h-4 text-amber-500" />
-          <span>Weekly Payouts</span>
-        </Link>
+        {navLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+              pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href))
+                ? "bg-amber-400/10 text-amber-400 border border-amber-400/20"
+                : "text-slate-300 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <link.icon className={`w-4 h-4 ${link.color}`} />
+            <span>{link.label}</span>
+            {link.badge && (
+              <span className="ml-auto bg-amber-400/20 text-amber-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                {link.badge}
+              </span>
+            )}
+          </Link>
+        ))}
       </nav>
 
       {/* Courier Integration Status */}
@@ -183,6 +156,36 @@ export function SellerNav() {
           <span>Sign Out</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed top-4 left-4 z-50 p-2 rounded-xl bg-[#0f172a] text-white shadow-lg lg:hidden"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-64 flex-col bg-[#0f172a] border-r border-slate-800/80 sticky top-0 h-screen z-30">
+        {navContent}
+      </aside>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-[#0f172a] shadow-2xl flex flex-col">
+            {navContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { AdminProvider } from "@/components/AdminProvider";
 import { ClientAuthGuard } from "@/components/ClientAuthGuard";
 import { AdminShell } from "@/components/AdminShell";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,11 +22,13 @@ export default function AdminLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AdminProvider>
-          <ClientAuthGuard tokenKey="admin_token">
-            <AdminShell>{children}</AdminShell>
-          </ClientAuthGuard>
-        </AdminProvider>
+        <ErrorBoundary>
+          <AdminProvider>
+            <ClientAuthGuard tokenKey="admin_token">
+              <AdminShell>{children}</AdminShell>
+            </ClientAuthGuard>
+          </AdminProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

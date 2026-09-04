@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
 
 jobs:
   lint:
@@ -25,6 +25,16 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run lint
+
+  migrations:
+    name: Migrations
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+      - name: Verify migrations
+        run: supabase db push --linked
 
   typecheck:
     name: TypeCheck
@@ -50,7 +60,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck]
+    needs: [lint, typecheck, migrations]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -61,7 +71,7 @@ jobs:
       - run: npm run build
 
   test:
-    name: Test
+    name: Unit Tests
     runs-on: ubuntu-latest
     needs: [build]
     services:
@@ -95,17 +105,30 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npx turbo run build --filter=@waw/types
-      - name: Run API tests
+      - name: Run API unit tests
         run: npm test --workspace=@waw/api
-        continue-on-error: true
-      - name: Run web tests
-        run: npm test --workspace=@waw/web
-        continue-on-error: true
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: npx playwright test --project=chromium
+        env:
+          CI: true
 
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [lint, typecheck]
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

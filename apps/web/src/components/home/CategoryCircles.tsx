@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { fetchCategories } from "@/lib/api";
@@ -116,11 +117,12 @@ export function CategoryCircles() {
                 <div className="relative w-22 h-22 sm:w-28 sm:h-28 rounded-full p-1.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 shadow-md group-hover:shadow-xl transition-all group-hover:scale-105">
                   <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5 border-2 border-white flex items-center justify-center bg-slate-50">
                     {imgUrl ? (
-                      <img
+                      <Image
                         src={imgUrl}
                         alt={cat.name}
-                        loading="lazy"
-                        className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
+                        fill
+                        sizes="112px"
+                        className="object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
                       />
                     ) : (
                       <span className="text-slate-300 font-black text-xl flex items-center justify-center w-full h-full rounded-full group-hover:scale-110 transition-transform duration-300">

@@ -1,3 +1,5 @@
+// DEPRECATED: This script is superseded by SCHEMA_COMPLETE.sql.
+// Do not use for new deployments. retained for legacy database migration only.
 const fs = require('fs');
 
 const content = `

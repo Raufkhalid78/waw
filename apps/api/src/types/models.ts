@@ -261,3 +261,64 @@ export interface AuditLog {
   ipAddress?: string;
   createdAt: string;
 }
+
+export interface CatalogProduct {
+  id: string;
+  title: string;
+  titleUrdu?: string;
+  slug: string;
+  description: string;
+  descriptionUrdu?: string;
+  categoryId: string;
+  images: string[];
+  is_active: boolean;
+  is_featured: boolean;
+  is_sponsored: boolean;
+  rating_average: number;
+  rating_count: number;
+  sold_count: number;
+  cost_price_pkr?: number;
+  tags?: string[];
+  weight_kg?: number;
+  merchandising_rank?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SellerOffer {
+  id: string;
+  store_id: string;
+  catalog_product_id: string;
+  sku: string;
+  price_pkr: number;
+  original_price_pkr?: number;
+  condition: "NEW" | "REFURBISHED" | "USED";
+  status: "PENDING" | "ACTIVE" | "REJECTED" | "SUSPENDED";
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OfferVariant {
+  id: string;
+  offer_id: string;
+  sku: string;
+  attributes: Record<string, string>;
+  price_adjustment_pkr: number;
+  stock_quantity: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryLedgerEntry {
+  id: string;
+  offer_variant_id: string;
+  store_id: string;
+  transaction_type: "RESTOCK" | "RESERVE" | "RELEASE" | "SALE" | "RETURN_RESTOCK" | "DAMAGE_ADJUSTMENT";
+  quantity: number;
+  reference_id?: string;
+  notes?: string;
+  actor_id?: string;
+  created_at: string;
+}

@@ -11,15 +11,24 @@ import { StoreSpotlight } from "@/components/home/StoreSpotlight";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package, AlertCircle } from "lucide-react";
 import { fetchProducts, fetchCategories } from "@/lib/api";
+import { FadeIn, Stagger } from "@/components/Motion";
 
 function ProductCardSkeleton() {
   return (
-    <div className="bg-white border border-slate-200/90 rounded-3xl p-4 space-y-4 animate-pulse shadow-xs">
-      <div className="w-full aspect-square bg-slate-100 rounded-2xl" />
-      <div className="space-y-2 pt-1">
-        <div className="h-3.5 bg-slate-100 rounded-full w-4/5" />
-        <div className="h-3 bg-slate-100 rounded-full w-1/2" />
-        <div className="h-4.5 bg-slate-200 rounded-full w-2/5 pt-1" />
+    <div className="bg-white rounded-xl border border-gray-200 p-3 animate-pulse">
+      <div className="w-full aspect-square bg-gray-100 rounded-lg mb-3" />
+      <div className="space-y-2">
+        <div className="h-3 bg-gray-100 rounded w-1/3" />
+        <div className="h-3.5 bg-gray-100 rounded w-4/5" />
+        <div className="h-3 bg-gray-100 rounded w-1/2" />
+        <div className="flex items-center gap-1 mt-2">
+          <div className="h-4 bg-gray-100 rounded w-8" />
+          <div className="h-3 bg-gray-100 rounded w-12" />
+        </div>
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="h-5 bg-gray-100 rounded w-1/3 mb-2" />
+          <div className="h-8 bg-gray-100 rounded w-full" />
+        </div>
       </div>
     </div>
   );
@@ -105,42 +114,44 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-3 pb-20">
+    <div className="space-y-4 pb-20">
       {/* 1. Hero Banner Carousel */}
-      <HeroBanner />
+      <FadeIn>
+        <HeroBanner />
+      </FadeIn>
 
       {/* 2. Flash Deals */}
-      <FlashDeals />
+      <FadeIn delay={50}>
+        <FlashDeals />
+      </FadeIn>
 
       {/* 3. DB-backed Category Circles */}
-      <CategoryCircles />
+      <FadeIn delay={100}>
+        <CategoryCircles />
+      </FadeIn>
 
-      {/* 2. Live Marketplace Catalog */}
-      <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
-        <div className="bg-white border border-slate-200/90 rounded-[36px] p-6 sm:p-9 shadow-xs space-y-7">
-          {/* Section Heading & Category Tabs */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-slate-100 pb-6">
+      {/* 4. Live Marketplace Catalog */}
+      <FadeIn delay={150}>
+      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {/* Section Header & Category Tabs */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 px-5 py-4">
             <div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-xs">
-                  <Flame className="w-5 h-5 fill-slate-950" />
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
-                  Trending in Pakistan
-                </h2>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
+              <h2 className="text-lg font-bold text-gray-900">
+                Trending in Pakistan
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
                 Discover authentic products from verified merchants across Pakistan.
               </p>
             </div>
 
             {/* DB-backed Category Filter Tabs */}
             {dbCategories.length > 0 && (
-              <div className="flex items-center gap-2 max-w-full md:max-w-md relative">
+              <div className="flex items-center gap-1.5 max-w-full md:max-w-lg relative">
                 {canScrollLeft && (
                   <button
                     onClick={() => scrollTabs("left")}
-                    className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-amber-600 shrink-0 cursor-pointer"
                     aria-label="Scroll left"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -149,14 +160,14 @@ export default function HomePage() {
 
                 <div
                   ref={tabScrollRef}
-                  className="flex items-center gap-2.5 overflow-x-auto no-scrollbar scroll-smooth py-1"
+                  className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth"
                 >
                   <button
                     onClick={() => setActiveCategory(null)}
-                    className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                       activeCategory === null
-                        ? "bg-slate-950 text-amber-400 shadow-md"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        ? "bg-amber-400 text-slate-900"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     All Products
@@ -165,10 +176,10 @@ export default function HomePage() {
                     <button
                       key={cat.slug}
                       onClick={() => setActiveCategory(cat.slug)}
-                      className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                         activeCategory === cat.slug
-                          ? "bg-slate-950 text-amber-400 shadow-md"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          ? "bg-amber-400 text-slate-900"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
                       {cat.name}
@@ -179,7 +190,7 @@ export default function HomePage() {
                 {canScrollRight && (
                   <button
                     onClick={() => scrollTabs("right")}
-                    className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-700 hover:text-amber-600 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-amber-600 shrink-0 cursor-pointer"
                     aria-label="Scroll right"
                   >
                     <ChevronRight className="w-4 h-4" />
@@ -190,122 +201,129 @@ export default function HomePage() {
           </div>
 
           {/* Product Grid */}
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-              {[...Array(8)].map((_, i) => (
-                <ProductCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="text-center py-16 space-y-4 max-w-md mx-auto">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="w-7 h-7" />
+          <div className="p-5">
+            {loading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {[...Array(8)].map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
               </div>
-              <h3 className="text-lg font-black text-slate-900">Catalog Temporarily Unavailable</h3>
-              <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                {error}
-              </p>
-              <button
-                onClick={loadCatalog}
-                className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 px-6 py-2.5 rounded-full font-black text-xs uppercase tracking-wider shadow-xs transition-all cursor-pointer"
-              >
-                <span>Retry Connection</span>
-              </button>
-            </div>
-          ) : liveProducts.length === 0 ? (
-            <div className="text-center py-20 space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-                <Package className="w-7 h-7" />
-              </div>
-              <p className="text-slate-500 font-bold">
-                No products found in this category yet.
-              </p>
-              {activeCategory && (
+            ) : error ? (
+              <div className="text-center py-16 space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold text-gray-900">Catalog Temporarily Unavailable</h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  {error}
+                </p>
                 <button
-                  onClick={() => setActiveCategory(null)}
-                  className="text-xs font-black text-amber-600 underline"
+                  onClick={loadCatalog}
+                  className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-900 px-5 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer"
                 >
-                  View all products
+                  Retry Connection
                 </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-              {liveProducts.map((prod) => (
-                <ProductCard
-                  key={prod.productId}
-                  productId={prod.productId}
-                  title={prod.title}
-                  storeName={prod.storeName}
-                  sellerCity={prod.sellerCity}
-                  pricePkr={prod.pricePkr}
-                  originalPricePkr={prod.originalPricePkr}
-                  discountPercent={prod.discountPercent}
-                  rating={prod.rating}
-                  reviewsCount={prod.reviewsCount}
-                  soldCount={prod.soldCount}
-                  imageUrl={prod.imageUrl}
-                  isExpress={prod.isExpress}
-                  sellerType={prod.sellerType}
-                />
-              ))}
-            </div>
-          )}
+              </div>
+            ) : liveProducts.length === 0 ? (
+              <div className="text-center py-16 space-y-3">
+                <Package className="w-10 h-10 text-gray-300 mx-auto" />
+                <p className="text-sm text-gray-500 font-medium">
+                  No products found in this category yet.
+                </p>
+                {activeCategory && (
+                  <button
+                    onClick={() => setActiveCategory(null)}
+                    className="text-xs font-semibold text-amber-600 hover:text-amber-700 underline"
+                  >
+                    View all products
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {liveProducts.map((prod) => (
+                  <ProductCard
+                    key={prod.productId}
+                    productId={prod.productId}
+                    title={prod.title}
+                    storeName={prod.storeName}
+                    sellerCity={prod.sellerCity}
+                    pricePkr={prod.pricePkr}
+                    originalPricePkr={prod.originalPricePkr}
+                    discountPercent={prod.discountPercent}
+                    rating={prod.rating}
+                    reviewsCount={prod.reviewsCount}
+                    soldCount={prod.soldCount}
+                    imageUrl={prod.imageUrl}
+                    isExpress={prod.isExpress}
+                    sellerType={prod.sellerType}
+                  />
+                ))}
+              </div>
+            )}
 
-          {/* View More */}
-          <div className="text-center pt-5">
-            <Link
-              href="/category/mobiles-tech"
-              className="inline-flex items-center gap-2.5 bg-slate-950 hover:bg-slate-900 text-amber-400 px-9 py-4 rounded-2xl text-sm sm:text-base font-black shadow-lg hover:scale-105 transition-all cursor-pointer"
-            >
-              <span>EXPLORE ALL PRODUCTS</span>
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+            {/* View More */}
+            {liveProducts.length > 0 && (
+              <div className="text-center pt-5 border-t border-gray-100 mt-5">
+                <Link
+                  href="/categories"
+                  className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer"
+                >
+                  View All Products
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </section>
+      </FadeIn>
 
-      {/* 3. Buyer Protection Banner */}
-      <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-5">
-        <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white rounded-[36px] p-7 sm:p-12 border border-slate-800 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-8 relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="space-y-3 relative z-10 max-w-2xl">
-            <div className="flex items-center gap-2 text-amber-400 text-xs sm:text-sm font-black uppercase tracking-wider">
-              <ShieldCheck className="w-5 h-5" />
+      {/* 5. Buyer Protection Banner */}
+      <FadeIn delay={200}>
+        <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
+        <div className="bg-gray-900 text-white rounded-xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold uppercase tracking-wider">
+              <ShieldCheck className="w-4 h-4" />
               <span>{cmsContent?.title || "Secure Payments"}</span>
             </div>
-            <h3 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+            <h3 className="text-xl sm:text-2xl font-bold">
               Shop with Confidence on WAW
             </h3>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
+            <p className="text-sm text-gray-400 leading-relaxed max-w-lg">
               {cmsContent?.content_html || "Direct from verified Pakistani sellers with doorstep delivery, easy returns, and dedicated customer care."}
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 relative z-10">
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/buyer-protection"
-              className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black px-7 py-4 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xl hover:scale-105 transition-all"
+              className="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-all"
             >
-              <span>Learn About Buyer Protection</span>
-              <ArrowRight className="w-5 h-5" />
+              Learn More
+              <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/help"
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-black px-7 py-4 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all"
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold px-5 py-2.5 rounded-lg text-sm transition-all"
             >
-              <span>Help & Support</span>
+              Help & Support
             </Link>
           </div>
         </div>
-      </section>
+        </section>
+      </FadeIn>
 
-      {/* 4. Featured Brand Hubs */}
-      <FeaturedBrands />
+      {/* 6. Featured Brand Hubs */}
+      <FadeIn delay={250}>
+        <FeaturedBrands />
+      </FadeIn>
 
-      {/* 5. Store Spotlight */}
-      <StoreSpotlight />
+      {/* 7. Store Spotlight */}
+      <FadeIn delay={300}>
+        <StoreSpotlight />
+      </FadeIn>
     </div>
   );
 }

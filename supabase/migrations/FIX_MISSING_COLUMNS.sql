@@ -1,7 +1,9 @@
 -- ============================================================================
--- FIX: Add missing columns to tables created by old schema
--- Run this AFTER SCHEMA_COMPLETE.sql to patch any tables that were created
--- by the old migration system and are missing newer columns.
+-- [DEPRECATED] FIX: Add missing columns to tables created by old schema
+-- ============================================================================
+-- DEPRECATED: This file is for legacy databases only. New deployments should
+-- use SCHEMA_COMPLETE.sql which already includes all columns and tables.
+-- Run this ONLY if migrating from a pre-Phase-1 database.
 -- ============================================================================
 
 -- Orders: add order_number if missing

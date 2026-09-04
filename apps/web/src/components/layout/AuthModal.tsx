@@ -57,16 +57,37 @@ export function AuthModal({
     return "Waw Customer";
   };
 
-  const handleContinue = (e: React.FormEvent) => {
+  const API_BASE = (
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+  ).replace(/\/+$/, "");
+
+  const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasInput) return;
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      if (isEmail) {
+        // Email login — go directly to OTP step (email OTP flow)
+        setResendTimer(45);
+        setStep("OTP");
+      } else {
+        // Phone — send WhatsApp OTP
+        const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: formattedTarget }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to send OTP");
+        setResendTimer(45);
+        setStep("OTP");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to send verification code");
+    } finally {
       setLoading(false);
-      setResendTimer(45);
-      setStep("OTP");
-    }, 600);
+    }
   };
 
   const handleOtpChange = (index: number, val: string) => {
@@ -82,52 +103,79 @@ export function AuthModal({
     }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const otpCode = otp.join("");
+      if (!isEmail) {
+        // Phone OTP verification via API
+        const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: formattedTarget, otp: otpCode }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Invalid OTP");
+
+        // Store token
+        localStorage.setItem("waw_auth_token", data.token);
+        localStorage.setItem("waw_user", JSON.stringify(data.user));
+
+        login({
+          name: data.user?.full_name || parseDisplayName(identifier),
+          emailOrPhone: identifier,
+        });
+      } else {
+        // Email OTP — simulate for now (needs email OTP service)
+        login({
+          name: parseDisplayName(identifier),
+          emailOrPhone: identifier,
+        });
+      }
+
       setStep("SUCCESS");
-
-      // Update global user authentication state
-      const userName = parseDisplayName(identifier);
-      login({
-        name: userName,
-        emailOrPhone: identifier,
-      });
-
       setTimeout(() => {
         if (onSuccess) onSuccess(identifier);
         onClose();
         setStep("INPUT");
         setOtp(["", "", "", "", "", ""]);
       }, 1000);
-    }, 700);
+    } catch (err: any) {
+      alert(err.message || "Verification failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleOAuthLogin = (provider: "GOOGLE" | "APPLE") => {
+  const handleOAuthLogin = async (provider: "GOOGLE" | "APPLE") => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      // Use Supabase OAuth redirect
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseAnonKey) {
+        const redirectUrl = `${window.location.origin}/auth/callback`;
+        const providerLower = provider.toLowerCase();
+        window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=${providerLower}&redirect_to=${encodeURIComponent(redirectUrl)}`;
+      } else {
+        // Fallback: simulate OAuth for development
+        const userName = provider === "GOOGLE" ? "Google User" : "Apple User";
+        login({
+          name: userName,
+          emailOrPhone: "",
+        });
+        setStep("SUCCESS");
+        setTimeout(() => {
+          if (onSuccess) onSuccess("");
+          onClose();
+          setStep("INPUT");
+        }, 1000);
+      }
+    } catch {
       setLoading(false);
-      setStep("SUCCESS");
-
-      const userName =
-        provider === "GOOGLE"
-          ? parseDisplayName(identifier)
-          : `Customer ${identifier.slice(-4)}`;
-      const userEmail = provider === "GOOGLE" ? identifier : "";
-
-      login({
-        name: userName,
-        emailOrPhone: userEmail,
-      });
-
-      setTimeout(() => {
-        if (onSuccess) onSuccess(userEmail);
-        onClose();
-        setStep("INPUT");
-      }, 1000);
-    }, 800);
+    }
   };
 
   return (
@@ -179,14 +227,13 @@ export function AuthModal({
               </div>
             </div>
 
-            {/* Centerpiece: Clean Pure Waw 'و' Squircle (NO STAR) */}
+            {/* Centerpiece: WAW Logo */}
             <div className="flex flex-col items-center justify-center space-y-2 z-10 mx-1">
-              <div className="w-22 h-22 sm:w-24 sm:h-24 rounded-[28px] bg-slate-950 text-[#FFEB00] font-black text-5xl shadow-2xl border-2 border-white flex items-center justify-center transform hover:scale-105 transition-transform">
-                <span>و</span>
-              </div>
-              <div className="bg-slate-950 px-3.5 py-1 rounded-full text-[10px] font-black text-[#FFEB00] tracking-wider uppercase shadow-md border border-white/20">
-                waw.com.pk
-              </div>
+              <img
+                src="/images/logo/waw_noon_logo_black.svg"
+                alt="Waw Logo"
+                className="w-22 h-22 sm:w-24 sm:h-24"
+              />
             </div>
 
             {/* Right Column (Large Prominent Showcase Cards) */}
@@ -254,6 +301,7 @@ export function AuthModal({
               <form onSubmit={handleContinue} className="space-y-3">
                 <div className="relative">
                   <input
+                    id="waw-identifier-input"
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
@@ -351,7 +399,10 @@ export function AuthModal({
               <button
                 type="button"
                 onClick={() => {
-                  setIdentifier("+92 300 1234567");
+                  if (!identifier.trim()) {
+                    document.getElementById("waw-identifier-input")?.focus();
+                    return;
+                  }
                   setStep("OTP");
                 }}
                 className="w-full flex items-center justify-center gap-2 p-2.5 bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-xs font-black text-emerald-800 transition-all shadow-xs cursor-pointer"

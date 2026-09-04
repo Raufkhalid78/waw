@@ -1,0 +1,672 @@
+openapi: 3.0.3
+info:
+  title: Waw Marketplace API
+  description: |
+    Multi-vendor e-commerce marketplace API for Pakistan.
+    Supports product catalog, orders, payments (XPay, Raast, COD), logistics (PostEx), and seller management.
+  version: 1.0.0
+  contact:
+    name: Waw Support
+    url: https://waw.com.pk
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:4000
+    description: Development
+  - url: https://api.waw.com.pk
+    description: Production
+
+tags:
+  - name: Auth
+    description: Authentication & OTP
+  - name: Products
+    description: Product catalog & search
+  - name: Orders
+    description: Order management
+  - name: Cart
+    description: Shopping cart
+  - name: Seller
+    description: Seller portal
+  - name: Admin
+    description: Admin operations
+  - name: Support
+    description: Customer support tickets
+  - name: Payments
+    description: Payment processing
+  - name: Logistics
+    description: Courier & shipping
+  - name: Health
+    description: Health checks
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Service is running
+
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe (checks Supabase, Redis, Typesense)
+      responses:
+        "200":
+          description: All dependencies healthy
+        "503":
+          description: One or more dependencies degraded
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Email/password login (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Login successful
+        "401":
+          description: Invalid credentials
+
+  /api/auth/whatsapp-otp/send:
+    post:
+      tags: [Auth]
+      summary: Send OTP via WhatsApp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  example: "03001234567"
+      responses:
+        "200":
+          description: OTP sent
+        "429":
+          description: Rate limited
+
+  /api/auth/whatsapp-otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and get JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone:
+                  type: string
+                otp:
+                  type: string
+                  example: "123456"
+      responses:
+        "200":
+          description: Verified, returns JWT
+
+  /api/products:
+    get:
+      tags: [Products]
+      summary: List products with filters
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [price_asc, price_desc, newest, popular]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Product list
+    post:
+      tags: [Products, Seller]
+      summary: Create a product (seller/admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProduct"
+      responses:
+        "201":
+          description: Product created
+        "401":
+          description: Unauthorized
+
+  /api/products/{slug}:
+    get:
+      tags: [Products]
+      summary: Get product by slug or ID
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product details
+        "404":
+          description: Product not found
+
+  /api/products/{id}/reviews:
+    post:
+      tags: [Products]
+      summary: Submit a product review
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+                  maxLength: 2000
+      responses:
+        "201":
+          description: Review submitted
+        "400":
+          description: Validation error
+
+  /api/categories:
+    get:
+      tags: [Products]
+      summary: List category tree
+      responses:
+        "200":
+          description: Category hierarchy
+
+  /api/stores:
+    get:
+      tags: [Products]
+      summary: List active stores
+      responses:
+        "200":
+          description: Store list with top products
+
+  /api/orders:
+    post:
+      tags: [Orders]
+      summary: Create an order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrder"
+      responses:
+        "201":
+          description: Order created
+        "400":
+          description: Validation error
+    get:
+      tags: [Orders]
+      summary: List user orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order list
+
+  /api/orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get order details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order details
+        "403":
+          description: Not authorized
+        "404":
+          description: Order not found
+
+  /api/orders/{id}/status:
+    patch:
+      tags: [Orders]
+      summary: Update order status (admin/seller)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PENDING, CONFIRMED, PROCESSING, SHIPPED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, RETURNED]
+                trackingNumber:
+                  type: string
+                courierProvider:
+                  type: string
+                  enum: [POSTEX, TRAX, LEOPARDS, TCS, WAW_FLEET]
+      responses:
+        "200":
+          description: Status updated
+
+  /api/orders/{id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel an order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Order cancelled
+
+  /api/orders/{id}/return:
+    post:
+      tags: [Orders]
+      summary: Request order return
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Return request created
+
+  /api/orders/{id}/dispute:
+    post:
+      tags: [Orders]
+      summary: File a dispute for an order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, description]
+              properties:
+                reason:
+                  type: string
+                  minLength: 10
+                description:
+                  type: string
+                  minLength: 10
+                evidenceImages:
+                  type: array
+                  items:
+                    type: string
+                    format: uri
+      responses:
+        "201":
+          description: Dispute filed
+
+  /api/cart:
+    get:
+      tags: [Cart]
+      summary: Get cart contents
+      parameters:
+        - name: guestToken
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cart contents
+
+  /api/cart/items:
+    post:
+      tags: [Cart]
+      summary: Add item to cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId:
+                  type: string
+                variantId:
+                  type: string
+                quantity:
+                  type: integer
+                  minimum: 1
+                guestToken:
+                  type: string
+      responses:
+        "201":
+          description: Item added
+
+  /api/seller/apply:
+    post:
+      tags: [Seller]
+      summary: Apply as a seller
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storeName, city, cnic, iban]
+              properties:
+                storeName:
+                  type: string
+                  minLength: 3
+                city:
+                  type: string
+                cnic:
+                  type: string
+                  example: "35202-1234567-1"
+                iban:
+                  type: string
+                  example: "PK36HABB00000012345678"
+                bankName:
+                  type: string
+      responses:
+        "201":
+          description: Application submitted
+        "400":
+          description: Validation error
+
+  /api/seller/store:
+    get:
+      tags: [Seller]
+      summary: Get seller store details
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Store details
+
+  /api/seller/orders:
+    get:
+      tags: [Seller]
+      summary: List seller orders
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Order list
+
+  /api/seller/products:
+    get:
+      tags: [Seller]
+      summary: List seller products
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Product list
+
+  /api/seller/analytics:
+    get:
+      tags: [Seller]
+      summary: Get seller analytics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Revenue, orders, products stats
+
+  /api/admin/stats:
+    get:
+      tags: [Admin]
+      summary: Get platform statistics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Platform metrics
+
+  /api/admin/sellers:
+    get:
+      tags: [Admin]
+      summary: List all sellers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, PENDING_KYC, SUSPENDED]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Seller list with pagination
+
+  /api/support/tickets:
+    post:
+      tags: [Support]
+      summary: Create a support ticket
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, description]
+              properties:
+                subject:
+                  type: string
+                  minLength: 5
+                description:
+                  type: string
+                  minLength: 10
+                orderId:
+                  type: string
+                priority:
+                  type: string
+                  enum: [LOW, MEDIUM, HIGH, URGENT]
+      responses:
+        "201":
+          description: Ticket created
+
+  /api/search:
+    get:
+      tags: [Products]
+      summary: Search products (Typesense)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query (supports Roman Urdu)
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Search results
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CreateProduct:
+      type: object
+      required: [title, description, categoryId]
+      properties:
+        title:
+          type: string
+          minLength: 3
+        titleUrdu:
+          type: string
+        description:
+          type: string
+          minLength: 5
+        pricePkr:
+          type: number
+        categoryId:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        stockQuantity:
+          type: integer
+          minimum: 0
+
+    CreateOrder:
+      type: object
+      required: [buyerName, buyerPhone, shippingAddress, shippingCity, shippingProvince, paymentMethod, items]
+      properties:
+        buyerName:
+          type: string
+        buyerPhone:
+          type: string
+        shippingAddress:
+          type: string
+        shippingCity:
+          type: string
+        shippingProvince:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [COD, XPAY_CARD, XPAY_WALLET, RAAST_P2M_QR]
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId:
+                type: string
+              variantId:
+                type: string
+              quantity:
+                type: integer
+                minimum: 1
+                maximum: 100
+              unitPricePkr:
+                type: number

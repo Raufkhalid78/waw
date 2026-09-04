@@ -221,15 +221,14 @@ export default function SellerOrdersPage() {
               {/* PostEx Action Buttons */}
               <div className="space-y-2">
                 <button
-                  onClick={() =>
-                    alert(
-                      `Printing PostEx 4x6 Thermal Air Waybill for CN: ${selectedOrder.trackingNumber}`,
-                    )
-                  }
+                  onClick={() => {
+                    if (selectedOrder.trackingNumber) {
+                      navigator.clipboard.writeText(selectedOrder.trackingNumber);
+                    }
+                  }}
                   className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
                 >
-                  <Printer className="w-4 h-4 text-amber-400" /> Print PostEx
-                  Thermal Label
+                  <Printer className="w-4 h-4 text-amber-400" /> Copy Tracking #
                 </button>
 
                 {selectedOrder.orderStatus === OrderStatus.CONFIRMED && (

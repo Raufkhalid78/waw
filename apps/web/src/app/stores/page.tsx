@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Store, Star, CheckCircle2, MapPin, Search, ArrowRight, ShieldCheck } from "lucide-react";
 import { fetchStores, type StoreSummary } from "@/lib/api";
 import { SellerType } from "@waw/types";
+import { FadeIn } from "@/components/Motion";
 
 const GRADIENTS = [
   "from-amber-800 to-amber-950",
@@ -72,6 +73,7 @@ export default function StoresPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8">
+        <FadeIn delay={100}>
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
@@ -206,6 +208,7 @@ export default function StoresPage() {
             })}
           </div>
         )}
+        </FadeIn>
       </div>
     </div>
   );

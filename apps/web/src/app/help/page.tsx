@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import {
   HelpCircle,
   Search,
@@ -14,6 +15,7 @@ import {
   ChevronRight,
   ArrowRight,
 } from "lucide-react";
+import { FadeIn } from "@/components/Motion";
 
 const FAQS = [
   {
@@ -94,6 +96,7 @@ export default function HelpCenterPage() {
       </div>
 
       {/* ── FAQ Accordion Section ────────────────────────────────────────── */}
+      <FadeIn delay={100}>
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 max-w-4xl mx-auto shadow-xs space-y-6">
         <h2 className="text-xl font-black text-slate-950 tracking-tight">
           Frequently Asked Questions
@@ -120,12 +123,13 @@ export default function HelpCenterPage() {
           ))}
         </div>
       </div>
+      </FadeIn>
 
       {/* ── Direct Contact Strip ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
         <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-3xl space-y-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
-            <MessageCircle className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center overflow-hidden">
+            <WhatsAppIcon className="w-8 h-8" />
           </div>
           <h3 className="font-black text-sm text-emerald-950">
             24/7 WhatsApp Helpline

@@ -55,7 +55,7 @@ body {
   @apply bg-blue-100 text-blue-800;
 }
 .badge-neutral {
-  @apply bg-gray-100 text-gray-800;
+  @apply bg-gray-100 text-gray-700;
 }
 
 /* Table styles */
@@ -63,7 +63,7 @@ body {
   @apply w-full text-sm text-left;
 }
 .admin-table thead {
-  @apply text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200;
+  @apply text-xs text-gray-500 uppercase bg-gray-50/80 border-b border-gray-200;
 }
 .admin-table th {
   @apply px-4 py-3 font-semibold;
@@ -71,6 +71,44 @@ body {
 .admin-table td {
   @apply px-4 py-3 border-b border-gray-100;
 }
+.admin-table tbody tr {
+  @apply transition-colors;
+}
 .admin-table tbody tr:hover {
   @apply bg-gray-50;
+}
+
+/* Form inputs */
+.admin-input {
+  @apply w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm
+    focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400
+    placeholder:text-gray-400 transition-shadow;
+}
+
+/* Skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  @apply bg-gray-100 rounded-lg;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Row fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Sidebar overlay animation */
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }

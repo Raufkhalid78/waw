@@ -98,6 +98,72 @@ export interface MarketplaceSettings {
   support_email?: string;
 }
 
+export interface AdminDispute {
+  id: string;
+  order_id: string;
+  buyer_id: string;
+  buyer_name?: string;
+  seller_id: string;
+  seller_name?: string;
+  reason: string;
+  description?: string;
+  status: string;
+  resolution?: string;
+  created_at: string;
+}
+
+export interface AdminReturn {
+  id: string;
+  order_id: string;
+  buyer_id: string;
+  buyer_name?: string;
+  seller_id: string;
+  seller_name?: string;
+  reason: string;
+  status: string;
+  refund_amount_pkr?: number;
+  pickup_address?: string;
+  created_at: string;
+}
+
+export interface AdminReview {
+  id: string;
+  product_id: string;
+  product_title?: string;
+  user_id: string;
+  user_name?: string;
+  rating: number;
+  comment?: string;
+  is_verified_purchase: boolean;
+  status: string;
+  created_at: string;
+}
+
+export interface AdminPayout {
+  id: string;
+  seller_id: string;
+  seller_name?: string;
+  store_name?: string;
+  amount_pkr: number;
+  status: string;
+  bank_account?: string;
+  created_at: string;
+  settled_at?: string;
+}
+
+export interface AdminKyc {
+  id: string;
+  store_id: string;
+  store_name?: string;
+  owner_name?: string;
+  cnic_number?: string;
+  business_registration?: string;
+  bank_account_number?: string;
+  bank_name?: string;
+  status: string;
+  submitted_at: string;
+}
+
 // ── API Modules ────────────────────────────────────────────────────────
 
 // Products
@@ -197,4 +263,107 @@ export const settingsApi = {
 // Stats
 export const statsApi = {
   get: () => adminFetch<AdminStats>("/api/admin/stats"),
+};
+
+// Disputes
+export const disputesApi = {
+  list: (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.status) query.set("status", params.status);
+    return adminFetch<{ disputes: AdminDispute[]; total: number }>(
+      `/api/admin/disputes?${query}`
+    );
+  },
+  resolve: (id: string, resolution: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/disputes/${id}/resolve`, {
+      method: "PATCH",
+      body: JSON.stringify({ resolution }),
+    }),
+};
+
+// Returns
+export const returnsApi = {
+  list: (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.status) query.set("status", params.status);
+    return adminFetch<{ returns: AdminReturn[]; total: number }>(
+      `/api/admin/returns?${query}`
+    );
+  },
+  receive: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/returns/${id}/receive`, {
+      method: "PATCH",
+    }),
+  refund: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/returns/${id}/refund`, {
+      method: "PATCH",
+    }),
+  reject: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/returns/${id}/reject`, {
+      method: "PATCH",
+    }),
+};
+
+// Reviews
+export const reviewsApi = {
+  list: (params?: { page?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    return adminFetch<{ reviews: AdminReview[]; total: number }>(
+      `/api/admin/reviews/pending?${query}`
+    );
+  },
+  approve: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/reviews/${id}/approve`, {
+      method: "PATCH",
+    }),
+  reject: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/reviews/${id}/reject`, {
+      method: "PATCH",
+    }),
+};
+
+// Payouts
+export const payoutsApi = {
+  list: (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.status) query.set("status", params.status);
+    return adminFetch<{ payouts: AdminPayout[]; total: number }>(
+      `/api/admin/payouts?${query}`
+    );
+  },
+  settle: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/payouts/${id}/settle`, {
+      method: "PATCH",
+    }),
+};
+
+// KYC
+export const kycApi = {
+  listPending: () =>
+    adminFetch<{ submissions: AdminKyc[] }>("/api/admin/kyc/pending"),
+  approve: (storeId: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/kyc/${storeId}/approve`, {
+      method: "PATCH",
+    }),
+  reject: (storeId: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/kyc/${storeId}/reject`, {
+      method: "PATCH",
+    }),
+};
+
+// Sellers
+export const sellersApi = {
+  update: (id: string, data: { status?: string; commission_rate_percentage?: number }) =>
+    adminFetch<{ success: boolean }>(`/api/admin/sellers/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 };

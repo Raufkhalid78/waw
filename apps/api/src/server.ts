@@ -8,6 +8,7 @@ import { supabaseAdmin } from "./config/supabase.js";
 import { initTypesenseCollections } from "./config/typesense.js";
 import { startReconciliationCron } from "./jobs/reconciliation.cron.js";
 import { startInventoryCleanupCron } from "./jobs/inventory-cleanup.cron.js";
+import { initSentry, captureException } from "./config/sentry.js";
 
 const server = http.createServer(app);
 
@@ -55,14 +56,20 @@ io.on("connection", (socket) => {
 });
 
 process.on("unhandledRejection", (reason: any) => {
-  logger.error("Unhandled promise rejection", { scope: "Process", message: reason?.message || String(reason) });
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error("Unhandled promise rejection", { scope: "Process", message: error.message });
+  captureException(error, { source: "unhandledRejection" });
 });
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught exception — shutting down", { scope: "Process", message: err.message });
+  captureException(err, { source: "uncaughtException" });
   process.exit(1);
 });
 
 async function bootstrap() {
+  // Initialize Sentry error tracking
+  initSentry();
+
   // Start HTTP server first so Railway health checks pass immediately
   server.listen(ENV.PORT, () => {
     logger.info(`
@@ -83,6 +90,30 @@ async function bootstrap() {
 
   startReconciliationCron();
   startInventoryCleanupCron();
+
+  // Graceful shutdown handler
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received — starting graceful shutdown`);
+
+    // Stop accepting new connections
+    server.close(() => {
+      logger.info("HTTP server closed");
+    });
+
+    // Close Socket.IO
+    io.close(() => {
+      logger.info("WebSocket server closed");
+    });
+
+    // Give in-flight requests up to 10s to complete
+    setTimeout(() => {
+      logger.error("Forced shutdown after timeout");
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 bootstrap().catch((err) => {

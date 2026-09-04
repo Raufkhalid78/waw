@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { FadeIn } from "@/components/Motion";
 import {
   fetchCheckoutQuote,
   createOrderApi,
@@ -220,6 +221,7 @@ export default function CheckoutPage() {
         </p>
       </div>
 
+      <FadeIn delay={100}>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Form & Payment (7 Cols) */}
         <form onSubmit={handlePlaceOrder} className="lg:col-span-7 space-y-6">
@@ -594,6 +596,7 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      </FadeIn>
 
       {/* ── State Bank Raast P2M Dynamic QR Modal ─────────────────────────── */}
     </div>

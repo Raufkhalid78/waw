@@ -32,7 +32,7 @@ export class InventoryLockService {
       if (!acquired) {
         logger.warn(`Could not acquire checkout lock for product ${item.productId} — concurrent checkout in progress`);
         if (productLockKeys.length > 0) {
-          try { await redis.del(...productLockKeys); } catch {}
+          try { await redis.del(...productLockKeys); } catch { /* lock TTL will expire */ }
         }
         return false;
       }
@@ -70,7 +70,7 @@ export class InventoryLockService {
         } catch (err) {
           logger.warn("Redis lock acquisition failed:", err);
           if (reservationKeys.length > 0) {
-            try { await redis.del(...reservationKeys); } catch {}
+            try { await redis.del(...reservationKeys); } catch { /* lock TTL will expire */ }
           }
           return false;
         }
@@ -86,7 +86,7 @@ export class InventoryLockService {
             `Post-lock stock check failed for ${item.productId}: available=${stockAvailable}, requested=${item.quantity}`,
           );
           // Release reservation locks we just acquired
-          try { await redis.del(...reservationKeys); } catch {}
+          try { await redis.del(...reservationKeys); } catch { /* lock TTL will expire */ }
           return false;
         }
       }
@@ -94,7 +94,7 @@ export class InventoryLockService {
       return true;
     } finally {
       // Release pessimistic checkout locks (short-lived, but release early)
-      try { await redis.del(...productLockKeys); } catch {}
+      try { await redis.del(...productLockKeys); } catch { /* lock TTL will expire */ }
     }
   }
 
@@ -127,7 +127,7 @@ export class InventoryLockService {
         const reservationKey = `RESERVED:ORDER:${orderId}:${lockKey}`;
         try {
           await redis.del(reservationKey);
-        } catch {}
+        } catch { /* reservation TTL will expire */ }
       }
     }
   }

@@ -1,7 +1,23 @@
 import { Request, Response } from "express";
 import { AuthService } from "./auth.service.js";
+import { logger } from "../../config/logger.js";
 
 export class AuthController {
+  static async login(req: Request, res: Response): Promise<void> {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        res.status(400).json({ error: "Email and password are required" });
+        return;
+      }
+      const result = await AuthService.loginWithEmail(email, password);
+      res.json(result);
+    } catch (err: any) {
+      logger.error("Auth login failed", { message: err.message });
+      res.status(401).json({ error: err.message });
+    }
+  }
+
   static async requestOtp(req: Request, res: Response): Promise<void> {
     try {
       const { phone } = req.body;

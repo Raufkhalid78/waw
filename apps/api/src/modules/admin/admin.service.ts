@@ -1,5 +1,6 @@
 import { AuditService } from "../audit/audit.service.js";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { logger } from "../../config/logger.js";
 import { PayoutStatus, StoreStatus } from "../../types/index.js";
 
 export class AdminService {
@@ -7,41 +8,31 @@ export class AdminService {
    * Calculates overall platform metrics and financials from Supabase.
    */
   static async getPlatformStats() {
-    const [
-      { count: totalOrders },
-      { count: totalSellers },
-      { count: totalProducts },
-      { data: orders },
-      { data: storeOrders },
-    ] = await Promise.all([
-      supabaseAdmin.from("orders").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("stores").select("*", { count: "exact", head: true }),
-      supabaseAdmin
-        .from("catalog_products")
-        .select("*", { count: "exact", head: true }),
-      supabaseAdmin
-        .from("orders")
-        .select("total_amount_pkr, payment_status, global_status")
-        .limit(10000), // TODO: replace with database-side SUM via RPC once available
-      supabaseAdmin
-        .from("store_orders")
-        .select("commission_pkr")
-        .limit(10000),
+    // Run queries independently so one failure doesn't break everything
+    const safeQuery = async (builder: any) => {
+      try { return await builder; } catch { return { count: 0, data: [], error: null }; }
+    };
+
+    const [ordersCount, sellersCount, productsCount, ordersResult, storeOrdersResult] = await Promise.all([
+      safeQuery(supabaseAdmin.from("orders").select("*", { count: "exact", head: true })),
+      safeQuery(supabaseAdmin.from("stores").select("*", { count: "exact", head: true })),
+      safeQuery(supabaseAdmin.from("catalog_products").select("*", { count: "exact", head: true })),
+      safeQuery(supabaseAdmin.from("orders").select("total_amount_pkr").limit(10000)),
+      safeQuery(supabaseAdmin.from("store_orders").select("commission_pkr").limit(10000)),
     ]);
 
-    const orderList: any[] = orders || [];
-    const storeOrderList: any[] = storeOrders || [];
-    const gmvPkr = orderList.reduce((sum, o) => sum + (o.total_amount_pkr || 0), 0);
+    const orderList: any[] = ordersResult.data || [];
+    const storeOrderList: any[] = storeOrdersResult.data || [];
+    const gmvPkr = orderList.reduce((sum: number, o: any) => sum + (o.total_amount_pkr || 0), 0);
     const totalCommissionsPkr = storeOrderList.reduce(
-      (sum, so) => sum + (so.commission_pkr || 0),
-      0,
+      (sum: number, so: any) => sum + (so.commission_pkr || 0), 0,
     );
 
     return {
       gmvPkr,
-      totalOrders: totalOrders || 0,
-      totalSellers: totalSellers || 0,
-      totalProducts: totalProducts || 0,
+      totalOrders: ordersCount.count || 0,
+      totalSellers: sellersCount.count || 0,
+      totalProducts: productsCount.count || 0,
       totalCommissionsPkr,
       codFeesCollectedPkr: 0,
       netPlatformRevenuePkr: totalCommissionsPkr,
@@ -77,14 +68,12 @@ export class AdminService {
     let query = supabaseAdmin
       .from("seller_offers")
       .select(
-        "id, sku, price_pkr, original_price_pkr, condition, status, is_active, created_at, store_id, catalog_product:catalog_products(id, title, slug, images, is_active), store:stores(name)",
+        "id, sku, price_pkr, original_price_pkr, condition, status, created_at, store_id, catalog_product:catalog_products(id, title, slug, images, is_active), store:stores(name)",
         { count: "exact" },
       );
 
     if (params?.search) {
-      query = query.or(
-        `sku.ilike.%${params.search}%,catalog_product.title.ilike.%${params.search}%`,
-      );
+      query = query.ilike("sku", `%${params.search}%`);
     }
 
     query = query
@@ -93,7 +82,10 @@ export class AdminService {
 
     const { data: offers, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      logger.error("Admin products query failed", { message: error.message, details: error.details, hint: error.hint });
+      throw error;
+    }
 
     const products = (offers || []).map((o: any) => ({
       id: o.id,
@@ -101,7 +93,6 @@ export class AdminService {
       slug: o.catalog_product?.slug || "—",
       price_pkr: o.price_pkr,
       status: o.status,
-      is_active: o.is_active,
       store_id: o.store_id,
       store_name: o.store?.name || "—",
       images: o.catalog_product?.images || [],
@@ -397,17 +388,29 @@ export class AdminService {
   /**
    * Lists sellers with KYC status from Supabase.
    */
-  static async listSellers(status?: StoreStatus) {
+  static async listSellers(status?: StoreStatus, page = 1, limit = 50) {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
     let query = supabaseAdmin
       .from("stores")
-      .select("*, owner:profiles(full_name, phone, email)");
+      .select("*, owner:profiles(full_name, phone, email)", { count: "exact" });
 
     if (status) query = query.eq("status", status);
 
-    const { data: stores } = await query.order("created_at", {
-      ascending: false,
-    });
-    return stores || [];
+    const { data: stores, count } = await query
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    return {
+      sellers: stores || [],
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
+    };
   }
 
   /**
@@ -460,13 +463,25 @@ export class AdminService {
   /**
    * Lists seller payout records from Supabase.
    */
-  static async listPayouts() {
-    const { data: payouts } = await supabaseAdmin
-      .from("payouts")
-      .select("*, store:stores(name, city)")
-      .order("created_at", { ascending: false });
+  static async listPayouts(page = 1, limit = 50) {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    return payouts || [];
+    const { data: payouts, count } = await supabaseAdmin
+      .from("payouts")
+      .select("*, store:stores(name, city)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    return {
+      payouts: payouts || [],
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
+    };
   }
 
   /**

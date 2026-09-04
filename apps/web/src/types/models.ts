@@ -29,6 +29,13 @@ export interface ProductDetail {
   inStock: boolean;
   stockCount: number;
   sku: string;
+  variants: {
+    id: string;
+    variant_name: string;
+    price_adjustment_pkr: number;
+    sku?: string;
+    stock_quantity?: number;
+  }[];
   reviews: {
     id: string;
     author?: string;

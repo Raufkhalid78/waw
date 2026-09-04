@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Store,
   Star,
@@ -86,9 +87,9 @@ export function StoreSpotlight() {
               <div className={`bg-gradient-to-r ${bannerGrad} p-4 sm:p-5 text-white relative`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-2xl ${avatarBg} flex items-center justify-center font-black text-lg shadow-md shrink-0 overflow-hidden`}>
+                    <div className={`w-12 h-12 rounded-2xl ${avatarBg} flex items-center justify-center font-black text-lg shadow-md shrink-0 overflow-hidden relative`}>
                       {store.logo_url ? (
-                        <img src={store.logo_url} alt={store.name} className="w-full h-full object-cover" />
+                        <Image src={store.logo_url} alt={store.name} fill sizes="48px" className="object-cover" />
                       ) : (
                         initials
                       )}
@@ -147,10 +148,12 @@ export function StoreSpotlight() {
                         <div>
                           <div className="relative aspect-square rounded-xl overflow-hidden bg-white mb-2">
                             {prod.imageUrl ? (
-                              <img
+                              <Image
                                 src={prod.imageUrl}
                                 alt={prod.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                fill
+                                sizes="120px"
+                                className="object-cover group-hover:scale-105 transition-transform duration-300"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-slate-300">?</div>

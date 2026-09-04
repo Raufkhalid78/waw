@@ -38,17 +38,40 @@ export async function requireAuth(
   const token = authHeader.split(" ")[1];
 
   try {
+    let userId: string;
+    let userPhone: string = "";
+    let userEmail: string | undefined;
+    let userRole: UserRole = UserRole.BUYER;
+
     // 1. First try verifying with JWT Secret
     if (ENV.JWT_SECRET) {
       try {
         const decoded = jwt.verify(token, ENV.JWT_SECRET) as any;
         if (decoded && decoded.sub) {
-          req.user = {
-            id: decoded.sub,
-            phone: decoded.phone || "",
-            email: decoded.email,
-            role: decoded.role || UserRole.BUYER,
-          };
+          userId = decoded.sub;
+          userPhone = decoded.phone || "";
+          userEmail = decoded.email;
+          userRole = decoded.role || UserRole.BUYER;
+
+          // Fetch profile to check banned status
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("role, phone, email, is_banned")
+            .eq("id", userId)
+            .single();
+
+          if (profile?.is_banned) {
+            res.status(403).json({ error: "Account has been banned" });
+            return;
+          }
+
+          if (profile) {
+            userRole = (profile.role as UserRole) || userRole;
+            userPhone = profile.phone || userPhone;
+            userEmail = profile.email || userEmail;
+          }
+
+          req.user = { id: userId, phone: userPhone, email: userEmail, role: userRole };
           return next();
         }
       } catch {
@@ -71,9 +94,14 @@ export async function requireAuth(
     // Fetch user profile from Supabase Database
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("role, phone, email")
+      .select("role, phone, email, is_banned")
       .eq("id", user.id)
       .single();
+
+    if (profile?.is_banned) {
+      res.status(403).json({ error: "Account has been banned" });
+      return;
+    }
 
     req.user = {
       id: user.id,

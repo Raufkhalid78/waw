@@ -68,6 +68,13 @@ function mapApiProductToDetail(p: any): ProductDetail {
     inStock: stockCount > 0,
     stockCount: stockCount,
     sku: p.sku || (activeVariants[0]?.sku ?? ""),
+    variants: activeVariants.map((v: any) => ({
+      id: v.id,
+      variant_name: v.variant_name || v.name || "",
+      price_adjustment_pkr: Number(v.price_adjustment_pkr ?? v.priceAdjustmentPkr ?? 0),
+      sku: v.sku || "",
+      stock_quantity: Number(v.stock_quantity ?? v.stockQuantity ?? 0),
+    })),
     reviews: Array.isArray(p.reviews) ? p.reviews.map((r: any) => ({
       id: r.id,
       author: r.author || r.profiles?.full_name || "",
@@ -602,6 +609,73 @@ export async function initiatePaymentApi(paymentInput: {
   } catch (err: any) {
     if (err.message === "Failed to initiate payment gateway session") throw err;
     throw new ApiError(err.message || "Network error initiating payment", { isNetwork: true });
+  }
+}
+
+// ── Wishlist API ───────────────────────────────────────────────────────────
+
+export interface WishlistItem {
+  id: string;
+  product_id: string;
+  created_at: string;
+  products: any;
+}
+
+export async function fetchUserWishlist(): Promise<WishlistItem[]> {
+  const token = localStorage.getItem("waw_auth_token");
+  if (!token) return [];
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/user/wishlist`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function addToWishlist(productId: string): Promise<any> {
+  const token = localStorage.getItem("waw_auth_token");
+  if (!token) throw new ApiError("Login required to add to wishlist", { status: 401 });
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/user/wishlist`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ product_id: productId }),
+    });
+    if (!res.ok) {
+      let errMsg = "Failed to add to wishlist";
+      try { const err = await res.json(); if (err?.error) errMsg = err.error; } catch {}
+      throw new Error(errMsg);
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(err.message || "Network error adding to wishlist", { isNetwork: true });
+  }
+}
+
+export async function removeFromWishlist(productId: string): Promise<void> {
+  const token = localStorage.getItem("waw_auth_token");
+  if (!token) throw new ApiError("Login required", { status: 401 });
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/user/wishlist/${encodeURIComponent(productId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      let errMsg = "Failed to remove from wishlist";
+      try { const err = await res.json(); if (err?.error) errMsg = err.error; } catch {}
+      throw new Error(errMsg);
+    }
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(err.message || "Network error removing from wishlist", { isNetwork: true });
   }
 }
 

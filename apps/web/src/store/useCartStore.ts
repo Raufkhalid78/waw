@@ -16,6 +16,7 @@ const API_BASE_URL = (
 export interface CartItem {
   productId: string;
   variantId?: string;
+  variantName?: string;
   title: string;
   titleUrdu?: string;
   imageUrl?: string;

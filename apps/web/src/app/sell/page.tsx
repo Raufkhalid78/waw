@@ -551,15 +551,13 @@ export default function SellOnWawPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <a
-              href="/seller"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              href="/account"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-full text-xs transition-all shadow-xs"
             >
               <Store className="w-4 h-4" />
               <span>Go to Seller Portal</span>
-            </a>
+            </Link>
             <Link
               href="/"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-950 hover:bg-slate-800 text-white font-black rounded-full text-xs transition-all shadow-xs"

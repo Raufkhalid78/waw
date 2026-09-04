@@ -1,10 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { Providers } from "./providers";
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import { AppShell } from "@/components/layout/AppShell";
 
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-jakarta" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -63,13 +60,7 @@ export default function RootLayout({
         />
       </head>
       <body className="flex flex-col min-h-screen bg-slate-100/70 text-slate-950 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
-        <Providers>
-          <Header />
-          <main className="flex-1">
-            <ErrorBoundary>{children}</ErrorBoundary>
-          </main>
-          <Footer />
-        </Providers>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

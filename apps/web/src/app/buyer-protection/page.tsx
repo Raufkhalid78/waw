@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import {
   ShieldCheck,
   Lock,
@@ -8,7 +9,6 @@ import {
   Truck,
   Award,
   HelpCircle,
-  MessageSquare,
   CheckCircle2,
   ChevronRight,
   Sparkles,
@@ -169,7 +169,7 @@ export default function BuyerProtectionPage() {
           rel="noopener noreferrer"
           className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all self-start sm:self-auto"
         >
-          <MessageSquare className="w-4 h-4" />
+          <WhatsAppIcon className="w-5 h-5" />
           <span>Chat on WhatsApp Helpline</span>
         </a>
       </div>

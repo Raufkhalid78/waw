@@ -338,3 +338,77 @@ export async function fetchSellerAnalytics(): Promise<SellerAnalytics> {
     };
   }
 }
+
+export async function updateSellerProduct(
+  productId: string,
+  data: { title?: string; description?: string; base_price_pkr?: number; is_active?: boolean }
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/products/${productId}`, {
+    method: "PATCH",
+    headers: { ...getAuthHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to update product" }));
+    throw new Error(err.error || "Failed to update product");
+  }
+  return await res.json();
+}
+
+export async function deleteSellerProduct(productId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/products/${productId}`, {
+    method: "DELETE",
+    headers: getAuthHeader(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to delete product" }));
+    throw new Error(err.error || "Failed to delete product");
+  }
+}
+
+export async function updateStoreProfile(data: {
+  name?: string;
+  description?: string;
+  logoUrl?: string;
+  city?: string;
+  address?: string;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/seller/store`, {
+    method: "PATCH",
+    headers: { ...getAuthHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to update store" }));
+    throw new Error(err.error || "Failed to update store");
+  }
+  return await res.json();
+}
+
+export async function submitKyc(data: {
+  cnic_number: string;
+  business_registration?: string;
+  bank_account_number: string;
+  bank_name: string;
+  bank_branch?: string;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/seller/kyc`, {
+    method: "POST",
+    headers: { ...getAuthHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to submit KYC" }));
+    throw new Error(err.error || "Failed to submit KYC");
+  }
+  return await res.json();
+}
+
+export async function fetchKycStatus(): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/seller/kyc/status`, {
+    headers: getAuthHeader(),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return await res.json();
+}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   ChevronLeft,
@@ -197,10 +198,12 @@ export function HeroBanner() {
                 <div className="relative w-full rounded-3xl p-3.5 bg-black/30 backdrop-blur-xl border border-white/30 shadow-2xl flex flex-col justify-between overflow-hidden transform group-hover:-translate-y-1.5 transition-all duration-300">
                   {/* Product Image Frame */}
                   <div className="relative w-full h-36 sm:h-42 md:h-46 rounded-2xl overflow-hidden bg-black/20 border border-white/15 shadow-inner">
-                    <img
-                      src={slide.productImage}
+                    <Image
+                      src={slide.productImage || "/placeholder.png"}
                       alt={slide.productTitle}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      className="object-cover group-hover:scale-110 transition-transform duration-500"
                     />
                     <span className="absolute top-2.5 left-2.5 bg-slate-950/90 backdrop-blur-md text-amber-400 border border-amber-400/30 text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-lg shadow-sm">
                       {slide.floatingBadge}
@@ -309,10 +312,12 @@ export function HeroBanner() {
             <div className="flex items-center gap-3 my-2.5 bg-white/5 p-2.5 rounded-xl border border-white/10">
               <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 relative">
                 {dealProduct?.imageUrl ? (
-                  <img
+                  <Image
                     src={dealProduct.imageUrl}
                     alt={dealProduct.title}
-                    className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                    fill
+                    sizes="64px"
+                    className="object-cover group-hover:scale-108 transition-transform duration-300"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-600">

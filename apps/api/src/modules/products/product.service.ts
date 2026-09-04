@@ -29,7 +29,7 @@ export class ProductService {
         price_pkr, 
         original_price_pkr, 
         is_express, 
-        catalog_product:catalog_products!inner(id, title, slug, thumbnail, category_id, is_active),
+        catalog_product:catalog_products!inner(id, title, slug, thumbnail, images, category_id, is_active),
         store:stores!inner(id, name, slug, city, rating_average, seller_type),
         variants:offer_variants(id, variant_name, price_adjustment_pkr)
       `, { count: "exact" })
@@ -74,7 +74,9 @@ export class ProductService {
       productId: offer.catalog_product.id,
       slug: offer.catalog_product.slug,
       title: offer.catalog_product.title,
-      imageUrl: offer.catalog_product.thumbnail,
+      imageUrl: (Array.isArray(offer.catalog_product.images) && offer.catalog_product.images.length > 0)
+        ? offer.catalog_product.images[0]
+        : offer.catalog_product.thumbnail,
       pricePkr: offer.price_pkr,
       originalPricePkr: offer.original_price_pkr,
       discountPercent: offer.original_price_pkr 

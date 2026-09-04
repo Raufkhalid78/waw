@@ -207,7 +207,9 @@ async function runShipmentReconciliation(): Promise<{ synced: number }> {
             await handleDeliveredMilestone(shipment, now, sevenDaysLater);
             synced++;
           }
-        } catch {}
+        } catch (err) {
+          logger.warn("Failed to sync shipment milestone", { shipmentId: shipment.id, error: (err as Error).message });
+        }
       }
     }
   } catch (err: any) {
@@ -292,5 +294,7 @@ async function handleDeliveredMilestone(shipment: any, now: string, sevenDaysLat
       status: "DELIVERED",
       deliveredAt: now,
     });
-  } catch {}
+  } catch (err) {
+    logger.warn("Failed to emit delivery milestone event", { orderId: shipment.order_id, error: (err as Error).message });
+  }
 }

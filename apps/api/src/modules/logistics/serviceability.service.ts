@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { PaymentMethod } from "../../types/index.js";
+import { logger } from "../../config/logger.js";
 
 export interface DeliveryWindow {
   min: number;
@@ -52,7 +53,9 @@ export class ServiceabilityService {
           supportedCouriers: c.supported_couriers || ["POSTEX"],
         }));
       }
-    } catch {}
+    } catch (err) {
+      logger.warn("Failed to fetch serviceable cities from DB", { error: (err as Error).message });
+    }
 
     // Fallback if table not populated yet
     return Object.entries(this.FALLBACK_CITIES).map(([cityName, meta]) => ({
@@ -112,7 +115,9 @@ export class ServiceabilityService {
         if (result?.data) {
           cityRecord = result.data;
         }
-      } catch {}
+      } catch (err) {
+        logger.warn("Failed to fetch city record for serviceability check", { city: normDest, error: (err as Error).message });
+      }
     }
 
     if (!cityRecord || !cityRecord.is_active) {

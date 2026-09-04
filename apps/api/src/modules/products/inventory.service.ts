@@ -124,7 +124,9 @@ export class InventoryService {
                 await redis.del(...keys);
               }
             } while (cursor !== "0");
-          } catch {}
+          } catch (err) {
+            logger.warn("Failed to clean up reservation keys from Redis", { error: (err as Error).message });
+          }
 
           itemsReleasedCount++;
         }

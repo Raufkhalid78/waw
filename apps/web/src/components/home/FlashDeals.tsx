@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
 import { RatingStars, WawExpressBadge } from "../ui/Badges";
 import {
@@ -133,11 +134,12 @@ export function FlashDeals() {
                     href={`/products/${prod.id}`}
                     className="block relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-2.5"
                   >
-                    <img
-                      src={prod.imageUrl}
+                    <Image
+                      src={prod.imageUrl || "/placeholder.png"}
                       alt={prod.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      className="object-cover group-hover:scale-108 transition-transform duration-300"
                     />
 
                     {/* Discount Pill */}

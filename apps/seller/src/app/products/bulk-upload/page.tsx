@@ -59,10 +59,38 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,Ready to Wear,4999,6
   };
 
   const handleImport = async () => {
+    if (parsedRows.length === 0) return;
     setUploading(true);
-    // Simulate batch upload
-    await new Promise((r) => setTimeout(r, 1200));
-    setSuccessCount(parsedRows.length || 3);
+    const token = localStorage.getItem("waw_seller_token");
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    let successCount = 0;
+
+    for (const row of parsedRows) {
+      try {
+        const res = await fetch(`${API_BASE}/api/products`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: row.Title || row.title,
+            titleUrdu: row.Title_Urdu || row.title_urdu,
+            basePricePkr: parseInt(row.Price_PKR || row.price_pkr || "0", 10),
+            compareAtPricePkr: row.Compare_Price_PKR ? parseInt(row.Compare_Price_PKR, 10) : undefined,
+            stockQuantity: parseInt(row.Stock || row.stock || "0", 10),
+            sku: row.SKU || row.sku,
+            imageUrl: row.Image_URL || row.image_url,
+            description: row.Description || row.description,
+          }),
+        });
+        if (res.ok) successCount++;
+      } catch {
+        // Skip failed rows
+      }
+    }
+
+    setSuccessCount(successCount);
     setUploading(false);
   };
 

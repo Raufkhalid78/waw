@@ -1,21 +1,56 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { fetchUserWishlist, removeFromWishlist, type WishlistItem } from "@/lib/api";
 import {
   Heart,
   ShoppingBag,
   Trash2,
   Share2,
-  MessageSquare,
   ArrowRight,
   Sparkles,
   CheckCircle2,
   ChevronRight,
 } from "lucide-react";
+import { FadeIn } from "@/components/Motion";
 
 export default function WishlistPage() {
   const { wishlist, toggleWishlist, addItem } = useCartStore();
+  const [serverWishlist, setServerWishlist] = useState<WishlistItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadWishlist() {
+      try {
+        const token = localStorage.getItem("waw_auth_token");
+        if (token) {
+          const items = await fetchUserWishlist();
+          setServerWishlist(items);
+        }
+      } catch {
+        // Fall back to local wishlist
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadWishlist();
+  }, []);
+
+  const displayItems = serverWishlist.length > 0
+    ? serverWishlist.map((w) => ({
+        productId: w.product_id,
+        title: w.products?.title || "Product",
+        imageUrl: w.products?.images?.[0] || w.products?.thumbnail || "",
+        pricePkr: Number(w.products?.base_price_pkr ?? w.products?.price_pkr ?? 0),
+        sellerType: w.products?.is_first_party ? "FIRST_PARTY" : "THIRD_PARTY",
+        storeName: w.products?.store?.name || "Waw",
+        quantity: 1,
+      }))
+    : wishlist;
 
   const handleMoveToCart = (item: any) => {
     addItem({
@@ -30,15 +65,30 @@ export default function WishlistPage() {
     toggleWishlist(item);
   };
 
+  const handleRemove = async (item: any) => {
+    const token = localStorage.getItem("waw_auth_token");
+    if (token && serverWishlist.length > 0) {
+      try {
+        await removeFromWishlist(item.productId);
+        setServerWishlist((prev) => prev.filter((w) => w.product_id !== item.productId));
+      } catch {
+        // Fall back to local removal
+        toggleWishlist(item);
+      }
+    } else {
+      toggleWishlist(item);
+    }
+  };
+
   const handleShareWishlist = () => {
-    const listText = wishlist
+    const listText = displayItems
       .map(
-        (item, idx) =>
+        (item: any, idx: number) =>
           `${idx + 1}. ${item.title} - PKR ${item.pricePkr.toLocaleString()}`,
       )
       .join("\n");
     const text = encodeURIComponent(
-      `Check out my Waw Pakistan Wishlist! 🛍️✨\n\n${listText}\n\nShop on Waw: http://localhost:3000`,
+      `Check out my Waw Pakistan Wishlist!\n\n${listText}\n\nShop on Waw: https://waw.com.pk`,
     );
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
@@ -62,26 +112,27 @@ export default function WishlistPage() {
             <span>My Saved Wishlist</span>
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            {wishlist.length} {wishlist.length === 1 ? "item" : "items"} saved
+            {displayItems.length} {displayItems.length === 1 ? "item" : "items"} saved
             from verified Pakistani artisans & flagship stores
           </p>
         </div>
 
-        {wishlist.length > 0 && (
+        {displayItems.length > 0 && (
           <button
             onClick={handleShareWishlist}
             className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-2xl transition-all shadow-xs cursor-pointer self-start sm:self-auto"
           >
-            <Share2 className="w-4 h-4" />
+            <WhatsAppIcon className="w-5 h-5" />
             <span>Share on WhatsApp</span>
           </button>
         )}
       </div>
 
       {/* ── Wishlist Items Grid ──────────────────────────────────────────── */}
-      {wishlist.length > 0 ? (
+      <FadeIn delay={100}>
+      {displayItems.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {wishlist.map((item) => (
+          {displayItems.map((item: any) => (
             <div
               key={item.productId}
               className="bg-white border border-slate-200 rounded-3xl p-4 shadow-xs flex flex-col justify-between hover:border-amber-400 hover:shadow-lg transition-all group"
@@ -92,16 +143,18 @@ export default function WishlistPage() {
                   href={`/products/${item.productId}`}
                   className="block relative aspect-square rounded-2xl overflow-hidden bg-slate-50"
                 >
-                  <img
-                    src={item.imageUrl}
+                  <Image
+                    src={item.imageUrl || "/placeholder.png"}
                     alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      toggleWishlist(item);
+                      handleRemove(item);
                     }}
                     className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 text-rose-600 hover:scale-110 shadow-xs transition-transform cursor-pointer"
                     title="Remove from Wishlist"
@@ -164,6 +217,7 @@ export default function WishlistPage() {
           </Link>
         </div>
       )}
+      </FadeIn>
     </div>
   );
 }

@@ -1,9 +1,117 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { HelpCircle, Mail } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { fetchCategories, fetchStores } from "@/lib/api";
 
 export function Footer() {
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [comingSoonStore, setComingSoonStore] = useState("");
+  const [footerCategories, setFooterCategories] = useState<{
+    electronics: { name: string; slug: string }[];
+    womensFashion: { name: string; slug: string }[];
+    mensHeritage: { name: string; slug: string }[];
+    beautyAttar: { name: string; slug: string }[];
+    sports: { name: string; slug: string }[];
+    homeHeritage: { name: string; slug: string }[];
+  }>({
+    electronics: [],
+    womensFashion: [],
+    mensHeritage: [],
+    beautyAttar: [],
+    sports: [],
+    homeHeritage: [],
+  });
+
+  const [topBrands, setTopBrands] = useState<{ name: string; slug: string; isVerified?: boolean }[]>([]);
+
+  useEffect(() => {
+    async function loadFooterData() {
+      try {
+        const [cats, stores] = await Promise.all([
+          fetchCategories("en"),
+          fetchStores().catch(() => []),
+        ]);
+
+        // Process categories
+        const flat = cats.flatMap((c: any) => [
+          { name: c.name, slug: c.slug },
+          ...(c.children || []).map((child: any) => ({
+            name: child.name,
+            slug: child.slug,
+          })),
+        ]);
+
+        const findCat = (searchTerms: string[]) =>
+          flat.filter((c) =>
+            searchTerms.some(
+              (t) =>
+                c.slug.toLowerCase().includes(t.toLowerCase()) ||
+                c.name.toLowerCase().includes(t.toLowerCase())
+            )
+          );
+
+        const electronics = findCat([
+          "electronic", "mobile", "laptop", "tablet", "tech", "gadget",
+          "accessori", "charger", "cable", "power-bank", "earbuds",
+          "headphone", "smart-watch", "wearable",
+        ]);
+        const womensFashion = findCat([
+          "women", "lawn", "unstitch", "kurti", "festive", "chiffon",
+          "dupatta", "fashion", "apparel",
+        ]);
+        const mensHeritage = findCat([
+          "men", "peshawari", "chappal", "leather", "wallet", "belt",
+          "heritage", "shoe", "footwear",
+        ]);
+        const beautyAttar = findCat([
+          "beauty", "fragrance", "attar", "oud", "perfume", "cosmetic",
+        ]);
+        const sports = findCat([
+          "sport", "football", "cricket", "boxing", "glove", "sialkot",
+        ]);
+        const homeHeritage = findCat([
+          "home", "heritage", "decor", "pottery", "multani", "handmade",
+          "cultural", "living", "kitchen",
+        ]);
+
+        const allTopLevel = cats.map((c: any) => ({ name: c.name, slug: c.slug }));
+
+        setFooterCategories({
+          electronics: electronics.length > 0 ? electronics.slice(0, 5) : allTopLevel.slice(0, 5),
+          womensFashion: womensFashion.length > 0 ? womensFashion.slice(0, 4) : allTopLevel.slice(0, 4),
+          mensHeritage: mensHeritage.length > 0 ? mensHeritage.slice(0, 3) : allTopLevel.slice(0, 3),
+          beautyAttar: beautyAttar.length > 0 ? beautyAttar.slice(0, 3) : allTopLevel.slice(0, 3),
+          sports: sports.length > 0 ? sports.slice(0, 3) : allTopLevel.slice(0, 3),
+          homeHeritage: homeHeritage.length > 0 ? homeHeritage.slice(0, 3) : allTopLevel.slice(0, 3),
+        });
+
+        // Process stores for Top Brands
+        if (stores.length > 0) {
+          const brandStores = stores
+            .filter((s: any) => s.status === "ACTIVE" || s.is_verified)
+            .slice(0, 8)
+            .map((s: any) => ({
+              name: s.name,
+              slug: s.slug,
+              isVerified: s.is_verified,
+            }));
+          setTopBrands(brandStores);
+        }
+      } catch (err) {
+        // Silently fail
+      }
+    }
+    loadFooterData();
+  }, []);
+
+  const { electronics, womensFashion, mensHeritage, beautyAttar, sports, homeHeritage } =
+    footerCategories;
+
   return (
+    <>
     <footer className="bg-white border-t border-slate-200 text-slate-700 text-xs font-sans">
       {/* ── 1. Top "We're Always Here To Help" Strip ────────────────────────── */}
       <div className="bg-[#F7F7FA] border-b border-slate-200 py-7 px-3 sm:px-6 lg:px-10 xl:px-12">
@@ -59,7 +167,7 @@ export function Footer() {
 
             {/* WhatsApp 24/7 Helpline */}
             <a
-              href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
+              href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "+923001234567").replace(/[^0-9]/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3.5 group text-left hover:text-emerald-600 transition-colors"
@@ -89,46 +197,33 @@ export function Footer() {
               Electronics
             </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/category/mobiles-tech"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Mobiles & Tablets
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/mobiles-tech"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Wireless Earbuds
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/mobiles-tech"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Smart Watches
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/mobiles-tech"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Power Banks
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/mobiles-tech"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Fast Chargers & Cables
-                </Link>
-              </li>
+              {electronics.length > 0
+                ? electronics.map((cat) => (
+                    <li key={cat.slug}>
+                      <Link
+                        href={`/category/${cat.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  ))
+                : [
+                    { name: "Mobiles & Tablets", slug: "mobiles-tech" },
+                    { name: "Wireless Earbuds", slug: "mobiles-tech" },
+                    { name: "Smart Watches", slug: "mobiles-tech" },
+                    { name: "Power Banks", slug: "mobiles-tech" },
+                    { name: "Fast Chargers & Cables", slug: "mobiles-tech" },
+                  ].map((item) => (
+                    <li key={item.name}>
+                      <Link
+                        href={`/category/${item.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                    </li>
+                  ))}
             </ul>
           </div>
 
@@ -138,38 +233,32 @@ export function Footer() {
               Women&apos;s Fashion
             </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/category/womens-lawn"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Unstitched Lawn
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/womens-lawn"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Ready-to-Wear Kurtis
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/womens-lawn"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Festive 3-Piece
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/womens-lawn"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Luxury Chiffon Dupattas
-                </Link>
-              </li>
+              {womensFashion.length > 0
+                ? womensFashion.map((cat) => (
+                    <li key={cat.slug}>
+                      <Link
+                        href={`/category/${cat.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  ))
+                : [
+                    { name: "Unstitched Lawn", slug: "womens-lawn" },
+                    { name: "Ready-to-Wear Kurtis", slug: "womens-lawn" },
+                    { name: "Festive 3-Piece", slug: "womens-lawn" },
+                    { name: "Luxury Chiffon Dupattas", slug: "womens-lawn" },
+                  ].map((item) => (
+                    <li key={item.name}>
+                      <Link
+                        href={`/category/${item.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                    </li>
+                  ))}
             </ul>
           </div>
 
@@ -179,30 +268,31 @@ export function Footer() {
               Men&apos;s Heritage
             </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/category/peshawari-chappal"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Peshawari Chappals
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/leather-craft"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Pure Leather Wallets
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/leather-craft"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Handmade Leather Belts
-                </Link>
-              </li>
+              {mensHeritage.length > 0
+                ? mensHeritage.map((cat) => (
+                    <li key={cat.slug}>
+                      <Link
+                        href={`/category/${cat.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  ))
+                : [
+                    { name: "Peshawari Chappals", slug: "peshawari-chappal" },
+                    { name: "Pure Leather Wallets", slug: "leather-craft" },
+                    { name: "Handmade Leather Belts", slug: "leather-craft" },
+                  ].map((item) => (
+                    <li key={item.name}>
+                      <Link
+                        href={`/category/${item.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                    </li>
+                  ))}
             </ul>
           </div>
 
@@ -212,22 +302,30 @@ export function Footer() {
               Beauty & Attar
             </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/category/home-heritage"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Pure Royal Oud & Attar
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/home-heritage"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Natural Fragrances
-                </Link>
-              </li>
+              {beautyAttar.length > 0
+                ? beautyAttar.map((cat) => (
+                    <li key={cat.slug}>
+                      <Link
+                        href={`/category/${cat.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  ))
+                : [
+                    { name: "Pure Royal Oud & Attar", slug: "home-heritage" },
+                    { name: "Natural Fragrances", slug: "home-heritage" },
+                  ].map((item) => (
+                    <li key={item.name}>
+                      <Link
+                        href={`/category/${item.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                    </li>
+                  ))}
             </ul>
           </div>
 
@@ -237,30 +335,31 @@ export function Footer() {
               Sialkot Sports
             </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/category/sialkot-sports"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Match Footballs (FIFA Grade)
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/sialkot-sports"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  English Willow Cricket Bats
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/sialkot-sports"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Pro Boxing & Training Gloves
-                </Link>
-              </li>
+              {sports.length > 0
+                ? sports.map((cat) => (
+                    <li key={cat.slug}>
+                      <Link
+                        href={`/category/${cat.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  ))
+                : [
+                    { name: "Match Footballs (FIFA Grade)", slug: "sialkot-sports" },
+                    { name: "English Willow Cricket Bats", slug: "sialkot-sports" },
+                    { name: "Pro Boxing & Training Gloves", slug: "sialkot-sports" },
+                  ].map((item) => (
+                    <li key={item.name}>
+                      <Link
+                        href={`/category/${item.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                    </li>
+                  ))}
             </ul>
           </div>
 
@@ -270,22 +369,30 @@ export function Footer() {
               Home & Heritage
             </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/category/home-heritage"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Multani Blue Pottery
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/home-heritage"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Handmade Cultural Décor
-                </Link>
-              </li>
+              {homeHeritage.length > 0
+                ? homeHeritage.map((cat) => (
+                    <li key={cat.slug}>
+                      <Link
+                        href={`/category/${cat.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  ))
+                : [
+                    { name: "Multani Blue Pottery", slug: "home-heritage" },
+                    { name: "Handmade Cultural Decor", slug: "home-heritage" },
+                  ].map((item) => (
+                    <li key={item.name}>
+                      <Link
+                        href={`/category/${item.slug}`}
+                        className="hover:text-slate-950 transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                    </li>
+                  ))}
             </ul>
           </div>
 
@@ -294,72 +401,22 @@ export function Footer() {
             <h4 className="font-black text-slate-950 text-xs tracking-tight uppercase">
               Top Brands
             </h4>
-            <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-amber-600 transition-colors font-bold text-slate-900"
-                >
-                  Waw Signature 1P
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Khyber Artisans
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Lahore Tech Hub
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Sindh Silk & Lawn
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Sialkot Sports Co.
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Khaadi & J.
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Sapphire Lawn
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Al-Haramain PKR
-                </Link>
-              </li>
-            </ul>
+            {topBrands.length > 0 ? (
+              <ul className="space-y-2 text-slate-500 font-medium">
+                {topBrands.map((brand) => (
+                  <li key={brand.slug}>
+                    <Link
+                      href={`/store/${brand.slug}`}
+                      className={`hover:text-amber-600 transition-colors ${brand.isVerified ? "font-bold text-slate-900" : ""}`}
+                    >
+                      {brand.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[11px] text-slate-400 italic">Loading brands...</p>
+            )}
           </div>
 
           {/* Column 8: Discover Now */}
@@ -370,58 +427,51 @@ export function Footer() {
             <ul className="space-y-2 text-slate-500 font-medium">
               <li>
                 <Link
-                  href="/"
+                  href="/search?sellerType=1P"
                   className="text-amber-600 font-bold hover:underline"
                 >
-                  ⚡ Waw Express
+                  Waw Express
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/"
+                  href="/search"
                   className="text-rose-600 font-bold hover:underline"
                 >
-                  🔥 Flash Deals
+                  Flash Deals
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/"
+                  href="/search?sellerType=3P"
                   className="text-sky-700 font-bold hover:underline"
                 >
-                  🏬 Verified Shops
+                  Verified Shops
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/checkout"
-                  className="hover:text-slate-950 transition-colors"
+                <a
+                  href="https://seller.waw.com.pk/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-slate-950 transition-colors font-semibold"
                 >
                   Sell on Waw
+                </a>
+              </li>
+              <li>
+                <Link href="/sell" className="hover:text-slate-950 transition-colors">
+                  Seller Registration
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Seller KYC Policy
+                <Link href="/buyer-protection" className="hover:text-slate-950 transition-colors">
+                  Buyer Protection
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Affiliate Program
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Free Delivery Policy
+                <Link href="/help" className="hover:text-slate-950 transition-colors">
+                  Help & Support
                 </Link>
               </li>
             </ul>
@@ -433,70 +483,25 @@ export function Footer() {
               Delivery Hubs
             </h4>
             <ul className="space-y-2 text-slate-500 font-medium">
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Lahore (Central)
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Karachi (South)
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Islamabad (Capital)
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Rawalpindi
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Faisalabad
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Peshawar
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Sialkot
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/"
-                  className="hover:text-slate-950 transition-colors"
-                >
-                  Quetta & Multan
-                </Link>
-              </li>
+              {[
+                "Lahore (Central)",
+                "Karachi (South)",
+                "Islamabad (Capital)",
+                "Rawalpindi",
+                "Faisalabad",
+                "Peshawar",
+                "Sialkot",
+                "Quetta & Multan",
+              ].map((city) => (
+                <li key={city}>
+                  <Link
+                    href={`/search?city=${encodeURIComponent(city.split(" (")[0])}`}
+                    className="hover:text-slate-950 transition-colors"
+                  >
+                    {city}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
@@ -512,9 +517,10 @@ export function Footer() {
             </span>
             <div className="flex flex-wrap items-center justify-center gap-2.5">
               {/* Apple App Store Badge */}
-              <a
-                href="#"
-                className="bg-black hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg flex items-center gap-2 shadow-xs transition-all hover:scale-105"
+              <button
+                type="button"
+                onClick={() => { setComingSoonStore("App Store"); setShowComingSoon(true); }}
+                className="bg-black hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg flex items-center gap-2 shadow-xs transition-all hover:scale-105 cursor-pointer"
               >
                 <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                   <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.62-.75 1.04-1.8 0.92-2.84-.9.04-2 .6-2.65 1.34-.58.65-1.09 1.72-.95 2.73.99.08 2.06-.48 2.68-1.23z" />
@@ -527,12 +533,13 @@ export function Footer() {
                     App Store
                   </div>
                 </div>
-              </a>
+              </button>
 
               {/* Google Play Badge */}
-              <a
-                href="#"
-                className="bg-black hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg flex items-center gap-2 shadow-xs transition-all hover:scale-105"
+              <button
+                type="button"
+                onClick={() => { setComingSoonStore("Google Play"); setShowComingSoon(true); }}
+                className="bg-black hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg flex items-center gap-2 shadow-xs transition-all hover:scale-105 cursor-pointer"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path
@@ -560,25 +567,7 @@ export function Footer() {
                     Google Play
                   </div>
                 </div>
-              </a>
-
-              {/* Huawei AppGallery Badge */}
-              <a
-                href="#"
-                className="bg-black hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg flex items-center gap-2 shadow-xs transition-all hover:scale-105"
-              >
-                <div className="w-4 h-4 rounded bg-rose-600 flex items-center justify-center">
-                  <span className="text-[9px] font-black text-white">H</span>
-                </div>
-                <div className="text-left leading-none">
-                  <div className="text-[8px] text-slate-300 font-medium">
-                    EXPLORE IT ON
-                  </div>
-                  <div className="text-xs font-bold text-white mt-0.5">
-                    AppGallery
-                  </div>
-                </div>
-              </a>
+              </button>
             </div>
           </div>
 
@@ -664,7 +653,7 @@ export function Footer() {
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 text-[11px] text-slate-600">
             {/* Copyright */}
             <div className="font-medium text-slate-500">
-              © {new Date().getFullYear()} WAW TECHNOLOGIES (SMC-PRIVATE)
+              &copy; {new Date().getFullYear()} WAW TECHNOLOGIES (SMC-PRIVATE)
               LIMITED. All Rights Reserved.
             </div>
 
@@ -766,12 +755,14 @@ export function Footer() {
               >
                 Buyer Protection
               </Link>
-              <Link
-                href="/sell"
+              <a
+                href="https://seller.waw.com.pk/login"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="hover:text-slate-950 font-bold text-amber-700 transition-colors"
               >
                 Sell on Waw
-              </Link>
+              </a>
               <Link
                 href="/refund-policy"
                 className="hover:text-slate-950 transition-colors"
@@ -796,8 +787,8 @@ export function Footer() {
           {/* Row 2: Regulatory Company Registration Details */}
           <div className="pt-3 border-t border-slate-200 text-[10px] text-slate-400 text-center lg:text-left flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
-              WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED • NTN: 8945201-3 • 100%
-              Secure Checkout & Escrow Protection • SECP Reg. # 0192847
+              WAW TECHNOLOGIES (SMC-PRIVATE) LIMITED &bull; NTN: 8945201-3 &bull; 100%
+              Secure Checkout &amp; Escrow Protection &bull; SECP Reg. # 0192847
             </div>
             <div className="flex items-center gap-2 text-slate-500 font-medium">
               <span>
@@ -808,5 +799,27 @@ export function Footer() {
         </div>
       </div>
     </footer>
+
+      {showComingSoon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowComingSoon(false)}>
+          <div className="bg-white rounded-xl shadow-2xl px-8 py-6 max-w-sm w-full mx-4 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Coming Soon</h3>
+            <p className="text-sm text-slate-500 mb-5">The {comingSoonStore} app is under development. Stay tuned!</p>
+            <button
+              type="button"
+              onClick={() => setShowComingSoon(false)}
+              className="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-6 py-2 rounded-lg transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

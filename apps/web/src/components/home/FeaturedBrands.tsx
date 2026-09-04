@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   CheckCircle2,
   Sparkles,
@@ -93,10 +94,10 @@ export function FeaturedBrands() {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div
-                      className={`w-14 h-14 rounded-2xl ${colorClass} text-white flex items-center justify-center font-black text-xl shadow-lg shrink-0 group-hover:scale-105 transition-transform border border-white/10 overflow-hidden`}
+                      className={`w-14 h-14 rounded-2xl ${colorClass} text-white flex items-center justify-center font-black text-xl shadow-lg shrink-0 group-hover:scale-105 transition-transform border border-white/10 overflow-hidden relative`}
                     >
                       {store.logo_url ? (
-                        <img src={store.logo_url} alt={store.name} className="w-full h-full object-cover" />
+                        <Image src={store.logo_url} alt={store.name} fill sizes="56px" className="object-cover" />
                       ) : (
                         initials
                       )}
@@ -156,10 +157,12 @@ export function FeaturedBrands() {
                         >
                           <div className="w-full aspect-square relative rounded-lg overflow-hidden bg-slate-900 mb-1">
                             {item.imageUrl ? (
-                              <img
+                              <Image
                                 src={item.imageUrl}
                                 alt={item.title}
-                                className="w-full h-full object-cover"
+                                fill
+                                sizes="80px"
+                                className="object-cover"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">?</div>

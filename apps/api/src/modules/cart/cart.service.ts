@@ -24,7 +24,7 @@ export class CartService {
   }
 
   /**
-   * Get cart items with product details
+   * Get cart items with product details (via offer_variants → seller_offers → catalog_products)
    */
   static async getCartItems(cartId: string) {
     const { data, error } = await supabaseAdmin
@@ -34,18 +34,19 @@ export class CartService {
         product_id,
         variant_id,
         quantity,
-        products (
+        offer_variant:offer_variants(
           id,
-          title,
-          slug,
-          base_price_pkr,
-          images,
-          is_first_party,
-          store_id,
-          stores (
+          sku,
+          price_adjustment_pkr,
+          stock_quantity,
+          offer:seller_offers(
             id,
-            name,
-            slug
+            price_pkr,
+            original_price_pkr,
+            store_id,
+            status,
+            store:stores(id, name, slug),
+            catalog_product:catalog_products(id, title, slug, images, is_active)
           )
         )
       `)
@@ -56,7 +57,7 @@ export class CartService {
   }
 
   /**
-   * Add item to cart (upsert quantity)
+   * Add item to cart (upsert quantity). Validates stock from offer_variants.
    */
   static async addItem(
     cartId: string,
@@ -64,6 +65,20 @@ export class CartService {
     quantity: number,
     variantId?: string
   ) {
+    // Validate stock from offer_variants
+    if (variantId) {
+      const { data: variant } = await supabaseAdmin
+        .from("offer_variants")
+        .select("id, stock_quantity")
+        .eq("id", variantId)
+        .single();
+
+      if (!variant) throw new Error("Product variant not found");
+      if (variant.stock_quantity < quantity) {
+        throw new Error(`Insufficient stock. Available: ${variant.stock_quantity}`);
+      }
+    }
+
     // Check if item already exists
     const { data: existing } = await supabaseAdmin
       .from("cart_items")
@@ -74,9 +89,20 @@ export class CartService {
       .maybeSingle();
 
     if (existing) {
+      const newQty = existing.quantity + quantity;
+      if (variantId) {
+        const { data: v } = await supabaseAdmin
+          .from("offer_variants")
+          .select("stock_quantity")
+          .eq("id", variantId)
+          .single();
+        if (v && v.stock_quantity < newQty) {
+          throw new Error(`Insufficient stock. Available: ${v.stock_quantity}`);
+        }
+      }
       const { error } = await supabaseAdmin
         .from("cart_items")
-        .update({ quantity: existing.quantity + quantity })
+        .update({ quantity: newQty })
         .eq("id", existing.id);
       if (error) throw error;
     } else {

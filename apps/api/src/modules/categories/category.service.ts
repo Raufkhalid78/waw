@@ -1,13 +1,26 @@
 import { supabaseAdmin } from "../../config/supabase.js";
+import { redis } from "../../config/redis.js";
 import { logger } from "../../config/logger.js";
 import { Category } from "../../types/index.js";
+
+const CATEGORY_CACHE_KEY = "categories:tree";
+const CATEGORY_CACHE_TTL = 300; // 5 minutes
 
 export class CategoryService {
   /**
    * Retrieves all active categories from Supabase
    * and returns a hierarchical tree of root categories with nested children.
+   * Uses Redis cache with 5-minute TTL.
    */
   static async getCategoryTree(locale = "en"): Promise<Category[]> {
+    // Try cache first
+    try {
+      const cached = await redis.get(CATEGORY_CACHE_KEY);
+      if (cached) return JSON.parse(cached);
+    } catch (err) {
+      logger.warn("Failed to read category cache", { error: (err as Error).message });
+    }
+
     let categoriesRaw: any[] = [];
 
     try {
@@ -66,7 +79,25 @@ export class CategoryService {
       }
     });
 
+    // Cache the result
+    try {
+      await redis.set(CATEGORY_CACHE_KEY, JSON.stringify(rootCategories), { ex: CATEGORY_CACHE_TTL });
+    } catch (err) {
+      logger.warn("Failed to cache category tree", { error: (err as Error).message });
+    }
+
     return rootCategories;
+  }
+
+  /**
+   * Invalidates the category tree cache. Call after category CRUD operations.
+   */
+  static async invalidateCache(): Promise<void> {
+    try {
+      await redis.del(CATEGORY_CACHE_KEY);
+    } catch (err) {
+      logger.warn("Failed to invalidate category cache", { error: (err as Error).message });
+    }
   }
 
   /**

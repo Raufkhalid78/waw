@@ -11,6 +11,9 @@ export interface BackgroundJobPayload<T = any> {
   id?: string;
   type:
     | "WHATSAPP_NOTIFICATION"
+    | "WHATSAPP_ORDER_CANCELLED"
+    | "WHATSAPP_RETURN_REQUESTED"
+    | "WHATSAPP_SELLER_NEW_ORDER"
     | "TYPESENSE_SYNC"
     | "ESCROW_PAYOUT"
     | "COD_RECONCILIATION"
@@ -48,6 +51,39 @@ try {
               payload.orderNumber,
               payload.totalPkr,
               payload.isCod,
+            );
+          }
+          break;
+
+        case "WHATSAPP_ORDER_CANCELLED":
+          if (payload.phone && payload.orderNumber) {
+            await WhatsAppService.sendOrderCancelled(
+              payload.phone,
+              payload.orderNumber,
+              payload.reason,
+            );
+          }
+          break;
+
+        case "WHATSAPP_RETURN_REQUESTED":
+          if (payload.phone && payload.orderNumber) {
+            await WhatsAppService.sendReturnRequested(
+              payload.phone,
+              payload.orderNumber,
+              payload.returnId,
+              payload.reason,
+            );
+          }
+          break;
+
+        case "WHATSAPP_SELLER_NEW_ORDER":
+          if (payload.sellerPhone && payload.orderNumber) {
+            await WhatsAppService.sendSellerNewOrder(
+              payload.sellerPhone,
+              payload.storeName,
+              payload.orderNumber,
+              payload.itemSummary,
+              payload.totalPkr,
             );
           }
           break;

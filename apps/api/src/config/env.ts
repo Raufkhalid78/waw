@@ -86,6 +86,14 @@ export const ENV = {
     process.env.DEFAULT_COMMISSION_PERCENTAGE || "10",
     10,
   ),
+
+  // OpenRouter AI
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
+  OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || "mistralai/mistral-7b-instruct",
+  OPENROUTER_DAILY_REQUEST_LIMIT: parseInt(process.env.OPENROUTER_DAILY_REQUEST_LIMIT || "1000", 10),
+
+  // Sentry Error Tracking
+  SENTRY_DSN: process.env.SENTRY_DSN || "",
 };
 
 if (ENV.NODE_ENV === "production") {
@@ -128,5 +136,13 @@ if (ENV.NODE_ENV === "production") {
 
   if (ENV.POSTEX_XPAY_SECRET_KEY === "xpay_sec_test_secret_key_2026" || !process.env.POSTEX_XPAY_SECRET_KEY) {
     console.warn("⚠️  POSTEX_XPAY_SECRET_KEY not set — XPay webhook verification will be disabled.");
+  }
+
+  if (ENV.RAAST_WEBHOOK_SECRET && ENV.RAAST_WEBHOOK_SECRET.length < 16) {
+    throw new Error("FATAL: RAAST_WEBHOOK_SECRET must be at least 16 characters in production.");
+  }
+
+  if (ENV.TYPESENSE_API_KEY === "xyz123WawTypesenseSecretKey2026" || !process.env.TYPESENSE_API_KEY) {
+    console.warn("⚠️  TYPESENSE_API_KEY not set — search functionality will be disabled.");
   }
 }

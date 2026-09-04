@@ -9,6 +9,30 @@ interface LogEntry {
 }
 
 const isDev = process.env.NODE_ENV === "development";
+const isBrowser = typeof window !== "undefined";
+
+async function captureToSentry(entry: LogEntry) {
+  if (isDev || !isBrowser) return;
+  try {
+    const Sentry = await import("@sentry/nextjs");
+    if (entry.level === "error") {
+      Sentry.captureException(
+        entry.data instanceof Error ? entry.data : new Error(entry.message),
+        {
+          level: "error",
+          extra: {
+            context: entry.context,
+            data: entry.data,
+          },
+        }
+      );
+    } else {
+      Sentry.captureMessage(entry.message, entry.level as any);
+    }
+  } catch {
+    // @sentry/nextjs not installed — skip
+  }
+}
 
 function emit(entry: LogEntry) {
   if (isDev) {
@@ -21,8 +45,7 @@ function emit(entry: LogEntry) {
       case "error": console.error(...args); break;
     }
   }
-  // In production, route to external service (Sentry, LogRocket, etc.)
-  // Example: Sentry.captureException(entry);
+  captureToSentry(entry);
 }
 
 export const logger = {

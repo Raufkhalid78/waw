@@ -3,13 +3,13 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { logger } from "@/lib/logger";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import {
   CheckCircle2,
   Package,
   Truck,
   MapPin,
   Clock,
-  MessageSquare,
   Copy,
   Download,
   ArrowRight,
@@ -201,7 +201,7 @@ export default function OrderTrackingPage() {
 
         {/* WhatsApp Notification Alert */}
         <div className="flex items-center gap-3 p-3.5 bg-white/10 backdrop-blur rounded-2xl text-xs font-medium border border-white/15">
-          <MessageSquare className="w-4 h-4 text-emerald-200 shrink-0" />
+          <WhatsAppIcon className="w-5 h-5 shrink-0" />
           <span>
             Real-time delivery updates, courier tracking link & digital receipt
             have been dispatched via <strong>WhatsApp ({order.buyer_phone})</strong>.

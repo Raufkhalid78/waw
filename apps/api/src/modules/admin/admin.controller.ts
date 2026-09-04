@@ -13,8 +13,12 @@ export class AdminController {
 
   static async listSellers(req: Request, res: Response): Promise<void> {
     try {
-      const { status } = req.query;
-      const sellers = await AdminService.listSellers(status as any);
+      const { status, page = "1", limit = "50" } = req.query;
+      const sellers = await AdminService.listSellers(
+        status as any,
+        parseInt(page as string),
+        parseInt(limit as string),
+      );
       res.json(sellers);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -38,7 +42,11 @@ export class AdminController {
 
   static async listPayouts(req: Request, res: Response): Promise<void> {
     try {
-      const payouts = await AdminService.listPayouts();
+      const { page = "1", limit = "50" } = req.query;
+      const payouts = await AdminService.listPayouts(
+        parseInt(page as string),
+        parseInt(limit as string),
+      );
       res.json(payouts);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

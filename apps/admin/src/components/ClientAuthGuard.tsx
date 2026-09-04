@@ -4,6 +4,12 @@ import { usePathname, useRouter } from "next/navigation";
 
 type AuthState = "checking" | "authorized" | "redirecting";
 
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export function ClientAuthGuard({
   children,
   tokenKey,
@@ -25,10 +31,17 @@ export function ClientAuthGuard({
     const token =
       typeof window !== "undefined" ? localStorage.getItem(tokenKey) : null;
 
-    if (!token) {
+    // Also check cookie as fallback (middleware sets cookie, ClientAuthGuard may not have localStorage)
+    const cookieToken = getCookie(tokenKey);
+
+    if (!token && !cookieToken) {
       setAuthState("redirecting");
       router.replace("/login");
     } else {
+      // If cookie exists but localStorage doesn't, sync them
+      if (!token && cookieToken && typeof window !== "undefined") {
+        localStorage.setItem(tokenKey, cookieToken);
+      }
       setAuthState("authorized");
     }
   }, [pathname, router, tokenKey]);

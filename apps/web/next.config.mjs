@@ -2,8 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@waw/types'],
+  swcMinify: true,
   images: {
     formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60 * 60 * 24,
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'plus.unsplash.com' },
@@ -11,6 +13,8 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.postex.pk' },
     ],
   },
+  poweredByHeader: false,
+  compress: true,
   async headers() {
     return [
       {
@@ -27,10 +31,6 @@ const nextConfig = {
           {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload',
-          },
-          {
-            key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https:;",
           },
         ],
       },

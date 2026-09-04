@@ -85,7 +85,7 @@ export default function SellerDashboardPage() {
           </p>
         </div>
         <a
-          href="http://localhost:3000/sell"
+          href="/sell"
           className="inline-flex items-center gap-2 px-6 py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs transition-all"
         >
           <span>Apply to Sell on Waw</span>

@@ -83,7 +83,12 @@ const TRANSLATIONS = {
   },
 };
 
-export function Header() {
+interface HeaderProps {
+  onMenuToggle?: () => void;
+  menuOpen?: boolean;
+}
+
+export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps = {}) {
   const router = useRouter();
   const {
     items,
@@ -108,6 +113,10 @@ export function Header() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Sync with external menu control
+  const isMenuOpen = externalMenuOpen !== undefined ? externalMenuOpen : mobileMenuOpen;
+  const toggleMenu = onMenuToggle || (() => setMobileMenuOpen(!mobileMenuOpen));
   const [isListening, setIsListening] = useState(false);
   const [rawCategories, setRawCategories] = useState<any[]>([]);
   const [categoryLinks, setCategoryLinks] = useState<any[]>([
@@ -235,7 +244,6 @@ export function Header() {
       document.documentElement.dir = language === "UR" ? "rtl" : "ltr";
       document.documentElement.lang = language === "UR" ? "ur" : "en";
     }
-    checkScrollability();
     const el = catScrollRef.current;
     if (el) {
       el.addEventListener("scroll", checkScrollability);
@@ -246,6 +254,13 @@ export function Header() {
       };
     }
   }, [language]);
+
+  // Re-check scrollability whenever category links change (async DB load)
+  useEffect(() => {
+    // Small delay to let DOM render the new links
+    const timer = setTimeout(checkScrollability, 50);
+    return () => clearTimeout(timer);
+  }, [categoryLinks]);
 
   const scrollCategories = (direction: "left" | "right") => {
     if (catScrollRef.current) {
@@ -617,10 +632,10 @@ export function Header() {
 
               {/* Mobile Menu Trigger */}
               <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                onClick={toggleMenu}
                 className="sm:hidden p-1.5 rounded-lg text-slate-950 hover:bg-black/10"
               >
-                {mobileMenuOpen ? (
+                {isMenuOpen ? (
                   <X className="w-5 h-5" />
                 ) : (
                   <Menu className="w-5 h-5" />
@@ -748,7 +763,7 @@ export function Header() {
               {canScrollRight && (
                 <button
                   onClick={() => scrollCategories("right")}
-                  className="absolute right-0 z-10 p-1.5 rounded-full bg-white/95 border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -mr-1"
+                  className="absolute right-0 z-10 p-1.5 rounded-full bg-white/95 border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -mr-1 cursor-pointer"
                   aria-label="Scroll right"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -760,17 +775,17 @@ export function Header() {
       </header>
 
       {/* Mobile Nav Drawer */}
-      {mobileMenuOpen && (
+      {isMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
-            onClick={() => setMobileMenuOpen(false)}
+            onClick={toggleMenu}
             className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
           />
           <div className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl p-5 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <Logo size="md" />
-                <button onClick={() => setMobileMenuOpen(false)}>
+                <button onClick={toggleMenu}>
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
@@ -780,7 +795,7 @@ export function Header() {
                   <Link
                     key={link.label}
                     href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={toggleMenu}
                     className="flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-amber-50 hover:text-amber-700"
                   >
                     <span>{link.label}</span>

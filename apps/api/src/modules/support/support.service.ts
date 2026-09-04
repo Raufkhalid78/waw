@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { AuditService } from "../audit/audit.service.js";
 import { PayoutStatus } from "../../types/index.js";
+import { logger } from "../../config/logger.js";
 
 export type DisputeReason =
   | "NON_DELIVERY"
@@ -119,7 +120,9 @@ export class SupportService {
         message: input.description.trim(),
         attachments: input.evidenceImages || [],
       });
-    } catch {}
+    } catch (err) {
+      logger.warn("Failed to create initial ticket message", { ticketId: ticket.id, error: (err as Error).message });
+    }
 
     // 3. Log Audit
     await AuditService.logAction({
@@ -146,7 +149,9 @@ export class SupportService {
         .order("created_at", { ascending: false });
 
       if (!error && tickets) return tickets;
-    } catch {}
+    } catch (err) {
+      logger.warn("Failed to fetch buyer tickets", { buyerId, error: (err as Error).message });
+    }
 
     return [];
   }
@@ -169,7 +174,9 @@ export class SupportService {
         .maybeSingle();
 
       if (!error && data) ticket = data;
-    } catch {}
+    } catch (err) {
+      logger.warn("Failed to fetch ticket details", { ticketId, error: (err as Error).message });
+    }
 
     if (!ticket) {
       ticket = {
@@ -196,7 +203,9 @@ export class SupportService {
         .order("created_at", { ascending: true });
 
       if (msgList) messages = msgList;
-    } catch {}
+    } catch (err) {
+      logger.warn("Failed to fetch ticket messages", { ticketId, error: (err as Error).message });
+    }
 
     return {
       ticket,
@@ -241,7 +250,9 @@ export class SupportService {
           updated_at: new Date().toISOString(),
         })
         .eq("id", ticketId);
-    } catch {}
+    } catch (err) {
+      logger.warn("Failed to update ticket status", { ticketId, error: (err as Error).message });
+    }
 
     if (error) {
       return {
