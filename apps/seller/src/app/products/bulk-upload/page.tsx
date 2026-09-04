@@ -61,7 +61,6 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,Ready to Wear,4999,6
   const handleImport = async () => {
     if (parsedRows.length === 0) return;
     setUploading(true);
-    const token = localStorage.getItem("waw_seller_token");
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
     let successCount = 0;
 
@@ -69,9 +68,9 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,Ready to Wear,4999,6
       try {
         const res = await fetch(`${API_BASE}/api/products`, {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             title: row.Title || row.title,

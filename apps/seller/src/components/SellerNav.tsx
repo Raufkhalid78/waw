@@ -32,30 +32,42 @@ export function SellerNav() {
     setMounted(true);
     if (pathname === "/login") return;
 
-    const token = localStorage.getItem("waw_seller_token");
-    if (!token) {
+    function getCookie(name: string): string | null {
+      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+    const session = getCookie("waw_session");
+    if (!session) {
       router.push("/login");
       return;
     }
 
-    const userRaw = localStorage.getItem("waw_seller_user");
-    if (userRaw) {
+    async function loadSession() {
       try {
-        const u = JSON.parse(userRaw);
-        if (u.storeName) setStoreName(u.storeName);
-        if (u.city) setCity(u.city);
-      } catch (e) {}
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/auth/session/me`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.storeName) setStoreName(data.storeName);
+          if (data.city) setCity(data.city);
+        }
+      } catch {}
     }
+    loadSession();
   }, [pathname, router]);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("waw_seller_token");
-    localStorage.removeItem("waw_store_id");
-    localStorage.removeItem("waw_seller_user");
+  const handleLogout = async () => {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/auth/session/revoke`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {}
     router.push("/login");
   };
 

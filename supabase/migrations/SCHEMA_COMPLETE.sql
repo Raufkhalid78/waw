@@ -908,11 +908,6 @@ GRANT SELECT, INSERT, UPDATE ON support_tickets TO authenticated;
 GRANT SELECT, INSERT ON ticket_messages TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON marketplace_settings TO authenticated;
 
--- Guest checkout
-GRANT SELECT, INSERT ON orders TO anon;
-GRANT SELECT, INSERT ON store_orders TO anon;
-GRANT SELECT, INSERT ON order_items TO anon;
-
 -- ============================================================================
 -- 9. CHECK CONSTRAINTS
 -- ============================================================================

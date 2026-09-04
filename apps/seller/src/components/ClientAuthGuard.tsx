@@ -6,10 +6,8 @@ type AuthState = "checking" | "authorized" | "redirecting";
 
 export function ClientAuthGuard({
   children,
-  tokenKey,
 }: {
   children: React.ReactNode;
-  tokenKey: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -22,16 +20,19 @@ export function ClientAuthGuard({
       return;
     }
 
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem(tokenKey) : null;
+    function getCookie(name: string): string | null {
+      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+    const session = typeof window !== "undefined" ? getCookie("waw_session") : null;
 
-    if (!token) {
+    if (!session) {
       setAuthState("redirecting");
       router.replace("/login");
     } else {
       setAuthState("authorized");
     }
-  }, [pathname, router, tokenKey]);
+  }, [pathname, router]);
 
   if (authState === "checking" || authState === "redirecting") {
     return (

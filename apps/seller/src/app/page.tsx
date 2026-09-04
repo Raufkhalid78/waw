@@ -36,8 +36,12 @@ export default function SellerDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("waw_seller_token") : null;
-    if (!token) {
+    function getCookie(name: string): string | null {
+      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+    const session = getCookie("waw_session");
+    if (!session) {
       window.location.href = "/login";
       return;
     }

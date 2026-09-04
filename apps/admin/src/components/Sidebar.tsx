@@ -47,9 +47,13 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
 
-  const handleLogout = () => {
-    localStorage.removeItem("admin_token");
-    document.cookie = "admin_token=; path=/; max-age=0";
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/session/revoke", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {}
     window.location.href = "/login";
   };
 

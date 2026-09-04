@@ -27,7 +27,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[#080d1a] text-slate-100 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
         <ErrorBoundary>
-          <ClientAuthGuard tokenKey="waw_seller_token">
+          <ClientAuthGuard>
             <div className="flex min-h-screen">
               <SellerNav />
               <div className="flex-1 flex flex-col min-w-0">{children}</div>

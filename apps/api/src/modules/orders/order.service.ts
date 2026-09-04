@@ -425,9 +425,9 @@ export class OrderService {
       query = query.eq("buyer_id", buyerId);
     }
 
-    const { data, error } = await query.maybeSingle();
+    const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return data || [];
   }
 
   /**
@@ -454,36 +454,17 @@ export class OrderService {
       throw new Error("Forbidden");
     }
 
-    const cancellableStatuses = ["PENDING", "PENDING_PAYMENT", "CONFIRMED", "PROCESSING"];
-    if (!cancellableStatuses.includes(order.global_status)) {
-      throw new Error(`Order cannot be cancelled in ${order.global_status} status`);
-    }
+    const { error } = await supabaseAdmin.rpc("cancel_order", {
+      p_order_id: id,
+      p_reason: reason || "Customer cancelled",
+    });
+    if (error) throw error;
 
-    // Cancel parent order
-    await supabaseAdmin
-      .from("orders")
-      .update({
-        global_status: "CANCELLED",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    // Cancel all child store_orders and release inventory in ledger
-    if (order.store_orders?.length > 0) {
-      await supabaseAdmin
-        .from("store_orders")
-        .update({
-          status: "CANCELLED",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("order_id", id);
-
-      await InventoryService.releaseOrderReservation(
-        id,
-        reason || "Customer cancelled",
-        authenticatedUser?.id || "CUSTOMER",
-      );
-    }
+    await InventoryService.releaseOrderReservation(
+      id,
+      reason || "Customer cancelled",
+      authenticatedUser?.id || "CUSTOMER",
+    );
 
     return { success: true, orderId: id, status: "CANCELLED" };
   }

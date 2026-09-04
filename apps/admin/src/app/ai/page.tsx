@@ -20,9 +20,9 @@ export default function AdminAIPage() {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("waw_admin_token");
-      const res = await fetch("/api/ai/usage", {
-        headers: { Authorization: `Bearer ${token}` },
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const res = await fetch(`${API_BASE}/api/ai/usage`, {
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to load AI usage");
       const data = await res.json();
