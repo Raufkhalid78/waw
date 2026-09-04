@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { payoutsApi, type AdminPayout } from "@/lib/api";
 import { Wallet, CheckCircle, RefreshCw } from "lucide-react";
 
@@ -12,7 +12,7 @@ export default function PayoutsPage() {
   const [loading, setLoading] = useState(true);
   const [settleLoading, setSettleLoading] = useState<string | null>(null);
 
-  const loadPayouts = async () => {
+  const loadPayouts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await payoutsApi.list({ page, limit: 20, status: statusFilter || undefined });
@@ -23,11 +23,11 @@ export default function PayoutsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
     loadPayouts();
-  }, [page, statusFilter]);
+  }, [loadPayouts]);
 
   const handleSettle = async (id: string) => {
     setSettleLoading(id);

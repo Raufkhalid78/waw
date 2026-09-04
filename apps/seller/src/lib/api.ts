@@ -108,29 +108,74 @@ export interface SellerCoupon {
   createdAt: string;
 }
 
-function getAuthHeader(): Record<string, string> {
-  if (typeof window === "undefined")
-    return { "Content-Type": "application/json" };
-  const token =
-    localStorage.getItem("waw_seller_token") ||
-    localStorage.getItem("waw_auth_token");
+function getCsrfToken(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|; )waw_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function getHeaders(isStateChanging = false): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (token) headers["Authorization"] = "Bearer " + token;
+  if (isStateChanging) {
+    const csrf = getCsrfToken();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
   return headers;
+}
+
+async function sellerFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const method = options?.method?.toUpperCase();
+  const isStateChanging = method !== undefined && !["GET", "HEAD", "OPTIONS"].includes(method);
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    credentials: "include",
+    headers: {
+      ...getHeaders(isStateChanging),
+      ...(options?.headers as Record<string, string>),
+    },
+  });
+
+  if (res.status === 401) {
+    try {
+      const refreshRes = await fetch(`${API_BASE}/api/auth/session/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (refreshRes.ok) {
+        const retryRes = await fetch(`${API_BASE}${path}`, {
+          ...options,
+          credentials: "include",
+          headers: {
+            ...getHeaders(isStateChanging),
+            ...(options?.headers as Record<string, string>),
+          },
+        });
+        if (!retryRes.ok) {
+          const error = await retryRes.json().catch(() => ({ error: "Request failed" }));
+          throw new Error(error.error || `HTTP ${retryRes.status}`);
+        }
+        return retryRes.json();
+      }
+    } catch {
+      if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+        window.location.href = "/login";
+      }
+    }
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
 }
 
 export async function fetchSellerStore(): Promise<SellerStore | null> {
   try {
-    const res = await fetch(API_BASE + "/api/seller/store", {
-      headers: getAuthHeader(),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      return null;
-    }
-    const data = await res.json();
+    const data = await sellerFetch<any>("/api/seller/store", { cache: "no-store" as any });
     if (!data || data.message || !data.id) return null;
 
     return {
@@ -160,12 +205,7 @@ export async function fetchSellerStore(): Promise<SellerStore | null> {
 
 export async function fetchSellerOrders(): Promise<SellerOrder[]> {
   try {
-    const res = await fetch(API_BASE + "/api/seller/orders", {
-      headers: getAuthHeader(),
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
+    const data = await sellerFetch<any>("/api/seller/orders", { cache: "no-store" as any });
     return Array.isArray(data) ? data : data?.orders || [];
   } catch (err) {
     console.error("Failed to fetch seller orders:", err);
@@ -177,29 +217,16 @@ export async function updateStoreOrderStatus(
   storeOrderId: string,
   status: OrderStatus,
 ): Promise<boolean> {
-  const res = await fetch(
-    API_BASE + "/api/seller/orders/" + storeOrderId + "/status",
-    {
-      method: "PATCH",
-      headers: getAuthHeader(),
-      body: JSON.stringify({ status }),
-    },
-  );
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || "Failed to update order status");
-  }
+  await sellerFetch(`/api/seller/orders/${storeOrderId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
   return true;
 }
 
 export async function fetchSellerProducts(): Promise<SellerProduct[]> {
   try {
-    const res = await fetch(API_BASE + "/api/seller/products", {
-      headers: getAuthHeader(),
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
+    const data = await sellerFetch<any>("/api/seller/products", { cache: "no-store" as any });
     const rawItems = Array.isArray(data) ? data : data?.items || [];
     return rawItems.map((p: any) => ({
       id: p.id,
@@ -236,29 +263,18 @@ export async function createSellerProduct(productData: {
   description: string;
   weightKg?: number;
 }): Promise<any> {
-  const res = await fetch(API_BASE + "/api/products", {
+  return sellerFetch("/api/products", {
     method: "POST",
-    headers: getAuthHeader(),
     body: JSON.stringify({
       ...productData,
       sellerType: SellerType.THIRD_PARTY,
     }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to create product listing");
-  }
-  return await res.json();
 }
 
 export async function fetchSellerPayouts(): Promise<SellerPayout[]> {
   try {
-    const res = await fetch(API_BASE + "/api/seller/payouts", {
-      headers: getAuthHeader(),
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
+    const data = await sellerFetch<any>("/api/seller/payouts", { cache: "no-store" as any });
     return Array.isArray(data) ? data : data?.payouts || [];
   } catch (err) {
     console.error("Failed to fetch seller payouts:", err);
@@ -268,12 +284,7 @@ export async function fetchSellerPayouts(): Promise<SellerPayout[]> {
 
 export async function fetchSellerCoupons(): Promise<SellerCoupon[]> {
   try {
-    const res = await fetch(API_BASE + "/api/seller/coupons", {
-      headers: getAuthHeader(),
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
+    const data = await sellerFetch<any>("/api/seller/coupons", { cache: "no-store" as any });
     return Array.isArray(data) ? data : data?.coupons || [];
   } catch (err) {
     console.error("Failed to fetch seller coupons:", err);
@@ -290,16 +301,10 @@ export async function createSellerCoupon(couponData: {
   expiresAt?: string;
   maxUses?: number;
 }): Promise<any> {
-  const res = await fetch(API_BASE + "/api/seller/coupons", {
+  return sellerFetch("/api/seller/coupons", {
     method: "POST",
-    headers: getAuthHeader(),
     body: JSON.stringify(couponData),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to create promotional coupon");
-  }
-  return await res.json();
 }
 
 export interface SellerAnalytics {
@@ -313,20 +318,7 @@ export interface SellerAnalytics {
 
 export async function fetchSellerAnalytics(): Promise<SellerAnalytics> {
   try {
-    const res = await fetch(API_BASE + "/api/seller/analytics", {
-      headers: getAuthHeader(),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      return {
-        totalRevenuePkr: 0,
-        pendingPayoutsPkr: 0,
-        totalOrders: 0,
-        activeProducts: 0,
-        storeStatus: StoreStatus.PENDING_KYC,
-      };
-    }
-    return await res.json();
+    return await sellerFetch<SellerAnalytics>("/api/seller/analytics", { cache: "no-store" as any });
   } catch (err) {
     console.error("Failed to fetch seller analytics:", err);
     return {
@@ -343,27 +335,14 @@ export async function updateSellerProduct(
   productId: string,
   data: { title?: string; description?: string; base_price_pkr?: number; is_active?: boolean }
 ): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/products/${productId}`, {
+  return sellerFetch(`/api/products/${productId}`, {
     method: "PATCH",
-    headers: { ...getAuthHeader(), "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Failed to update product" }));
-    throw new Error(err.error || "Failed to update product");
-  }
-  return await res.json();
 }
 
 export async function deleteSellerProduct(productId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/products/${productId}`, {
-    method: "DELETE",
-    headers: getAuthHeader(),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Failed to delete product" }));
-    throw new Error(err.error || "Failed to delete product");
-  }
+  await sellerFetch(`/api/products/${productId}`, { method: "DELETE" });
 }
 
 export async function updateStoreProfile(data: {
@@ -373,16 +352,10 @@ export async function updateStoreProfile(data: {
   city?: string;
   address?: string;
 }): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/seller/store`, {
+  return sellerFetch("/api/seller/store", {
     method: "PATCH",
-    headers: { ...getAuthHeader(), "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Failed to update store" }));
-    throw new Error(err.error || "Failed to update store");
-  }
-  return await res.json();
 }
 
 export async function submitKyc(data: {
@@ -392,23 +365,12 @@ export async function submitKyc(data: {
   bank_name: string;
   bank_branch?: string;
 }): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/seller/kyc`, {
+  return sellerFetch("/api/seller/kyc", {
     method: "POST",
-    headers: { ...getAuthHeader(), "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Failed to submit KYC" }));
-    throw new Error(err.error || "Failed to submit KYC");
-  }
-  return await res.json();
 }
 
 export async function fetchKycStatus(): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/seller/kyc/status`, {
-    headers: getAuthHeader(),
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return await res.json();
+  return sellerFetch("/api/seller/kyc/status", { cache: "no-store" as any });
 }

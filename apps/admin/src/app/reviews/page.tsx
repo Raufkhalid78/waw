@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { reviewsApi, type AdminReview } from "@/lib/api";
 import { Star, CheckCircle, XCircle, RefreshCw, MessageSquare } from "lucide-react";
 
@@ -11,7 +11,7 @@ export default function ReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const loadReviews = async () => {
+  const loadReviews = useCallback(async () => {
     setLoading(true);
     try {
       const data = await reviewsApi.list({ page, limit: 20 });
@@ -22,11 +22,11 @@ export default function ReviewsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
 
   useEffect(() => {
     loadReviews();
-  }, [page]);
+  }, [loadReviews]);
 
   const handleAction = async (id: string, action: "approve" | "reject") => {
     setActionLoading(id);

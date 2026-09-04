@@ -24,7 +24,7 @@ export default function AdminLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <AdminProvider>
-            <ClientAuthGuard tokenKey="admin_token">
+            <ClientAuthGuard>
               <AdminShell>{children}</AdminShell>
             </ClientAuthGuard>
           </AdminProvider>

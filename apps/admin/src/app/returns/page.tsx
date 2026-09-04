@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { returnsApi, type AdminReturn } from "@/lib/api";
 import { RotateCcw, CheckCircle, XCircle, Package, RefreshCw } from "lucide-react";
 
@@ -12,7 +12,7 @@ export default function ReturnsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const loadReturns = async () => {
+  const loadReturns = useCallback(async () => {
     setLoading(true);
     try {
       const data = await returnsApi.list({ page, limit: 20, status: statusFilter || undefined });
@@ -23,11 +23,11 @@ export default function ReturnsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
     loadReturns();
-  }, [page, statusFilter]);
+  }, [loadReturns]);
 
   const handleAction = async (id: string, action: "receive" | "refund" | "reject") => {
     setActionLoading(id);

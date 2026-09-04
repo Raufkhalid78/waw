@@ -2,6 +2,7 @@
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import path from "path";
@@ -18,6 +19,7 @@ import { performanceTracker } from "./middleware/performance.middleware.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 import { requireActiveStore } from "./middleware/require-active-store.middleware.js";
 import { requireRole } from "./middleware/require-role.middleware.js";
+import { csrfProtection } from "./middleware/csrf.middleware.js";
 import {
   otpRateLimiter,
   apiRateLimiter,
@@ -48,6 +50,7 @@ import {
 
 // Controllers
 import { AuthController } from "./modules/auth/auth.controller.js";
+import { SessionController } from "./modules/auth/session.controller.js";
 import { CategoryController } from "./modules/categories/category.controller.js";
 import { ProductController } from "./modules/products/product.controller.js";
 import { OrderController } from "./modules/orders/order.controller.js";
@@ -133,6 +136,7 @@ const corsOptions: cors.CorsOptions = {
     "Accept",
     "Origin",
     "X-Correlation-Id",
+    "X-CSRF-Token",
   ],
   exposedHeaders: ["Content-Range", "X-Total-Count"],
 };
@@ -149,8 +153,10 @@ app.use(
   }),
 );
 app.use(morgan(ENV.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(cookieParser());
 app.use(apiRateLimiter);
 app.use(apiVersioning);
+app.use(csrfProtection);
 
 // ── Swagger API Documentation ──────────────────────────────────────────────
 try {
@@ -196,9 +202,10 @@ app.get("/readyz", async (req, res) => {
     if (error) isHealthy = false;
   } catch {
     checks.supabasePostgres = {
-      status: "healthy",
+      status: "unhealthy",
       latencyMs: Date.now() - startDb,
     };
+    isHealthy = false;
   }
 
   // 2. Redis Ping
@@ -252,6 +259,13 @@ app.post(
 );
 
 app.post("/api/auth/oauth/sync", requireAuth, AuthController.syncOAuth);
+
+// ── Session Management (HttpOnly Cookie-based) ─────────────────────
+app.post("/api/auth/session/create", SessionController.createSession);
+app.post("/api/auth/session/refresh", SessionController.refreshSession);
+app.post("/api/auth/session/revoke", SessionController.revokeSession);
+app.get("/api/auth/session/me", SessionController.getCurrentUser);
+app.post("/api/auth/session/revoke-all", requireAuth, SessionController.revokeAllSessions);
 
 // ── Storefront Config (Dynamic UI Metadata) ───────────────
 // CMS Content Route

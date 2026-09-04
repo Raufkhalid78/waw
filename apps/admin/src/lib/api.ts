@@ -1,20 +1,53 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-function getAuthToken(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("admin_token") || "";
+function getCsrfToken(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|; )waw_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : "";
 }
 
 async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = getAuthToken();
-  const res = await fetch(`${API_BASE}${path}`, {
+  const method = options?.method?.toUpperCase();
+  const isStateChanging = method !== undefined && !["GET", "HEAD", "OPTIONS"].includes(method);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string>),
+  };
+
+  if (isStateChanging) {
+    const csrf = getCsrfToken();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
+
+  let res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...options?.headers,
-    },
+    credentials: "include",
+    headers,
   });
+
+  // If 401, try refreshing the session once
+  if (res.status === 401) {
+    try {
+      const refreshRes = await fetch(`${API_BASE}/api/auth/session/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (refreshRes.ok) {
+        // Retry the original request
+        res = await fetch(`${API_BASE}${path}`, {
+          ...options,
+          credentials: "include",
+          headers,
+        });
+      }
+    } catch {
+      // Refresh failed, redirect to login
+      if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+        window.location.href = "/login";
+      }
+    }
+  }
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Request failed" }));

@@ -6,7 +6,7 @@ import {
   PayoutStatus,
 } from "../types/index.js";
 import axios from "axios";
-import { ENV } from "../config/env.js";
+import { ENV, FEATURES } from "../config/env.js";
 import { logger } from "../config/logger.js";
 import { AuditService } from "../modules/audit/audit.service.js";
 
@@ -188,8 +188,7 @@ async function runShipmentReconciliation(): Promise<{ synced: number }> {
     for (const shipment of inTransitShipments) {
       // If live PostEx API is configured, query tracking
       if (
-        ENV.POSTEX_API_TOKEN &&
-        ENV.POSTEX_API_TOKEN !== "ptx_live_test_token_2026" &&
+        FEATURES.COURIER_ENABLED &&
         shipment.courier === CourierProvider.POSTEX
       ) {
         try {

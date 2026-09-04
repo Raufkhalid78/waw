@@ -6,6 +6,8 @@ import { CourierService } from "../logistics/courier.service.js";
 import { QuoteService } from "./quote.service.js";
 import { InventoryService } from "../products/inventory.service.js";
 import { JobQueueManager } from "../../jobs/queue.service.js";
+import { AuthorizationService } from "../auth/authorization.service.js";
+import { CheckoutSessionService } from "../checkout/checkout-session.service.js";
 import {
   calculateOrderSummary,
   OrderItemPricingInput,
@@ -14,6 +16,7 @@ import {
   PaymentStatus,
   ReturnReason,
   SellerType,
+  UserRole,
 } from "../../types/index.js";
 
 export interface CartItem {
@@ -46,7 +49,42 @@ export class OrderService {
    * + PostEx shipment per distinct seller.
    */
   static async createOrder(input: CreateOrderInput, authenticatedUser?: any) {
-    if (input.idempotencyKey) {
+    // 1. Durable idempotency check via database session
+    if (input.quoteToken || input.idempotencyKey) {
+      const { session, isDuplicate } = await CheckoutSessionService.beginSession({
+        quoteToken: input.quoteToken || `gen_${Date.now()}`,
+        buyerId: authenticatedUser?.id,
+        buyerPhone: input.buyerPhone,
+        idempotencyKey: input.idempotencyKey,
+      });
+
+      // If this is a duplicate committed session, return the existing order
+      if (isDuplicate && session.order_id) {
+        logger.info("Returning existing order from committed checkout session", {
+          sessionId: session.id,
+          orderId: session.order_id,
+        });
+        return {
+          orderId: session.order_id,
+          orderNumber: session.id.slice(0, 8),
+          status: "already_processed",
+          idempotentReplay: true,
+        };
+      }
+
+      // If pending session exists but no order yet, this is a concurrent retry
+      if (!isDuplicate && session.status === "pending" && session.order_id) {
+        return {
+          orderId: session.order_id,
+          orderNumber: session.id.slice(0, 8),
+          status: "already_processed",
+          idempotentReplay: true,
+        };
+      }
+    }
+
+    // 2. Redis fast-path for non-session idempotency keys
+    if (input.idempotencyKey && !input.quoteToken) {
       try {
         const cached = await redis.get(`idempotency:${input.idempotencyKey}`);
         if (cached) return JSON.parse(cached);
@@ -55,12 +93,22 @@ export class OrderService {
       }
     }
 
+    // 3. Generate or verify quote
     let quote: any;
+    let sessionId: string | null = null;
+
     if (input.quoteToken) {
-      const isUsed = await redis.get(`quote_used:${input.quoteToken}`);
-      if (isUsed) throw new Error("This checkout session has already been processed.");
+      // Verify the quote token is valid (signature check)
       quote = QuoteService.verifyQuoteToken(input.quoteToken);
-      await redis.set(`quote_used:${input.quoteToken}`, "1", { ex: 86400 });
+
+      // Create durable session if not already created
+      const { session } = await CheckoutSessionService.beginSession({
+        quoteToken: input.quoteToken,
+        buyerId: authenticatedUser?.id,
+        buyerPhone: input.buyerPhone,
+        idempotencyKey: input.idempotencyKey,
+      });
+      sessionId = session.id;
     } else if (input.items && input.items.length > 0) {
       quote = await QuoteService.generateQuote({
         items: input.items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
@@ -79,6 +127,7 @@ export class OrderService {
       quantity: i.quantity,
     }));
 
+    // 4. Execute checkout transaction via RPC
     const { data: result, error } = await supabaseAdmin.rpc('checkout_transaction', {
       p_buyer_id: buyerId || null,
       p_buyer_name: input.buyerName,
@@ -92,7 +141,16 @@ export class OrderService {
     });
 
     if (error || !result?.success) {
+      // Mark session as failed so it can be retried
+      if (sessionId) {
+        await CheckoutSessionService.failSession(sessionId);
+      }
       throw new Error(`Checkout transaction failed: ${error?.message || 'Unknown error'}`);
+    }
+
+    // 5. Commit the session atomically after successful order creation
+    if (sessionId) {
+      await CheckoutSessionService.commitSession(sessionId, result.order_id);
     }
 
     const response = {
@@ -102,6 +160,7 @@ export class OrderService {
       status: input.paymentMethod === PaymentMethod.COD ? "PENDING_COD" : "PENDING_PAYMENT"
     };
 
+    // 6. Redis fast-path cache (secondary, not source of truth)
     if (input.idempotencyKey) {
       try {
         await redis.set(`idempotency:${input.idempotencyKey}`, JSON.stringify(response), { ex: 86400 });
@@ -123,8 +182,14 @@ export class OrderService {
 
   /**
    * Fetches full order details including all store_orders and their shipments.
+   * When userId/userRole are provided, enforces object-level authorization.
    */
-  static async getOrder(id: string) {
+  static async getOrder(id: string, userId?: string, userRole?: UserRole) {
+    if (userId && userRole) {
+      const authorized = await AuthorizationService.requireOrderOwnership(id, userId, userRole);
+      if (!authorized) return null;
+    }
+
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select("*, store_orders(*, order_items(*, offer_variants(*, seller_offers(*, catalog_products(*)))), shipments(*))")
@@ -152,6 +217,7 @@ export class OrderService {
 
   /**
    * Submits a return request for an order, books PostEx reverse pickup, and logs audit event.
+   * Handles multi-vendor orders by grouping items by seller sub-order.
    */
   static async createReturnRequest(
     orderId: string,
@@ -163,13 +229,18 @@ export class OrderService {
       refundPreference?: string;
       pickupAddress?: string;
       pickupCity?: string;
-      items?: { orderItemId: string; quantity: number }[];
+      items: { orderItemId: string; quantity: number }[];
     },
   ) {
-    // 1. Fetch order and verify ownership
+    // 0. Validate items array is non-empty
+    if (!input.items || input.items.length === 0) {
+      throw new Error("At least one item must be specified for return.");
+    }
+
+    // 1. Fetch order with full item details
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("orders")
-      .select("*, order_items(*), store_orders(*)")
+      .select("*, order_items(*, offer_variants(*, seller_offers(*, catalog_products(*)))), store_orders(*)")
       .eq("id", orderId)
       .single();
 
@@ -188,50 +259,92 @@ export class OrderService {
       }
     }
 
-    // 3. Book reverse pickup via CourierService
-    const reversePickupResult = await CourierService.bookPostExReversePickup({
-      orderId: order.id,
-      orderNumber: order.order_number || order.id,
-      customerName: order.buyer_name,
-      customerPhone: order.buyer_phone,
-      pickupAddress: input.pickupAddress || order.shipping_address,
-      pickupCity: input.pickupCity || order.shipping_city,
-      returnReason: input.reason as ReturnReason,
-      itemsDescription: input.comments || "Customer Return",
-    });
-
-    // 4. Create return_requests record
-    const { data: returnReq, error: retErr } = await supabaseAdmin
-      .from("return_requests")
-      .insert({
-        order_id: order.id,
-        store_order_id: order.store_orders?.[0]?.id || null,
-        buyer_id: buyerId,
-        reason: input.reason,
-        evidence_images: input.evidenceImages || [],
-        status: "REVERSE_PICKUP_BOOKED",
-        reverse_courier_cn: reversePickupResult.reverseTrackingNumber,
-        refund_amount_pkr: order.total_amount_pkr || 0,
-        staff_notes: input.comments
-          ? `Buyer notes: ${input.comments}. Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`
-          : `Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`,
-      })
-      .select()
-      .single();
-
-    if (retErr) throw retErr;
-
-    // 5. If specific items, insert into return_items
-    if (input.items && input.items.length > 0) {
-      const returnItemsData = input.items.map((i) => ({
-        return_request_id: returnReq.id,
-        order_item_id: i.orderItemId,
-        quantity: i.quantity || 1,
-      }));
-      await supabaseAdmin.from("return_items").insert(returnItemsData);
+    // 3. Build a map of order_item_id -> order_item for validation
+    const orderItemMap = new Map<string, any>();
+    for (const item of order.order_items || []) {
+      orderItemMap.set(item.id, item);
     }
 
-    // 6. Update order status
+    // 4. Validate requested items belong to this order and cap quantities
+    const validatedItems: { orderItemId: string; quantity: number; storeOrderId: string; lineTotalPkr: number }[] = [];
+    let totalRefundPkr = 0;
+
+    for (const reqItem of input.items) {
+      const orderItem = orderItemMap.get(reqItem.orderItemId);
+      if (!orderItem) {
+        throw new Error(`Order item ${reqItem.orderItemId} does not belong to this order.`);
+      }
+
+      const deliveredQty = orderItem.quantity || 0;
+      const requestedQty = Math.min(reqItem.quantity || 1, deliveredQty);
+      if (requestedQty <= 0) {
+        throw new Error(`Invalid return quantity for item ${reqItem.orderItemId}.`);
+      }
+
+      // Calculate line-level refund from captured price
+      const unitPrice = orderItem.price_pkr || 0;
+      const lineTotal = unitPrice * requestedQty;
+      totalRefundPkr += lineTotal;
+
+      // Resolve which store_order this item belongs to
+      const storeOrderId = orderItem.store_order_id || order.store_orders?.[0]?.id || null;
+
+      validatedItems.push({
+        orderItemId: reqItem.orderItemId,
+        quantity: requestedQty,
+        storeOrderId,
+        lineTotalPkr: lineTotal,
+      });
+    }
+
+    // 5. Group validated items by store_order_id (one return per seller)
+    const itemsByStoreOrder = new Map<string, typeof validatedItems>();
+    for (const item of validatedItems) {
+      const key = item.storeOrderId || "unknown";
+      if (!itemsByStoreOrder.has(key)) {
+        itemsByStoreOrder.set(key, []);
+      }
+      itemsByStoreOrder.get(key)!.push(item);
+    }
+
+    // 6. Create return_requests FIRST (outbox pattern — durable record before external call)
+    const returnRequests: any[] = [];
+
+    for (const [storeOrderId, items] of itemsByStoreOrder) {
+      const storeRefund = items.reduce((sum, i) => sum + i.lineTotalPkr, 0);
+
+      const { data: returnReq, error: retErr } = await supabaseAdmin
+        .from("return_requests")
+        .insert({
+          order_id: order.id,
+          store_order_id: storeOrderId === "unknown" ? null : storeOrderId,
+          buyer_id: buyerId,
+          reason: input.reason,
+          evidence_images: input.evidenceImages || [],
+          status: "PENDING_COURIER_BOOKING",
+          reverse_courier_cn: null,
+          refund_amount_pkr: storeRefund,
+          staff_notes: input.comments
+            ? `Buyer notes: ${input.comments}. Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`
+            : `Pref: ${input.refundPreference || "ORIGINAL_PAYMENT"}`,
+        })
+        .select()
+        .single();
+
+      if (retErr) throw retErr;
+
+      // Insert line-level return items
+      const returnItemsData = items.map((i) => ({
+        return_request_id: returnReq.id,
+        order_item_id: i.orderItemId,
+        quantity: i.quantity,
+      }));
+      await supabaseAdmin.from("return_items").insert(returnItemsData);
+
+      returnRequests.push(returnReq);
+    }
+
+    // 7. Update order status to RETURN_REQUESTED
     await supabaseAdmin
       .from("orders")
       .update({
@@ -240,7 +353,39 @@ export class OrderService {
       })
       .eq("id", order.id);
 
-    // 7. Immutable Audit Log
+    // 8. Enqueue courier booking via BullMQ (async, retried, idempotent)
+    const courierJobIds: string[] = [];
+    for (const returnReq of returnRequests) {
+      try {
+        const job = await JobQueueManager.addJob(
+          "REVERSE_COURIER_BOOKING",
+          {
+            returnRequestId: returnReq.id,
+            orderId: order.id,
+            orderNumber: order.order_number || order.id,
+            customerName: order.buyer_name,
+            customerPhone: order.buyer_phone,
+            pickupAddress: input.pickupAddress || order.shipping_address,
+            pickupCity: input.pickupCity || order.shipping_city,
+            returnReason: input.reason,
+            itemsDescription: input.comments || "Customer Return",
+          },
+          {
+            attempts: 3,
+            backoff: { type: "exponential", delay: 5000 },
+            jobId: `return_booking_${returnReq.id}`,
+          },
+        );
+        courierJobIds.push(job);
+      } catch (err) {
+        logger.error("Failed to enqueue reverse courier booking", {
+          returnRequestId: returnReq.id,
+          error: (err as Error).message,
+        });
+      }
+    }
+
+    // 8. Immutable Audit Log
     const { AuditService } = await import("../audit/audit.service.js");
     await AuditService.logAction({
       actorId: buyerId,
@@ -251,16 +396,19 @@ export class OrderService {
       previousState: { orderStatus: order.global_status },
       newState: {
         orderStatus: "RETURN_REQUESTED",
-        returnRequestId: returnReq.id,
-        reverseCn: reversePickupResult.reverseTrackingNumber,
+        returnRequestIds: returnRequests.map((r) => r.id),
+        totalRefundPkr,
+        sellerCount: returnRequests.length,
+        courierJobsEnqueued: courierJobIds.length,
       },
-      reason: `Buyer returned order: ${input.reason}`,
+      reason: `Buyer returned ${input.items.length} item(s): ${input.reason}`,
     });
 
     return {
       success: true,
-      returnRequest: returnReq,
-      reverseShipment: reversePickupResult,
+      returnRequests,
+      totalRefundPkr,
+      courierJobsEnqueued: courierJobIds.length,
     };
   }
 

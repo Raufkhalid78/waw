@@ -21,15 +21,29 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const createSession = async (userId: string, userRole: string, userPhone?: string, userEmail?: string) => {
+    const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ userId, userRole, userPhone, userEmail }),
+    });
+    if (!sessionRes.ok) {
+      const err = await sessionRes.json().catch(() => ({ error: "Session creation failed" }));
+      throw new Error(err.error || "Failed to create session");
+    }
+  };
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
@@ -43,7 +57,7 @@ export default function LoginPage() {
         throw new Error("Access denied. Admin only.");
       }
 
-      localStorage.setItem("admin_token", data.token);
+      await createSession(data.user.id, data.user.role, data.user.phone, data.user.email);
       router.push("/");
     } catch (err: any) {
       setError(err.message);
@@ -83,6 +97,7 @@ export default function LoginPage() {
       const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ phone: mobile, otp, role: "ADMIN" }),
       });
 
@@ -93,7 +108,7 @@ export default function LoginPage() {
         throw new Error("Access denied. Admin only.");
       }
 
-      localStorage.setItem("admin_token", data.token);
+      await createSession(data.user.id, data.user.role, data.user.phone, data.user.email);
       router.push("/");
     } catch (err: any) {
       setError(err.message);
@@ -109,6 +124,7 @@ export default function LoginPage() {
       const res = await fetch(`${API_BASE}/api/auth/oauth/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ provider }),
       });
       const data = await res.json();
@@ -117,7 +133,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      localStorage.setItem("admin_token", data.token);
+      await createSession(data.user.id, data.user.role, data.user.phone, data.user.email);
       router.push("/");
     } catch {
       setError(`${provider} login will be available once OAuth providers are configured in Supabase.`);

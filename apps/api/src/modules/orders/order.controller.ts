@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { OrderService } from "./order.service.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { AuditService } from "../audit/audit.service.js";
+import { AuthorizationService } from "../auth/authorization.service.js";
 import { UserRole } from "../../types/index.js";
 
 export class OrderController {
@@ -29,14 +30,10 @@ export class OrderController {
 
   static async getOrder(req: Request, res: Response): Promise<void> {
     try {
-      const order = await OrderService.getOrder(req.params.id);
-      if (!order) {
-        res.status(404).json({ error: "Order not found" });
-        return;
-      }
       const user = (req as any).user;
-      if (user.role !== "ADMIN" && order.buyer_id !== user.id) {
-        res.status(403).json({ error: "Forbidden" });
+      const order = await OrderService.getOrder(req.params.id, user.id, user.role);
+      if (!order) {
+        res.status(404).json({ error: "Order not found or access denied" });
         return;
       }
       res.json(order);

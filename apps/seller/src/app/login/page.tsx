@@ -31,6 +31,19 @@ export default function SellerLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const createSession = async (userId: string, userRole: string, userPhone?: string, userEmail?: string, storeId?: string) => {
+    const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ userId, userRole, userPhone, userEmail, storeId }),
+    });
+    if (!sessionRes.ok) {
+      const err = await sessionRes.json().catch(() => ({ error: "Session creation failed" }));
+      throw new Error(err.error || "Failed to create session");
+    }
+  };
+
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -39,6 +52,7 @@ export default function SellerLoginPage() {
       const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ phone }),
       });
       const data = await res.json();
@@ -59,19 +73,19 @@ export default function SellerLoginPage() {
       const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ phone, otp, role: "SELLER", storeName, city }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Invalid OTP");
 
-      localStorage.setItem("waw_seller_token", data.token);
-      localStorage.setItem(
-        "waw_seller_user",
-        JSON.stringify(data.user || { role: "SELLER", phone }),
+      await createSession(
+        data.user.id,
+        data.user.role,
+        data.user.phone,
+        data.user.email,
+        data.user.store_id,
       );
-      if (data.user?.store_id) {
-        localStorage.setItem("waw_store_id", data.user.store_id);
-      }
       router.push("/");
     } catch (err: any) {
       setError(err.message || "OTP verification failed");
@@ -88,19 +102,19 @@ export default function SellerLoginPage() {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
 
-      localStorage.setItem("waw_seller_token", data.token);
-      localStorage.setItem(
-        "waw_seller_user",
-        JSON.stringify(data.user || { role: "SELLER", email }),
+      await createSession(
+        data.user.id,
+        data.user.role,
+        data.user.phone,
+        data.user.email,
+        data.user.store_id,
       );
-      if (data.user?.store_id) {
-        localStorage.setItem("waw_store_id", data.user.store_id);
-      }
       router.push("/");
     } catch (err: any) {
       setError(err.message || "Login failed");

@@ -2,10 +2,11 @@ import { Queue, Worker, Job } from "bullmq";
 import { ENV } from "../config/env.js";
 import { logger } from "../config/logger.js";
 import { WhatsAppService } from "../modules/notifications/whatsapp.service.js";
+import { CourierService } from "../modules/logistics/courier.service.js";
 import { typesenseClient } from "../config/typesense.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { InventoryLockService } from "../modules/products/inventory-lock.service.js";
-import { OrderStatus, PaymentStatus } from "../types/index.js";
+import { OrderStatus, PaymentStatus, ReturnReason } from "../types/index.js";
 
 export interface BackgroundJobPayload<T = any> {
   id?: string;
@@ -17,7 +18,8 @@ export interface BackgroundJobPayload<T = any> {
     | "TYPESENSE_SYNC"
     | "ESCROW_PAYOUT"
     | "COD_RECONCILIATION"
-    | "INVENTORY_LOCK_SWEEP";
+    | "INVENTORY_LOCK_SWEEP"
+    | "REVERSE_COURIER_BOOKING";
   payload: T;
   createdAt?: string;
 }
@@ -167,6 +169,54 @@ try {
           );
           break;
 
+        case "REVERSE_COURIER_BOOKING": {
+          logger.info(
+            `📦 [Reverse Courier] Booking reverse pickup for return ${payload.returnRequestId}`,
+          );
+          try {
+            const reverseResult = await CourierService.bookPostExReversePickup({
+              orderId: payload.orderId,
+              orderNumber: payload.orderNumber,
+              customerName: payload.customerName,
+              customerPhone: payload.customerPhone,
+              pickupAddress: payload.pickupAddress,
+              pickupCity: payload.pickupCity,
+              returnReason: payload.returnReason as ReturnReason,
+              itemsDescription: payload.itemsDescription,
+            });
+
+            // Update return request with tracking info
+            await supabaseAdmin
+              .from("return_requests")
+              .update({
+                status: "REVERSE_PICKUP_BOOKED",
+                reverse_courier_cn: reverseResult.reverseTrackingNumber,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", payload.returnRequestId);
+
+            logger.info(
+              `✅ [Reverse Courier] Booked reverse pickup for return ${payload.returnRequestId}, CN: ${reverseResult.reverseTrackingNumber}`,
+            );
+          } catch (err: any) {
+            logger.error(
+              `❌ [Reverse Courier] Failed to book reverse pickup for return ${payload.returnRequestId}:`,
+              err.message,
+            );
+            // Mark as failed so it can be retried or manually handled
+            await supabaseAdmin
+              .from("return_requests")
+              .update({
+                status: "COURIER_BOOKING_FAILED",
+                staff_notes: `Courier booking failed: ${err.message}`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", payload.returnRequestId);
+            throw err; // Re-throw to trigger BullMQ retry
+          }
+          break;
+        }
+
         default:
           logger.info(`ℹ️ Unknown job type: ${type}`);
       }
@@ -199,8 +249,13 @@ export class JobQueueManager {
   static async addJob<T>(
     type: BackgroundJobPayload["type"],
     payload: T,
+    options?: {
+      attempts?: number;
+      backoff?: { type: "exponential" | "fixed"; delay: number };
+      jobId?: string;
+    },
   ): Promise<string> {
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const jobId = options?.jobId || `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     if (wawQueue) {
       try {
@@ -209,8 +264,8 @@ export class JobQueueManager {
           { type, payload, jobId },
           {
             jobId,
-            attempts: 3,
-            backoff: { type: "exponential", delay: 2000 },
+            attempts: options?.attempts || 3,
+            backoff: options?.backoff || { type: "exponential", delay: 2000 },
             removeOnComplete: 1000,
             removeOnFail: 5000,
           },

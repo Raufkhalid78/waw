@@ -12,10 +12,8 @@ function getCookie(name: string): string | null {
 
 export function ClientAuthGuard({
   children,
-  tokenKey,
 }: {
   children: React.ReactNode;
-  tokenKey: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -28,23 +26,16 @@ export function ClientAuthGuard({
       return;
     }
 
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem(tokenKey) : null;
+    // Check for session cookie (HttpOnly, sent automatically by browser)
+    const sessionCookie = getCookie("waw_session");
 
-    // Also check cookie as fallback (middleware sets cookie, ClientAuthGuard may not have localStorage)
-    const cookieToken = getCookie(tokenKey);
-
-    if (!token && !cookieToken) {
+    if (!sessionCookie) {
       setAuthState("redirecting");
       router.replace("/login");
     } else {
-      // If cookie exists but localStorage doesn't, sync them
-      if (!token && cookieToken && typeof window !== "undefined") {
-        localStorage.setItem(tokenKey, cookieToken);
-      }
       setAuthState("authorized");
     }
-  }, [pathname, router, tokenKey]);
+  }, [pathname, router]);
 
   if (authState === "checking" || authState === "redirecting") {
     return (
@@ -52,7 +43,7 @@ export function ClientAuthGuard({
         {authState === "redirecting" ? (
           <>
             <div className="w-10 h-10 border-4 border-amber-400/20 border-t-amber-400 rounded-full animate-spin" />
-            <p className="text-slate-400 text-sm">Redirecting to login…</p>
+            <p className="text-slate-400 text-sm">Redirecting to login...</p>
             <a
               href="/login"
               className="text-amber-400 text-xs underline underline-offset-2"

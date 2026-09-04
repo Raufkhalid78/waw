@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { disputesApi, type AdminDispute } from "@/lib/api";
 import { AlertTriangle, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 
@@ -13,7 +13,7 @@ export default function DisputesPage() {
   const [resolving, setResolving] = useState<string | null>(null);
   const [resolutionText, setResolutionText] = useState("");
 
-  const loadDisputes = async () => {
+  const loadDisputes = useCallback(async () => {
     setLoading(true);
     try {
       const data = await disputesApi.list({ page, limit: 20, status: statusFilter || undefined });
@@ -24,11 +24,11 @@ export default function DisputesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
     loadDisputes();
-  }, [page, statusFilter]);
+  }, [loadDisputes]);
 
   const handleResolve = async (id: string) => {
     if (!resolutionText.trim()) return;

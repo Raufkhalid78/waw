@@ -9,7 +9,7 @@ import {
   ReturnReason,
   ReturnStatus,
 } from "../../types/index.js";
-import { ENV } from "../../config/env.js";
+import { ENV, FEATURES } from "../../config/env.js";
 
 export interface PostExShipmentInput {
   orderId: string;
@@ -80,10 +80,7 @@ export class CourierService {
     );
 
     // 1. Call PostEx Production / Sandbox API if token is configured
-    if (
-      ENV.POSTEX_API_TOKEN &&
-      ENV.POSTEX_API_TOKEN !== "ptx_live_test_token_2026"
-    ) {
+    if (FEATURES.COURIER_ENABLED) {
       try {
         const response = await axios.post(
           `${this.POSTEX_API_BASE}/order/v1/create-order`,
@@ -302,10 +299,7 @@ export class CourierService {
     let returnTrackingUrl = `https://postex.pk/tracking?cn=${reverseCn}`;
 
     // Real PostEx Reverse Pickup API integration
-    if (
-      ENV.POSTEX_API_TOKEN &&
-      ENV.POSTEX_API_TOKEN !== "ptx_live_test_token_2026"
-    ) {
+    if (FEATURES.COURIER_ENABLED) {
       try {
         const response = await axios.post(
           `${this.POSTEX_API_BASE}/order/v1/create-reverse-pickup`,

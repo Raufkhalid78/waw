@@ -84,7 +84,7 @@ describe("Waw Marketplace Core API Engine Tests", () => {
 
   it("should accurately verify valid PostEx XPay HMAC-SHA256 signatures and reject tampered payloads", () => {
     const secret =
-      ENV.POSTEX_XPAY_SECRET_KEY || "xpay_sec_test_secret_key_2026";
+      ENV.POSTEX_XPAY_SECRET_KEY || "test-only-hmac-secret-not-a-real-key";
     const payload = JSON.stringify({
       intentId: "xpay_12345",
       amount: 5000,
