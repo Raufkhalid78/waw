@@ -1,47 +1,45 @@
-import { supabaseAdmin } from "../config/supabase.js";
+﻿import { supabaseAdmin } from "../config/supabase.js";
 import { logger } from "../config/logger.js";
-import { InventoryService } from "../modules/products/inventory.service.js";
 import { AuditService } from "../modules/audit/audit.service.js";
+import { ADVISORY_LOCKS } from "../config/advisory-locks.js";
 
 /**
- * Advisory lock key for distributed inventory cleanup safety.
+ * Inventory Reservation Auto-Release Worker
+ *
+ * Every 2 minutes, calls the database RPC `release_expired_checkout_reservations()`
+ * which uses FOR UPDATE SKIP LOCKED to atomically:
+ *   1. Find PENDING_PAYMENT orders older than 15 minutes
+ *   2. Cancel the orders and store_orders
+ *   3. Release reserved counts from inventory_snapshots
+ *   4. Insert RELEASE entries into inventory_ledger for audit
+ *   5. Publish ORDER_CANCELLED outbox events
+ *
+ * Uses PostgreSQL advisory lock to prevent duplicate execution across replicas.
  */
-const INVENTORY_CLEANUP_LOCK_KEY = 54321;
 
-/**
- * Acquires a PostgreSQL advisory lock for distributed cron safety.
- */
 async function acquireCleanupLock(): Promise<boolean> {
   const { data, error } = await supabaseAdmin.rpc("pg_try_advisory_lock", {
-    lock_key: INVENTORY_CLEANUP_LOCK_KEY,
+    lock_key: ADVISORY_LOCKS.INVENTORY_CLEANUP,
   });
   if (error) {
-    logger.warn("Failed to acquire inventory cleanup lock, skipping", { error: error.message });
+    logger.warn("Failed to acquire inventory cleanup lock", { error: error.message });
     return false;
   }
   return data === true;
 }
 
-/**
- * Releases the PostgreSQL advisory lock.
- */
 async function releaseCleanupLock(): Promise<void> {
   try {
     await supabaseAdmin.rpc("pg_advisory_unlock", {
-      lock_key: INVENTORY_CLEANUP_LOCK_KEY,
+      lock_key: ADVISORY_LOCKS.INVENTORY_CLEANUP,
     });
   } catch {
     // Lock auto-releases on connection close
   }
 }
 
-/**
- * Periodically scans for unpaid orders older than 15 minutes and
- * automatically releases their double-entry inventory reservations back to the catalog.
- * Uses PostgreSQL advisory lock to prevent duplicate execution across replicas.
- */
 export function startInventoryCleanupCron() {
-  logger.info("⏱️ Inventory Reservation Auto-Release Worker Initialized (2-min Interval, Distributed-Lock Enabled)");
+  logger.info("Inventory Reservation Auto-Release Worker Initialized (2-min Interval, Distributed-Lock Enabled)");
 
   // Run every 2 minutes
   setInterval(async () => {
@@ -50,79 +48,53 @@ export function startInventoryCleanupCron() {
 
   // Also run 15s after server startup for immediate cleanup
   setTimeout(async () => {
-    logger.info("🔄 Running initial startup inventory reservation timeout check...");
+    logger.info("Running initial startup inventory reservation timeout check...");
     await runInventoryCleanup();
   }, 15 * 1000);
 }
 
-export async function runInventoryCleanup() {
-  // P0-6: Acquire distributed lock
+export async function runInventoryCleanup(): Promise<{ expired: number; itemsReleased: number }> {
   const lockAcquired = await acquireCleanupLock();
   if (!lockAcquired) {
-    return; // Another worker is handling this
+    return { expired: 0, itemsReleased: 0 };
   }
 
   try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-
-    // Find orders still awaiting payment older than 15 minutes
-    const { data: expiredOrders, error } = await supabaseAdmin
-      .from("orders")
-      .select("id, buyer_phone, created_at")
-      .eq("global_status", "PENDING_PAYMENT")
-      .lt("created_at", fifteenMinutesAgo);
+    // Call the database-side expiry RPC which uses SKIP LOCKED for safety
+    const { data, error } = await supabaseAdmin.rpc(
+      "release_expired_checkout_reservations"
+    );
 
     if (error) {
-      logger.error("❌ [InventoryCleanup] Error querying expired orders:", error.message);
-      return;
+      logger.error("[InventoryCleanup] RPC error:", error.message);
+      return { expired: 0, itemsReleased: 0 };
     }
 
-    if (!expiredOrders || expiredOrders.length === 0) {
-      return;
-    }
+    const result = data as { expired_orders: number; items_released: number };
 
-    logger.info(`🧹 [InventoryCleanup] Found ${expiredOrders.length} expired unpaid checkout reservations. Processing releases...`);
-
-    for (const order of expiredOrders) {
-      // 1. Release reserved stock back to catalog via double-entry ledger
-      await InventoryService.releaseOrderReservation(
-        order.id,
-        "15-minute unpaid checkout reservation timeout",
-        "SYSTEM_WORKER",
+    if (result.expired_orders > 0) {
+      logger.info(
+        `[InventoryCleanup] Released ${result.expired_orders} expired checkout reservations, ` +
+        `restored ${result.items_released} inventory units`
       );
 
-      // 2. Mark parent order as CANCELLED
-      await supabaseAdmin
-        .from("orders")
-        .update({
-          global_status: "CANCELLED",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
-
-      // 3. Mark child store orders as CANCELLED
-      await supabaseAdmin
-        .from("store_orders")
-        .update({
-          status: "CANCELLED",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("order_id", order.id);
-
-      // 4. Record audit log
       await AuditService.logAction({
         actorId: "SYSTEM_WORKER",
         actorRole: "SYSTEM",
-        action: "ORDER_AUTO_CANCELLED_TIMEOUT",
-        targetResourceType: "order",
-        targetResourceId: order.id,
-        reason: "Unpaid checkout session expired after 15 minutes",
+        action: "CHECKOUT_RESERVATIONS_EXPIRED_BATCH",
+        targetResourceType: "inventory",
+        targetResourceId: "batch",
+        reason: `${result.expired_orders} orders expired, ${result.items_released} units restored`,
       });
-
-      logger.info(`✅ [InventoryCleanup] Auto-cancelled expired Order ${order.id} and restored inventory balance`);
     }
+
+    return {
+      expired:       result.expired_orders || 0,
+      itemsReleased: result.items_released  || 0,
+    };
   } catch (err: any) {
-    logger.error("❌ [InventoryCleanup] Unexpected error in inventory cleanup job:", err.message);
+    logger.error("[InventoryCleanup] Unexpected error:", err.message);
+    return { expired: 0, itemsReleased: 0 };
   } finally {
     await releaseCleanupLock();
   }

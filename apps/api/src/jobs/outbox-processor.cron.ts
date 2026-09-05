@@ -2,11 +2,12 @@ import { supabaseAdmin } from "../config/supabase.js";
 import { logger } from "../config/logger.js";
 import { WhatsAppService } from "../modules/notifications/whatsapp.service.js";
 import { OutboxService, OutboxEventType } from "../modules/outbox/outbox.service.js";
+import { ADVISORY_LOCKS } from "../config/advisory-locks.js";
 
 /**
  * Advisory lock key for distributed outbox processor safety.
  */
-const OUTBOX_PROCESSOR_LOCK_KEY = 77777;
+const OUTBOX_PROCESSOR_LOCK_KEY = ADVISORY_LOCKS.OUTBOX_PROCESSOR;
 
 async function acquireOutboxLock(): Promise<boolean> {
   const { data, error } = await supabaseAdmin.rpc("pg_try_advisory_lock", {

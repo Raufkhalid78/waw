@@ -11,6 +11,7 @@ import { logger } from "../config/logger.js";
 import { AuditService } from "../modules/audit/audit.service.js";
 import { PayoutSettlementService } from "../modules/payments/payout-settlement.service.js";
 import { OutboxService } from "../modules/outbox/outbox.service.js";
+import { ADVISORY_LOCKS } from "../config/advisory-locks.js";
 
 export interface ReconciliationReport {
   payoutsSettled: number;
@@ -22,10 +23,9 @@ export interface ReconciliationReport {
 
 /**
  * Advisory lock key for distributed reconciliation.
- * Uses hashtext() to get a stable integer from a string.
- * Only one worker can hold this lock at a time.
+ * Uses centralized registry to prevent key collisions across workers.
  */
-const RECONCILIATION_LOCK_KEY = 98765; // arbitrary unique integer
+const RECONCILIATION_LOCK_KEY = ADVISORY_LOCKS.RECONCILIATION;
 
 /**
  * Acquires a PostgreSQL advisory lock for distributed cron safety.
@@ -219,7 +219,9 @@ async function handleDeliveredMilestone(shipment: any, now: string, sevenDaysLat
       updated_at: now,
     };
     if (shipment.is_cod) {
-      updatePayload.payment_status = PaymentStatus.PAID;
+      // COD cash not yet confirmed collected — mark as awaiting remittance.
+      // Will be updated to PAID when PostEx COD remittance webhook arrives.
+      updatePayload.payment_status = 'AWAITING_COD_REMITTANCE';
     }
 
     await supabaseAdmin

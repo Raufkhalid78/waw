@@ -17,7 +17,7 @@ DO $$ BEGIN CREATE TYPE "UserRole" AS ENUM ('BUYER','SELLER','ADMIN','SUPPORT');
 DO $$ BEGIN CREATE TYPE "StoreStatus" AS ENUM ('PENDING_KYC','ACTIVE','SUSPENDED','REJECTED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE TYPE "SellerType" AS ENUM ('FIRST_PARTY','THIRD_PARTY'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE TYPE "PaymentMethod" AS ENUM ('XPAY_CARD','XPAY_WALLET_JAZZCASH','XPAY_WALLET_EASYPAISA','RAAST_P2M_QR','COD'); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE TYPE "PaymentStatus" AS ENUM ('PENDING','AUTHORIZED','PAID','ESCROW_HELD','COD_PENDING','COD_COLLECTED','FAILED','REFUNDED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "PaymentStatus" AS ENUM ('PENDING','AUTHORIZED','PAID','ESCROW_HELD','COD_PENDING','COD_COLLECTED','AWAITING_COD_REMITTANCE','FAILED','REFUNDED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE TYPE "OrderStatus" AS ENUM ('PENDING','CONFIRMED','PROCESSING','SHIPPED','OUT_FOR_DELIVERY','DELIVERED','CANCELLED','RETURNED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE TYPE "CourierProvider" AS ENUM ('POSTEX','TRAX','LEOPARDS','TCS','WAW_FLEET'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE TYPE "PayoutStatus" AS ENUM ('SCHEDULED','PROCESSING','COMPLETED','PAID','HELD','HELD_PENDING_DELIVERY','FAILED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -152,6 +152,21 @@ CREATE TABLE IF NOT EXISTS inventory_ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ── Inventory Snapshots (Authoritative Balance for Locking) ─────────────────
+-- Single row per offer_variant; locked FOR UPDATE by checkout RPC.
+-- Eliminates the zero-stock race window in the old aggregate approach.
+
+CREATE TABLE IF NOT EXISTS inventory_snapshots (
+  offer_variant_id  TEXT        NOT NULL PRIMARY KEY
+                               REFERENCES offer_variants(id) ON DELETE CASCADE,
+  store_id          TEXT        NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  on_hand           INTEGER     NOT NULL DEFAULT 0 CHECK (on_hand >= 0),
+  reserved          INTEGER     NOT NULL DEFAULT 0 CHECK (reserved >= 0),
+  available         INTEGER     GENERATED ALWAYS AS (on_hand - reserved) STORED,
+  version           BIGINT      NOT NULL DEFAULT 0,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── Legacy Products (pre-catalog, kept for migration compat) ────────────────
 
 CREATE TABLE IF NOT EXISTS products (
@@ -224,6 +239,7 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_method TEXT NOT NULL,
   payment_status TEXT NOT NULL DEFAULT 'PENDING',
   global_status TEXT NOT NULL DEFAULT 'PENDING',
+  idempotency_key TEXT UNIQUE,
   notes TEXT,
   delivered_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -431,6 +447,7 @@ CREATE TABLE IF NOT EXISTS return_requests (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   store_order_id TEXT REFERENCES store_orders(id) ON DELETE SET NULL,
+  parent_return_id TEXT REFERENCES return_requests(id) ON DELETE CASCADE,
   buyer_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
   reason TEXT NOT NULL,
   evidence_images TEXT[] NOT NULL DEFAULT '{}',
@@ -647,6 +664,13 @@ CREATE INDEX IF NOT EXISTS idx_inventory_ledger_variant ON inventory_ledger(offe
 CREATE INDEX IF NOT EXISTS idx_inventory_ledger_store ON inventory_ledger(store_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_ledger_reference ON inventory_ledger(reference_id, transaction_type);
 
+-- Inventory snapshots
+CREATE INDEX IF NOT EXISTS idx_inv_snapshots_store ON inventory_snapshots(store_id);
+CREATE INDEX IF NOT EXISTS idx_inv_snapshots_available ON inventory_snapshots(offer_variant_id, available);
+
+-- Orders idempotency
+CREATE INDEX IF NOT EXISTS idx_orders_idempotency_key ON orders(idempotency_key) WHERE idempotency_key IS NOT NULL;
+
 -- Orders
 CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(global_status, created_at);
@@ -715,6 +739,7 @@ ALTER TABLE catalog_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE seller_offers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE offer_variants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_ledger ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE store_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
@@ -784,6 +809,12 @@ CREATE POLICY "Public can view offer variants" ON offer_variants FOR SELECT USIN
 
 -- INVENTORY LEDGER (deny anon)
 CREATE POLICY "Deny public anon inventory_ledger read" ON inventory_ledger FOR SELECT TO anon USING (false);
+
+-- INVENTORY SNAPSHOTS (deny anon; store owners can see their own)
+CREATE POLICY "Deny anon inventory_snapshots read" ON inventory_snapshots FOR SELECT TO anon USING (false);
+CREATE POLICY "Store owners can view inventory snapshots" ON inventory_snapshots FOR SELECT TO authenticated USING (
+  store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid()::TEXT)
+  OR auth.role() = 'service_role');
 
 -- ORDERS
 CREATE POLICY "Buyers can view own orders" ON orders FOR SELECT USING (buyer_id = auth.uid()::TEXT OR auth.role() = 'service_role');
