@@ -107,37 +107,21 @@ export class PayoutSettlementService {
       }
     }
 
-    // All checks passed: settle the payout
-    const now = new Date().toISOString();
-    await supabaseAdmin
-      .from("payouts")
-      .update({
-        status: "SETTLED",
-        processed_at: now,
-        updated_at: now,
-      })
-      .eq("id", payoutId);
+    // All checks passed: settle the payout atomically
+    const { data: settleResult, error: settleError } = await supabaseAdmin.rpc(
+      "settle_payout_atomic",
+      {
+        p_payout_id: payoutId,
+        p_provider_transfer_id: payout.provider_transfer_id || payout.bank_reference || null,
+        p_provider_payload_hash: null,
+      }
+    );
 
-    // Create double-entry financial ledger entry
-    const netPayout = (payout.amount_pkr || 0) - (payout.commission_pkr || 0);
-    await supabaseAdmin.from("financial_ledger").insert([
-      {
-        store_id: payout.store_id,
-        transaction_type: "PAYOUT_SETTLED",
-        amount_pkr: -netPayout,
-        entry_type: "DEBIT",
-        reference_id: payoutId,
-        description: `Seller payout settled for Order ${orderId || payoutId}`,
-      },
-      {
-        store_id: payout.store_id,
-        transaction_type: "COMMISSION_EARNED",
-        amount_pkr: payout.commission_pkr || 0,
-        entry_type: "CREDIT",
-        reference_id: payoutId,
-        description: `Platform commission for Order ${orderId || payoutId}`,
-      },
-    ]);
+    if (settleError) {
+      throw new Error(`Failed to atomically settle payout: ${settleError.message}`);
+    }
+
+    const netPayout = settleResult?.net_payout_pkr || 0;
 
     await AuditService.logAction({
       actorId: "PAYOUT_SETTLEMENT",

@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- P0-4 [HARDENED]: Guest Checkout Transaction RPC
 -- Improvements:
 --   1. HMAC-SHA256 signature verification using pgcrypto.hmac().
@@ -49,6 +49,7 @@ DECLARE
   v_expected_sig      TEXT;
   v_token_phone       TEXT;
   v_token_expires_at  TIMESTAMPTZ;
+  v_token_nonce       TEXT;
   v_guest_secret      TEXT;
 BEGIN
   -- -- 1. Validate token presence --
@@ -97,6 +98,18 @@ BEGIN
 
   v_token_phone      := v_payload_json->>'phone';
   v_token_expires_at := (v_payload_json->>'expires_at')::TIMESTAMPTZ;
+  v_token_nonce      := v_payload_json->>'nonce';
+
+  IF v_token_nonce IS NULL OR v_token_nonce = '' THEN
+    RAISE EXCEPTION 'Guest session token is missing cryptographic nonce';
+  END IF;
+
+  -- -- Consume nonce to prevent replay attacks --
+  BEGIN
+    INSERT INTO guest_token_nonces (nonce) VALUES (v_token_nonce);
+  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'Guest session token already consumed (replay attack)';
+  END;
 
   -- Phone must match
   IF v_token_phone IS NULL OR v_token_phone != p_buyer_phone THEN
