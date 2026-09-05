@@ -1,10 +1,12 @@
 -- ============================================================================
--- P0-3 + P0-4: Atomic return request creation RPC with seller-level allocation
+-- P0-3 + P0-4 + P0-5: Atomic return request creation RPC with seller-level allocation
 -- Wraps return request + return items in a single transaction.
 -- Prevents orphaned return_items without a return_request, or
 -- return_requests without line items.
 -- Validates: delivered status, 7-day window, no duplicate returns,
 --            seller-level grouping for multi-vendor orders.
+-- Locks order items with FOR UPDATE to prevent concurrent over-returns.
+-- Allocates refund economics per line (unit price, proportional shipping/tax).
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION create_return_request(
@@ -36,16 +38,22 @@ DECLARE
   v_seller_items JSONB;
   v_already_returned_qty INTEGER;
   v_item_refund NUMERIC;
+  v_shipping_per_line NUMERIC;
+  v_cod_fee_per_line NUMERIC;
+  v_proportional_shipping NUMERIC;
+  v_proportional_cod_fee NUMERIC;
+  v_line_subtotal NUMERIC;
 BEGIN
   -- ── P0-3: Verify caller identity ────────────────────────────────────────
   IF p_buyer_id IS NULL OR p_buyer_id != auth.uid() THEN
     RAISE EXCEPTION 'Unauthorized: buyer identity mismatch';
   END IF;
 
-  -- Validate order exists and belongs to buyer
+  -- ── P0-5: Lock order row to prevent concurrent status changes ───────────
   SELECT * INTO v_order
   FROM orders
-  WHERE id = p_order_id;
+  WHERE id = p_order_id
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Order not found';
@@ -65,24 +73,63 @@ BEGIN
     RAISE EXCEPTION 'The 7-day return window for this order has expired';
   END IF;
 
+  -- Validate order is in a returnable state
+  IF v_order.global_status NOT IN ('DELIVERED', 'RETURN_REQUESTED') THEN
+    RAISE EXCEPTION 'Order cannot be returned in % status', v_order.global_status;
+  END IF;
+
   -- Validate items array is non-empty
   IF jsonb_array_length(p_items) = 0 THEN
     RAISE EXCEPTION 'At least one item must be specified for return';
   END IF;
 
+  -- ── Calculate proportional shipping and COD fee per line ─────────────────
+  -- Total line subtotal for proportional allocation
+  v_line_subtotal := 0;
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    SELECT oi.unit_price_pkr INTO v_line_subtotal
+    FROM order_items oi
+    WHERE oi.id = (v_item->>'order_item_id')::UUID;
+    v_line_subtotal := v_line_subtotal + (v_line_subtotal * (v_item->>'quantity')::INT);
+  END LOOP;
+
+  -- Recalculate total sub from all items for proportional split
+  DECLARE v_total_order_sub NUMERIC;
+  BEGIN
+    SELECT COALESCE(SUM(oi.unit_price_pkr * oi.quantity), 1) INTO v_total_order_sub
+    FROM order_items oi
+    WHERE oi.order_id = p_order_id;
+    v_line_subtotal := GREATEST(v_total_order_sub, 1);
+  END;
+
   -- ── P0-4: Process items with seller-level grouping ──────────────────────
   -- First pass: validate all items and accumulate per-seller totals
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
-    -- Validate order item belongs to this order
+    -- ── P0-5: Lock order item row to prevent concurrent over-returns ──────
     SELECT oi.*, so.store_id INTO v_order_item
     FROM order_items oi
     JOIN store_orders so ON so.id = oi.store_order_id
     WHERE oi.id = (v_item->>'order_item_id')::UUID
-      AND oi.order_id = p_order_id;
+      AND oi.order_id = p_order_id
+    FOR UPDATE OF oi;
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Order item % does not belong to this order', v_item->>'order_item_id';
+    END IF;
+
+    -- Validate positive quantity
+    IF (v_item->>'quantity')::INT <= 0 THEN
+      RAISE EXCEPTION 'Return quantity must be positive for item %', v_item->>'order_item_id';
+    END IF;
+
+    -- Reject duplicate item IDs in one request
+    IF EXISTS (
+      SELECT 1 FROM jsonb_array_elements(v_return_items) AS existing
+      WHERE (existing->>'order_item_id')::UUID = (v_item->>'order_item_id')::UUID
+    ) THEN
+      RAISE EXCEPTION 'Duplicate order item % in return request', v_item->>'order_item_id';
     END IF;
 
     -- ── P0-4: Check not already returned ───────────────────────────────
@@ -100,8 +147,21 @@ BEGIN
         v_item->>'order_item_id';
     END IF;
 
-    -- Calculate refund for this line item
+    -- Calculate base refund for this line item
     v_item_refund := v_order_item.unit_price_pkr * (v_item->>'quantity')::INT;
+
+    -- Calculate proportional shipping and COD fee allocation
+    v_proportional_shipping := ROUND(
+      (v_order_item.unit_price_pkr * (v_item->>'quantity')::INT / v_line_subtotal)
+      * COALESCE(v_order.shipping_fee_pkr, 0), 2
+    );
+    v_proportional_cod_fee := ROUND(
+      (v_order_item.unit_price_pkr * (v_item->>'quantity')::INT / v_line_subtotal)
+      * COALESCE(v_order.cod_fee_pkr, 0), 2
+    );
+
+    -- Total refund includes proportional shipping and COD fee
+    v_item_refund := v_item_refund + v_proportional_shipping + v_proportional_cod_fee;
     v_total_refund := v_total_refund + v_item_refund;
 
     v_return_items := v_return_items || jsonb_build_object(
@@ -109,6 +169,8 @@ BEGIN
       'quantity', (v_item->>'quantity')::INT,
       'unit_price_pkr', v_order_item.unit_price_pkr,
       'refund_amount_pkr', v_item_refund,
+      'shipping_refund_pkr', v_proportional_shipping,
+      'cod_fee_refund_pkr', v_proportional_cod_fee,
       'store_order_id', v_order_item.store_order_id,
       'store_id', v_order_item.store_id
     );
@@ -141,10 +203,10 @@ BEGIN
     v_seller_refund := 0;
     v_seller_items := '[]'::JSONB;
 
-    -- Aggregate items for this seller
+    -- Aggregate items for this seller using proper alias
     FOR v_item IN
-      SELECT * FROM jsonb_array_elements(v_return_items)
-      WHERE (elem->>'store_order_id')::UUID = v_store_order.store_order_id
+      SELECT * FROM jsonb_array_elements(v_return_items) AS elem(value)
+      WHERE (elem.value->>'store_order_id')::UUID = v_store_order.store_order_id
     LOOP
       v_seller_refund := v_seller_refund + (v_item->>'refund_amount_pkr')::NUMERIC;
       v_seller_items := v_seller_items || jsonb_build_object(
@@ -169,10 +231,10 @@ BEGIN
       NOW(), NOW()
     );
 
-    -- Insert return items linked to this seller's return request
+    -- Insert return items linked to this seller's return request using proper alias
     FOR v_item IN
-      SELECT * FROM jsonb_array_elements(v_return_items)
-      WHERE (elem->>'store_order_id')::UUID = v_store_order.store_order_id
+      SELECT * FROM jsonb_array_elements(v_return_items) AS elem(value)
+      WHERE (elem.value->>'store_order_id')::UUID = v_store_order.store_order_id
     LOOP
       INSERT INTO return_items (
         id, return_request_id, order_item_id, quantity, created_at

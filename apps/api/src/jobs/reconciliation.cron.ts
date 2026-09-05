@@ -9,6 +9,8 @@ import axios from "axios";
 import { ENV, FEATURES } from "../config/env.js";
 import { logger } from "../config/logger.js";
 import { AuditService } from "../modules/audit/audit.service.js";
+import { PayoutSettlementService } from "../modules/payments/payout-settlement.service.js";
+import { OutboxService } from "../modules/outbox/outbox.service.js";
 
 export interface ReconciliationReport {
   payoutsSettled: number;
@@ -111,132 +113,20 @@ export async function executeReconciliationJob(): Promise<ReconciliationReport> 
 
 /**
  * 1. Verified Merchant Milestone Payout Settlement
- * Transitions SCHEDULED payouts past their T+7 return window maturity date to SETTLED,
- * ONLY when provider-confirmed settlement exists (provider_transfer_id is set).
- * Safeguards funds if the order is under active dispute.
+ * Uses PayoutSettlementService for provider-confirmed settlement.
+ * Never settles without provider transfer confirmation.
  */
 async function runPayoutReconciliation(): Promise<{ settled: number; held: number; skipped: number }> {
-  let settled = 0;
-  let held = 0;
-  let skipped = 0;
-
   try {
-    const now = new Date().toISOString();
-    const { data: maturedPayouts, error } = await supabaseAdmin
-      .from("payouts")
-      .select("*, store_order:store_orders(id, order_id, store_id)")
-      .eq("status", "SCHEDULED")
-      .lte("scheduled_for", now);
-
-    if (error || !maturedPayouts || maturedPayouts.length === 0) {
-      logger.info(
-        "✅ Payout Reconciliation: No matured vendor payouts pending release.",
-      );
-      return { settled: 0, held: 0, skipped: 0 };
-    }
-
+    const result = await PayoutSettlementService.reconcileMaturedPayouts();
     logger.info(
-      `💰 Reconciling ${maturedPayouts.length} matured merchant settlement payouts...`,
+      `Payout Settlement Cycle Complete: ${result.settled} settled, ${result.held} held, ${result.skipped} skipped.`,
     );
-
-    for (const payout of maturedPayouts) {
-      const orderId = payout.order_id || payout.store_order?.order_id;
-      let hasActiveDispute = false;
-
-      // 1. Check for active dispute or return on the order
-      if (orderId) {
-        const [{ data: returns }, { data: tickets }] = await Promise.all([
-          supabaseAdmin
-            .from("return_requests")
-            .select("id, status")
-            .eq("order_id", orderId)
-            .in("status", ["PENDING_REVIEW", "REVERSE_PICKUP_BOOKED", "RECEIVED"]),
-          supabaseAdmin
-            .from("support_tickets")
-            .select("id, status")
-            .eq("order_id", orderId)
-            .in("status", ["OPEN", "UNDER_REVIEW"]),
-        ]);
-
-        if ((returns && returns.length > 0) || (tickets && tickets.length > 0)) {
-          hasActiveDispute = true;
-        }
-      }
-
-      if (hasActiveDispute) {
-        // Freeze payout in escrow
-        await supabaseAdmin
-          .from("payouts")
-          .update({
-            status: PayoutStatus.HELD,
-            updated_at: now,
-          })
-          .eq("id", payout.id);
-
-        await AuditService.logAction({
-          actorId: "RECONCILIATION_CRON",
-          actorRole: "SYSTEM",
-          action: "ESCROW_HOLD_PRESERVED",
-          targetResourceType: "payout",
-          targetResourceId: payout.id,
-          reason: `Payout held because Order ${orderId} is under active dispute/return review`,
-        });
-
-        held++;
-      } else {
-        // P0-5: Only settle if provider has confirmed the transfer
-        // In production, this checks for a provider_transfer_id or bank_reference
-        // For COD orders without digital transfer, require explicit admin confirmation
-        const hasProviderConfirmation = Boolean(payout.provider_transfer_id || payout.bank_reference);
-
-        if (!hasProviderConfirmation && payout.payment_method !== 'COD') {
-          // Digital payment but no provider confirmation yet — skip
-          logger.info(`⏭️ Payout ${payout.id} skipped: awaiting provider settlement confirmation`);
-          skipped++;
-          continue;
-        }
-
-        // For COD: require at least 24h after delivery for manual verification window
-        if (payout.payment_method === 'COD' && !hasProviderConfirmation) {
-          const deliveredAt = payout.store_order?.delivered_at;
-          if (deliveredAt && (Date.now() - new Date(deliveredAt).getTime()) < 24 * 60 * 60 * 1000) {
-            logger.info(`⏭️ COD Payout ${payout.id} skipped: within 24h manual verification window`);
-            skipped++;
-            continue;
-          }
-        }
-
-        // Disburse matured payout with provider confirmation
-        await supabaseAdmin
-          .from("payouts")
-          .update({
-            status: PayoutStatus.SETTLED,
-            processed_at: now,
-            updated_at: now,
-          })
-          .eq("id", payout.id);
-
-        await AuditService.logAction({
-          actorId: "RECONCILIATION_CRON",
-          actorRole: "SYSTEM",
-          action: "PAYOUT_SETTLED_AUTOMATICALLY",
-          targetResourceType: "payout",
-          targetResourceId: payout.id,
-          reason: `T+7 settlement matured for PKR ${payout.amount_pkr || 0}. Provider confirmed: ${hasProviderConfirmation}`,
-        });
-
-        settled++;
-      }
-    }
-
-    logger.info(
-      `✅ Payout Settlement Cycle Complete: ${settled} settled, ${held} held, ${skipped} skipped.`,
-    );
+    return result;
   } catch (err: any) {
-    logger.error("❌ Error during payout reconciliation:", err.message);
+    logger.error("Error during payout reconciliation:", err.message);
+    return { settled: 0, held: 0, skipped: 0 };
   }
-
-  return { settled, held, skipped };
 }
 
 /**
@@ -364,7 +254,15 @@ async function handleDeliveredMilestone(shipment: any, now: string, sevenDaysLat
     }
   }
 
-  // 5. Emit live WebSocket milestone
+  // 5. Emit outbox event for delivery notification
+  await OutboxService.publish("ORDER_DELIVERED", {
+    orderId: shipment.order_id,
+    orderNumber: shipment.order_number || shipment.order_id,
+    buyerPhone: shipment.buyer_phone,
+    deliveredAt: now,
+  });
+
+  // 6. Emit live WebSocket milestone
   try {
     const { io } = await import("../server.js");
     io.to(`order:${shipment.order_id}`).emit("order_status_updated", {

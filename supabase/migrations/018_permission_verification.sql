@@ -1,7 +1,7 @@
 -- ============================================================================
--- P0-7: Database Permission Verification
+-- P0-6: Database Permission Verification (STRICT MODE)
 -- Verifies RLS is enabled on all sensitive tables and permissions are correct.
--- Run this migration to audit the current state of database security.
+-- FAILS the migration when critical security controls are missing.
 -- ============================================================================
 
 BEGIN;
@@ -15,7 +15,6 @@ DECLARE
   v_table RECORD;
   v_missing_rls TEXT[] := '{}';
 BEGIN
-  -- Check all user-facing tables for RLS
   FOR v_table IN
     SELECT tablename
     FROM pg_tables
@@ -30,7 +29,9 @@ BEGIN
         'shipments', 'xpay_webhooks_log', 'outbox_events',
         'category_schemas', 'serviceable_cities',
         'subscription_plans', 'ai_usage', 'schema_migrations',
-        'checkout_sessions', 'admin_mfa', 'mfa_backup_codes'
+        'checkout_sessions', 'admin_mfa', 'mfa_backup_codes',
+        'financial_ledger', 'ticket_messages', 'audit_logs',
+        'catalog_products', 'products', 'product_variants'
       )
   LOOP
     IF NOT EXISTS (
@@ -45,9 +46,9 @@ BEGIN
   END LOOP;
 
   IF array_length(v_missing_rls, 1) > 0 THEN
-    RAISE WARNING '⚠️ Tables missing RLS: %', array_to_string(v_missing_rls, ', ');
+    RAISE EXCEPTION 'CRITICAL: Tables missing RLS: %. Deployment blocked.', array_to_string(v_missing_rls, ', ');
   ELSE
-    RAISE NOTICE '✅ RLS verified on all sensitive tables';
+    RAISE NOTICE 'RLS verified on all sensitive tables';
   END IF;
 END $$;
 
@@ -60,7 +61,6 @@ DECLARE
   v_grant RECORD;
   v_unauthorized_grants TEXT[] := '{}';
 BEGIN
-  -- Check for GRANT EXECUTE to anon on protected functions
   FOR v_grant IN
     SELECT routine_name, grantee
     FROM information_schema.routine_privileges
@@ -77,9 +77,9 @@ BEGIN
   END LOOP;
 
   IF array_length(v_unauthorized_grants, 1) > 0 THEN
-    RAISE WARNING '⚠️ Unauthorized GRANT EXECUTE to anon: %', array_to_string(v_unauthorized_grants, ', ');
+    RAISE EXCEPTION 'CRITICAL: Unauthorized GRANT EXECUTE to anon: %. Deployment blocked.', array_to_string(v_unauthorized_grants, ', ');
   ELSE
-    RAISE NOTICE '✅ No unauthorized anon EXECUTE grants on protected RPCs';
+    RAISE NOTICE 'No unauthorized anon EXECUTE grants on protected RPCs';
   END IF;
 END $$;
 
@@ -91,20 +91,21 @@ DO $$
 DECLARE
   v_has_secrets BOOLEAN := false;
 BEGIN
-  -- Check for common secret patterns in data (heuristic check)
   IF EXISTS (
     SELECT 1 FROM pg_tables t
     JOIN pg_class c ON c.relname = t.tablename
     JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
     WHERE t.schemaname = 'public'
-      AND t.tablename LIKE '%secret%'
-      OR t.tablename LIKE '%password%'
-      OR t.tablename LIKE '%private_key%'
+      AND (
+        t.tablename LIKE '%secret%'
+        OR t.tablename LIKE '%password%'
+        OR t.tablename LIKE '%private_key%'
+      )
   ) THEN
     v_has_secrets := true;
-    RAISE WARNING '⚠️ Potential secret-related tables found';
+    RAISE WARNING 'Potential secret-related tables found (manual review required)';
   ELSE
-    RAISE NOTICE '✅ No obvious secret-related tables detected';
+    RAISE NOTICE 'No obvious secret-related tables detected';
   END IF;
 END $$;
 
@@ -120,7 +121,7 @@ BEGIN
   FOR v_func IN
     SELECT p.proname, pg_get_functiondef(p.oid) as definition
     FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
+    JOIN pg_namespace n ON n.oid = p.procnsp
     WHERE n.nspname = 'public'
       AND p.prosecdef = true
   LOOP
@@ -130,10 +131,10 @@ BEGIN
   END LOOP;
 
   IF array_length(v_missing_search_path, 1) > 0 THEN
-    RAISE WARNING '⚠️ SECURITY DEFINER functions missing SET search_path: %',
+    RAISE EXCEPTION 'CRITICAL: SECURITY DEFINER functions missing SET search_path: %. Deployment blocked.',
       array_to_string(v_missing_search_path, ', ');
   ELSE
-    RAISE NOTICE '✅ All SECURITY DEFINER functions have SET search_path';
+    RAISE NOTICE 'All SECURITY DEFINER functions have SET search_path';
   END IF;
 END $$;
 
@@ -141,15 +142,19 @@ END $$;
 -- 5. GRANT MINIMAL PERMISSIONS TO ANON ROLE
 -- ──────────────────────────────────────────────────────────────────────────────
 
--- Verify anon can only read public data
 DO $$
 BEGIN
-  -- These should already exist, but ensure they're present
   GRANT SELECT ON subscription_plans TO anon;
   GRANT SELECT ON serviceable_cities TO anon;
   GRANT SELECT ON categories TO anon;
+  GRANT SELECT ON catalog_products TO anon;
+  GRANT SELECT ON seller_offers TO anon;
+  GRANT SELECT ON offer_variants TO anon;
+  GRANT SELECT ON stores TO anon;
+  GRANT SELECT ON products TO anon;
+  GRANT SELECT ON product_variants TO anon;
 
-  RAISE NOTICE '✅ Anon role permissions verified: read-only on public data';
+  RAISE NOTICE 'Anon role permissions verified: read-only on public catalog data';
 END $$;
 
 -- ──────────────────────────────────────────────────────────────────────────────
@@ -168,7 +173,54 @@ BEGIN
   REVOKE EXECUTE ON FUNCTION create_return_request(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, TEXT, JSONB) FROM anon;
   REVOKE EXECUTE ON FUNCTION cancel_order(UUID, TEXT) FROM anon;
 
-  RAISE NOTICE '✅ Checkout/return/cancel RPCs restricted to authenticated role';
+  RAISE NOTICE 'Checkout/return/cancel RPCs restricted to authenticated role';
+END $$;
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- 7. VERIFY GUEST CHECKOUT IS PROPERLY RESTRICTED
+-- ──────────────────────────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+  -- Guest checkout should be available to both anon and authenticated
+  GRANT EXECUTE ON FUNCTION guest_checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO anon;
+  GRANT EXECUTE ON FUNCTION guest_checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO authenticated;
+
+  RAISE NOTICE 'Guest checkout permissions verified';
+END $$;
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- 8. VERIFY OUTBOX EVENTS TABLE HAS PROPER RLS
+-- ──────────────────────────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'outbox_events'
+      AND c.relrowsecurity = true
+  ) THEN
+    ALTER TABLE outbox_events ENABLE ROW LEVEL SECURITY;
+    RAISE NOTICE 'Enabled RLS on outbox_events table';
+  ELSE
+    RAISE NOTICE 'outbox_events RLS already enabled';
+  END IF;
+END $$;
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- 9. VERIFY MIGRATION VERSION TRACKING
+-- ──────────────────────────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+  -- Record this migration as applied
+  INSERT INTO schema_migrations (version, applied_at)
+  VALUES ('018_permission_verification_strict', NOW())
+  ON CONFLICT (version) DO NOTHING;
+
+  RAISE NOTICE 'Migration version recorded';
 END $$;
 
 COMMIT;
