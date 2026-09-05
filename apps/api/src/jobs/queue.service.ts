@@ -243,12 +243,12 @@ try {
               if (shipment.store_order_id) {
                 const { data: storeOrder } = await supabaseAdmin
                   .from("store_orders")
-                  .select("store_id, total_pkr, commission_pkr")
+                  .select("store_id, subtotal_pkr, commission_pkr")
                   .eq("id", shipment.store_order_id)
                   .single();
 
                 if (storeOrder) {
-                  const netPayout = (storeOrder.total_pkr || 0) - (storeOrder.commission_pkr || 0);
+                  const netPayout = (storeOrder.subtotal_pkr || 0) - (storeOrder.commission_pkr || 0);
                   await supabaseAdmin.from("payouts").upsert(
                     {
                       store_id: storeOrder.store_id,

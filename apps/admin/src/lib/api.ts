@@ -271,11 +271,11 @@ export const storesApi = {
     );
   },
   approve: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/kyc/${id}/approve`, {
+    adminFetch<{ success: boolean }>(`/api/admin/stores/${id}/approve`, {
       method: "PATCH",
     }),
   reject: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/kyc/${id}/reject`, {
+    adminFetch<{ success: boolean }>(`/api/admin/stores/${id}/reject`, {
       method: "PATCH",
     }),
 };
@@ -398,5 +398,154 @@ export const sellersApi = {
     adminFetch<{ success: boolean }>(`/api/admin/sellers/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
+    }),
+};
+
+// Flash Sales
+export interface AdminFlashSale {
+  id: string;
+  name: string;
+  starts_at: string;
+  ends_at: string;
+  is_active: boolean;
+  discount_percent?: number;
+  item_count?: number;
+  created_at: string;
+}
+
+export interface AdminFlashSaleItem {
+  id: string;
+  flash_sale_id: string;
+  variant_id: string;
+  product_title?: string;
+  promotional_price_pkr: number;
+  allocated_stock: number;
+  sold_count: number;
+}
+
+export const flashSalesApi = {
+  list: () => adminFetch<AdminFlashSale[]>("/api/admin/flash-sales"),
+  create: (data: { name: string; starts_at: string; ends_at: string; discount_percent?: number }) =>
+    adminFetch<AdminFlashSale>("/api/admin/flash-sales", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Partial<AdminFlashSale>) =>
+    adminFetch<{ success: boolean }>(`/api/admin/flash-sales/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/flash-sales/${id}`, {
+      method: "DELETE",
+    }),
+  addItem: (saleId: string, data: { variant_id: string; promotional_price_pkr: number; allocated_stock: number }) =>
+    adminFetch<{ success: boolean }>(`/api/admin/flash-sales/${saleId}/items`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  removeItem: (itemId: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/flash-sales/items/${itemId}`, {
+      method: "DELETE",
+    }),
+};
+
+// Banners
+export interface AdminBanner {
+  id: string;
+  title: string;
+  title_urdu?: string;
+  subtitle?: string;
+  tag?: string;
+  image_url: string;
+  link_url?: string;
+  link_text?: string;
+  position?: string;
+  campaign_type?: string;
+  sort_order?: number;
+  is_active: boolean;
+  start_date?: string;
+  end_date?: string;
+  created_at: string;
+}
+
+export const bannersApi = {
+  list: () => adminFetch<AdminBanner[]>("/api/admin/banners"),
+  create: (data: Partial<AdminBanner>) =>
+    adminFetch<AdminBanner>("/api/admin/banners", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Partial<AdminBanner>) =>
+    adminFetch<{ success: boolean }>(`/api/admin/banners/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/banners/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+// Categories
+export interface AdminCategory {
+  id: string;
+  name: string;
+  name_urdu?: string;
+  slug: string;
+  description?: string;
+  parent_id?: string;
+  image_url?: string;
+  is_active: boolean;
+  sort_order?: number;
+  created_at: string;
+}
+
+export const categoriesApi = {
+  list: () => adminFetch<AdminCategory[]>("/api/admin/categories"),
+  create: (data: Partial<AdminCategory>) =>
+    adminFetch<AdminCategory>("/api/admin/categories", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Partial<AdminCategory>) =>
+    adminFetch<{ success: boolean }>(`/api/admin/categories/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    adminFetch<{ success: boolean }>(`/api/admin/categories/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+// File Upload
+export const uploadApi = {
+  upload: async (file: File, bucket: string): Promise<{ url: string; path: string }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/api/uploads/${bucket}`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    if (!res.ok) throw new Error("Upload failed");
+    return res.json();
+  },
+};
+
+// MFA
+export const mfaApi = {
+  getStatus: () => adminFetch<{ enrolled: boolean; enabled: boolean }>("/api/admin/mfa/status"),
+  enroll: () => adminFetch<{ secret: string; otpauthUrl: string }>("/api/admin/mfa/enroll", { method: "POST" }),
+  verify: (code: string) =>
+    adminFetch<{ success: boolean }>("/api/admin/mfa/verify", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+  disable: (code: string) =>
+    adminFetch<{ success: boolean }>("/api/admin/mfa/disable", {
+      method: "POST",
+      body: JSON.stringify({ code }),
     }),
 };

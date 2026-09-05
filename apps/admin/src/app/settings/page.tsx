@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save, Globe, MessageSquare, CreditCard, Loader2 } from "lucide-react";
+import { Save, Globe, MessageSquare, CreditCard, Loader2, Shield } from "lucide-react";
+import Link from "next/link";
 import { settingsApi, type MarketplaceSettings } from "@/lib/api";
 import { FadeIn, Stagger } from "@/components/Motion";
 
@@ -249,6 +250,23 @@ export default function SettingsPage() {
           </div>
         </div>
       </Stagger>
+
+      {/* MFA Link */}
+      <FadeIn delay={200}>
+        <Link
+          href="/settings/mfa"
+          className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-2xl hover:border-amber-300 hover:bg-amber-50 transition-colors group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center group-hover:bg-amber-200 transition-colors">
+            <Shield className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">Multi-Factor Authentication (MFA)</h3>
+            <p className="text-xs text-gray-500">Add TOTP-based 2FA to your admin account for enhanced security</p>
+          </div>
+          <span className="ml-auto text-gray-300 group-hover:text-amber-500 transition-colors">→</span>
+        </Link>
+      </FadeIn>
     </div>
   );
 }

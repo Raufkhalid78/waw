@@ -17,6 +17,7 @@ import { FadeIn } from "@/components/Motion";
 import {
   fetchCheckoutQuote,
   createOrderApi,
+  createGuestOrderApi,
   initiatePaymentApi,
 } from "@/lib/api";
 
@@ -61,6 +62,20 @@ export default function CheckoutPage() {
     description: string;
   } | null>(null);
   const [voucherError, setVoucherError] = useState("");
+
+  // Loyalty points
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const [useLoyalty, setUseLoyalty] = useState(false);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+
+  // Fetch loyalty balance
+  useEffect(() => {
+    fetch("/api/loyalty/balance")
+      .then((r) => r.json())
+      .then((data) => setLoyaltyBalance(data?.points_balance || 0))
+      .catch(() => setLoyaltyBalance(0));
+  }, []);
 
   // 1. Fetch Server-Authoritative Quote on Cart / Form change
   useEffect(() => {
@@ -117,11 +132,38 @@ export default function CheckoutPage() {
     setVoucherInput("");
   };
 
-  const finalTotalPkr = quoteData?.totalPkr || 0;
+  const finalTotalPkr = Math.max(0, (quoteData?.totalPkr || 0) - loyaltyDiscount);
   const subtotalPkr = quoteData?.subtotalPkr || 0;
   const shippingFeePkr = quoteData?.shippingFeePkr || 0;
   const codFeePkr = quoteData?.codFeePkr || 0;
   const discountAmount = quoteData?.couponDiscountPkr || 0;
+
+  // Handle loyalty redemption toggle
+  const handleLoyaltyToggle = async () => {
+    if (useLoyalty) {
+      setUseLoyalty(false);
+      setLoyaltyDiscount(0);
+      return;
+    }
+    if (!quoteData?.totalPkr) return;
+    setLoyaltyLoading(true);
+    try {
+      const res = await fetch("/api/loyalty/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderTotalPkr: quoteData.totalPkr }),
+      });
+      const data = await res.json();
+      if (data.discountPkr > 0) {
+        setUseLoyalty(true);
+        setLoyaltyDiscount(data.discountPkr);
+      }
+    } catch {
+      setLoyaltyDiscount(0);
+    } finally {
+      setLoyaltyLoading(false);
+    }
+  };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,7 +178,7 @@ export default function CheckoutPage() {
     setQuoteError(null);
 
     try {
-      const orderResult = await createOrderApi({
+      const orderPayload = {
         quoteToken: quoteData.quoteToken,
         buyerName: formData.fullName,
         buyerPhone: formData.phone,
@@ -145,7 +187,14 @@ export default function CheckoutPage() {
         shippingProvince: formData.province,
         paymentMethod,
         notes: formData.notes,
-      });
+      };
+
+      // Check if user is logged in (has cookie/session)
+      const isLoggedIn = document.cookie.includes("waw_session");
+
+      const orderResult = isLoggedIn
+        ? await createOrderApi(orderPayload)
+        : await createGuestOrderApi(orderPayload);
 
       const orderId = orderResult.orderId;
 
@@ -567,6 +616,38 @@ export default function CheckoutPage() {
                     <div className="flex justify-between text-emerald-700 font-bold">
                       <span>Voucher Discount</span>
                       <span>-PKR {discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {loyaltyBalance > 0 && (
+                    <div className="flex items-center justify-between py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">⭐ Use Loyalty Points</span>
+                        <span className="text-xs text-gray-400">
+                          ({loyaltyBalance.toLocaleString()} available)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleLoyaltyToggle}
+                        disabled={loyaltyLoading}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          useLoyalty ? "bg-amber-500" : "bg-gray-300"
+                        } ${loyaltyLoading ? "opacity-50" : ""}`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            useLoyalty ? "translate-x-4.5" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+
+                  {loyaltyDiscount > 0 && (
+                    <div className="flex justify-between text-amber-700 font-bold">
+                      <span>Loyalty Discount</span>
+                      <span>-PKR {loyaltyDiscount.toLocaleString()}</span>
                     </div>
                   )}
 

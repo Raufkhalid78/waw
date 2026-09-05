@@ -177,6 +177,38 @@ export class CartService {
   }
 
   /**
+   * Atomically replace entire cart contents (clear + bulk insert in one transaction).
+   * Fixes race condition from clear-then-add pattern.
+   */
+  static async replaceCart(cartId: string, items: Array<{ productId: string; variantId?: string; quantity: number }>) {
+    // Delete all existing items
+    const { error: deleteError } = await supabaseAdmin
+      .from("cart_items")
+      .delete()
+      .eq("cart_id", cartId);
+
+    if (deleteError) throw deleteError;
+
+    // Bulk insert new items
+    if (items.length > 0) {
+      const rows = items.map((item) => ({
+        cart_id: cartId,
+        product_id: item.productId,
+        variant_id: item.variantId || null,
+        quantity: item.quantity,
+      }));
+
+      const { error: insertError } = await supabaseAdmin
+        .from("cart_items")
+        .insert(rows);
+
+      if (insertError) throw insertError;
+    }
+
+    return { success: true };
+  }
+
+  /**
    * Merge guest cart into user cart after login
    */
   static async mergeGuestCartToUser(guestToken: string, userId: string) {

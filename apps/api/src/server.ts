@@ -9,6 +9,8 @@ import { initTypesenseCollections } from "./config/typesense.js";
 import { startReconciliationCron } from "./jobs/reconciliation.cron.js";
 import { startInventoryCleanupCron } from "./jobs/inventory-cleanup.cron.js";
 import { initSentry, captureException } from "./config/sentry.js";
+import { EmailService } from "./modules/email/email.service.js";
+import { UploadService } from "./modules/uploads/upload.service.js";
 
 const server = http.createServer(app);
 
@@ -90,6 +92,14 @@ async function bootstrap() {
 
   startReconciliationCron();
   startInventoryCleanupCron();
+
+  // Initialize email service
+  EmailService.init();
+
+  // Ensure storage buckets exist
+  UploadService.ensureBuckets().catch((err) => {
+    logger.warn("Storage bucket init failed:", err?.message || err);
+  });
 
   // Graceful shutdown handler
   const shutdown = async (signal: string) => {

@@ -101,6 +101,29 @@ export class CartController {
   }
 
   /**
+   * PUT /api/cart — Atomic cart replacement (fixes race condition)
+   */
+  static async replaceCart(req: Request, res: Response) {
+    try {
+      const { guestToken, items } = req.body;
+      if (!guestToken) {
+        return res.status(400).json({ error: "guestToken is required" });
+      }
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ error: "items must be an array" });
+      }
+
+      const cart = await CartService.getOrCreateGuestCart(guestToken);
+      await CartService.replaceCart(cart.id, items);
+
+      const updatedItems = await CartService.getCartItems(cart.id);
+      res.json({ cartId: cart.id, items: updatedItems });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
    * POST /api/cart/merge
    */
   static async mergeGuestCart(req: Request, res: Response) {

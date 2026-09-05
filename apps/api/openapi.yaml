@@ -25,7 +25,7 @@ tags:
   - name: Orders
     description: Order management
   - name: Cart
-    description: Shopping cart
+    description: Shopping cart & wishlist
   - name: Seller
     description: Seller portal
   - name: Admin
@@ -602,6 +602,216 @@ paths:
       responses:
         "200":
           description: Search results
+
+  /api/search/autocomplete:
+    get:
+      tags: [Products]
+      summary: Search autocomplete suggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Partial search query
+      responses:
+        "200":
+          description: Autocomplete suggestions
+
+  /api/wishlist:
+    get:
+      tags: [Cart]
+      summary: Get wishlist
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Wishlist items
+        "401":
+          description: Unauthorized
+
+  /api/wishlist/items:
+    post:
+      tags: [Cart]
+      summary: Add item to wishlist
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId]
+              properties:
+                productId:
+                  type: string
+      responses:
+        "201":
+          description: Added to wishlist
+        "401":
+          description: Unauthorized
+
+  /api/orders/guest:
+    post:
+      tags: [Orders]
+      summary: Create guest order (no auth required)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [buyerName, buyerPhone, shippingAddress, shippingCity, paymentMethod, items]
+              properties:
+                buyerName:
+                  type: string
+                buyerPhone:
+                  type: string
+                shippingAddress:
+                  type: string
+                shippingCity:
+                  type: string
+                paymentMethod:
+                  type: string
+                  enum: [COD, XPAY_CARD]
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [offerVariantId, quantity]
+                    properties:
+                      offerVariantId:
+                        type: string
+                      quantity:
+                        type: integer
+                        minimum: 1
+      responses:
+        "201":
+          description: Guest order created
+        "400":
+          description: Validation error
+
+  /api/orders/{id}/invoice:
+    get:
+      tags: [Orders]
+      summary: Download order invoice PDF
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: PDF invoice
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+
+  /api/flash-sales/active:
+    get:
+      tags: [Admin]
+      summary: Get active flash sales
+      responses:
+        "200":
+          description: Active flash sales
+
+  /api/admin/flash-sales:
+    get:
+      tags: [Admin]
+      summary: List all flash sales
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Flash sales list
+        "401":
+          description: Unauthorized
+
+  /api/admin/banners:
+    get:
+      tags: [Admin]
+      summary: List all banners/campaigns
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Banners list
+        "401":
+          description: Unauthorized
+
+  /api/admin/categories:
+    get:
+      tags: [Admin]
+      summary: List all categories
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Categories list
+        "401":
+          description: Unauthorized
+
+  /api/uploads/image:
+    post:
+      tags: [Auth]
+      summary: Upload image to Supabase Storage
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (jpg, png, webp)
+      responses:
+        "200":
+          description: Upload successful, returns { url, path }
+        "401":
+          description: Unauthorized
+
+  /api/reviews/product/{productId}:
+    get:
+      tags: [Products]
+      summary: Get reviews for a product
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product reviews
+
+  /api/serviceability/check:
+    get:
+      tags: [Logistics]
+      summary: Check if city is serviceable
+      parameters:
+        - name: city
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Serviceability result
+
+  /api/admin/cron/abandoned-carts:
+    post:
+      tags: [Admin]
+      summary: Process abandoned carts (cron endpoint)
+      responses:
+        "200":
+          description: Abandoned carts processed
 
 components:
   securitySchemes:

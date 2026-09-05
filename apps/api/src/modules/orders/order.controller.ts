@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { OrderService } from "./order.service.js";
+import { generateInvoicePdf } from "./invoice.service.js";
+import { CartAbandonmentService } from "../cart/cart-abandonment.service.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { AuditService } from "../audit/audit.service.js";
 import { AuthorizationService } from "../auth/authorization.service.js";
@@ -10,6 +12,38 @@ export class OrderController {
     try {
       const user = (req as any).user;
       const result = await OrderService.createOrder(req.body, user);
+      if (user?.id) {
+        CartAbandonmentService.markRecovered(user.id, result.id).catch(() => {});
+      }
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async createGuestOrder(req: Request, res: Response): Promise<void> {
+    try {
+      const { buyerName, buyerPhone, shippingAddress, shippingCity, shippingProvince, paymentMethod, notes, items, guestToken } = req.body;
+
+      if (!buyerName || !buyerPhone || !shippingAddress || !shippingCity) {
+        res.status(400).json({ error: "buyerName, buyerPhone, shippingAddress, and shippingCity are required" });
+        return;
+      }
+
+      // Create a guest user profile
+      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+      const result = await OrderService.createOrder({
+        quoteToken: req.body.quoteToken,
+        buyerName,
+        buyerPhone,
+        shippingAddress,
+        shippingCity,
+        shippingProvince,
+        paymentMethod,
+        notes,
+      }, { id: guestId, role: "BUYER" });
+
       res.status(201).json(result);
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -182,6 +216,80 @@ export class OrderController {
       res.status(201).json(result);
     } catch (err: any) {
       res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async downloadInvoice(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+
+      const { data: order, error } = await supabaseAdmin
+        .from("orders")
+        .select("*, store_orders(*, order_items(*))")
+        .eq("id", id)
+        .single();
+
+      if (error || !order) {
+        res.status(404).json({ error: "Order not found" });
+        return;
+      }
+
+      if (order.buyer_id && order.buyer_id !== userId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+
+      const allItems: any[] = [];
+      const storeOrders = order.store_orders || [];
+      for (const so of storeOrders) {
+        const items = so.order_items || [];
+        for (const item of items) {
+          allItems.push({
+            productTitle: item.product_title || "Product",
+            variantTitle: item.variant_title || undefined,
+            quantity: item.quantity || 1,
+            unitPricePkr: item.unit_price_pkr || 0,
+            totalPricePkr: item.total_price_pkr || 0,
+          });
+        }
+      }
+
+      const invoiceData = {
+        orderNumber: order.order_number || order.id,
+        createdAt: order.created_at,
+        buyerName: order.buyer_name || "Customer",
+        buyerPhone: order.buyer_phone || "",
+        shippingAddress: order.shipping_address || "",
+        shippingCity: order.shipping_city || "",
+        shippingProvince: order.shipping_province || "",
+        paymentMethod: order.payment_method || "COD",
+        items: allItems,
+        subtotalPkr: order.subtotal_pkr || 0,
+        shippingFeePkr: order.shipping_fee_pkr || 0,
+        codFeePkr: order.cod_fee_pkr || 0,
+        discountPkr: order.discount_pkr || 0,
+        totalPkr: order.total_amount_pkr || 0,
+      };
+
+      const pdfStream = generateInvoicePdf(invoiceData);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="waw-invoice-${invoiceData.orderNumber}.pdf"`,
+      );
+
+      pdfStream.pipe(res);
+      pdfStream.on("error", (err) => {
+        console.error("PDF stream error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Failed to generate invoice" });
+        }
+      });
+    } catch (err: any) {
+      console.error("Invoice generation error:", err);
+      res.status(500).json({ error: err.message });
     }
   }
 }

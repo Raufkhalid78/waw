@@ -1,6 +1,6 @@
 # WAW (واو) Marketplace — Authoritative Canonical Schema Dictionary
 
-**Target Standard:** Pakistan Multi-Vendor Marketplace Operating System  
+**Target Standard:** Pakistan Premium Marketplace Operating System  
 **Baseline Database Engine:** PostgreSQL 15+ (Supabase)  
 **Schema State:** Canonical converged contract (No legacy table references allowed)
 

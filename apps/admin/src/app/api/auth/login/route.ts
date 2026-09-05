@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Set HttpOnly cookie server-side (cannot be read by JavaScript)
-    response.cookies.set("admin_token", data.token, {
+    response.cookies.set("waw_admin_token", data.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

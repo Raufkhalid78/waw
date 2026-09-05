@@ -1,4 +1,4 @@
-# Waw (واو) — Premium Hybrid Multi-Vendor Marketplace (Pakistan)
+# Waw (واو) — Premium Marketplace Pakistan
 
 > **"واو"** (Waw): Sounds like "Wow" (the customer experience) and represents "And" in Arabic/Urdu (connecting buyers and sellers).
 

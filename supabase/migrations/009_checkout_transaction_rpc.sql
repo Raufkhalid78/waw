@@ -121,7 +121,7 @@ BEGIN
     id, order_number, buyer_id, buyer_name, buyer_phone,
     shipping_address, shipping_city, shipping_province,
     global_status, payment_status, payment_method,
-    total_amount_pkr, subtotal_pkr, shipping_pkr, cod_fee_pkr,
+    total_amount_pkr, subtotal_pkr, shipping_fee_pkr, cod_fee_pkr,
     idempotency_key, created_at, updated_at
   ) VALUES (
     v_order_id, v_order_number, p_buyer_id, p_buyer_name, p_buyer_phone,

@@ -26,10 +26,10 @@ export function ClientAuthGuard({
       return;
     }
 
-    // Check for session cookie (HttpOnly, sent automatically by browser)
-    const sessionCookie = getCookie("waw_session");
+    // Check for admin token cookie (HttpOnly, sent automatically by browser)
+    const adminToken = getCookie("waw_admin_token");
 
-    if (!sessionCookie) {
+    if (!adminToken) {
       setAuthState("redirecting");
       router.replace("/login");
     } else {

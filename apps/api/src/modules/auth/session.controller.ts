@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { SessionService } from "./session.service.js";
 import { setCsrfCookie, generateCsrfToken } from "../../middleware/csrf.middleware.js";
+import { supabaseAdmin } from "../../config/supabase.js";
 import { logger } from "../../config/logger.js";
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -60,11 +61,34 @@ export class SessionController {
    */
   static async createSession(req: Request, res: Response): Promise<void> {
     try {
-      const { userId, userRole, userPhone, userEmail, storeId } = req.body;
+      const { userId, userRole, userPhone, userEmail, storeId, authToken } = req.body;
 
       if (!userId || !userRole) {
         res.status(400).json({ error: "userId and userRole are required" });
         return;
+      }
+
+      // Verify the caller's identity via Supabase auth token
+      if (authToken) {
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(authToken);
+        if (authError || !user || user.id !== userId) {
+          res.status(401).json({ error: "Invalid authentication token" });
+          return;
+        }
+      } else {
+        // Fallback: verify via the access token cookie if present
+        const accessToken = req.cookies?.waw_session;
+        if (accessToken) {
+          const session = await SessionService.validateSession(accessToken);
+          if (!session || session.userId !== userId) {
+            res.status(401).json({ error: "Session mismatch" });
+            return;
+          }
+        } else {
+          // No token at all — reject
+          res.status(401).json({ error: "Authentication required" });
+          return;
+        }
       }
 
       const ip = req.ip || req.socket.remoteAddress || "unknown";

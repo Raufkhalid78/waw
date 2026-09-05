@@ -14,7 +14,7 @@ export class AuthController {
       res.json(result);
     } catch (err: any) {
       logger.error("Auth login failed", { message: err.message });
-      res.status(401).json({ error: err.message });
+      res.status(401).json({ error: "Invalid email or password" });
     }
   }
 
@@ -28,7 +28,8 @@ export class AuthController {
       const result = await AuthService.requestWhatsAppOtp(phone);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      logger.error("OTP request failed", { message: err.message });
+      res.status(500).json({ error: "Failed to send OTP" });
     }
   }
 
@@ -48,7 +49,8 @@ export class AuthController {
       );
       res.json(result);
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      logger.error("OTP verification failed", { message: err.message });
+      res.status(400).json({ error: "Verification failed" });
     }
   }
 
@@ -65,7 +67,8 @@ export class AuthController {
       });
       res.json({ user: profile });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      logger.error("OAuth sync failed", { message: err.message });
+      res.status(500).json({ error: "OAuth sync failed" });
     }
   }
 }

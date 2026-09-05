@@ -15,14 +15,14 @@ export class AIController {
         return;
       }
 
-      // Check seller subscription status
-      const { data: seller } = await supabaseAdmin
-        .from("sellers")
+      // Check seller subscription status via stores table
+      const { data: store } = await supabaseAdmin
+        .from("stores")
         .select("subscription_plan, subscription_active")
-        .eq("user_id", user.id)
+        .eq("owner_user_id", user.id)
         .single();
 
-      if (!seller || !seller.subscription_active || seller.subscription_plan === "free") {
+      if (!store || !store.subscription_active || store.subscription_plan === "free") {
         res.status(403).json({
           error: "Product Description Generator requires an active Pro or Enterprise subscription",
           code: "SUBSCRIPTION_REQUIRED",
@@ -37,10 +37,10 @@ export class AIController {
         user.id,
       );
 
-      // If product_id provided, optionally update the product
+      // If product_id provided, update catalog_products
       if (product_id) {
         await supabaseAdmin
-          .from("products")
+          .from("catalog_products")
           .update({ description })
           .eq("id", product_id);
       }
@@ -71,13 +71,16 @@ export class AIController {
 
       if (product_id) {
         const { data: product } = await supabaseAdmin
-          .from("products")
-          .select("name, description, price, category:categories(name), store:stores(name)")
+          .from("catalog_products")
+          .select("title, description, category:categories(name), offers:seller_offers(price_pkr, store:stores(name))")
           .eq("id", product_id)
           .single();
 
         if (product) {
-          productInfo = `Product: ${product.name}\nDescription: ${product.description || "N/A"}\nPrice: PKR ${product.price}\nCategory: ${(product.category as any)?.name || "N/A"}\nStore: ${(product.store as any)?.name || "N/A"}`;
+          const offer = (product.offers as any)?.[0];
+          const price = offer?.price_pkr || "N/A";
+          const storeName = (offer?.store as any)?.name || "N/A";
+          productInfo = `Product: ${product.title}\nDescription: ${product.description || "N/A"}\nPrice: PKR ${price}\nCategory: ${(product.category as any)?.name || "N/A"}\nStore: ${storeName}`;
         }
       }
 
@@ -99,8 +102,8 @@ export class AIController {
       const { productId } = req.params;
 
       const { data: product } = await supabaseAdmin
-        .from("products")
-        .select("id, name, category_id, price")
+        .from("catalog_products")
+        .select("id, category_id")
         .eq("id", productId)
         .single();
 
@@ -109,14 +112,13 @@ export class AIController {
         return;
       }
 
-      // Get same-category products excluding current
+      // Get same-category catalog products excluding current, with best offer price
       const { data: related } = await supabaseAdmin
-        .from("products")
-        .select("id, name, slug, price, images, avg_rating, review_count")
+        .from("catalog_products")
+        .select("id, title, slug, thumbnail, images, category_id, offers:seller_offers(price_pkr, original_price_pkr, avg_rating, review_count)")
         .eq("category_id", product.category_id)
         .neq("id", productId)
-        .eq("status", "active")
-        .order("avg_rating", { ascending: false })
+        .eq("is_active", true)
         .limit(8);
 
       res.json({ recommendations: related || [] });

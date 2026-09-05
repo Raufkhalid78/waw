@@ -17,6 +17,7 @@ import {
   Package,
   ArrowRight,
   AlertCircle,
+  Zap,
 } from "lucide-react";
 import { FadeIn } from "@/components/Motion";
 
@@ -49,43 +50,68 @@ export default function CategoryPage() {
   >("ALL");
   const [userMaxPrice, setUserMaxPrice] = useState<number | undefined>(undefined);
   const [minRating, setMinRating] = useState<number>(0);
+  const [inStockOnly, setInStockOnly] = useState(false);
   const [sortBy, setSortBy] = useState<
     "featured" | "price-asc" | "price-desc" | "rating"
   >("featured");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [facets, setFacets] = useState<any>({ minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] });
   const [error, setError] = useState<string | null>(null);
 
-  const loadCategoryData = useCallback(async () => {
-    setLoading(true);
+  const loadCategoryData = useCallback(async (pageNum = 1, append = false) => {
+    if (pageNum === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
       const [catData, prodData] = await Promise.all([
-        fetchCategoryBySlug(slug),
+        pageNum === 1 ? fetchCategoryBySlug(slug) : Promise.resolve(category),
         fetchProducts({
           categorySlug: slug,
           city: selectedCity !== "All Cities" ? selectedCity : undefined,
           sellerType: selectedSellerType,
           maxPrice: userMaxPrice,
+          minRating: minRating > 0 ? minRating : undefined,
+          inStock: inStockOnly || undefined,
           sortBy,
+          page: pageNum,
+          limit: 24,
         }),
       ]);
-      setCategory(catData);
+      if (pageNum === 1) setCategory(catData);
       if (prodData) {
-        setProducts(prodData.items || []);
+        setProducts((prev) => append ? [...prev, ...(prodData.items || [])] : (prodData.items || []));
         if (prodData.facets) setFacets(prodData.facets);
+        setHasMore((prodData.items || []).length === 24);
       }
     } catch (err: any) {
       logger.error("Failed to load category data", "Category", err);
       setError("Unable to load category offers from the database. Please retry.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [slug, selectedCity, selectedSellerType, userMaxPrice, sortBy]);
+  }, [slug, selectedCity, selectedSellerType, userMaxPrice, minRating, inStockOnly, sortBy]);
 
   useEffect(() => {
-    loadCategoryData();
+    setPage(1);
+    setHasMore(true);
+    loadCategoryData(1, false);
   }, [loadCategoryData]);
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadCategoryData(nextPage, true);
+    }
+  };
 
   // Fallback category metadata if database lookup is pending/offline
   const categoryTitle = isUrdu
@@ -213,6 +239,39 @@ export default function CategoryPage() {
             </div>
           )}
 
+          {/* Rating Filter */}
+          <div className="space-y-2">
+            <div className="text-xs font-bold text-slate-700">
+              {isUrdu ? "کسٹمر ریٹنگ:" : "Minimum Rating:"}
+            </div>
+            <div className="space-y-1">
+              {[4, 3, 2, 1].map((rating) => (
+                <button
+                  key={rating}
+                  onClick={() => setMinRating(minRating === rating ? 0 : rating)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    minRating === rating
+                      ? "bg-amber-400 text-slate-950"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <svg
+                        key={i}
+                        className={`w-3 h-3 ${i < rating ? "text-amber-400 fill-amber-400" : "text-slate-300 fill-slate-300"}`}
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <span>& Up</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Fulfillment Type */}
           <div className="space-y-2">
             <div className="text-xs font-bold text-slate-700">
@@ -238,6 +297,29 @@ export default function CategoryPage() {
               ))}
             </div>
           </div>
+
+          {/* In Stock Only */}
+          <div className="space-y-2">
+            <button
+              onClick={() => setInStockOnly(!inStockOnly)}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                inStockOnly
+                  ? "bg-green-500 text-white"
+                  : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+              }`}
+            >
+              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                inStockOnly ? "border-white bg-white/20" : "border-slate-300"
+              }`}>
+                {inStockOnly && (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              {isUrdu ? "صرف دستیاب" : "In Stock Only"}
+            </button>
+          </div>
         </div>
 
         {/* Right Products Catalog (9 cols) */}
@@ -257,6 +339,31 @@ export default function CategoryPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 mr-2">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                    viewMode === "grid" ? "bg-white shadow-sm text-amber-600" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                  title="Grid View"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                    viewMode === "list" ? "bg-white shadow-sm text-amber-600" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                  title="List View"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
               <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
                 <ArrowUpDown className="w-3.5 h-3.5" />
                 <span>{isUrdu ? "ترتیب:" : "Sort by:"}</span>
@@ -273,6 +380,50 @@ export default function CategoryPage() {
               </select>
             </div>
           </div>
+
+          {/* Active Filter Chips */}
+          {(selectedCity !== "All Cities" || selectedSellerType !== "ALL" || userMaxPrice !== undefined || minRating > 0 || inStockOnly) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] text-slate-500 font-medium">Active filters:</span>
+              {selectedCity !== "All Cities" && (
+                <button onClick={() => setSelectedCity("All Cities")} className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-[11px] font-bold hover:bg-amber-100 transition-colors cursor-pointer">
+                  {selectedCity} <span className="text-amber-400">×</span>
+                </button>
+              )}
+              {selectedSellerType !== "ALL" && (
+                <button onClick={() => setSelectedSellerType("ALL")} className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-[11px] font-bold hover:bg-amber-100 transition-colors cursor-pointer">
+                  {selectedSellerType} <span className="text-amber-400">×</span>
+                </button>
+              )}
+              {userMaxPrice !== undefined && (
+                <button onClick={() => setUserMaxPrice(undefined)} className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-[11px] font-bold hover:bg-amber-100 transition-colors cursor-pointer">
+                  Max PKR {userMaxPrice.toLocaleString()} <span className="text-amber-400">×</span>
+                </button>
+              )}
+              {minRating > 0 && (
+                <button onClick={() => setMinRating(0)} className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-[11px] font-bold hover:bg-amber-100 transition-colors cursor-pointer">
+                  {minRating}★ & Up <span className="text-amber-400">×</span>
+                </button>
+              )}
+              {inStockOnly && (
+                <button onClick={() => setInStockOnly(false)} className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-[11px] font-bold hover:bg-green-100 transition-colors cursor-pointer">
+                  In Stock <span className="text-green-400">×</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setSelectedCity("All Cities");
+                  setSelectedSellerType("ALL");
+                  setUserMaxPrice(undefined);
+                  setMinRating(0);
+                  setInStockOnly(false);
+                }}
+                className="text-[11px] font-bold text-slate-500 hover:text-slate-700 underline cursor-pointer"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
 
           {/* Products Grid */}
           <FadeIn delay={100}>
@@ -296,33 +447,94 @@ export default function CategoryPage() {
                 </p>
               </div>
               <button
-                onClick={loadCategoryData}
+                onClick={() => loadCategoryData(1, false)}
                 className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all cursor-pointer"
               >
                 <span>{isUrdu ? "دوبارہ کوشش کریں" : "Retry Connection"}</span>
               </button>
             </div>
           ) : products.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {products.map((prod) => (
-                <ProductCard
-                  key={prod.productId || prod.id}
-                  productId={prod.productId || prod.id}
-                  title={prod.title}
-                  pricePkr={prod.pricePkr}
-                  originalPricePkr={prod.originalPricePkr}
-                  discountPercent={prod.discountPercent}
-                  imageUrl={prod.images?.[0] || prod.imageUrl}
-                  rating={prod.rating}
-                  reviewsCount={prod.reviewsCount}
-                  sellerType={prod.sellerType}
-                  storeName={prod.storeName}
-                  sellerCity={prod.sellerCity}
-                  isExpress={prod.isExpress}
-                  soldCount={prod.soldCount}
-                />
-              ))}
-            </div>
+            <>
+              <div className={viewMode === "grid" 
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+                : "flex flex-col gap-3"
+              }>
+                {products.map((prod) => (
+                  viewMode === "grid" ? (
+                    <ProductCard
+                      key={prod.productId || prod.id}
+                      productId={prod.productId || prod.id}
+                      title={prod.title}
+                      pricePkr={prod.pricePkr}
+                      originalPricePkr={prod.originalPricePkr}
+                      discountPercent={prod.discountPercent}
+                      imageUrl={prod.images?.[0] || prod.imageUrl}
+                      rating={prod.rating}
+                      reviewsCount={prod.reviewsCount}
+                      sellerType={prod.sellerType}
+                      storeName={prod.storeName}
+                      sellerCity={prod.sellerCity}
+                      isExpress={prod.isExpress}
+                      soldCount={prod.soldCount}
+                    />
+                  ) : (
+                    <div
+                      key={prod.productId || prod.id}
+                      className="bg-white border border-slate-200 rounded-2xl p-4 flex gap-4 hover:shadow-md transition-shadow"
+                    >
+                      <img
+                        src={prod.images?.[0] || prod.imageUrl || "/placeholder.png"}
+                        alt={prod.title}
+                        className="w-24 h-24 sm:w-32 sm:h-32 object-cover rounded-xl shrink-0"
+                      />
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center gap-2">
+                          {prod.isExpress && (
+                            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                              <Zap className="w-2.5 h-2.5" /> Express
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-500">{prod.storeName}</span>
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900 line-clamp-2">{prod.title}</h3>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-black text-slate-900">PKR {prod.pricePkr.toLocaleString()}</span>
+                          {prod.originalPricePkr && (
+                            <span className="text-xs text-slate-400 line-through">PKR {prod.originalPricePkr.toLocaleString()}</span>
+                          )}
+                          {prod.discountPercent && prod.discountPercent > 0 && (
+                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">-{prod.discountPercent}%</span>
+                          )}
+                        </div>
+                        {prod.rating && prod.rating > 0 && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <div className="flex items-center gap-0.5 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              <svg className="w-3 h-3 text-emerald-600 fill-emerald-600" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                              <span className="font-bold text-emerald-700">{prod.rating.toFixed(1)}</span>
+                            </div>
+                            <span className="text-slate-400">({prod.reviewsCount || 0})</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                ))}
+              </div>
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="flex justify-center pt-4">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="px-8 py-3 bg-white border-2 border-slate-200 hover:border-amber-400 text-slate-900 font-bold rounded-xl text-sm transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {loadingMore ? "Loading..." : "Load More Products"}
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-4 shadow-xs">
               <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">

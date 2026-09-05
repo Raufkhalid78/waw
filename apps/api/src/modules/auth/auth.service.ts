@@ -169,7 +169,7 @@ export class AuthService {
 
     if (error) {
       logger.error(`Supabase auth error: ${error.message} (status: ${error.status})`);
-      throw new Error(`Invalid email or password: ${error.message}`);
+      throw new Error("Invalid email or password");
     }
 
     if (!data.user) {

@@ -848,5 +848,217 @@ export class AdminService {
 
     return updatedReturn;
   }
+
+  // ── Flash Sales Management ──────────────────────────────────────────────
+
+  static async listFlashSales() {
+    const { data, error } = await supabaseAdmin
+      .from("flash_sales")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async createFlashSale(input: {
+    name: string;
+    starts_at: string;
+    ends_at: string;
+    discount_percent?: number;
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from("flash_sales")
+      .insert({
+        id: `fs_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: input.name,
+        starts_at: input.starts_at,
+        ends_at: input.ends_at,
+        discount_percent: input.discount_percent || 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async updateFlashSale(id: string, input: { name?: string; starts_at?: string; ends_at?: string; is_active?: boolean; discount_percent?: number }) {
+    const { data, error } = await supabaseAdmin
+      .from("flash_sales")
+      .update({ ...input, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async deleteFlashSale(id: string) {
+    const { error } = await supabaseAdmin
+      .from("flash_sales")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  static async addFlashSaleItem(flashSaleId: string, productId: string, salePricePkr: number, stockQuantity: number) {
+    const { data, error } = await supabaseAdmin
+      .from("flash_sale_items")
+      .insert({
+        id: `fsi_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        flash_sale_id: flashSaleId,
+        product_id: productId,
+        sale_price_pkr: salePricePkr,
+        stock_quantity: stockQuantity,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async removeFlashSaleItem(itemId: string) {
+    const { error } = await supabaseAdmin
+      .from("flash_sale_items")
+      .delete()
+      .eq("id", itemId);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  // ── Banner/Campaign Management ─────────────────────────────────────────
+
+  static async listBanners() {
+    const { data, error } = await supabaseAdmin
+      .from("campaigns")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async createBanner(input: {
+    title: string;
+    subtitle?: string;
+    image_url: string;
+    link_url?: string;
+    position?: string;
+    starts_at?: string;
+    ends_at?: string;
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from("campaigns")
+      .insert({
+        id: `banner_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        title: input.title,
+        subtitle: input.subtitle || "",
+        image_url: input.image_url,
+        link_url: input.link_url || "/",
+        position: input.position || "homepage",
+        starts_at: input.starts_at || new Date().toISOString(),
+        ends_at: input.ends_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        is_active: true,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async updateBanner(id: string, input: { title?: string; subtitle?: string; image_url?: string; link_url?: string; is_active?: boolean; position?: string }) {
+    const { data, error } = await supabaseAdmin
+      .from("campaigns")
+      .update({ ...input, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async deleteBanner(id: string) {
+    const { error } = await supabaseAdmin
+      .from("campaigns")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  // ── Category Management ────────────────────────────────────────────────
+
+  static async listCategories() {
+    const { data, error } = await supabaseAdmin
+      .from("categories")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async createCategory(input: {
+    name: string;
+    name_urdu?: string;
+    slug: string;
+    description?: string;
+    parent_id?: string;
+    image_url?: string;
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from("categories")
+      .insert({
+        id: `cat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: input.name,
+        name_urdu: input.name_urdu || "",
+        slug: input.slug,
+        description: input.description || "",
+        parent_id: input.parent_id || null,
+        image_url: input.image_url || "",
+        is_active: true,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async updateCategory(id: string, input: { name?: string; name_urdu?: string; slug?: string; description?: string; is_active?: boolean; image_url?: string }) {
+    const { data, error } = await supabaseAdmin
+      .from("categories")
+      .update({ ...input, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async deleteCategory(id: string) {
+    const { error } = await supabaseAdmin
+      .from("categories")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+    return { success: true };
+  }
 }
 

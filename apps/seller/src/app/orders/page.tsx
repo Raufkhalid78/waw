@@ -13,6 +13,7 @@ import {
   MapPin,
   Phone,
   Package,
+  Download,
 } from "lucide-react";
 import {
   fetchSellerOrders,
@@ -229,6 +230,16 @@ export default function SellerOrdersPage() {
                   className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
                 >
                   <Printer className="w-4 h-4 text-amber-400" /> Copy Tracking #
+                </button>
+
+                <button
+                  onClick={() => {
+                    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+                    window.open(`${API}/api/orders/${selectedOrder.id}/invoice`, "_blank");
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-amber-400" /> Download Invoice
                 </button>
 
                 {selectedOrder.orderStatus === OrderStatus.CONFIRMED && (

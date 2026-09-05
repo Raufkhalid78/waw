@@ -15,7 +15,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = sys_user_id::uuid) THEN
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
     VALUES (sys_user_id::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-            'admin@waw.com.pk', crypt('WawAdmin2026!', gen_salt('bf')),
+            'admin@waw.com.pk', crypt('${ADMIN_PASSWORD:-ChangeMeInProduction!}', gen_salt('bf')),
             NOW(), '{"provider":"email","providers":["email"]}', '{}', NOW(), NOW());
   END IF;
 

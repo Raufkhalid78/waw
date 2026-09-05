@@ -5,6 +5,7 @@ node_modules/
 
 # Testing
 coverage/
+test-results/
 
 # Next.js
 .next/
@@ -12,6 +13,7 @@ out/
 build/
 dist/
 !packages/types/dist/
+*.tsbuildinfo
 
 # Flutter / Android / iOS
 .dart_tool/
@@ -52,3 +54,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.log
+*-output.log
+*-out.log
+*-err.log

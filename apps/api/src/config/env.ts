@@ -13,6 +13,15 @@ function optionalEnv(name: string, defaultValue = ""): string {
   return process.env[name] || defaultValue;
 }
 
+// Lazy logger to avoid circular import at module load time
+let _logger: any = null;
+function getLogger() {
+  if (!_logger) {
+    try { _logger = require("./logger.js").logger; } catch {}
+  }
+  return _logger;
+}
+
 export const ENV = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: parseInt(process.env.PORT || "4000", 10),
@@ -128,23 +137,30 @@ if (ENV.NODE_ENV === "production") {
     );
   }
 
+  if (ENV.JWT_SECRET && ENV.JWT_SECRET.length < 32) {
+    throw new Error("FATAL: JWT_SECRET must be at least 32 characters in production.");
+  }
+
   if (ENV.RAAST_WEBHOOK_SECRET && ENV.RAAST_WEBHOOK_SECRET.length < 16) {
     throw new Error("FATAL: RAAST_WEBHOOK_SECRET must be at least 16 characters in production.");
   }
 
+  const log = getLogger();
+  const warn = (msg: string) => log ? log.warn(msg) : console.warn(msg);
+
   if (!FEATURES.COURIER_ENABLED) {
-    console.warn("⚠️  POSTEX_API_TOKEN not set — courier booking is DISABLED.");
+    warn("[SECURITY] POSTEX_API_TOKEN not set - courier booking is DISABLED.");
   }
   if (!FEATURES.XPAY_ENABLED) {
-    console.warn("⚠️  XPay credentials not set — card/digital payments are DISABLED.");
+    warn("[SECURITY] XPay credentials not set - card/digital payments are DISABLED.");
   }
   if (!FEATURES.SEARCH_ENABLED) {
-    console.warn("⚠️  TYPESENSE_API_KEY not set — search is DISABLED.");
+    warn("[SECURITY] TYPESENSE_API_KEY not set - search is DISABLED.");
   }
   if (!FEATURES.WHATSAPP_ENABLED) {
-    console.warn("⚠️  META_WHATSAPP_TOKEN not set — WhatsApp notifications are DISABLED.");
+    warn("[SECURITY] META_WHATSAPP_TOKEN not set - WhatsApp notifications are DISABLED.");
   }
   if (!FEATURES.OTP_ENABLED) {
-    console.warn("⚠️  Twilio credentials not set — OTP via SMS is DISABLED.");
+    warn("[SECURITY] Twilio credentials not set - OTP via SMS is DISABLED.");
   }
 }

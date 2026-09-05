@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { fetchSellerStore, updateStoreProfile, submitKyc, fetchKycStatus } from "@/lib/api";
-import { Settings, Save, BadgeCheck, Building2, CreditCard, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { fetchSellerStore, updateStoreProfile, submitKyc, fetchKycStatus, uploadFile } from "@/lib/api";
+import { Settings, Save, BadgeCheck, Building2, CreditCard, Upload } from "lucide-react";
 
 export default function SettingsPage() {
   const [store, setStore] = useState<any>(null);
@@ -12,6 +12,8 @@ export default function SettingsPage() {
   const [kycSubmitting, setKycSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [storeForm, setStoreForm] = useState({
     name: "",
     description: "",
@@ -19,6 +21,20 @@ export default function SettingsPage() {
     address: "",
     logoUrl: "",
   });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await uploadFile(file, "stores");
+      setStoreForm({ ...storeForm, logoUrl: result.url });
+    } catch {
+      alert("Upload failed. Enter a URL manually.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const [kycForm, setKycForm] = useState({
     cnic_number: "",
@@ -159,13 +175,31 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Logo URL</label>
-            <input
-              type="url"
-              value={storeForm.logoUrl}
-              onChange={(e) => setStoreForm({ ...storeForm, logoUrl: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            />
+            <label className="block text-xs font-medium text-gray-500 mb-1">Store Logo</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                value={storeForm.logoUrl}
+                onChange={(e) => setStoreForm({ ...storeForm, logoUrl: e.target.value })}
+                placeholder="https://... or upload"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              />
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Upload className="w-4 h-4" />
+                {uploading ? "..." : "Upload"}
+              </button>
+            </div>
+            {storeForm.logoUrl && (
+              <div className="mt-2 w-16 h-16 rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+                <img src={storeForm.logoUrl} alt="Logo preview" className="w-full h-full object-cover" />
+              </div>
+            )}
           </div>
         </div>
         <button

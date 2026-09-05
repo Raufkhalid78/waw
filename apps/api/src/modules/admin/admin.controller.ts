@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { AdminService } from "./admin.service.js";
+import { CartAbandonmentService } from "../cart/cart-abandonment.service.js";
+import { logger } from "../../config/logger.js";
 
 export class AdminController {
   static async getStats(req: Request, res: Response): Promise<void> {
@@ -299,6 +301,181 @@ export class AdminController {
       res.json(rejected);
     } catch (err: any) {
       res.status(400).json({ error: err.message });
+    }
+  }
+
+  // ── Flash Sales ────────────────────────────────────────────────────────
+
+  static async listFlashSales(req: Request, res: Response): Promise<void> {
+    try {
+      const sales = await AdminService.listFlashSales();
+      res.json(sales);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async createFlashSale(req: Request, res: Response): Promise<void> {
+    try {
+      const sale = await AdminService.createFlashSale(req.body);
+      res.status(201).json(sale);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async updateFlashSale(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const sale = await AdminService.updateFlashSale(id, req.body);
+      res.json(sale);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async deleteFlashSale(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      await AdminService.deleteFlashSale(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async addFlashSaleItem(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { productId, salePricePkr, stockQuantity } = req.body;
+      const item = await AdminService.addFlashSaleItem(id, productId, salePricePkr, stockQuantity);
+      res.status(201).json(item);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async removeFlashSaleItem(req: Request, res: Response): Promise<void> {
+    try {
+      const { itemId } = req.params;
+      await AdminService.removeFlashSaleItem(itemId);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  // ── Banners ────────────────────────────────────────────────────────────
+
+  static async listBanners(req: Request, res: Response): Promise<void> {
+    try {
+      const banners = await AdminService.listBanners();
+      res.json(banners);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async createBanner(req: Request, res: Response): Promise<void> {
+    try {
+      const banner = await AdminService.createBanner(req.body);
+      res.status(201).json(banner);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async updateBanner(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const banner = await AdminService.updateBanner(id, req.body);
+      res.json(banner);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async deleteBanner(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      await AdminService.deleteBanner(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  // ── Categories ─────────────────────────────────────────────────────────
+
+  static async listCategories(req: Request, res: Response): Promise<void> {
+    try {
+      const categories = await AdminService.listCategories();
+      res.json(categories);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async createCategory(req: Request, res: Response): Promise<void> {
+    try {
+      const category = await AdminService.createCategory(req.body);
+      res.status(201).json(category);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async updateCategory(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const category = await AdminService.updateCategory(id, req.body);
+      res.json(category);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  static async deleteCategory(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      await AdminService.deleteCategory(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  // ── Cart Abandonment Recovery ───────────────────────────────────────────
+
+  static async processAbandonedCarts(req: Request, res: Response): Promise<void> {
+    try {
+      const abandoned = await CartAbandonmentService.getAbandonedCarts();
+      let processed = 0;
+
+      for (const cart of abandoned) {
+        try {
+          const items = cart.cart_snapshot || [];
+          const itemCount = items.length;
+          const totalEstimate = items.reduce(
+            (sum: number, item: any) => sum + (item.unit_price_pkr || 0) * (item.quantity || 1),
+            0,
+          );
+
+          logger.info(
+            `Abandoned cart: user=${cart.user_id}, items=${itemCount}, total=~PKR ${totalEstimate}`,
+            "CartAbandonment",
+          );
+
+          await CartAbandonmentService.markReminded(cart.user_id);
+          processed++;
+        } catch (err) {
+          logger.error(`Failed to process cart for user ${cart.user_id}`, "CartAbandonment", err);
+        }
+      }
+
+      res.json({ processed, total: abandoned.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   }
 }

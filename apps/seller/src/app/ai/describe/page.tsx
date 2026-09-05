@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { Sparkles, Copy, Check, AlertCircle } from "lucide-react";
 
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+).replace(/\/+$/, "");
+
 export default function AIDescribePage() {
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
@@ -33,9 +37,10 @@ export default function AIDescribePage() {
         });
       }
 
-      const res = await fetch("/api/ai/generate-description", {
+      const res = await fetch(`${API_BASE}/api/ai/generate-description`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           product_name: productName,
           category,

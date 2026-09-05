@@ -171,7 +171,7 @@ export function StoreSpotlight() {
                           <button
                             onClick={() =>
                               addItem({
-                                productId: prod.title,
+                                productId: prod.id || prod.title,
                                 title: prod.title,
                                 imageUrl: prod.imageUrl,
                                 pricePkr: prod.pricePkr,

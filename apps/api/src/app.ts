@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -31,6 +31,7 @@ import {
 } from "./middleware/rate-limit.middleware.js";
 import { validateBody } from "./middleware/validate.middleware.js";
 import { apiVersioning } from "./middleware/api-versioning.middleware.js";
+import { sanitizeInput } from "./middleware/sanitize.middleware.js";
 
 // Schemas
 import {
@@ -63,9 +64,16 @@ import { OrderService } from "./modules/orders/order.service.js";
 import { PaymentController } from "./modules/payments/payment.controller.js";
 import { SearchController } from "./modules/search/search.service.js";
 import { AdminController } from "./modules/admin/admin.controller.js";
+import mfaRoutes from "./modules/admin/mfa.routes.js";
 import { CartController } from "./modules/cart/cart.controller.js";
 import { ConfigController } from "./modules/config/config.controller.js";
 import { AIController } from "./modules/ai/ai.controller.js";
+import { LoyaltyController } from "./modules/loyalty/loyalty.controller.js";
+import { ReferralController } from "./modules/referrals/referral.controller.js";
+import { SubscriptionController } from "./modules/subscriptions/subscription.controller.js";
+import { UploadController } from "./modules/uploads/upload.controller.js";
+import { uploadSingle, uploadMultiple } from "./middleware/upload.middleware.js";
+import { sentryRequestContext, sentryErrorHandler } from "./config/sentry.js";
 
 export const app = express();
 
@@ -73,6 +81,7 @@ app.set("trust proxy", 1);
 
 app.use(requestTracer);
 app.use(performanceTracker);
+app.use(sentryRequestContext);
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -101,6 +110,7 @@ const TRUSTED_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:3002",
+  "http://localhost:3003",
   "http://localhost:4000",
 ];
 
@@ -156,9 +166,10 @@ app.use(morgan(ENV.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(cookieParser());
 app.use(apiRateLimiter);
 app.use(apiVersioning);
+app.use(sanitizeInput);
 app.use(csrfProtection);
 
-// ── Swagger API Documentation ──────────────────────────────────────────────
+// -- Swagger API Documentation ----------------------------------------------
 try {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -171,11 +182,11 @@ try {
   logger.warn("Failed to load OpenAPI docs", { error: (err as Error).message });
 }
 
-// â”€â”€ Health & Diagnostics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Health & Diagnostics ──────────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    service: "Waw (ÙˆØ§Ùˆ) API Engine",
+    service: "Waw (واو) API Engine",
     country: "Pakistan (PKR)",
     supabaseBackend: "Connected (PostgreSQL / Auth / Storage)",
     freeDeliveryThreshold: ENV.FREE_DELIVERY_THRESHOLD_PKR,
@@ -242,8 +253,8 @@ app.get("/readyz", async (req, res) => {
   });
 });
 
-// â”€â”€ Authentication Routes (Supabase Phone/OTP & OAuth) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.post("/api/auth/login", AuthController.login);
+// ── Authentication Routes (Supabase Phone/OTP & OAuth) ────────────────────
+app.post("/api/auth/login", apiRateLimiter, AuthController.login);
 
 app.post(
   "/api/auth/whatsapp-otp/send",
@@ -260,14 +271,14 @@ app.post(
 
 app.post("/api/auth/oauth/sync", requireAuth, AuthController.syncOAuth);
 
-// ── Session Management (HttpOnly Cookie-based) ─────────────────────
+// -- Session Management (HttpOnly Cookie-based) ---------------------
 app.post("/api/auth/session/create", SessionController.createSession);
 app.post("/api/auth/session/refresh", SessionController.refreshSession);
 app.post("/api/auth/session/revoke", SessionController.revokeSession);
 app.get("/api/auth/session/me", SessionController.getCurrentUser);
 app.post("/api/auth/session/revoke-all", requireAuth, SessionController.revokeAllSessions);
 
-// ── Storefront Config (Dynamic UI Metadata) ───────────────
+// -- Storefront Config (Dynamic UI Metadata) ---------------
 // CMS Content Route
 app.get("/api/content", async (req, res) => {
   try {
@@ -285,15 +296,15 @@ app.get("/api/content", async (req, res) => {
 
 app.get("/api/config/storefront", ConfigController.getStorefrontConfig);
 
-// ── Category Taxonomy Routes (Hierarchical Database Tree) ───────────────
+// -- Category Taxonomy Routes (Hierarchical Database Tree) ---------------
 app.get("/api/categories", CategoryController.listTree);
 app.get("/api/categories/:slug", CategoryController.getBySlug);
 
-// ── Product Routes ──────────────────────────────────────────────────────────
+// -- Product Routes ----------------------------------------------------------
 app.get("/api/products", ProductController.list);
 app.get("/api/products/:slug", ProductController.getBySlug);
 
-// ── Store Routes ───────────────────────────────────────────────────────────
+// -- Store Routes -----------------------------------------------------------
 app.get("/api/stores", StoreController.listStores);
 
 app.get("/api/stores/:slug", StoreController.getStoreBySlug);
@@ -308,7 +319,7 @@ app.post(
   ProductController.create,
 );
 
-// â”€â”€ Checkout Quote Engine (Server-Authoritative Pricing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Checkout Quote Engine (Server-Authoritative Pricing) ──────────────────
 app.post("/api/checkout/quote", async (req, res) => {
   try {
     const { items, shippingCity, paymentMethod, couponCode } = req.body;
@@ -329,12 +340,16 @@ app.post("/api/checkout/quote", async (req, res) => {
   }
 });
 
-// â”€â”€ Order Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Order Routes ──────────────────────────────────────────────────────────
 app.post("/api/orders", requireAuth, orderRateLimiter, validateBody(CreateOrderSchema), OrderController.createOrder);
+
+app.post("/api/orders/guest", orderRateLimiter, OrderController.createGuestOrder);
 
 app.get("/api/orders", requireAuth, OrderController.listUserOrders);
 
 app.get("/api/orders/:id", requireAuth, OrderController.getOrder);
+
+app.get("/api/orders/:id/invoice", requireAuth, OrderController.downloadInvoice);
 
 app.post("/api/orders/:id/return", requireAuth, OrderController.createReturn);
 
@@ -345,21 +360,21 @@ app.patch("/api/orders/:id/status", requireAuth, requireRole(UserRole.ADMIN, Use
 
 app.post("/api/orders/:id/cancel", requireAuth, OrderController.cancelOrder);
 
-// ── User Addresses ─────────────────────────────────────────────────────────
+// -- User Addresses ---------------------------------------------------------
 app.get("/api/user/addresses", requireAuth, UserController.listAddresses);
 
 app.post("/api/user/addresses", requireAuth, validateBody(UserAddressSchema), UserController.createAddress);
 
 app.delete("/api/user/addresses/:id", requireAuth, UserController.deleteAddress);
 
-// ── Wishlist ───────────────────────────────────────────────────────────────
+// -- Wishlist ---------------------------------------------------------------
 app.get("/api/user/wishlist", requireAuth, UserController.listWishlist);
 
 app.post("/api/user/wishlist", requireAuth, wishlistRateLimiter, validateBody(WishlistSchema), UserController.addToWishlist);
 
 app.delete("/api/user/wishlist/:productId", requireAuth, UserController.removeFromWishlist);
 
-// ── Coupon Validation (Phase 2: Promo Engine) ───────────────────────────────
+// -- Coupon Validation (Phase 2: Promo Engine) -------------------------------
 app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
   try {
     const { couponCode, items } = req.body;
@@ -374,7 +389,7 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
   }
 });
 
-// ── Seller Routes ──────────────────────────────────────────────────────────
+// -- Seller Routes ----------------------------------------------------------
 app.post("/api/seller/apply", requireAuth, SellerController.apply);
 
 app.post("/api/seller/kyc", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), SellerController.updateKyc);
@@ -393,12 +408,12 @@ app.get("/api/seller/payouts", requireAuth, requireRole(UserRole.SELLER, UserRol
 
 app.post("/api/seller/coupons", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.createCoupon);
 
-// ── Destination Serviceability Routes ─────────────────────────────────────────
+// -- Destination Serviceability Routes -----------------------------------------
 app.get("/api/serviceability/cities", LogisticsController.listCities);
 
 app.get("/api/serviceability/check", LogisticsController.checkDestination);
 
-// ── Customer Support & Dispute Routes ───────────────────────────────────────
+// -- Customer Support & Dispute Routes ---------------------------------------
 app.post("/api/support/tickets", requireAuth, supportRateLimiter, SupportController.createTicket);
 
 app.get("/api/support/tickets", requireAuth, SupportController.listTickets);
@@ -407,10 +422,10 @@ app.get("/api/support/tickets/:id", requireAuth, SupportController.getTicket);
 
 app.post("/api/support/tickets/:id/messages", requireAuth, validateBody(SupportMessageSchema), SupportController.addMessage);
 
-// ── Logistics Webhook (PostEx Live Milestone Updates) ─────────────────────────
+// -- Logistics Webhook (PostEx Live Milestone Updates) -------------------------
 app.post("/api/logistics/postex/webhook", LogisticsController.handlePostExWebhook);
 
-// â”€â”€ Payment Routes (PostEx XPay Unified Fintech Engine) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Payment Routes (PostEx XPay Unified Fintech Engine) ────────────────────
 app.post(
   "/api/payments/xpay/initiate",
   requireAuth,
@@ -418,7 +433,7 @@ app.post(
 );
 app.post("/api/payments/xpay/webhook", PaymentController.xpayWebhook);
 
-// ── Raast P2M QR Routes ────────────────────────────────────────────────
+// -- Raast P2M QR Routes ------------------------------------------------
 app.post(
   "/api/payments/raast/qr",
   requireAuth,
@@ -512,7 +527,7 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
     } else if (ENV.NODE_ENV === "production") {
       return res.status(500).json({ error: "RAAST webhook secret not configured" });
     } else {
-      logger.warn("RAAST_WEBHOOK_SECRET not set — skipping signature verification (dev mode)");
+      logger.warn("RAAST_WEBHOOK_SECRET not set � skipping signature verification (dev mode)");
     }
 
     const { RaastService } = await import(
@@ -613,15 +628,32 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
   }
 });
 
-// ── Server-Backed Guest Cart Routes ──────────────────────────────────────────
+// -- Server-Backed Guest Cart Routes ------------------------------------------
 app.get("/api/cart", cartRateLimiter, CartController.getCart);
+app.put("/api/cart", cartRateLimiter, CartController.replaceCart);
 app.post("/api/cart/items", cartRateLimiter, CartController.addItem);
 app.patch("/api/cart/items", cartRateLimiter, CartController.updateItem);
 app.delete("/api/cart/items", cartRateLimiter, CartController.removeItem);
 app.delete("/api/cart", cartRateLimiter, CartController.clearCart);
 app.post("/api/cart/merge", requireAuth, cartRateLimiter, CartController.mergeGuestCart);
 
-// â”€â”€ Search Routes (Typesense Engine) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Loyalty & Rewards Routes ------------------------------------------------
+app.get("/api/loyalty/balance", requireAuth, LoyaltyController.getBalance);
+app.get("/api/loyalty/history", requireAuth, LoyaltyController.getHistory);
+app.post("/api/loyalty/redeem", requireAuth, LoyaltyController.calculateRedemption);
+
+// -- Referral Program Routes -------------------------------------------------
+app.get("/api/referrals/stats", requireAuth, ReferralController.getStats);
+app.post("/api/referrals/generate", requireAuth, ReferralController.generateCode);
+app.post("/api/referrals/validate", ReferralController.validateCode);
+
+// -- Subscription Routes -----------------------------------------------------
+app.get("/api/subscriptions/plans", SubscriptionController.getPlans);
+app.get("/api/seller/subscription", requireAuth, SubscriptionController.getCurrentSubscription);
+app.post("/api/seller/subscribe", requireAuth, SubscriptionController.subscribe);
+app.delete("/api/seller/subscription", requireAuth, SubscriptionController.cancel);
+
+// ── Search Routes (Typesense Engine) ──────────────────────────────────────
 app.get("/api/search", SearchController.search);
 
 app.post(
@@ -648,7 +680,7 @@ app.get(
   AIController.getUsage,
 );
 
-// â”€â”€ Admin Control Center (Strict Admin Guard) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Admin Control Center (Strict Admin Guard) ─────────────────────────────
 app.get(
   "/api/admin/stats",
   requireAuth,
@@ -725,7 +757,7 @@ app.post(
   },
 );
 
-// ── Admin KYC Approval Routes ───────────────────────────────────────────────
+// -- Admin KYC Approval Routes -----------------------------------------------
 app.get(
   "/api/admin/kyc/pending",
   requireAuth,
@@ -747,7 +779,7 @@ app.patch(
   AdminController.rejectKyc,
 );
 
-// ── Admin Product Listing Approvals ─────────────────────────────────────────
+// -- Admin Product Listing Approvals -----------------------------------------
 app.get(
   "/api/admin/products/pending",
   requireAuth,
@@ -767,7 +799,7 @@ app.patch(
   AdminController.rejectProduct,
 );
 
-// ── Admin Review Moderation ─────────────────────────────────────────────────
+// -- Admin Review Moderation -------------------------------------------------
 app.get(
   "/api/admin/reviews/pending",
   requireAuth,
@@ -787,7 +819,7 @@ app.patch(
   AdminController.rejectReview,
 );
 
-// ── Admin Dispute Resolution ────────────────────────────────────────────────
+// -- Admin Dispute Resolution ------------------------------------------------
 app.get(
   "/api/admin/disputes",
   requireAuth,
@@ -801,7 +833,7 @@ app.patch(
   AdminController.resolveDispute,
 );
 
-// ── Admin Return & Reverse Logistics Management ─────────────────────────────
+// -- Admin Return & Reverse Logistics Management -----------------------------
 app.get(
   "/api/admin/returns",
   requireAuth,
@@ -827,7 +859,49 @@ app.patch(
   AdminController.rejectReturn,
 );
 
-// ── Admin Marketplace Settings ─────────────────────────────────────────
+// -- Admin Flash Sales Management -----------------------------------------
+app.get("/api/admin/flash-sales", requireAuth, requireRole(UserRole.ADMIN), AdminController.listFlashSales);
+app.post("/api/admin/flash-sales", requireAuth, requireRole(UserRole.ADMIN), AdminController.createFlashSale);
+app.patch("/api/admin/flash-sales/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.updateFlashSale);
+app.delete("/api/admin/flash-sales/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.deleteFlashSale);
+app.post("/api/admin/flash-sales/:id/items", requireAuth, requireRole(UserRole.ADMIN), AdminController.addFlashSaleItem);
+app.delete("/api/admin/flash-sales/items/:itemId", requireAuth, requireRole(UserRole.ADMIN), AdminController.removeFlashSaleItem);
+
+// -- Admin Banner/Campaign Management -------------------------------------
+app.get("/api/admin/banners", requireAuth, requireRole(UserRole.ADMIN), AdminController.listBanners);
+app.post("/api/admin/banners", requireAuth, requireRole(UserRole.ADMIN), AdminController.createBanner);
+app.patch("/api/admin/banners/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.updateBanner);
+app.delete("/api/admin/banners/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.deleteBanner);
+
+// -- Admin Category Management --------------------------------------------
+app.get("/api/admin/categories", requireAuth, requireRole(UserRole.ADMIN), AdminController.listCategories);
+app.post("/api/admin/categories", requireAuth, requireRole(UserRole.ADMIN), AdminController.createCategory);
+app.patch("/api/admin/categories/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.updateCategory);
+app.delete("/api/admin/categories/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.deleteCategory);
+
+// -- Cart Abandonment Recovery (Cron) --------------------------------------
+app.post("/api/admin/cron/abandoned-carts", requireAuth, requireRole(UserRole.ADMIN), AdminController.processAbandonedCarts);
+
+// -- File Upload Routes (Supabase Storage) ---------------------------------
+app.post(
+  "/api/uploads/:bucket",
+  requireAuth,
+  uploadSingle,
+  UploadController.upload,
+);
+app.post(
+  "/api/uploads/:bucket/multiple",
+  requireAuth,
+  uploadMultiple,
+  UploadController.uploadMultiple,
+);
+app.delete(
+  "/api/uploads/:bucket/:path",
+  requireAuth,
+  UploadController.delete,
+);
+
+// -- Admin Marketplace Settings -----------------------------------------
 app.get(
   "/api/admin/settings",
   requireAuth,
@@ -886,7 +960,7 @@ app.patch(
 
       const userId = req.user?.id;
 
-      // Upsert each setting — store as proper jsonb, not stringified
+      // Upsert each setting � store as proper jsonb, not stringified
       for (const [key, value] of Object.entries(updates)) {
         await supabaseAdmin
           .from("marketplace_settings")
@@ -908,7 +982,10 @@ app.patch(
   },
 );
 
-// ── Buyer Product Review Submission (Account & Purchase Verified) ───────────
+// -- Admin MFA (TOTP) Routes ---------------------------------------------
+app.use("/api/admin/mfa", mfaRoutes);
+
+// -- Buyer Product Review Submission (Account & Purchase Verified) -----------
 app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBody(CreateReviewSchema), async (req, res) => {
   try {
     const user = (req as any).user;
@@ -974,20 +1051,21 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
   }
 });
 
-// ── Buyer Order Dispute Submission ──────────────────────────────────────────
+// -- Buyer Order Dispute Submission ------------------------------------------
 app.post("/api/orders/:id/dispute", requireAuth, validateBody(CreateDisputeSchema), OrderController.createDispute);
 
-// ── 404 Handler for undefined routes ────────────────────────────────────────
+// -- 404 Handler for undefined routes ----------------------------------------
 app.use("/api/*", (req, res) => {
-  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+  res.status(404).json({ error: `Route not found` });
 });
 
-// ── Global 404 Handler ──────────────────────────────────────────────────────
+// -- Global 404 Handler ------------------------------------------------------
 app.use((req, res) => {
-  res.status(404).json({ error: `Not found: ${req.method} ${req.originalUrl}` });
+  res.status(404).json({ error: `Not found` });
 });
 
-// ── Global Error Handler ────────────────────────────────────────────────────
+// -- Global Error Handler ----------------------------------------------------
+app.use(sentryErrorHandler);
 app.use(async (err: any, req: any, res: any, _next: any) => {
   logger.error("Unhandled Express error", { context: "ErrorHandler", message: err.message, path: req.path });
   if (ENV.NODE_ENV === "production") {

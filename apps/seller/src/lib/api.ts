@@ -125,7 +125,7 @@ function getHeaders(isStateChanging = false): Record<string, string> {
   return headers;
 }
 
-async function sellerFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function sellerFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const method = options?.method?.toUpperCase();
   const isStateChanging = method !== undefined && !["GET", "HEAD", "OPTIONS"].includes(method);
   const res = await fetch(`${API_BASE}${path}`, {
@@ -333,7 +333,18 @@ export async function fetchSellerAnalytics(): Promise<SellerAnalytics> {
 
 export async function updateSellerProduct(
   productId: string,
-  data: { title?: string; description?: string; base_price_pkr?: number; is_active?: boolean }
+  data: {
+    title?: string;
+    title_urdu?: string;
+    description?: string;
+    base_price_pkr?: number;
+    compare_at_price_pkr?: number;
+    stock_quantity?: number;
+    category_id?: string;
+    image_url?: string;
+    weight_kg?: number;
+    is_active?: boolean;
+  }
 ): Promise<any> {
   return sellerFetch(`/api/products/${productId}`, {
     method: "PATCH",
@@ -343,6 +354,50 @@ export async function updateSellerProduct(
 
 export async function deleteSellerProduct(productId: string): Promise<void> {
   await sellerFetch(`/api/products/${productId}`, { method: "DELETE" });
+}
+
+export async function uploadFile(file: File, bucket: string): Promise<{ url: string; path: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const csrf = getCsrfToken();
+  const res = await fetch(`${API_BASE}/api/uploads/${bucket}`, {
+    method: "POST",
+    credentials: "include",
+    headers: csrf ? { "X-CSRF-Token": csrf } : {},
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    try {
+      const refreshRes = await fetch(`${API_BASE}/api/auth/session/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (refreshRes.ok) {
+        const retryRes = await fetch(`${API_BASE}/api/uploads/${bucket}`, {
+          method: "POST",
+          credentials: "include",
+          headers: csrf ? { "X-CSRF-Token": csrf } : {},
+          body: formData,
+        });
+        if (!retryRes.ok) {
+          const error = await retryRes.json().catch(() => ({ error: "Upload failed" }));
+          throw new Error(error.error || `HTTP ${retryRes.status}`);
+        }
+        return retryRes.json();
+      }
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Upload failed" }));
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
 }
 
 export async function updateStoreProfile(data: {

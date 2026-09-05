@@ -1,4 +1,14 @@
 -- ==============================================================================
+-- ⚠️ DEPRECATED — DO NOT USE FOR NEW INSTALLATIONS
+-- ==============================================================================
+-- This file is the ORIGINAL legacy schema and is kept for reference only.
+-- For new installations or schema verification, use:
+--   supabase/migrations/SCHEMA_COMPLETE.sql
+-- For incremental migrations, use the numbered migration files:
+--   supabase/migrations/002_* through 012_*
+-- ==============================================================================
+
+-- ==============================================================================
 -- Waw (واو) Marketplace — Supabase PostgreSQL Production Schema
 -- Supports Multi-Vendor, 1P Flagship, SBP Escrow Ledger, PostEx Courier, & Typesense
 -- ==============================================================================

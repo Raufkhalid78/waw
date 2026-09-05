@@ -135,6 +135,14 @@ const config: Config = {
           from: { transform: "translateY(100%)" },
           to: { transform: "translateY(0)" },
         },
+        "slide-in": {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" },
+        },
+        "scale-up": {
+          from: { opacity: "0", transform: "scale(0.95)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
         shimmer: {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
@@ -152,6 +160,8 @@ const config: Config = {
         "fade-up": "fade-up 0.4s ease-out forwards",
         "fade-in": "fade-in 0.3s ease-out forwards",
         "slide-up": "slide-up 0.3s cubic-bezier(0.4,0,0.2,1) forwards",
+        "slide-in": "slide-in 0.3s cubic-bezier(0.4,0,0.2,1) forwards",
+        "scale-up": "scale-up 0.2s ease-out forwards",
         shimmer: "shimmer 1.5s infinite",
         marquee: "marquee 28s linear infinite",
       },

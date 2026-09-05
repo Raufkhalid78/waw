@@ -20,6 +20,9 @@ import {
   BadgeCheck,
   BarChart3,
   Sparkles,
+  Zap,
+  Image,
+  FolderTree,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -36,6 +39,9 @@ const navItems = [
   { href: "/kyc", label: "KYC", icon: BadgeCheck },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/ai", label: "AI Usage", icon: Sparkles },
+  { href: "/flash-sales", label: "Flash Sales", icon: Zap },
+  { href: "/banners", label: "Banners", icon: Image },
+  { href: "/categories", label: "Categories", icon: FolderTree },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -54,6 +60,8 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         credentials: "include",
       });
     } catch {}
+    // Clear the admin token cookie
+    document.cookie = "waw_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     window.location.href = "/login";
   };
 

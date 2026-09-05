@@ -1,17 +1,21 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 import Link from "next/link";
 import { logger } from "@/lib/logger";
 import { CategoryCircles } from "@/components/home/CategoryCircles";
 import { HeroBanner } from "@/components/home/HeroBanner";
-import { FlashDeals } from "@/components/home/FlashDeals";
-import { FeaturedBrands } from "@/components/home/FeaturedBrands";
-import { StoreSpotlight } from "@/components/home/StoreSpotlight";
 import { ProductCard } from "@/components/ui/ProductCard";
+import { JsonLdOrganization, JsonLdSearchBox } from "@/components/seo/JsonLd";
 import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package, AlertCircle } from "lucide-react";
 import { fetchProducts, fetchCategories } from "@/lib/api";
 import { FadeIn, Stagger } from "@/components/Motion";
+import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
+
+// Lazy-load below-fold components for better LCP
+const FlashDeals = lazy(() => import("@/components/home/FlashDeals").then(m => ({ default: m.FlashDeals })));
+const FeaturedBrands = lazy(() => import("@/components/home/FeaturedBrands").then(m => ({ default: m.FeaturedBrands })));
+const StoreSpotlight = lazy(() => import("@/components/home/StoreSpotlight").then(m => ({ default: m.StoreSpotlight })));
 
 function ProductCardSkeleton() {
   return (
@@ -115,6 +119,8 @@ export default function HomePage() {
 
   return (
     <div className="space-y-4 pb-20">
+      <JsonLdOrganization />
+      <JsonLdSearchBox />
       {/* 1. Hero Banner Carousel */}
       <FadeIn>
         <HeroBanner />
@@ -122,7 +128,9 @@ export default function HomePage() {
 
       {/* 2. Flash Deals */}
       <FadeIn delay={50}>
-        <FlashDeals />
+        <Suspense fallback={<div className="h-64 bg-gray-50 animate-pulse rounded-xl" />}>
+          <FlashDeals />
+        </Suspense>
       </FadeIn>
 
       {/* 3. DB-backed Category Circles */}
@@ -279,8 +287,34 @@ export default function HomePage() {
       </section>
       </FadeIn>
 
-      {/* 5. Buyer Protection Banner */}
+      {/* 5. Trust Badges */}
       <FadeIn delay={200}>
+        <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: ShieldCheck, title: "100% Genuine", desc: "Verified sellers only", color: "text-green-600 bg-green-50" },
+              { icon: Package, title: "Free Delivery", desc: "On orders over PKR 5,000", color: "text-amber-600 bg-amber-50" },
+              { icon: "🔄", title: "7-Day Returns", desc: "Easy doorstep returns", color: "text-blue-600 bg-blue-50" },
+              { icon: "🔒", title: "Secure Checkout", desc: "Encrypted payments", color: "text-purple-600 bg-purple-50" },
+            ].map((badge, i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 text-center hover:shadow-md transition-shadow">
+                <div className={`w-10 h-10 rounded-xl ${badge.color} flex items-center justify-center mx-auto mb-2`}>
+                  {typeof badge.icon === "string" ? (
+                    <span className="text-lg">{badge.icon}</span>
+                  ) : (
+                    <badge.icon className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="text-xs font-bold text-gray-900">{badge.title}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{badge.desc}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </FadeIn>
+
+      {/* 6. Buyer Protection Banner */}
+      <FadeIn delay={250}>
         <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
         <div className="bg-gray-900 text-white rounded-xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
@@ -315,15 +349,22 @@ export default function HomePage() {
         </section>
       </FadeIn>
 
-      {/* 6. Featured Brand Hubs */}
-      <FadeIn delay={250}>
-        <FeaturedBrands />
+      {/* 7. Featured Brand Hubs */}
+      <FadeIn delay={300}>
+        <Suspense fallback={<div className="h-48 bg-gray-50 animate-pulse rounded-xl" />}>
+          <FeaturedBrands />
+        </Suspense>
       </FadeIn>
 
-      {/* 7. Store Spotlight */}
-      <FadeIn delay={300}>
-        <StoreSpotlight />
+      {/* 8. Store Spotlight */}
+      <FadeIn delay={350}>
+        <Suspense fallback={<div className="h-48 bg-gray-50 animate-pulse rounded-xl" />}>
+          <StoreSpotlight />
+        </Suspense>
       </FadeIn>
+
+      {/* 9. Recently Viewed */}
+      <RecentlyViewedSection />
     </div>
   );
 }

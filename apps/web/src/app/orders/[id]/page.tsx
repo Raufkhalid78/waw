@@ -18,7 +18,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchOrderById } from "@/lib/api";
 
 export default function OrderTrackingPage() {
@@ -28,6 +28,31 @@ export default function OrderTrackingPage() {
   const [copied, setCopied] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+
+  const handleDownloadInvoice = useCallback(async () => {
+    setDownloadingInvoice(true);
+    try {
+      const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
+      const res = await fetch(`${API_BASE}/api/orders/${orderId}/invoice`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to download invoice");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `waw-invoice-${order?.order_number || orderId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      alert(err.message || "Failed to download invoice");
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  }, [orderId, order]);
 
   useEffect(() => {
     async function loadOrder() {
@@ -411,11 +436,16 @@ export default function OrderTrackingPage() {
               )}
 
               <button
-                onClick={() => window.print()}
-                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                onClick={handleDownloadInvoice}
+                disabled={downloadingInvoice}
+                className="w-full py-3 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-900 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
-                <Download className="w-4 h-4" />
-                <span>Download / Print Receipt</span>
+                {downloadingInvoice ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                <span>{downloadingInvoice ? "Generating..." : "Download Invoice (PDF)"}</span>
               </button>
 
               <Link

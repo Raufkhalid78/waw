@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 import {
   Trash2, Plus, Minus, Truck, ShieldCheck, CreditCard, Banknote,
-  ArrowRight, Zap,
+  ArrowRight, Zap, Tag, X, CheckCircle2,
 } from "lucide-react";
 import { MARKETPLACE_CONFIG, PaymentMethod, SellerType } from "@waw/types";
 import { FadeIn } from "@/components/Motion";
@@ -12,6 +13,41 @@ import { FadeIn } from "@/components/Motion";
 export default function CartPage() {
   const { items, paymentMethod, setPaymentMethod, updateQuantity, removeItem, getSummary } = useCartStore();
   const summary = getSummary();
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPkr: number } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  const handleApplyCoupon = async () => {
+    const code = couponCode.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError("");
+    try {
+      const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
+      const res = await fetch(`${API_BASE_URL}/api/checkout/apply-coupon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          couponCode: code,
+          items: items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Invalid coupon" }));
+        setCouponError(err.error || "Invalid coupon code");
+        return;
+      }
+      const data = await res.json();
+      setAppliedCoupon({ code, discountPkr: data.discountPkr || 0 });
+      setCouponCode("");
+    } catch {
+      setCouponError("Failed to validate coupon");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   const progressPercentage = Math.min(100, Math.round(
     (summary.subtotalPkr / MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR) * 100
@@ -166,6 +202,51 @@ export default function CartPage() {
                     <div className="text-[11px] text-amber-700 font-medium mt-1">+PKR 100 fee</div>
                   </button>
                 </div>
+              </div>
+
+              {/* Coupon Input */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5" />
+                  Promo / Coupon Code
+                </label>
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      <span className="text-xs font-bold text-green-700">{appliedCoupon.code}</span>
+                      {appliedCoupon.discountPkr > 0 && (
+                        <span className="text-[10px] font-bold text-green-600">-PKR {appliedCoupon.discountPkr.toLocaleString()}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setAppliedCoupon(null)}
+                      className="p-1 text-gray-400 hover:text-red-500 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Enter code"
+                      value={couponCode}
+                      onChange={(e) => { setCouponCode(e.target.value); setCouponError(""); }}
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <button
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponCode.trim()}
+                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-gray-300 text-white rounded-xl text-xs font-black transition-colors cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {couponLoading ? "..." : "Apply"}
+                    </button>
+                  </div>
+                )}
+                {couponError && (
+                  <p className="text-[11px] font-bold text-red-500">{couponError}</p>
+                )}
               </div>
 
               {/* Pricing */}

@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Sparkles,
 } from "lucide-react";
+import { createSellerProduct } from "@/lib/api";
 
 export default function BulkUploadPage() {
   const [csvContent, setCsvContent] = useState<string>("");
@@ -61,29 +62,22 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,Ready to Wear,4999,6
   const handleImport = async () => {
     if (parsedRows.length === 0) return;
     setUploading(true);
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
     let successCount = 0;
 
     for (const row of parsedRows) {
       try {
-        const res = await fetch(`${API_BASE}/api/products`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: row.Title || row.title,
-            titleUrdu: row.Title_Urdu || row.title_urdu,
-            basePricePkr: parseInt(row.Price_PKR || row.price_pkr || "0", 10),
-            compareAtPricePkr: row.Compare_Price_PKR ? parseInt(row.Compare_Price_PKR, 10) : undefined,
-            stockQuantity: parseInt(row.Stock || row.stock || "0", 10),
-            sku: row.SKU || row.sku,
-            imageUrl: row.Image_URL || row.image_url,
-            description: row.Description || row.description,
-          }),
+        await createSellerProduct({
+          title: row.Title || row.title,
+          titleUrdu: row.Title_Urdu || row.title_urdu,
+          categoryId: row.Category_ID || row.category_id || "",
+          basePricePkr: parseInt(row.Price_PKR || row.price_pkr || "0", 10),
+          compareAtPricePkr: row.Compare_Price_PKR ? parseInt(row.Compare_Price_PKR, 10) : undefined,
+          stockQuantity: parseInt(row.Stock || row.stock || "0", 10),
+          sku: row.SKU || row.sku,
+          imageUrl: row.Image_URL || row.image_url || "",
+          description: row.Description || row.description || "",
         });
-        if (res.ok) successCount++;
+        successCount++;
       } catch {
         // Skip failed rows
       }

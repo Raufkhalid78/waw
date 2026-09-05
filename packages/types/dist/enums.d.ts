@@ -18,6 +18,7 @@ export declare enum PaymentMethod {
     XPAY_CARD = "XPAY_CARD",// Visa, Mastercard, PayPak (via PostEx XPay)
     XPAY_WALLET_JAZZCASH = "XPAY_WALLET_JAZZCASH",// JazzCash Mobile Account (via PostEx XPay)
     XPAY_WALLET_EASYPAISA = "XPAY_WALLET_EASYPAISA",// Easypaisa Mobile Wallet (via PostEx XPay)
+    RAAST_P2M_QR = "RAAST_P2M_QR",// Raast Person-to-Merchant QR Code Payment
     COD = "COD"
 }
 export declare enum PaymentStatus {
@@ -45,6 +46,7 @@ export declare enum CourierProvider {
     POSTEX = "POSTEX",// Designated primary logistics & COD partner
     LEOPARDS = "LEOPARDS",
     TRAX = "TRAX",
+    TCS = "TCS",// TCS Express courier
     WAW_FLEET = "WAW_FLEET"
 }
 export declare enum PayoutStatus {
@@ -53,6 +55,7 @@ export declare enum PayoutStatus {
     PAID = "PAID",
     COMPLETED = "COMPLETED",
     HELD = "HELD",
+    HELD_PENDING_DELIVERY = "HELD_PENDING_DELIVERY",
     FAILED = "FAILED"
 }
 export declare enum ReturnReason {

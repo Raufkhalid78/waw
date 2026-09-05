@@ -49,28 +49,20 @@ async function syncCartToServer(items: CartItem[]): Promise<void> {
     const guestToken = getOrCreateGuestToken();
     if (!guestToken) return;
 
-    // Clear server cart first
-    const clearRes = await fetch(`${API_BASE_URL}/api/cart`, {
-      method: "DELETE",
+    // Atomic cart replacement (fixes race condition from clear-then-add)
+    const res = await fetch(`${API_BASE_URL}/api/cart`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ guestToken }),
-    });
-    if (!clearRes.ok) throw new Error(`Cart clear failed: ${clearRes.status}`);
-
-    // Add all items
-    for (const item of items) {
-      const addRes = await fetch(`${API_BASE_URL}/api/cart/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          guestToken,
+      body: JSON.stringify({
+        guestToken,
+        items: items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
           quantity: item.quantity,
-        }),
-      });
-      if (!addRes.ok) throw new Error(`Cart add failed: ${addRes.status}`);
-    }
+        })),
+      }),
+    });
+    if (!res.ok) throw new Error(`Cart replace failed: ${res.status}`);
   } catch (err) {
     logger.error("Failed to sync cart to server", "CartStore", err);
   }

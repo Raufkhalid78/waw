@@ -32,6 +32,7 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'reviews'>('overview');
+  const [copied, setCopied] = useState(false);
 
   const storeScrollRef = useRef<HTMLDivElement>(null);
   const fbtScrollRef = useRef<HTMLDivElement>(null);
@@ -45,6 +46,19 @@ export default function ProductDetailPage() {
       const data = await fetchProductById(productId);
       if (data) {
         setProduct(data);
+
+        // Track recently viewed
+        try {
+          const { addToRecentlyViewed } = await import("@/lib/recentlyViewed");
+          addToRecentlyViewed({
+            id: data.productId,
+            slug: data.slug || data.productId,
+            title: data.title,
+            imageUrl: data.imageUrl || data.images?.[0],
+            price: data.pricePkr,
+            comparePrice: data.originalPricePkr,
+          });
+        } catch {}
 
         const categoryParam = data.categorySlug
           ? { categorySlug: data.categorySlug }
@@ -218,6 +232,15 @@ export default function ProductDetailPage() {
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10 py-4 space-y-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdProduct) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": `${process.env.NEXT_PUBLIC_SITE_URL || "https://waw.com.pk"}` },
+          { "@type": "ListItem", "position": 2, "name": product.category || "Products", "item": `${process.env.NEXT_PUBLIC_SITE_URL || "https://waw.com.pk"}/category/${product.categorySlug || 'all'}` },
+          { "@type": "ListItem", "position": 3, "name": product.title }
+        ]
+      }) }} />
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs text-gray-500 overflow-x-auto whitespace-nowrap">
@@ -306,8 +329,19 @@ export default function ProductDetailPage() {
                 <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-red-500' : ''}`} />
               </button>
               <button
-                onClick={() => { navigator.clipboard?.writeText(window.location.href); }}
-                className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all cursor-pointer"
+                onClick={() => {
+                  const url = window.location.href;
+                  const text = `Check out ${product.title} on Waw!`;
+                  if (navigator.share) {
+                    navigator.share({ title: product.title, text, url });
+                  } else {
+                    navigator.clipboard?.writeText(url);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }
+                }}
+                className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all cursor-pointer relative"
+                title="Share product"
               >
                 <Share2 className="w-4 h-4" />
               </button>
@@ -401,26 +435,45 @@ export default function ProductDetailPage() {
                   Delivering to <span className="font-medium text-gray-700">{selectedCity}, Pakistan</span>
                 </div>
                 <div className="mt-2 space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className={`w-1.5 h-1.5 rounded-full ${product.isExpress ? 'bg-green-500' : 'bg-amber-500'}`} />
-                    <span className="text-gray-700">
-                      Get it <span className="font-semibold text-gray-900">
-                        {product.isExpress ? 'Wed, Sep 9' : 'Fri, Sep 11'}
-                      </span>
-                    </span>
-                  </div>
-                  {product.pricePkr >= 5000 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                      <span className="text-green-700 font-medium">FREE delivery</span>
-                    </div>
-                  )}
-                  {product.pricePkr < 5000 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                      <span className="text-gray-500">Delivery fee: PKR 200</span>
-                    </div>
-                  )}
+                  {(() => {
+                    // Calculate dynamic delivery dates based on city
+                    const isTier1City = ["Lahore", "Karachi", "Islamabad", "Rawalpindi"].includes(selectedCity);
+                    const expressDays = isTier1City ? 2 : 3;
+                    const standardDays = isTier1City ? 4 : 6;
+                    const expressDate = new Date();
+                    expressDate.setDate(expressDate.getDate() + expressDays);
+                    const standardDate = new Date();
+                    standardDate.setDate(standardDate.getDate() + standardDays);
+                    const formatDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                    return (
+                      <>
+                        <div className="flex items-center gap-2 text-xs">
+                          <div className={`w-1.5 h-1.5 rounded-full ${product.isExpress ? 'bg-green-500' : 'bg-amber-500'}`} />
+                          <span className="text-gray-700">
+                            Get it <span className="font-semibold text-gray-900">
+                              {product.isExpress ? formatDate(expressDate) : formatDate(standardDate)}
+                            </span>
+                          </span>
+                        </div>
+                        {product.pricePkr >= 5000 && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            <span className="text-green-700 font-medium">FREE delivery</span>
+                          </div>
+                        )}
+                        {product.pricePkr < 5000 && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                            <span className="text-gray-500">Delivery fee: PKR 200</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-xs">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          <span className="text-gray-500">7-day return policy</span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

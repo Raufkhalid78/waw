@@ -227,6 +227,7 @@ export async function fetchProducts(params?: {
   sellerType?: string;
   minPrice?: number;
   maxPrice?: number;
+  minRating?: number;
   sortBy?: "featured" | "price-asc" | "price-desc" | "rating";
   page?: number;
   limit?: number;
@@ -259,6 +260,8 @@ export async function fetchProducts(params?: {
     query.append("minPrice", params.minPrice.toString());
   if (params?.maxPrice !== undefined)
     query.append("maxPrice", params.maxPrice.toString());
+  if (params?.minRating !== undefined && params.minRating > 0)
+    query.append("minRating", params.minRating.toString());
   if (params?.sortBy) query.append("sortBy", params.sortBy);
   if (params?.page) query.append("page", params.page.toString());
   if (params?.limit) query.append("limit", params.limit.toString());
@@ -393,6 +396,19 @@ export async function createOrderApi(orderInput: any): Promise<any> {
   });
   if (!res.ok || !res.data) {
     throw res.error || new Error("Failed to place order");
+  }
+  return res.data;
+}
+
+export async function createGuestOrderApi(orderInput: any): Promise<any> {
+  const res = await safeFetch<any>(`${API_BASE_URL}/api/orders/guest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(orderInput),
+    timeoutMs: 12000,
+  });
+  if (!res.ok || !res.data) {
+    throw res.error || new Error("Failed to place guest order");
   }
   return res.data;
 }

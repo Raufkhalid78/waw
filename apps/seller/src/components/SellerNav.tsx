@@ -18,6 +18,8 @@ import {
   Menu,
   X,
   Sparkles,
+  Crown,
+  Boxes,
 } from "lucide-react";
 
 export function SellerNav() {
@@ -79,11 +81,13 @@ export function SellerNav() {
     { href: "/", label: "Dashboard Overview", icon: LayoutDashboard, color: "text-amber-400" },
     { href: "/orders", label: "Store Orders", icon: ShoppingBag, color: "text-emerald-400", badge: "Live" },
     { href: "/products", label: "Catalog & Inventory", icon: Package, color: "text-blue-400" },
+    { href: "/inventory", label: "Stock Management", icon: Boxes, color: "text-cyan-400" },
     { href: "/products/bulk-upload", label: "CSV Bulk Import", icon: FileSpreadsheet, color: "text-purple-400" },
     { href: "/ai/describe", label: "AI Description", icon: Sparkles, color: "text-amber-300" },
     { href: "/coupons", label: "Seller Coupons", icon: Tag, color: "text-pink-400" },
     { href: "/payouts", label: "Weekly Payouts", icon: CreditCard, color: "text-amber-500" },
     { href: "/analytics", label: "Analytics", icon: BarChart3, color: "text-cyan-400" },
+    { href: "/subscription", label: "Subscription", icon: Crown, color: "text-amber-400" },
     { href: "/settings", label: "Store Settings", icon: Settings, color: "text-slate-300" },
   ];
 

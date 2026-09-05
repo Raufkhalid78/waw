@@ -1,17 +1,18 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import { Providers } from "./providers";
 import { AppShell } from "@/components/layout/AppShell";
 
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-jakarta" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: {
-    default: "Waw — Online Shopping in Pakistan | Fast Delivery & Best Prices",
-    template: "%s | Waw — Online Shopping Pakistan",
+    default: "Waw — Premium Marketplace Pakistan",
+    template: "%s | Waw — Premium Marketplace Pakistan",
   },
   description:
-    "Online Shopping in Pakistan at Waw.com.pk. Shop local products with fast nationwide delivery and verified checkout.",
+    "Pakistan's premium online marketplace. Shop verified local products with fast nationwide delivery and secure checkout.",
   keywords:
     "online shopping pakistan, waw com pk, waw pakistan, waw online shopping, noon pakistan, fashion lawn, peshawari chappal, sialkot sports",
   icons: {
@@ -25,9 +26,9 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true },
   },
   openGraph: {
-    title: "Waw.com.pk — Online Shopping PK",
+    title: "Waw — Premium Marketplace Pakistan",
     description:
-      "Online Shopping in Pakistan at Waw.com.pk. 24h Waw Express fast delivery nationwide.",
+      "Pakistan's premium online marketplace. Shop verified local products with fast nationwide delivery.",
     url: "https://waw.com.pk",
     siteName: "Waw",
     locale: "en_PK",
@@ -35,8 +36,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Waw — Online Shopping in Pakistan",
-    description: "Shop local products with fast nationwide delivery.",
+    title: "Waw — Premium Marketplace Pakistan",
+    description: "Pakistan's premium online marketplace. Verified products, fast delivery.",
   },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://waw.com.pk"),
 };
@@ -60,7 +61,9 @@ export default function RootLayout({
         />
       </head>
       <body className="flex flex-col min-h-screen bg-slate-100/70 text-slate-950 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
-        <AppShell>{children}</AppShell>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );
