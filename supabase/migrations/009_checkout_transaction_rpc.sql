@@ -1,12 +1,13 @@
 -- ============================================================================
--- P0-5: Atomic checkout transaction RPC
+-- P0-2 + P0-3: Atomic checkout transaction RPC with inventory reservation
 -- Wraps the entire order creation in a single database transaction:
---   1. Verify inventory availability
---   2. Reserve stock
---   3. Create parent order
---   4. Create store_orders (one per seller)
---   5. Create order_items
---   6. Record payment intent
+--   1. Verify caller identity (auth.uid)
+--   2. Verify inventory availability via inventory_ledger
+--   3. Reserve stock (insert RESERVE entries)
+--   4. Create parent order
+--   5. Create store_orders (one per seller)
+--   6. Create order_items
+--   7. Record payment intent
 -- All steps succeed or all roll back.
 -- ============================================================================
 
@@ -40,7 +41,16 @@ DECLARE
   v_line_total NUMERIC;
   v_store_orders JSONB := '[]'::JSONB;
   v_existing_order RECORD;
+  v_available_stock INTEGER;
+  v_variant_id UUID;
+  v_item_quantity INTEGER;
 BEGIN
+  -- ── P0-3: Verify caller identity ────────────────────────────────────────
+  -- Allow NULL buyer_id for guest checkout, but if provided, must match auth.uid()
+  IF p_buyer_id IS NOT NULL AND p_buyer_id != auth.uid() THEN
+    RAISE EXCEPTION 'Unauthorized: buyer identity mismatch';
+  END IF;
+
   -- Idempotency check: if key already used, return existing order
   IF p_idempotency_key IS NOT NULL THEN
     SELECT id, order_number, total_amount_pkr INTO v_existing_order
@@ -65,9 +75,19 @@ BEGIN
   -- Create parent order
   v_order_id := gen_random_uuid();
 
-  -- Process each item and accumulate totals
+  -- ── P0-2: Verify inventory availability AND accumulate totals ──────────
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
+    -- Determine the variant_id to check stock for
+    IF v_item ? 'variant_id' AND (v_item->>'variant_id') IS NOT NULL THEN
+      v_variant_id := (v_item->>'variant_id')::UUID;
+    ELSE
+      -- Use the offer itself as the variant (default variant)
+      v_variant_id := (v_item->>'offer_variant_id')::UUID;
+    END IF;
+
+    v_item_quantity := (v_item->>'quantity')::INT;
+
     -- Fetch offer details (server-authoritative pricing)
     SELECT so.*, cp.title AS product_title
     INTO v_offer
@@ -92,9 +112,19 @@ BEGIN
         RAISE EXCEPTION 'Variant not found: %', v_item->>'variant_id';
       END IF;
 
-      v_line_total := (v_offer.price_pkr + v_variant.price_adjustment_pkr) * (v_item->>'quantity')::INT;
+      v_line_total := (v_offer.price_pkr + v_variant.price_adjustment_pkr) * v_item_quantity;
     ELSE
-      v_line_total := v_offer.price_pkr * (v_item->>'quantity')::INT;
+      v_line_total := v_offer.price_pkr * v_item_quantity;
+    END IF;
+
+    -- ── P0-2: Check available stock from inventory_ledger ────────────────
+    SELECT COALESCE(SUM(quantity), 0) INTO v_available_stock
+    FROM inventory_ledger
+    WHERE offer_variant_id = v_variant_id;
+
+    IF v_available_stock < v_item_quantity THEN
+      RAISE EXCEPTION 'Insufficient stock for item %: available=%, requested=%',
+        v_item->>'offer_variant_id', v_available_stock, v_item_quantity;
     END IF;
 
     v_subtotal_pkr := v_subtotal_pkr + v_line_total;
@@ -131,7 +161,7 @@ BEGIN
     p_idempotency_key, NOW(), NOW()
   );
 
-  -- Process items again to create store_orders and order_items
+  -- ── P0-2: Reserve stock and create store_orders/order_items ────────────
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
     SELECT so.*, cp.title AS product_title, so.store_id
@@ -146,9 +176,21 @@ BEGIN
       WHERE id = (v_item->>'variant_id')::UUID;
 
       v_line_total := (v_offer.price_pkr + v_variant.price_adjustment_pkr) * (v_item->>'quantity')::INT;
+      v_variant_id := (v_item->>'variant_id')::UUID;
     ELSE
       v_line_total := v_offer.price_pkr * (v_item->>'quantity')::INT;
+      v_variant_id := (v_item->>'offer_variant_id')::UUID;
     END IF;
+
+    v_item_quantity := (v_item->>'quantity')::INT;
+
+    -- Insert RESERVE entry in inventory_ledger (negative quantity = reservation)
+    INSERT INTO inventory_ledger (
+      offer_variant_id, store_id, transaction_type, quantity, reference_id, notes
+    ) VALUES (
+      v_variant_id, v_offer.store_id, 'RESERVE', -v_item_quantity,
+      v_order_id, 'Checkout reservation for Order ' || v_order_number
+    );
 
     -- Create store_order if not exists for this store
     IF NOT (v_store_orders @> jsonb_build_array(jsonb_build_object('store_id', v_offer.store_id))) THEN
@@ -183,7 +225,7 @@ BEGIN
       ) VALUES (
         gen_random_uuid(), v_order_id, v_so_id,
         (v_item->>'offer_variant_id')::UUID, v_offer.catalog_product_id,
-        (v_item->>'quantity')::INT, v_offer.price_pkr, v_line_total, NOW()
+        v_item_quantity, v_offer.price_pkr, v_line_total, NOW()
       );
 
       -- Update store_order subtotal
@@ -213,5 +255,5 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- Grant execute to authenticated users
+-- Grant execute to authenticated users only (guest checkout uses separate path)
 GRANT EXECUTE ON FUNCTION checkout_transaction(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) TO authenticated;

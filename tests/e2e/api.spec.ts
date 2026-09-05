@@ -10,7 +10,7 @@ test.describe("API — Guest Checkout Flow", () => {
         buyer_phone: "+923001234567",
         shipping_address: "123 Test Street, Lahore",
         shipping_city: "Lahore",
-        payment_method: "cod",
+        payment_method: "COD",
         items: [
           {
             offer_variant_id: "00000000-0000-0000-0000-000000000001",
@@ -19,7 +19,6 @@ test.describe("API — Guest Checkout Flow", () => {
         ],
       },
     });
-    // Should succeed or fail gracefully (not 500)
     expect([200, 201, 400, 404]).toContain(response.status());
   });
 
@@ -30,7 +29,7 @@ test.describe("API — Guest Checkout Flow", () => {
         buyer_phone: "+923001234567",
         shipping_address: "123 Test Street",
         shipping_city: "Lahore",
-        payment_method: "cod",
+        payment_method: "COD",
       },
     });
     expect(response.status()).toBe(400);
@@ -39,66 +38,92 @@ test.describe("API — Guest Checkout Flow", () => {
   });
 });
 
-test.describe("API — Product Search & Filters", () => {
-  test("GET /api/products accepts search query", async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/products?search=wallet`);
+test.describe("API — Product Listing", () => {
+  test("GET /api/products returns items array", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/products`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("products");
+    expect(body).toHaveProperty("items");
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body).toHaveProperty("total");
+    expect(body).toHaveProperty("page");
+    expect(body).toHaveProperty("totalPages");
   });
 
-  test("GET /api/products accepts category filter", async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/products?category=electronics`);
+  test("GET /api/products accepts categorySlug filter", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/products?categorySlug=leather-craft`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("products");
+    expect(body).toHaveProperty("items");
+  });
+
+  test("GET /api/products accepts inStock filter", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/products?inStock=true`);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body).toHaveProperty("items");
   });
 
   test("GET /api/products accepts minRating filter", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/products?minRating=4`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("products");
+    expect(body).toHaveProperty("items");
   });
 
-  test("GET /api/products accepts sort parameter", async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/products?sort=price_asc`);
+  test("GET /api/products accepts sortBy parameter", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/products?sortBy=price-asc`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("products");
+    expect(body).toHaveProperty("items");
   });
 
   test("GET /api/products accepts page/limit pagination", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/products?page=1&limit=5`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("products");
-    expect(Array.isArray(body.products)).toBe(true);
+    expect(body).toHaveProperty("items");
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.page).toBe(1);
+  });
+
+  test("GET /api/products accepts city filter", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/products?city=Lahore`);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body).toHaveProperty("items");
   });
 });
 
-test.describe("API — Search Autocomplete", () => {
-  test("GET /api/search/autocomplete returns suggestions", async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/search/autocomplete?q=wa`);
+test.describe("API — Search", () => {
+  test("GET /api/search returns hits array", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/search?q=wallet`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("suggestions");
+    expect(body).toHaveProperty("hits");
+    expect(Array.isArray(body.hits)).toBe(true);
   });
 
-  test("GET /api/search/autocomplete requires q parameter", async ({ request }) => {
-    const response = await request.get(`${API_BASE}/api/search/autocomplete`);
+  test("GET /api/search accepts q parameter", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/search?q=bag`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("suggestions");
+    expect(body).toHaveProperty("hits");
+    expect(body).toHaveProperty("found");
   });
 });
 
 test.describe("API — Categories", () => {
-  test("GET /api/categories returns category list", async ({ request }) => {
+  test("GET /api/categories returns array", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/categories`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty("categories");
+    expect(Array.isArray(body)).toBe(true);
+  });
+
+  test("GET /api/categories/:slug returns category", async ({ request }) => {
+    const response = await request.get(`${API_BASE}/api/categories/leather-craft`);
+    expect([200, 404]).toContain(response.status());
   });
 });
 
@@ -116,7 +141,7 @@ test.describe("API — Serviceability", () => {
   });
 });
 
-test.describe("API — Cart Operations", () => {
+test.describe("API — Auth Protected Endpoints", () => {
   test("GET /api/cart returns 401 without auth", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/cart`);
     expect(response.status()).toBe(401);
@@ -128,9 +153,7 @@ test.describe("API — Cart Operations", () => {
     });
     expect(response.status()).toBe(401);
   });
-});
 
-test.describe("API — Orders", () => {
   test("GET /api/orders returns 401 without auth", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/orders`);
     expect(response.status()).toBe(401);
@@ -201,6 +224,34 @@ test.describe("API — Seller Endpoints", () => {
 
   test("GET /api/seller/orders returns 401 without auth", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/seller/orders`);
+    expect(response.status()).toBe(401);
+  });
+});
+
+test.describe("API — Checkout Transaction RPC", () => {
+  test("checkout_transaction requires authenticated user", async ({ request }) => {
+    const response = await request.post(`${API_BASE}/api/orders`, {
+      data: {
+        buyerName: "Test",
+        buyerPhone: "+923000000000",
+        shippingAddress: "Test Address",
+        shippingCity: "Lahore",
+        paymentMethod: "COD",
+        items: [],
+      },
+    });
+    expect([400, 401, 404]).toContain(response.status());
+  });
+});
+
+test.describe("API — Return Request RPC", () => {
+  test("return endpoint requires authentication", async ({ request }) => {
+    const response = await request.post(`${API_BASE}/api/orders/fake-id/return`, {
+      data: {
+        reason: "Test return",
+        items: [],
+      },
+    });
     expect(response.status()).toBe(401);
   });
 });

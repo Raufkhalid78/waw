@@ -28,6 +28,8 @@ import {
   reviewRateLimiter,
   wishlistRateLimiter,
   supportRateLimiter,
+  loginRateLimiter,
+  otpVerifyRateLimiter,
 } from "./middleware/rate-limit.middleware.js";
 import { validateBody } from "./middleware/validate.middleware.js";
 import { apiVersioning } from "./middleware/api-versioning.middleware.js";
@@ -76,6 +78,30 @@ import { uploadSingle, uploadMultiple } from "./middleware/upload.middleware.js"
 import { sentryRequestContext, sentryErrorHandler } from "./config/sentry.js";
 
 export const app = express();
+
+// ── Helper Functions ──────────────────────────────────────────────────────
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${secs}s`);
+
+  return parts.join(" ");
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
 
 app.set("trust proxy", 1);
 
@@ -184,37 +210,55 @@ try {
 
 // ── Health & Diagnostics ──────────────────────────────────────────────────
 app.get("/health", (req, res) => {
+  const uptime = process.uptime();
+  const memUsage = process.memoryUsage();
+
   res.json({
     status: "ok",
     service: "Waw (واو) API Engine",
+    version: process.env.npm_package_version || "1.0.0",
     country: "Pakistan (PKR)",
+    environment: ENV.NODE_ENV || "development",
     supabaseBackend: "Connected (PostgreSQL / Auth / Storage)",
     freeDeliveryThreshold: ENV.FREE_DELIVERY_THRESHOLD_PKR,
     codHandlingFee: ENV.DEFAULT_COD_FEE_PKR,
+    uptime: {
+      seconds: Math.floor(uptime),
+      human: formatUptime(uptime),
+    },
+    memory: {
+      rss: formatBytes(memUsage.rss),
+      heapUsed: formatBytes(memUsage.heapUsed),
+      heapTotal: formatBytes(memUsage.heapTotal),
+      external: formatBytes(memUsage.external),
+    },
     timestamp: new Date().toISOString(),
   });
 });
 
 // Deep Readiness & Dependency Probe
 app.get("/readyz", async (req, res) => {
-  const checks: Record<string, { status: string; latencyMs?: number }> = {};
+  const checks: Record<string, { status: string; latencyMs?: number; details?: any }> = {};
   let isHealthy = true;
+  const startTime = Date.now();
 
   // 1. Supabase PostgreSQL Ping
   const startDb = Date.now();
   try {
-    const { error } = await supabaseAdmin
+    const { error, count } = await supabaseAdmin
       .from("profiles")
       .select("id", { head: true, count: "exact" });
     checks.supabasePostgres = {
       status: error ? "unhealthy" : "healthy",
       latencyMs: Date.now() - startDb,
+      details: error ? { message: error.message } : { rowCount: count },
     };
     if (error) isHealthy = false;
-  } catch {
+  } catch (err: any) {
     checks.supabasePostgres = {
       status: "unhealthy",
       latencyMs: Date.now() - startDb,
+      details: { message: err.message },
     };
     isHealthy = false;
   }
@@ -223,11 +267,16 @@ app.get("/readyz", async (req, res) => {
   const startRedis = Date.now();
   try {
     await redis.set("healthcheck", "1", { ex: 10 });
-    checks.redis = { status: "healthy", latencyMs: Date.now() - startRedis };
-  } catch {
+    const redisLatency = Date.now() - startRedis;
+    checks.redis = {
+      status: redisLatency > 1000 ? "degraded" : "healthy",
+      latencyMs: redisLatency,
+    };
+  } catch (err: any) {
     checks.redis = {
       status: "degraded_fallback",
       latencyMs: Date.now() - startRedis,
+      details: { message: err.message },
     };
   }
 
@@ -239,22 +288,55 @@ app.get("/readyz", async (req, res) => {
       status: health.ok ? "healthy" : "unhealthy",
       latencyMs: Date.now() - startTypesense,
     };
-  } catch {
+  } catch (err: any) {
     checks.typesense = {
       status: "degraded_fallback",
       latencyMs: Date.now() - startTypesense,
+      details: { message: err.message },
     };
   }
 
+  // 4. Memory Check
+  const memUsage = process.memoryUsage();
+  const heapUsedMB = memUsage.heapUsed / 1024 / 1024;
+  checks.memory = {
+    status: heapUsedMB > 512 ? "warning" : "healthy",
+    details: {
+      heapUsedMB: Math.round(heapUsedMB),
+      heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+      rssMB: Math.round(memUsage.rss / 1024 / 1024),
+    },
+  };
+
+  // 5. Event Loop Lag Check
+  const startLoop = Date.now();
+  await new Promise((resolve) => setImmediate(resolve));
+  const eventLoopLag = Date.now() - startLoop;
+  checks.eventLoop = {
+    status: eventLoopLag > 100 ? "degraded" : "healthy",
+    latencyMs: eventLoopLag,
+  };
+
+  const totalLatency = Date.now() - startTime;
+
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? "ready" : "degraded",
+    service: "Waw (واو) API Engine",
+    version: process.env.npm_package_version || "1.0.0",
+    environment: ENV.NODE_ENV || "development",
     checks,
+    totalLatencyMs: totalLatency,
     timestamp: new Date().toISOString(),
   });
 });
 
+// Liveness probe (simple check for container orchestration)
+app.get("/livez", (req, res) => {
+  res.status(200).json({ status: "alive" });
+});
+
 // ── Authentication Routes (Supabase Phone/OTP & OAuth) ────────────────────
-app.post("/api/auth/login", apiRateLimiter, AuthController.login);
+app.post("/api/auth/login", loginRateLimiter, AuthController.login);
 
 app.post(
   "/api/auth/whatsapp-otp/send",
@@ -265,6 +347,7 @@ app.post(
 
 app.post(
   "/api/auth/whatsapp-otp/verify",
+  otpVerifyRateLimiter,
   validateBody(VerifyOtpSchema),
   AuthController.verifyOtp,
 );
@@ -527,7 +610,7 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
     } else if (ENV.NODE_ENV === "production") {
       return res.status(500).json({ error: "RAAST webhook secret not configured" });
     } else {
-      logger.warn("RAAST_WEBHOOK_SECRET not set � skipping signature verification (dev mode)");
+      logger.warn("RAAST_WEBHOOK_SECRET not set � skipping signature verification (dev mode)");
     }
 
     const { RaastService } = await import(
@@ -960,7 +1043,7 @@ app.patch(
 
       const userId = req.user?.id;
 
-      // Upsert each setting � store as proper jsonb, not stringified
+      // Upsert each setting � store as proper jsonb, not stringified
       for (const [key, value] of Object.entries(updates)) {
         await supabaseAdmin
           .from("marketplace_settings")

@@ -1,6 +1,7 @@
 begin;
 
   -- Atomically cancel order + all store_orders
+  -- P0-3: Added auth.uid() verification
   create or replace function cancel_order(p_order_id uuid, p_reason text default 'Customer cancelled')
   returns jsonb
   language plpgsql
@@ -16,6 +17,11 @@ begin;
     if v_order is null then
       raise exception 'Order not found';
     end if;
+
+    -- P0-3: Verify caller owns the order (or is admin via service_role)
+    IF v_order.buyer_id IS NOT NULL AND v_order.buyer_id != auth.uid() THEN
+      RAISE EXCEPTION 'Unauthorized to cancel this order';
+    END IF;
 
     if v_order.global_status <> all(v_cancellable) then
       raise exception 'Order cannot be cancelled in % status', v_order.global_status;

@@ -4,11 +4,44 @@ import { InventoryService } from "../modules/products/inventory.service.js";
 import { AuditService } from "../modules/audit/audit.service.js";
 
 /**
+ * Advisory lock key for distributed inventory cleanup safety.
+ */
+const INVENTORY_CLEANUP_LOCK_KEY = 54321;
+
+/**
+ * Acquires a PostgreSQL advisory lock for distributed cron safety.
+ */
+async function acquireCleanupLock(): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc("pg_try_advisory_lock", {
+    lock_key: INVENTORY_CLEANUP_LOCK_KEY,
+  });
+  if (error) {
+    logger.warn("Failed to acquire inventory cleanup lock, skipping", { error: error.message });
+    return false;
+  }
+  return data === true;
+}
+
+/**
+ * Releases the PostgreSQL advisory lock.
+ */
+async function releaseCleanupLock(): Promise<void> {
+  try {
+    await supabaseAdmin.rpc("pg_advisory_unlock", {
+      lock_key: INVENTORY_CLEANUP_LOCK_KEY,
+    });
+  } catch {
+    // Lock auto-releases on connection close
+  }
+}
+
+/**
  * Periodically scans for unpaid orders older than 15 minutes and
  * automatically releases their double-entry inventory reservations back to the catalog.
+ * Uses PostgreSQL advisory lock to prevent duplicate execution across replicas.
  */
 export function startInventoryCleanupCron() {
-  logger.info("⏱️ Inventory Reservation Auto-Release Worker Initialized (2-min Interval)");
+  logger.info("⏱️ Inventory Reservation Auto-Release Worker Initialized (2-min Interval, Distributed-Lock Enabled)");
 
   // Run every 2 minutes
   setInterval(async () => {
@@ -23,6 +56,12 @@ export function startInventoryCleanupCron() {
 }
 
 export async function runInventoryCleanup() {
+  // P0-6: Acquire distributed lock
+  const lockAcquired = await acquireCleanupLock();
+  if (!lockAcquired) {
+    return; // Another worker is handling this
+  }
+
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
@@ -84,5 +123,7 @@ export async function runInventoryCleanup() {
     }
   } catch (err: any) {
     logger.error("❌ [InventoryCleanup] Unexpected error in inventory cleanup job:", err.message);
+  } finally {
+    await releaseCleanupLock();
   }
 }

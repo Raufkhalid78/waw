@@ -13,13 +13,49 @@ import { AuditService } from "../modules/audit/audit.service.js";
 export interface ReconciliationReport {
   payoutsSettled: number;
   payoutsHeld: number;
+  payoutsSkipped: number;
   shipmentsSynced: number;
   timestamp: string;
 }
 
+/**
+ * Advisory lock key for distributed reconciliation.
+ * Uses hashtext() to get a stable integer from a string.
+ * Only one worker can hold this lock at a time.
+ */
+const RECONCILIATION_LOCK_KEY = 98765; // arbitrary unique integer
+
+/**
+ * Acquires a PostgreSQL advisory lock for distributed cron safety.
+ * Returns true if lock was acquired, false if another worker holds it.
+ */
+async function acquireReconciliationLock(): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc("pg_try_advisory_lock", {
+    lock_key: RECONCILIATION_LOCK_KEY,
+  });
+  if (error) {
+    logger.warn("Failed to acquire advisory lock, skipping reconciliation", { error: error.message });
+    return false;
+  }
+  return data === true;
+}
+
+/**
+ * Releases the PostgreSQL advisory lock.
+ */
+async function releaseReconciliationLock(): Promise<void> {
+  try {
+    await supabaseAdmin.rpc("pg_advisory_unlock", {
+      lock_key: RECONCILIATION_LOCK_KEY,
+    });
+  } catch {
+    // Lock auto-releases on connection close
+  }
+}
+
 export function startReconciliationCron() {
   logger.info(
-    "⏱️ Financial Reconciliation & COD Settlement Cron Initialized (24h Interval)",
+    "⏱️ Financial Reconciliation & COD Settlement Cron Initialized (24h Interval, Distributed-Lock Enabled)",
   );
 
   // Run every 24 hours
@@ -41,28 +77,48 @@ export function startReconciliationCron() {
 
 /**
  * Executes a complete financial and shipment reconciliation cycle.
- * Can be triggered automatically by cron or on-demand by administrators.
+ * Uses PostgreSQL advisory lock to ensure only one worker runs at a time.
  */
 export async function executeReconciliationJob(): Promise<ReconciliationReport> {
-  const payoutResult = await runPayoutReconciliation();
-  const shipmentResult = await runShipmentReconciliation();
+  // P0-6: Acquire distributed lock to prevent duplicate execution across replicas
+  const lockAcquired = await acquireReconciliationLock();
+  if (!lockAcquired) {
+    logger.info("⏭️ Reconciliation skipped: another worker holds the lock.");
+    return {
+      payoutsSettled: 0,
+      payoutsHeld: 0,
+      payoutsSkipped: 0,
+      shipmentsSynced: 0,
+      timestamp: new Date().toISOString(),
+    };
+  }
 
-  return {
-    payoutsSettled: payoutResult.settled,
-    payoutsHeld: payoutResult.held,
-    shipmentsSynced: shipmentResult.synced,
-    timestamp: new Date().toISOString(),
-  };
+  try {
+    const payoutResult = await runPayoutReconciliation();
+    const shipmentResult = await runShipmentReconciliation();
+
+    return {
+      payoutsSettled: payoutResult.settled,
+      payoutsHeld: payoutResult.held,
+      payoutsSkipped: payoutResult.skipped,
+      shipmentsSynced: shipmentResult.synced,
+      timestamp: new Date().toISOString(),
+    };
+  } finally {
+    await releaseReconciliationLock();
+  }
 }
 
 /**
  * 1. Verified Merchant Milestone Payout Settlement
- * Transitions all SCHEDULED payouts past their T+7 return window maturity date to COMPLETED,
- * while strictly safeguarding funds if the order is under active dispute.
+ * Transitions SCHEDULED payouts past their T+7 return window maturity date to SETTLED,
+ * ONLY when provider-confirmed settlement exists (provider_transfer_id is set).
+ * Safeguards funds if the order is under active dispute.
  */
-async function runPayoutReconciliation(): Promise<{ settled: number; held: number }> {
+async function runPayoutReconciliation(): Promise<{ settled: number; held: number; skipped: number }> {
   let settled = 0;
   let held = 0;
+  let skipped = 0;
 
   try {
     const now = new Date().toISOString();
@@ -76,7 +132,7 @@ async function runPayoutReconciliation(): Promise<{ settled: number; held: numbe
       logger.info(
         "✅ Payout Reconciliation: No matured vendor payouts pending release.",
       );
-      return { settled: 0, held: 0 };
+      return { settled: 0, held: 0, skipped: 0 };
     }
 
     logger.info(
@@ -128,11 +184,33 @@ async function runPayoutReconciliation(): Promise<{ settled: number; held: numbe
 
         held++;
       } else {
-        // Disburse matured payout
+        // P0-5: Only settle if provider has confirmed the transfer
+        // In production, this checks for a provider_transfer_id or bank_reference
+        // For COD orders without digital transfer, require explicit admin confirmation
+        const hasProviderConfirmation = Boolean(payout.provider_transfer_id || payout.bank_reference);
+
+        if (!hasProviderConfirmation && payout.payment_method !== 'COD') {
+          // Digital payment but no provider confirmation yet — skip
+          logger.info(`⏭️ Payout ${payout.id} skipped: awaiting provider settlement confirmation`);
+          skipped++;
+          continue;
+        }
+
+        // For COD: require at least 24h after delivery for manual verification window
+        if (payout.payment_method === 'COD' && !hasProviderConfirmation) {
+          const deliveredAt = payout.store_order?.delivered_at;
+          if (deliveredAt && (Date.now() - new Date(deliveredAt).getTime()) < 24 * 60 * 60 * 1000) {
+            logger.info(`⏭️ COD Payout ${payout.id} skipped: within 24h manual verification window`);
+            skipped++;
+            continue;
+          }
+        }
+
+        // Disburse matured payout with provider confirmation
         await supabaseAdmin
           .from("payouts")
           .update({
-            status: PayoutStatus.COMPLETED,
+            status: PayoutStatus.SETTLED,
             processed_at: now,
             updated_at: now,
           })
@@ -144,7 +222,7 @@ async function runPayoutReconciliation(): Promise<{ settled: number; held: numbe
           action: "PAYOUT_SETTLED_AUTOMATICALLY",
           targetResourceType: "payout",
           targetResourceId: payout.id,
-          reason: `T+7 settlement matured for PKR ${payout.amount_pkr || 0}`,
+          reason: `T+7 settlement matured for PKR ${payout.amount_pkr || 0}. Provider confirmed: ${hasProviderConfirmation}`,
         });
 
         settled++;
@@ -152,13 +230,13 @@ async function runPayoutReconciliation(): Promise<{ settled: number; held: numbe
     }
 
     logger.info(
-      `✅ Payout Settlement Cycle Complete: ${settled} settled, ${held} held under dispute guard.`,
+      `✅ Payout Settlement Cycle Complete: ${settled} settled, ${held} held, ${skipped} skipped.`,
     );
   } catch (err: any) {
     logger.error("❌ Error during payout reconciliation:", err.message);
   }
 
-  return { settled, held };
+  return { settled, held, skipped };
 }
 
 /**
@@ -276,6 +354,7 @@ async function handleDeliveredMilestone(shipment: any, now: string, sevenDaysLat
           store_order_id: shipment.store_order_id,
           order_id: shipment.order_id,
           amount_pkr: Math.max(0, netPayout),
+          payment_method: shipment.is_cod ? 'COD' : 'DIGITAL',
           status: PayoutStatus.SCHEDULED,
           scheduled_for: sevenDaysLater,
           created_at: now,

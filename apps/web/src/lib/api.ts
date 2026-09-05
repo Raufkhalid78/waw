@@ -225,6 +225,7 @@ export async function fetchProducts(params?: {
   storeId?: string;
   city?: string;
   sellerType?: string;
+  inStock?: boolean;
   minPrice?: number;
   maxPrice?: number;
   minRating?: number;
@@ -262,6 +263,7 @@ export async function fetchProducts(params?: {
     query.append("maxPrice", params.maxPrice.toString());
   if (params?.minRating !== undefined && params.minRating > 0)
     query.append("minRating", params.minRating.toString());
+  if (params?.inStock) query.append("inStock", "true");
   if (params?.sortBy) query.append("sortBy", params.sortBy);
   if (params?.page) query.append("page", params.page.toString());
   if (params?.limit) query.append("limit", params.limit.toString());

@@ -157,6 +157,56 @@ export const wishlistRateLimiter = rateLimit({
 });
 
 /**
+ * Login rate limiter (10 attempts per 15 minutes per IP)
+ * Prevents brute force attacks on authentication endpoints
+ */
+export const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  store: redisClient
+    ? new RedisStore({
+        sendCommand: (...args: string[]) =>
+          redisClient.call(args[0], ...args.slice(1)) as any,
+        prefix: "rl_login:",
+      })
+    : undefined,
+  message: {
+    error:
+      "Too many login attempts from this IP. Please try again after 15 minutes.",
+  },
+});
+
+/**
+ * OTP verification rate limiter (5 attempts per 5 minutes per phone)
+ * Prevents OTP brute force attacks
+ */
+export const otpVerifyRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => {
+    const phone = req.body?.phone || "";
+    return phone || defaultKeyGenerator(req);
+  },
+  store: redisClient
+    ? new RedisStore({
+        sendCommand: (...args: string[]) =>
+          redisClient.call(args[0], ...args.slice(1)) as any,
+        prefix: "rl_otp_verify:",
+      })
+    : undefined,
+  message: {
+    error:
+      "Too many OTP verification attempts. Please request a new code.",
+  },
+});
+
+/**
  * Support ticket rate limiter (3 tickets per 10 minutes per user)
  */
 export const supportRateLimiter = rateLimit({

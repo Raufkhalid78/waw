@@ -1,0 +1,69 @@
+# ==============================================================================
+# Waw (واو) — Staging Docker Compose
+# ==============================================================================
+# Mirrors production configuration for pre-launch validation.
+# Usage: docker compose -f docker-compose.staging.yml up -d
+
+services:
+  # ── PostgreSQL 16 ──────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-waw_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-waw_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_staging}
+    volumes:
+      - staging_pgdata:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-EXEC", "pg_isready -U ${POSTGRES_USER:-waw_staging}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis 7 ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-change_me_staging}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - staging_redisdata:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_me_staging}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Typesense 27.1 ─────────────────────────────────────────────────────────
+  typesense:
+    image: typesense/typesense:27.1
+    restart: unless-stopped
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-change_me_staging}
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_ENABLE_CORS: "true"
+    volumes:
+      - staging_typesensedata:/data
+    ports:
+      - "8108:8108"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8108/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  staging_pgdata:
+  staging_redisdata:
+  staging_typesensedata:

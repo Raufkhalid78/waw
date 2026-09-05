@@ -20,7 +20,7 @@ export interface ProductCardProps {
   productId: string;
   title: string;
   titleUrdu?: string;
-  storeName: string;
+  storeName?: string;
   sellerCity?: string;
   sellerRating?: number;
   isStoreVerified?: boolean;
@@ -32,7 +32,7 @@ export interface ProductCardProps {
   reviewsCount?: number;
   imageUrl: string;
   isExpress?: boolean;
-  sellerType: SellerType;
+  sellerType?: SellerType;
   soldCount?: number;
 }
 
@@ -40,7 +40,7 @@ export function ProductCard({
   productId,
   title,
   titleUrdu,
-  storeName,
+  storeName = "Waw Store",
   sellerCity,
   pricePkr,
   originalPricePkr,
@@ -49,7 +49,7 @@ export function ProductCard({
   reviewsCount = 0,
   imageUrl,
   isExpress = false,
-  sellerType,
+  sellerType = SellerType.THIRD_PARTY,
   soldCount,
 }: ProductCardProps) {
   const { addItem, toggleWishlist, isInWishlist, language } = useCartStore();

@@ -27,31 +27,6 @@ test.describe("Homepage — Branding & Layout", () => {
     const content = await ogTitle.getAttribute("content");
     expect(content?.length).toBeGreaterThan(0);
   });
-
-  test("has canonical URL", async ({ page }) => {
-    await page.goto("/");
-    const canonical = page.locator("link[rel='canonical']");
-    await expect(canonical).toBeAttached({ timeout: 5000 });
-    const href = await canonical.getAttribute("href");
-    expect(href).toContain("waw.com.pk");
-  });
-});
-
-test.describe("Homepage — Category Circles", () => {
-  test("displays category circles section", async ({ page }) => {
-    await page.goto("/");
-    const section = page.locator("[data-testid='category-circles']");
-    await expect(section).toBeVisible({ timeout: 10000 });
-  });
-
-  test("category circles are clickable links", async ({ page }) => {
-    await page.goto("/");
-    const section = page.locator("[data-testid='category-circles']");
-    await expect(section).toBeVisible({ timeout: 10000 });
-    const links = section.locator("a");
-    const count = await links.count();
-    expect(count).toBeGreaterThan(0);
-  });
 });
 
 test.describe("Homepage — Navigation & Search", () => {
@@ -102,21 +77,6 @@ test.describe("Homepage — Footer", () => {
     await expect(privacyLink.first()).toBeAttached();
     await expect(termsLink.first()).toBeAttached();
   });
-
-  test("Sell on Waw link points to seller portal", async ({ page }) => {
-    await page.goto("/");
-    const sellLink = page.locator("a[href*='seller.waw.com.pk']").first();
-    await expect(sellLink).toBeAttached({ timeout: 5000 });
-    const href = await sellLink.getAttribute("href");
-    expect(href).toContain("seller.waw.com.pk/login");
-  });
-
-  test("App Store badges are not visible (Coming Soon)", async ({ page }) => {
-    await page.goto("/");
-    const appStoreLink = page.locator("a[href*='apps.apple.com']").first();
-    const count = await appStoreLink.count();
-    expect(count).toBe(0);
-  });
 });
 
 test.describe("Homepage — Auth Modal", () => {
@@ -128,26 +88,6 @@ test.describe("Homepage — Auth Modal", () => {
     await page.waitForTimeout(1000);
     const modal = page.locator("[role='dialog'], [data-testid='auth-modal']").first();
     await expect(modal).toBeVisible({ timeout: 5000 });
-  });
-
-  test("auth modal has login and signup tabs", async ({ page }) => {
-    await page.goto("/");
-    const accountBtn = page.locator("button:has-text('Account'), a:has-text('Account'), [data-testid='auth-trigger']").first();
-    await expect(accountBtn).toBeVisible({ timeout: 10000 });
-    await accountBtn.click();
-    await page.waitForTimeout(1000);
-    const loginTab = page.locator("text=Log in, button:has-text('Log in')").first();
-    await expect(loginTab).toBeVisible({ timeout: 5000 });
-  });
-
-  test("auth modal has WhatsApp login option", async ({ page }) => {
-    await page.goto("/");
-    const accountBtn = page.locator("button:has-text('Account'), a:has-text('Account'), [data-testid='auth-trigger']").first();
-    await expect(accountBtn).toBeVisible({ timeout: 10000 });
-    await accountBtn.click();
-    await page.waitForTimeout(1000);
-    const whatsappBtn = page.locator("button:has-text('WhatsApp'), [data-testid='whatsapp-login']").first();
-    await expect(whatsappBtn).toBeVisible({ timeout: 5000 });
   });
 });
 

@@ -11,8 +11,10 @@ export class ProductService {
     categorySlug?: string;
     storeId?: string;
     city?: string;
+    inStock?: boolean;
     minPrice?: number;
     maxPrice?: number;
+    minRating?: number;
     sortBy?: "featured" | "price-asc" | "price-desc" | "rating";
     limit?: number;
     page?: number;
@@ -66,7 +68,43 @@ export class ProductService {
     const { data, count, error } = await dbQuery.range(from, to);
     if (error) throw new Error(`Database error fetching products: ${error.message}`);
 
-    const items = data || [];
+    let items = data || [];
+
+    // inStock filter: check inventory_ledger for available stock > 0
+    // This is a post-fetch filter since stock is tracked via double-entry ledger
+    if (query.inStock) {
+      const { InventoryService } = await import("./inventory.service.js");
+      const filteredItems = [];
+      for (const offer of items) {
+        // Check if offer has variants with stock > 0
+        const variants = offer.variants || [];
+        if (variants.length === 0) {
+          // No variants listed — treat as in-stock if offer exists
+          filteredItems.push(offer);
+          continue;
+        }
+        let hasStock = false;
+        for (const variant of variants) {
+          const stock = await InventoryService.getAvailableStock(variant.id);
+          if (stock > 0) {
+            hasStock = true;
+            break;
+          }
+        }
+        if (hasStock) {
+          filteredItems.push(offer);
+        }
+      }
+      items = filteredItems;
+    }
+
+    // minRating filter (post-fetch since rating is on store, not offer)
+    if (query.minRating && query.minRating > 0) {
+      items = items.filter((offer: any) => {
+        const rating = offer.store?.rating_average || 0;
+        return rating >= query.minRating!;
+      });
+    }
     
     // Map to frontend expectation (product-centric view)
     const mappedItems = items.map((offer: any) => ({
