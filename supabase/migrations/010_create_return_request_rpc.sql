@@ -220,10 +220,10 @@ BEGIN
     v_seller_return_id := gen_random_uuid();
 
     INSERT INTO return_requests (
-      id, order_id, store_order_id, buyer_id, reason, evidence_images,
+      id, order_id, store_order_id, parent_return_id, buyer_id, reason, evidence_images,
       status, refund_amount_pkr, staff_notes, created_at, updated_at
     ) VALUES (
-      v_seller_return_id, p_order_id, v_store_order.store_order_id,
+      v_seller_return_id, p_order_id, v_store_order.store_order_id, v_return_request_id,
       p_buyer_id, p_reason, p_evidence_images,
       'PENDING_COURIER_BOOKING', v_seller_refund,
       'Seller sub-return for store ' || v_store_order.store_id || '. ' ||
