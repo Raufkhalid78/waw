@@ -95,8 +95,15 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npx turbo run build --filter=@waw/types
+      - name: Apply Supabase Migrations
+        run: npx supabase db push --db-url $DATABASE_URL
+      - name: Load Staging Seed Data
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d waw_test -f supabase/seed.sql
       - name: Run API unit tests
         run: npm test --workspace=@waw/api
+      - name: Run Integration RPC tests
+        run: npx tsx --import ./tests/setup.ts --test tests/integration-rpcs.test.ts
+        working-directory: apps/api
 
   e2e:
     name: E2E Tests
@@ -139,6 +146,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
       - run: npm ci
+      - name: Apply Supabase Migrations
+        run: npx supabase db push --db-url $DATABASE_URL
+      - name: Load Staging Seed Data
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d waw_e2e -f supabase/seed.sql
       - run: npx playwright install --with-deps chromium
       - name: Run E2E tests
         run: npx playwright test --project=chromium

@@ -106,7 +106,8 @@ BEGIN
 
   -- -- Consume nonce to prevent replay attacks --
   BEGIN
-    INSERT INTO guest_token_nonces (nonce) VALUES (v_token_nonce);
+    INSERT INTO guest_token_nonces (nonce, expires_at) 
+    VALUES (v_token_nonce, v_token_expires_at);
   EXCEPTION WHEN unique_violation THEN
     RAISE EXCEPTION 'Guest session token already consumed (replay attack)';
   END;

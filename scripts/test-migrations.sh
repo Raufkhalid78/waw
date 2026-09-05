@@ -3,7 +3,7 @@
 # WAW Migration & E2E Integration Test Script
 # Verifies migrations and runs E2E tests against a seeded Supabase instance.
 # ==============================================================================
-set -e
+set -euo pipefail
 
 echo "Starting migration and E2E integration tests..."
 
@@ -52,7 +52,6 @@ psql "$DATABASE_URL" -c "
 echo "Migration integration test complete. RPCs verified."
 
 echo "Running E2E tests..."
-# E2E suite assuming Next.js and API are reachable (e.g. handled by CI wrapper)
-npm run test:e2e || echo "E2E tests command executed (see CI wrapper for full env setup)."
+npm run test:e2e
 
 echo "All tests finished."

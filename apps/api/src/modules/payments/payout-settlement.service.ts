@@ -21,6 +21,7 @@ export class PayoutSettlementService {
    */
   static async settleWithProviderConfirmation(
     payoutId: string,
+    providerPayloadHash?: string,
   ): Promise<{ settled: boolean; reason: string }> {
     const { data: payout, error } = await supabaseAdmin
       .from("payouts")
@@ -105,6 +106,9 @@ export class PayoutSettlementService {
         // Digital payment without provider confirmation: never settle
         return { settled: false, reason: "Awaiting provider transfer confirmation" };
       }
+    } else if (payout.payment_method !== "COD" && !providerPayloadHash) {
+       // P0-4: Cryptographic enforcement. Must supply the hash of the verified provider event
+       return { settled: false, reason: "Cryptographic provider payload hash is required for digital settlement" };
     }
 
     // All checks passed: settle the payout atomically
@@ -113,7 +117,7 @@ export class PayoutSettlementService {
       {
         p_payout_id: payoutId,
         p_provider_transfer_id: payout.provider_transfer_id || payout.bank_reference || null,
-        p_provider_payload_hash: null,
+        p_provider_payload_hash: providerPayloadHash || null,
       }
     );
 
