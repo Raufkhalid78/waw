@@ -4,6 +4,7 @@ export const MARKETPLACE_CONFIG = {
     DEFAULT_SHIPPING_FEE_PKR: 200,
     DEFAULT_COD_FEE_PKR: 100,
     DEFAULT_COMMISSION_PERCENTAGE: 10,
+    GST_RATE_PERCENTAGE: 18,
     CURRENCY: "PKR",
 };
 /**
@@ -22,7 +23,10 @@ export function calculateOrderSummary(items, paymentMethod, customShippingFee = 
     const savingsOnlinePaymentPkr = isCod ? 0 : customCodFee;
     // Coupon discount is subtracted from subtotal (before shipping/cod)
     const effectiveSubtotal = Math.max(0, subtotalPkr - couponDiscountPkr);
-    const totalPkr = effectiveSubtotal + shippingPkr + codFeePkr;
+    const taxableAmount = effectiveSubtotal + shippingPkr + codFeePkr;
+    // Calculate 18% GST
+    const gstPkr = Math.round(taxableAmount * (MARKETPLACE_CONFIG.GST_RATE_PERCENTAGE / 100));
+    const totalPkr = taxableAmount + gstPkr;
     const itemBreakdowns = items.map((item) => {
         const grossAmountPkr = item.unitPricePkr * item.quantity;
         const commissionRatePercentage = item.sellerType === SellerType.FIRST_PARTY
@@ -53,6 +57,7 @@ export function calculateOrderSummary(items, paymentMethod, customShippingFee = 
         amountNeededForFreeDeliveryPkr,
         codFeePkr,
         couponDiscountPkr,
+        gstPkr,
         totalPkr,
         savingsOnlinePaymentPkr,
         itemBreakdowns,

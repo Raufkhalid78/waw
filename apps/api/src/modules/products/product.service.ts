@@ -168,9 +168,18 @@ export class ProductService {
     const { data: catProduct, error: catError } = await catQuery.maybeSingle();
 
     if (catProduct) {
-      const activeOffers = (catProduct.offers || []).filter((o: any) => o.status === "ACTIVE");
+      const activeOffers = (catProduct.offers || []).filter((o: any) => o.status === "ACTIVE").sort((a: any, b: any) => a.price_pkr - b.price_pkr);
       const bestOffer = activeOffers[0] || catProduct.offers?.[0];
+      const otherOffers = activeOffers.slice(1).map((o: any) => ({ id: o.id, pricePkr: o.price_pkr, originalPricePkr: o.original_price_pkr, condition: o.condition, isExpress: o.is_express, store: o.store }));
       if (bestOffer) {
+        const [reviewsData, questionsData] = await Promise.all([
+          supabaseAdmin.from('reviews').select('id, rating, comment, is_verified_purchase, created_at, seller_reply, seller_reply_at, profiles(full_name, avatar_url)').eq('product_id', catProduct.id),
+          supabaseAdmin.from('product_questions').select('id, question, answer, created_at, answered_at, profiles!product_questions_user_id_fkey(full_name)').eq('product_id', catProduct.id)
+        ]);
+
+        const reviews = (reviewsData.data || []).map(r => ({ id: r.id, rating: r.rating, comment: r.comment, date: new Date(r.created_at).toLocaleDateString(), author: (r.profiles as any)?.full_name || 'Anonymous', verifiedPurchase: r.is_verified_purchase, sellerReply: r.seller_reply }));
+        const questions = (questionsData.data || []).map(q => ({ id: q.id, question: q.question, answer: q.answer, author: (q.profiles as any)?.full_name || 'Anonymous' }));
+
         return {
           id: bestOffer.id,
           productId: catProduct.id,
@@ -187,7 +196,10 @@ export class ProductService {
           isExpress: bestOffer.is_express,
           store: bestOffer.store,
           category: catProduct.category,
-          variants: bestOffer.variants || []
+          variants: bestOffer.variants || [],
+          reviews,
+          questions,
+          otherOffers
         };
       }
     }
@@ -212,6 +224,15 @@ export class ProductService {
 
     if (offer && offer.catalog_product) {
       const offerData: any = offer;
+
+      const [reviewsData, questionsData] = await Promise.all([
+        supabaseAdmin.from('reviews').select('id, rating, comment, is_verified_purchase, created_at, seller_reply, seller_reply_at, profiles(full_name, avatar_url)').eq('product_id', offerData.catalog_product.id),
+        supabaseAdmin.from('product_questions').select('id, question, answer, created_at, answered_at, profiles!product_questions_user_id_fkey(full_name)').eq('product_id', offerData.catalog_product.id)
+      ]);
+
+      const reviews = (reviewsData.data || []).map(r => ({ id: r.id, rating: r.rating, comment: r.comment, date: new Date(r.created_at).toLocaleDateString(), author: (r.profiles as any)?.full_name || 'Anonymous', verifiedPurchase: r.is_verified_purchase, sellerReply: r.seller_reply }));
+      const questions = (questionsData.data || []).map(q => ({ id: q.id, question: q.question, answer: q.answer, author: (q.profiles as any)?.full_name || 'Anonymous' }));
+
       return {
         id: offerData.id,
         productId: offerData.catalog_product.id,
@@ -228,7 +249,10 @@ export class ProductService {
         isExpress: offerData.is_express,
         store: offerData.store,
         category: offerData.catalog_product.category,
-        variants: offerData.variants || []
+        variants: offerData.variants || [],
+        reviews,
+        questions,
+        otherOffers: []
       };
     }
 
@@ -333,3 +357,8 @@ export class ProductService {
     return offer;
   }
 }
+
+
+
+
+

@@ -239,6 +239,14 @@ export function CartDrawer({
                     </span>
                   )}
                 </div>
+                {summary.gstPkr > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>GST (18%)</span>
+                    <span className="font-bold text-slate-900">
+                      PKR {summary.gstPkr.toLocaleString()}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm font-black text-slate-950 pt-2 border-t border-slate-200">
                   <span>Estimated Total</span>
                   <span className="text-base text-amber-600">

@@ -638,3 +638,24 @@ export async function removeFromWishlist(productId: string): Promise<void> {
   }
 }
 
+export async function fetchContent(): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/content`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.content || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchActiveFlashSale(): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/flash-sales/active`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.flashSale || null;
+  } catch {
+    return null;
+  }
+}

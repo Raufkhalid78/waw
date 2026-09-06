@@ -68,6 +68,8 @@ import { SearchController } from "./modules/search/search.service.js";
 import { AdminController } from "./modules/admin/admin.controller.js";
 import mfaRoutes from "./modules/admin/mfa.routes.js";
 import { CartController } from "./modules/cart/cart.controller.js";
+import reviewsRouter from "./modules/reviews/reviews.routes.js";
+import questionsRouter from "./modules/questions/questions.routes.js";
 import { ConfigController } from "./modules/config/config.controller.js";
 import { AIController } from "./modules/ai/ai.controller.js";
 import { LoyaltyController } from "./modules/loyalty/loyalty.controller.js";
@@ -445,6 +447,9 @@ app.post("/api/orders/:id/cancel", requireAuth, OrderController.cancelOrder);
 
 // -- User Addresses ---------------------------------------------------------
 app.get("/api/user/addresses", requireAuth, UserController.listAddresses);
+
+  app.get("/api/user/me/export", requireAuth, UserController.exportData);
+  app.delete("/api/user/me/delete", requireAuth, UserController.deleteAccount);
 
 app.post("/api/user/addresses", requireAuth, validateBody(UserAddressSchema), UserController.createAddress);
 
@@ -1162,4 +1167,5 @@ app.use(async (err: any, req: any, res: any, _next: any) => {
   }
   res.status(500).json({ error: "An internal error occurred" });
 });
+
 

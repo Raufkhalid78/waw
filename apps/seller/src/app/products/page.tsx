@@ -40,19 +40,15 @@ export default function SellerProductsPage() {
   // Form state
   const [title, setTitle] = useState("");
   const [titleUrdu, setTitleUrdu] = useState("");
-  const [categoryName, setCategoryName] = useState("Women's Lawn");
-  const [categoryId, setCategoryId] = useState("cat_lawn");
-  const [basePricePkr, setBasePricePkr] = useState("4999");
-  const [comparePricePkr, setComparePricePkr] = useState("6500");
-  const [stockQuantity, setStockQuantity] = useState("20");
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [basePricePkr, setBasePricePkr] = useState("");
+  const [comparePricePkr, setComparePricePkr] = useState("");
+  const [stockQuantity, setStockQuantity] = useState("");
   const [sku, setSku] = useState("");
-  const [imageUrl, setImageUrl] = useState(
-    "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80",
-  );
-  const [description, setDescription] = useState(
-    "Handcrafted premium quality collection direct from registered maker.",
-  );
-  const [weightKg, setWeightKg] = useState("1.0");
+  const [imageUrl, setImageUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [weightKg, setWeightKg] = useState("");
 
   // Edit form state
   const [editTitle, setEditTitle] = useState("");
@@ -194,15 +190,15 @@ export default function SellerProductsPage() {
   const resetAddForm = () => {
     setTitle("");
     setTitleUrdu("");
-    setCategoryId("cat_lawn");
-    setCategoryName("Women's Lawn");
-    setBasePricePkr("4999");
-    setComparePricePkr("6500");
-    setStockQuantity("20");
+    setCategoryId("");
+    setCategoryName("");
+    setBasePricePkr("");
+    setComparePricePkr("");
+    setStockQuantity("");
     setSku("");
-    setImageUrl("https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80");
-    setDescription("Handcrafted premium quality collection direct from registered maker.");
-    setWeightKg("1.0");
+    setImageUrl("");
+    setDescription("");
+    setWeightKg("");
   };
 
   const filteredProducts = products.filter((p) =>

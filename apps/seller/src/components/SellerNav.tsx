@@ -20,6 +20,7 @@ import {
   Sparkles,
   Crown,
   Boxes,
+  MessageSquare,
 } from "lucide-react";
 
 export function SellerNav() {
@@ -86,6 +87,7 @@ export function SellerNav() {
     { href: "/ai/describe", label: "AI Description", icon: Sparkles, color: "text-amber-300" },
     { href: "/coupons", label: "Seller Coupons", icon: Tag, color: "text-pink-400" },
     { href: "/payouts", label: "Weekly Payouts", icon: CreditCard, color: "text-amber-500" },
+    { href: "/feedback", label: "Reviews & Q&A", icon: MessageSquare, color: "text-indigo-400" },
     { href: "/analytics", label: "Analytics", icon: BarChart3, color: "text-cyan-400" },
     { href: "/subscription", label: "Subscription", icon: Crown, color: "text-amber-400" },
     { href: "/settings", label: "Store Settings", icon: Settings, color: "text-slate-300" },
@@ -205,3 +207,4 @@ export function SellerNav() {
     </>
   );
 }
+

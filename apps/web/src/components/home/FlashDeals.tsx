@@ -16,20 +16,34 @@ import {
 } from "lucide-react";
 import { SellerType } from "@waw/types";
 
-import { fetchProducts } from "@/lib/api";
+import { fetchProducts, fetchActiveFlashSale } from "@/lib/api";
 
 export function FlashDeals() {
   const { addItem, toggleWishlist, isInWishlist } = useCartStore();
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [targetTime, setTargetTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState({
-    hours: 7,
-    minutes: 24,
-    seconds: 48,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
   });
   const [flashProducts, setFlashProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Fetch dynamic end time
+    fetchActiveFlashSale().then((sale) => {
+      if (sale && sale.end_time) {
+        setTargetTime(new Date(sale.end_time).getTime());
+      } else {
+        // Fallback: end of current day
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+        setTargetTime(endOfDay.getTime());
+      }
+    });
+
+    // 2. Fetch products
     fetchProducts({ limit: 20 }).then(({ items }) => {
       const discounted = items.filter(p => p.discountPercent && p.discountPercent > 10);
       setFlashProducts(discounted.slice(0, 4));
@@ -38,17 +52,25 @@ export function FlashDeals() {
   }, []);
 
   useEffect(() => {
+    if (!targetTime) return;
+    
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-        if (prev.minutes > 0) return { ...prev, minutes: 59, seconds: 59 };
-        if (prev.hours > 0)
-          return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        return { hours: 12, minutes: 0, seconds: 0 };
-      });
+      const now = new Date().getTime();
+      const difference = targetTime - now;
+
+      if (difference <= 0) {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+        clearInterval(timer);
+      } else {
+        setTimeLeft({
+          hours: Math.floor((difference / (1000 * 60 * 60))),
+          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((difference % (1000 * 60)) / 1000),
+        });
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [targetTime]);
 
   if (flashProducts.length === 0 && !loading) return null;
 

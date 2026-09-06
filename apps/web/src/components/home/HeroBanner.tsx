@@ -21,10 +21,10 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { SellerType } from "@waw/types";
-import { fetchProducts } from "@/lib/api";
+import { fetchProducts, fetchContent } from "@/lib/api";
 import { ProductDetail } from "@/types/models";
 
-const HERO_SLIDES = [
+const FALLBACK_HERO_SLIDES = [
   {
     id: "slide_1",
     badge: "🔥 FEATURED CRAFTS & TECH",
@@ -88,7 +88,25 @@ const HERO_SLIDES = [
 ];
 
 export function HeroBanner() {
+  const [slides, setSlides] = useState(FALLBACK_HERO_SLIDES);
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    fetchContent().then((content) => {
+      const heroContent = content.find((c: any) => c.key_slug === "hero_slides");
+      if (heroContent && heroContent.content_html) {
+        try {
+          const parsed = JSON.parse(heroContent.content_html);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSlides(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse dynamic hero slides", e);
+        }
+      }
+    });
+  }, []);
+
   const [timeLeft, setTimeLeft] = useState({
     hours: 8,
     minutes: 34,
@@ -109,10 +127,10 @@ export function HeroBanner() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 6500);
     return () => clearInterval(timer);
-  }, []);
+  }, [slides.length]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -127,7 +145,7 @@ export function HeroBanner() {
     return () => clearInterval(timer);
   }, []);
 
-  const slide = HERO_SLIDES[currentSlide];
+  const slide = slides[currentSlide];
 
   const handleQuickAdd = () => {
     if (!dealProduct) return;
@@ -247,7 +265,7 @@ export function HeroBanner() {
 
               {/* Slider Dots */}
               <div className="flex items-center gap-1.5">
-                {HERO_SLIDES.map((_, idx) => (
+                {slides.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setCurrentSlide(idx)}
@@ -268,7 +286,7 @@ export function HeroBanner() {
                 onClick={() =>
                   setCurrentSlide(
                     (prev) =>
-                      (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length,
+                      (prev - 1 + slides.length) % slides.length,
                   )
                 }
                 className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
@@ -278,7 +296,7 @@ export function HeroBanner() {
               </button>
               <button
                 onClick={() =>
-                  setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)
+                  setCurrentSlide((prev) => (prev + 1) % slides.length)
                 }
                 className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
                 aria-label="Next slide"

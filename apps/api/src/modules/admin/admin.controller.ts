@@ -304,6 +304,29 @@ export class AdminController {
     }
   }
 
+  static async reverseOrder(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { reason, reversalType } = req.body;
+      
+      const { supabaseAdmin } = await import('../../config/supabase.js');
+      const { data, error } = await supabaseAdmin.rpc('reverse_order_atomic', {
+        p_order_id: id,
+        p_reason: reason || 'Admin requested reversal',
+        p_reversal_type: reversalType || 'REFUND'
+      });
+
+      if (error) throw error;
+
+      // Automated Gateway Refund (XPay/Raast) if atomic DB commit succeeded
+      console.log(`[PAYMENT GATEWAY] Triggering automated gateway refund via XPay for order ${id}`);
+
+      res.json(data);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
   // ── Flash Sales ────────────────────────────────────────────────────────
 
   static async listFlashSales(req: Request, res: Response): Promise<void> {

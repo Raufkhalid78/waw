@@ -22,7 +22,7 @@ import { submitOrderReturn } from "@/lib/api";
 export default function OrderReturnPage() {
   const params = useParams();
   const router = useRouter();
-  const orderId = (params.id as string) || "WAW-PK-88492";
+  const orderId = params.id as string;
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [selectedReason, setSelectedReason] = useState<ReturnReason>(

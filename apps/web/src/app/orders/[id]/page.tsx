@@ -24,7 +24,7 @@ import { fetchOrderById } from "@/lib/api";
 export default function OrderTrackingPage() {
   const params = useParams();
   const router = useRouter();
-  const orderId = (params.id as string) || "WAW-PK-88492";
+  const orderId = params.id as string;
   const [copied, setCopied] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);

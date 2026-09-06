@@ -4,6 +4,7 @@ export declare const MARKETPLACE_CONFIG: {
     DEFAULT_SHIPPING_FEE_PKR: number;
     DEFAULT_COD_FEE_PKR: number;
     DEFAULT_COMMISSION_PERCENTAGE: number;
+    GST_RATE_PERCENTAGE: number;
     CURRENCY: string;
 };
 export interface OrderItemPricingInput {
@@ -22,6 +23,7 @@ export interface OrderCalculationResult {
     amountNeededForFreeDeliveryPkr: number;
     codFeePkr: number;
     couponDiscountPkr: number;
+    gstPkr: number;
     totalPkr: number;
     savingsOnlinePaymentPkr: number;
     itemBreakdowns: {

@@ -12,13 +12,25 @@ export function requireRole(...allowedRoles: UserRole[]) {
       return;
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
-      res.status(403).json({
-        error: `Forbidden: Requires one of [${allowedRoles.join(", ")}] permissions. Current role: ${req.user.role}`,
-      });
-      return;
+    const userRole = req.user.role;
+
+    // SUPER_ADMIN implicitly has all admin-level access
+    if (userRole === UserRole.SUPER_ADMIN) {
+      return next();
     }
 
-    next();
+    // If endpoint requires ADMIN, allow any sub-admin role to access (assuming broad admin route), 
+    // unless strictly locked down. For granular access, routes should specify OPS_AGENT, FINANCE etc.
+    const isAdminRoute = allowedRoles.includes(UserRole.ADMIN);
+    const hasSubAdminRole = [UserRole.OPS_AGENT, UserRole.FINANCE, UserRole.MODERATOR, UserRole.ADMIN].includes(userRole);
+
+    if (allowedRoles.includes(userRole) || (isAdminRoute && hasSubAdminRole)) {
+      return next();
+    }
+
+    res.status(403).json({
+      error: "Forbidden: Requires one of [" + allowedRoles.join(', ') + "] permissions. Current role: " + userRole,
+    });
   };
 }
+

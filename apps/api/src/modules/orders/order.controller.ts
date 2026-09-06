@@ -269,6 +269,7 @@ export class OrderController {
         shippingFeePkr: order.shipping_fee_pkr || 0,
         codFeePkr: order.cod_fee_pkr || 0,
         discountPkr: order.discount_pkr || 0,
+        gstPkr: order.gst_pkr || 0,
         totalPkr: order.total_amount_pkr || 0,
       };
 

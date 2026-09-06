@@ -2,6 +2,10 @@ export declare enum UserRole {
     BUYER = "BUYER",
     SELLER = "SELLER",
     ADMIN = "ADMIN",
+    SUPER_ADMIN = "SUPER_ADMIN",
+    OPS_AGENT = "OPS_AGENT",
+    FINANCE = "FINANCE",
+    MODERATOR = "MODERATOR",
     SUPPORT = "SUPPORT"
 }
 export declare enum StoreStatus {

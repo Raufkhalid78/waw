@@ -31,6 +31,7 @@ DECLARE
   v_subtotal_pkr      NUMERIC := 0;
   v_shipping_pkr      NUMERIC := 0;
   v_cod_fee_pkr       NUMERIC := 0;
+  v_gst_pkr           NUMERIC := 0;
   v_item              JSONB;
   v_offer             RECORD;
   v_variant           RECORD;
@@ -218,7 +219,11 @@ BEGIN
   -- -- 9. Fees --
   IF v_subtotal_pkr >= 5000 THEN v_shipping_pkr := 0; ELSE v_shipping_pkr := 200; END IF;
   IF p_payment_method = 'COD' THEN v_cod_fee_pkr := 100; ELSE v_cod_fee_pkr := 0; END IF;
-  v_total_pkr := v_subtotal_pkr + v_shipping_pkr + v_cod_fee_pkr;
+  
+  -- Calculate 18% GST
+  v_gst_pkr := ROUND((v_subtotal_pkr + v_shipping_pkr + v_cod_fee_pkr) * 0.18);
+  
+  v_total_pkr := v_subtotal_pkr + v_shipping_pkr + v_cod_fee_pkr + v_gst_pkr;
 
   -- -- 10. Create order --
   v_order_id     := gen_random_uuid();
@@ -229,13 +234,13 @@ BEGIN
     id, order_number, buyer_id, buyer_name, buyer_phone,
     shipping_address, shipping_city, shipping_province,
     global_status, payment_status, payment_method,
-    total_amount_pkr, subtotal_pkr, shipping_fee_pkr, cod_fee_pkr,
+    total_amount_pkr, subtotal_pkr, shipping_fee_pkr, cod_fee_pkr, gst_pkr,
     idempotency_key, created_at, updated_at
   ) VALUES (
     v_order_id, v_order_number, NULL, p_buyer_name, p_buyer_phone,
     p_shipping_address, p_shipping_city, '',
     'PENDING_PAYMENT', 'PENDING', p_payment_method,
-    v_total_pkr, v_subtotal_pkr, v_shipping_pkr, v_cod_fee_pkr,
+    v_total_pkr, v_subtotal_pkr, v_shipping_pkr, v_cod_fee_pkr, v_gst_pkr,
     p_idempotency_key, NOW(), NOW()
   );
 

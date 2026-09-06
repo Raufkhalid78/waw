@@ -269,6 +269,12 @@ export default function CartPage() {
                     <span className="font-medium text-amber-700">+PKR {summary.codFeePkr}</span>
                   </div>
                 )}
+                {summary.gstPkr > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>GST (18%)</span>
+                    <span className="font-medium text-gray-900">PKR {summary.gstPkr.toLocaleString()}</span>
+                  </div>
+                )}
                 {summary.savingsOnlinePaymentPkr > 0 && (
                   <div className="p-2 bg-green-50 text-green-800 rounded-lg text-xs font-medium flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />

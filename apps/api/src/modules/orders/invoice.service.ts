@@ -23,6 +23,7 @@ export interface InvoiceData {
   shippingFeePkr: number;
   codFeePkr: number;
   discountPkr: number;
+  gstPkr: number;
   totalPkr: number;
   storeName?: string;
 }
@@ -163,6 +164,10 @@ export function generateInvoicePdf(data: InvoiceData): PassThrough {
     doc.text("Discount:", totalsLabelX, doc.y + 4, { width: 100, align: "left" });
     doc.text(`-${formatPKR(data.discountPkr)}`, 460, doc.y - 8, { width: 85, align: "right" });
   }
+
+  // 18% GST row
+  doc.text("GST (18%):", totalsLabelX, doc.y + 4, { width: 100, align: "left" });
+  doc.text(formatPKR(data.gstPkr), 460, doc.y - 8, { width: 85, align: "right" });
 
   doc.moveDown(0.5);
 

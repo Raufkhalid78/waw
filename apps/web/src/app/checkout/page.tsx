@@ -69,6 +69,30 @@ export default function CheckoutPage() {
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyLoading, setLoyaltyLoading] = useState(false);
 
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressesLoading, setAddressesLoading] = useState(true);
+
+  useEffect(() => {
+    import('@/lib/api').then(api => {
+      api.fetchUserAddresses().then(data => {
+        setSavedAddresses(data);
+        setAddressesLoading(false);
+        const defaultAddr = data.find(a => a.is_default) || data[0];
+        if (defaultAddr) {
+          setFormData({
+            fullName: defaultAddr.full_name,
+            phone: defaultAddr.phone,
+            address: defaultAddr.street_address,
+            city: defaultAddr.city,
+            province: defaultAddr.province,
+            notes: ''
+          });
+        }
+      });
+    });
+  }, []);
+
   // Fetch loyalty balance
   useEffect(() => {
     fetch("/api/loyalty/balance")
@@ -280,6 +304,35 @@ export default function CheckoutPage() {
               <Truck className="w-5 h-5 text-amber-500" />
               <span>1. Delivery Details (Pakistan)</span>
             </h2>
+
+            {!addressesLoading && savedAddresses.length > 0 && (
+              <div className="space-y-3 mb-6 pb-6 border-b border-slate-100">
+                <label className="text-xs font-bold text-slate-700">Saved Addresses</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {savedAddresses.map((addr: any) => (
+                    <div 
+                      key={addr.id} 
+                      onClick={() => {
+                        setFormData({
+                          fullName: addr.full_name,
+                          phone: addr.phone,
+                          address: addr.street_address,
+                          city: addr.city,
+                          province: addr.province,
+                          notes: formData.notes
+                        });
+                      }}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all ${formData.address === addr.street_address ? 'border-amber-500 bg-amber-50 ring-1 ring-amber-500' : 'border-slate-200 hover:border-amber-300'}`}
+                    >
+                      <div className="font-bold text-sm text-slate-900">{addr.full_name}</div>
+                      <div className="text-xs text-slate-600 mt-1 truncate">{addr.street_address}</div>
+                      <div className="text-xs text-slate-500">{addr.city}, {addr.province}</div>
+                      <div className="text-xs text-slate-500">{addr.phone}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
@@ -612,6 +665,15 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
+                  {(quoteData?.gstPkr || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>GST (18%)</span>
+                      <span className="font-bold text-slate-900">
+                        PKR {quoteData!.gstPkr.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-emerald-700 font-bold">
                       <span>Voucher Discount</span>
@@ -683,3 +745,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+

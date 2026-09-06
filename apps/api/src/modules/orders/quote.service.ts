@@ -199,7 +199,11 @@ export class QuoteService {
         logger.warn("Coupon validation failed:", couponErr.message);
       }
     }
-    const totalPkr = subtotalPkr + shippingFeePkr + codFeePkr - couponDiscountPkr;
+    
+    // GST (18%) on taxable amount
+    const taxableAmount = Math.max(0, subtotalPkr - couponDiscountPkr) + shippingFeePkr + codFeePkr;
+    const gstPkr = Math.round(taxableAmount * 0.18);
+    const totalPkr = taxableAmount + gstPkr;
 
     // 5. Generate secure quote token
     const tokenPayload = {
@@ -208,6 +212,7 @@ export class QuoteService {
       shippingFeePkr,
       codFeePkr,
       couponDiscountPkr,
+      gstPkr,
       totalPkr,
       appliedCoupon,
       shippingCity: input.shippingCity,
@@ -224,6 +229,7 @@ export class QuoteService {
       shippingFeePkr,
       codFeePkr,
       couponDiscountPkr,
+      gstPkr,
       totalPkr,
       items: verifiedItems,
       estimatedDeliveryDays: serviceabilityMeta?.estimatedDays,

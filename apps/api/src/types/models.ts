@@ -210,6 +210,7 @@ export interface CheckoutQuoteResponse {
   shippingFeePkr: number;
   codFeePkr: number;
   couponDiscountPkr: number;
+  gstPkr: number;
   totalPkr: number;
   estimatedDeliveryDays?: {
     min: number;

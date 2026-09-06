@@ -36,11 +36,14 @@ export interface ProductDetail {
     sku?: string;
     stock_quantity?: number;
   }[];
-  reviews: {
+  questions?: any[];
+    otherOffers?: any[];
+    reviews: {
     id: string;
     author?: string;
     city?: string;
     rating: number;
+      sellerReply?: string;
     date?: string;
     comment?: string;
     verifiedPurchase?: boolean;
@@ -80,4 +83,7 @@ export interface StoreDetail {
   specialties?: string[];
   created_at?: string;
 }
+
+
+
 

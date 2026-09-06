@@ -797,7 +797,15 @@ export class AdminService {
         .eq("id", returnReq.order_id);
     }
 
-    // 5. Immutable Audit Log
+    // 5. Issue automated Gateway Refund (XPay/Raast)
+    if (returnReq.order?.payment_method === 'XPAY' || returnReq.order?.payment_method === 'RAAST') {
+      // TODO: Call XPay/Raast refund API using the recorded transaction_id
+      console.log(`[PAYMENT GATEWAY] Triggering automated refund of PKR ${returnReq.refund_amount_pkr} to customer for order ${returnReq.order_id}`);
+      // Example:
+      // await PaymentGateway.issueRefund(returnReq.order.transaction_id, returnReq.refund_amount_pkr);
+    }
+
+    // 6. Immutable Audit Log
     await AuditService.logAction({
       actorId: adminId || "SYSTEM",
       actorRole: "SUPER_ADMIN",
@@ -1061,4 +1069,5 @@ export class AdminService {
     return { success: true };
   }
 }
+
 
