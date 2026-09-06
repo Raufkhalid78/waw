@@ -99,6 +99,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
   useEffect(() => {
     if (isInitialRender.current) {
       isInitialRender.current = false;
+      setLoading(false);
       return;
     }
     loadCatalog();
@@ -143,7 +144,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
 
       {/* 5. Live Marketplace Catalog */}
       <FadeIn delay={200}>
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
+      <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12">
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Section Header & Category Tabs */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 px-5 py-4">
@@ -291,7 +292,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
 
       {/* 6. Trust Badges — Redesigned with Lucide icons */}
       <FadeIn delay={250}>
-        <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
+        <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { icon: ShieldCheck, title: "100% Genuine", desc: "Verified sellers only", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
@@ -313,7 +314,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
 
       {/* 7. Buyer Protection Banner — Redesigned with stats */}
       <FadeIn delay={300}>
-        <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
+        <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12">
           <div className="bg-gray-900 text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden">
             {/* Background decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />

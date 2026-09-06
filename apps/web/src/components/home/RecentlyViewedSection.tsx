@@ -16,7 +16,7 @@ export function RecentlyViewedSection() {
   if (items.length === 0) return null;
 
   return (
-    <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
+    <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12">
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">

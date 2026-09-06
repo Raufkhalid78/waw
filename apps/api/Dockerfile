@@ -4,7 +4,9 @@ WORKDIR /app
 
 COPY package*.json turbo.json ./
 COPY packages/ ./packages/
-COPY apps/api/ ./apps/api/
+COPY apps/api/package.json apps/api/tsconfig.json apps/api/openapi.yaml apps/api/.env.example apps/api/Dockerfile ./apps/api/
+COPY apps/api/src/ ./apps/api/src/
+COPY apps/api/tests/ ./apps/api/tests/
 
 RUN npm ci --workspace=@waw/types --workspace=@waw/api
 RUN npm run build --workspace=@waw/types
@@ -19,7 +21,6 @@ COPY package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
-COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 
 EXPOSE 4000
 CMD ["node", "apps/api/dist/server.js"]
