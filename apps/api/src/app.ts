@@ -407,10 +407,24 @@ app.post(
 // ── Checkout Quote Engine (Server-Authoritative Pricing) ──────────────────
 app.post("/api/checkout/quote", async (req, res) => {
   try {
-    const { items, shippingCity, paymentMethod, couponCode } = req.body;
+    const { items, shippingCity, paymentMethod, couponCode, useLoyaltyPoints } = req.body;
     if (!items || items.length === 0) {
       res.status(400).json({ error: "Cart must contain at least 1 item" });
       return;
+    }
+    // Optional auth: resolve userId from cookie if present (for loyalty calculation)
+    let userId: string | undefined;
+    if (useLoyaltyPoints) {
+      try {
+        const cookieToken = req.cookies?.waw_session;
+        if (cookieToken) {
+          const { SessionService } = await import("./modules/auth/session.service.js");
+          const session = await SessionService.validateSession(cookieToken);
+          if (session) userId = session.userId;
+        }
+      } catch {
+        // Guest checkout — no userId, skip loyalty
+      }
     }
     const { QuoteService } = await import("./modules/orders/quote.service.js");
     const quote = await QuoteService.generateQuote({
@@ -418,6 +432,8 @@ app.post("/api/checkout/quote", async (req, res) => {
       shippingCity: shippingCity || "Lahore",
       paymentMethod: paymentMethod || PaymentMethod.COD,
       couponCode,
+      useLoyaltyPoints: useLoyaltyPoints && userId ? true : false,
+      userId,
     });
     res.json(quote);
   } catch (err: any) {

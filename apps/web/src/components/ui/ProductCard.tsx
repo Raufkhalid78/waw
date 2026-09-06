@@ -34,6 +34,7 @@ export interface ProductCardProps {
   isExpress?: boolean;
   sellerType?: SellerType;
   soldCount?: number;
+  hasVariants?: boolean;
 }
 
 export function ProductCard({
@@ -51,6 +52,7 @@ export function ProductCard({
   isExpress = false,
   sellerType = SellerType.THIRD_PARTY,
   soldCount,
+  hasVariants = false,
 }: ProductCardProps) {
   const { addItem, toggleWishlist, isInWishlist, language } = useCartStore();
   const isUrdu = language === "UR";
@@ -64,6 +66,10 @@ export function ProductCard({
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (hasVariants) {
+      window.location.href = `/products/${productId}`;
+      return;
+    }
     addItem({
       productId,
       title,
@@ -125,7 +131,7 @@ export function ProductCard({
               storeName,
             });
           }}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white text-gray-400 hover:text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-all cursor-pointer z-10"
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-white text-gray-400 hover:text-red-500 shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer z-10"
         >
           <Heart className={`w-4 h-4 ${wishlisted ? "fill-red-500 text-red-500" : ""}`} />
         </button>

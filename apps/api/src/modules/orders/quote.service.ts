@@ -13,7 +13,7 @@ import {
 
 export class QuoteService {
   static async generateQuote(
-    input: CheckoutQuoteRequest,
+    input: CheckoutQuoteRequest & { userId?: string },
   ): Promise<CheckoutQuoteResponse> {
     if (!input.items || input.items.length === 0) {
       throw new Error("Cannot generate quote for empty cart");
@@ -199,9 +199,26 @@ export class QuoteService {
         logger.warn("Coupon validation failed:", couponErr.message);
       }
     }
+
+    // Loyalty points redemption (server-authoritative)
+    let loyaltyDiscountPkr = 0;
+    let loyaltyPointsUsed = 0;
+    if (input.useLoyaltyPoints && input.userId) {
+      try {
+        const { LoyaltyService } = await import("../loyalty/loyalty.service.js");
+        const loyaltyResult = await LoyaltyService.calculateRedemption(
+          input.userId,
+          subtotalPkr - couponDiscountPkr,
+        );
+        loyaltyDiscountPkr = loyaltyResult.discountPkr;
+        loyaltyPointsUsed = loyaltyResult.points;
+      } catch (loyaltyErr: any) {
+        logger.warn("Loyalty calculation failed:", loyaltyErr.message);
+      }
+    }
     
     // GST (18%) on taxable amount
-    const taxableAmount = Math.max(0, subtotalPkr - couponDiscountPkr) + shippingFeePkr + codFeePkr;
+    const taxableAmount = Math.max(0, subtotalPkr - couponDiscountPkr - loyaltyDiscountPkr) + shippingFeePkr + codFeePkr;
     const gstPkr = Math.round(taxableAmount * 0.18);
     const totalPkr = taxableAmount + gstPkr;
 
@@ -212,12 +229,15 @@ export class QuoteService {
       shippingFeePkr,
       codFeePkr,
       couponDiscountPkr,
+      loyaltyDiscountPkr,
+      loyaltyPointsUsed,
       gstPkr,
       totalPkr,
       appliedCoupon,
       shippingCity: input.shippingCity,
       estimatedDeliveryDays: serviceabilityMeta?.estimatedDays || { min: 2, max: 5, label: "2–5 business days" },
       paymentMethod: input.paymentMethod,
+      userId: input.userId,
       timestamp: Date.now(),
     };
 
@@ -229,6 +249,7 @@ export class QuoteService {
       shippingFeePkr,
       codFeePkr,
       couponDiscountPkr,
+      loyaltyDiscountPkr,
       gstPkr,
       totalPkr,
       items: verifiedItems,

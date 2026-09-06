@@ -202,6 +202,7 @@ export interface CheckoutQuoteRequest {
   shippingCity: string;
   paymentMethod: PaymentMethod;
   couponCode?: string;
+  useLoyaltyPoints?: boolean;
 }
 
 export interface CheckoutQuoteResponse {
@@ -211,6 +212,7 @@ export interface CheckoutQuoteResponse {
   shippingFeePkr: number;
   codFeePkr: number;
   couponDiscountPkr: number;
+  loyaltyDiscountPkr: number;
   gstPkr: number;
   totalPkr: number;
   estimatedDeliveryDays?: {

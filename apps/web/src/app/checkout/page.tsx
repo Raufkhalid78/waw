@@ -66,12 +66,11 @@ export default function CheckoutPage() {
   // Loyalty points
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [useLoyalty, setUseLoyalty] = useState(false);
-  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
-  const [loyaltyLoading, setLoyaltyLoading] = useState(false);
 
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [addressesLoading, setAddressesLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     import('@/lib/api').then(api => {
@@ -91,6 +90,14 @@ export default function CheckoutPage() {
         }
       });
     });
+  }, []);
+
+  // Check auth session via API instead of cookie sniffing
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data) => setIsLoggedIn(Boolean(data?.user?.id)))
+      .catch(() => setIsLoggedIn(false));
   }, []);
 
   // Fetch loyalty balance
@@ -119,6 +126,7 @@ export default function CheckoutPage() {
           shippingCity: formData.city,
           paymentMethod,
           couponCode: appliedVoucher?.code,
+          useLoyaltyPoints: useLoyalty,
         });
         if (isMounted) {
           setQuoteData(quote);
@@ -140,7 +148,7 @@ export default function CheckoutPage() {
     return () => {
       isMounted = false;
     };
-  }, [items, formData.city, paymentMethod, appliedVoucher]);
+  }, [items, formData.city, paymentMethod, appliedVoucher, useLoyalty]);
 
   const handleApplyVoucher = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,37 +164,16 @@ export default function CheckoutPage() {
     setVoucherInput("");
   };
 
-  const finalTotalPkr = Math.max(0, (quoteData?.totalPkr || 0) - loyaltyDiscount);
+  const finalTotalPkr = Math.max(0, (quoteData?.totalPkr || 0));
   const subtotalPkr = quoteData?.subtotalPkr || 0;
   const shippingFeePkr = quoteData?.shippingFeePkr || 0;
   const codFeePkr = quoteData?.codFeePkr || 0;
   const discountAmount = quoteData?.couponDiscountPkr || 0;
+  const loyaltyDiscount = quoteData?.loyaltyDiscountPkr || 0;
 
-  // Handle loyalty redemption toggle
-  const handleLoyaltyToggle = async () => {
-    if (useLoyalty) {
-      setUseLoyalty(false);
-      setLoyaltyDiscount(0);
-      return;
-    }
-    if (!quoteData?.totalPkr) return;
-    setLoyaltyLoading(true);
-    try {
-      const res = await fetch("/api/loyalty/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderTotalPkr: quoteData.totalPkr }),
-      });
-      const data = await res.json();
-      if (data.discountPkr > 0) {
-        setUseLoyalty(true);
-        setLoyaltyDiscount(data.discountPkr);
-      }
-    } catch {
-      setLoyaltyDiscount(0);
-    } finally {
-      setLoyaltyLoading(false);
-    }
+  // Handle loyalty redemption toggle — quote re-fetches with useLoyaltyPoints
+  const handleLoyaltyToggle = () => {
+    setUseLoyalty(!useLoyalty);
   };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -197,11 +184,13 @@ export default function CheckoutPage() {
       );
       return;
     }
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
     setQuoteError(null);
 
     try {
+      const idempotencyKey = crypto.randomUUID();
       const orderPayload = {
         quoteToken: quoteData.quoteToken,
         buyerName: formData.fullName,
@@ -211,10 +200,8 @@ export default function CheckoutPage() {
         shippingProvince: formData.province,
         paymentMethod,
         notes: formData.notes,
+        idempotencyKey,
       };
-
-      // Check if user is logged in (has cookie/session)
-      const isLoggedIn = document.cookie.includes("waw_session");
 
       const orderResult = isLoggedIn
         ? await createOrderApi(orderPayload)
@@ -310,8 +297,9 @@ export default function CheckoutPage() {
                 <label className="text-xs font-bold text-slate-700">Saved Addresses</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {savedAddresses.map((addr: any) => (
-                    <div 
-                      key={addr.id} 
+                    <button
+                      type="button"
+                      key={addr.id}
                       onClick={() => {
                         setFormData({
                           fullName: addr.full_name,
@@ -322,13 +310,13 @@ export default function CheckoutPage() {
                           notes: formData.notes
                         });
                       }}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${formData.address === addr.street_address ? 'border-amber-500 bg-amber-50 ring-1 ring-amber-500' : 'border-slate-200 hover:border-amber-300'}`}
+                      className={`p-3 rounded-xl border text-left transition-all ${formData.address === addr.street_address ? 'border-amber-500 bg-amber-50 ring-1 ring-amber-500' : 'border-slate-200 hover:border-amber-300'}`}
                     >
                       <div className="font-bold text-sm text-slate-900">{addr.full_name}</div>
                       <div className="text-xs text-slate-600 mt-1 truncate">{addr.street_address}</div>
                       <div className="text-xs text-slate-500">{addr.city}, {addr.province}</div>
                       <div className="text-xs text-slate-500">{addr.phone}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -609,9 +597,9 @@ export default function CheckoutPage() {
                   {voucherError}
                 </div>
               )}
-              {appliedVoucher && (
+              {appliedVoucher && appliedVoucher.discountPkr > 0 && (
                 <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 p-2 rounded-lg flex items-center justify-between">
-                  <span>✅ {appliedVoucher.description}</span>
+                  <span>✅ {appliedVoucher.description} — PKR {appliedVoucher.discountPkr.toLocaleString()} off</span>
                   <button
                     type="button"
                     onClick={() => setAppliedVoucher(null)}
@@ -692,10 +680,9 @@ export default function CheckoutPage() {
                       <button
                         type="button"
                         onClick={handleLoyaltyToggle}
-                        disabled={loyaltyLoading}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                           useLoyalty ? "bg-amber-500" : "bg-gray-300"
-                        } ${loyaltyLoading ? "opacity-50" : ""}`}
+                        }`}
                       >
                         <span
                           className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${

@@ -273,9 +273,15 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
             ) : null}
             <span className="text-gray-500 text-xs">{reviewsList.length} {reviewsList.length === 1 ? 'review' : 'reviews'}</span>
             <span className="text-gray-300">|</span>
-            <span className="text-green-700 text-xs font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> In Stock
-            </span>
+            {product.inStock !== false && (product.stockCount === undefined || product.stockCount > 0) ? (
+              <span className="text-green-700 text-xs font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> In Stock
+              </span>
+            ) : (
+              <span className="text-red-600 text-xs font-medium flex items-center gap-1">
+                Out of Stock
+              </span>
+            )}
           </div>
 
           {/* Price */}
