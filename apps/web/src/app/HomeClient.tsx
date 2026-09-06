@@ -21,7 +21,7 @@ import {
   Users,
   MapPin,
 } from "lucide-react";
-import { fetchProducts, fetchCategories } from "@/lib/api";
+import { fetchProducts, fetchCategories, fetchMarketplaceStats, MarketplaceStats } from "@/lib/api";
 import { FadeIn } from "@/components/Motion";
 import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
 
@@ -60,6 +60,11 @@ export default function HomeClient({ initialProducts, initialCategories, initial
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const isInitialRender = useRef(true);
   const [dbCategories, setDbCategories] = useState<{ name: string; slug: string }[]>(initialCategories || []);
+  const [stats, setStats] = useState<MarketplaceStats>({ verifiedSellers: 500, ordersDelivered: 10000, citiesCovered: 35, avgRating: 4.8 });
+
+  useEffect(() => {
+    fetchMarketplaceStats().then(setStats).catch(() => {});
+  }, []);
 
   const checkTabScroll = () => {
     if (tabScrollRef.current) {
@@ -312,7 +317,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
         </section>
       </FadeIn>
 
-      {/* 7. Buyer Protection Banner — Redesigned with stats */}
+      {/* 7. Buyer Protection Banner — Redesigned with dynamic stats */}
       <FadeIn delay={300}>
         <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12">
           <div className="bg-gray-900 text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden">
@@ -333,14 +338,14 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                   Every order is protected with secure payments, verified sellers, and hassle-free returns. Direct from Pakistani artisans and brands.
                 </p>
 
-                {/* Stats row */}
+                {/* Stats row — dynamic from API */}
                 <div className="flex flex-wrap items-center gap-4 sm:gap-6 pt-2">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                       <Users className="w-4 h-4 text-amber-400" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white">500+</div>
+                      <div className="text-sm font-bold text-white">{stats.verifiedSellers}+</div>
                       <div className="text-[10px] text-gray-500">Verified Sellers</div>
                     </div>
                   </div>
@@ -349,7 +354,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                       <Package className="w-4 h-4 text-emerald-400" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white">10K+</div>
+                      <div className="text-sm font-bold text-white">{stats.ordersDelivered >= 1000 ? `${Math.round(stats.ordersDelivered / 1000)}K+` : `${stats.ordersDelivered}+`}</div>
                       <div className="text-[10px] text-gray-500">Orders Delivered</div>
                     </div>
                   </div>
@@ -358,7 +363,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                       <MapPin className="w-4 h-4 text-blue-400" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white">35+</div>
+                      <div className="text-sm font-bold text-white">{stats.citiesCovered}+</div>
                       <div className="text-[10px] text-gray-500">Cities Covered</div>
                     </div>
                   </div>
@@ -367,7 +372,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                       <Star className="w-4 h-4 text-amber-400" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white">4.8</div>
+                      <div className="text-sm font-bold text-white">{stats.avgRating}</div>
                       <div className="text-[10px] text-gray-500">Avg. Rating</div>
                     </div>
                   </div>

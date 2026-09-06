@@ -36,6 +36,12 @@ function SearchContent() {
   const [searchQuery, setSearchQuery] = useState(queryParam);
   const [selectedCategory, setSelectedCategory] = useState(categoryParam);
   const [selectedCity, setSelectedCity] = useState(cityParam);
+
+  useEffect(() => {
+    setSearchQuery(queryParam);
+    setSelectedCategory(categoryParam);
+    setSelectedCity(cityParam);
+  }, [queryParam, categoryParam, cityParam]);
   const [selectedSellerType, setSelectedSellerType] = useState<
     "ALL" | "1P" | "3P"
   >("ALL");

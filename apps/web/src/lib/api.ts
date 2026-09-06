@@ -240,10 +240,9 @@ export async function fetchProducts(params?: {
     );
     if (searchRes.ok && searchRes.data) {
       const hits = searchRes.data.hits || searchRes.data.results || [];
-      if (hits.length > 0) {
-        return { items: hits.map((h: any) => mapApiProductToDetail(h.document || h)) };
-      }
+      return { items: hits.map((h: any) => mapApiProductToDetail(h.document || h)) };
     }
+    return { items: [] };
   }
 
   const query = new URLSearchParams();
@@ -285,6 +284,22 @@ export async function fetchProducts(params?: {
     items: items.map(mapApiProductToDetail),
     facets: data?.facets || { minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] }
   };
+}
+
+export interface MarketplaceStats {
+  verifiedSellers: number;
+  ordersDelivered: number;
+  citiesCovered: number;
+  avgRating: number;
+}
+
+export async function fetchMarketplaceStats(): Promise<MarketplaceStats> {
+  const res = await safeFetch<MarketplaceStats>(
+    `${API_BASE_URL}/api/marketplace-stats`,
+    { cache: "no-store", timeoutMs: 5000 }
+  );
+  if (res.ok && res.data) return res.data;
+  return { verifiedSellers: 500, ordersDelivered: 10000, citiesCovered: 35, avgRating: 4.8 };
 }
 
 export async function fetchProductById(
