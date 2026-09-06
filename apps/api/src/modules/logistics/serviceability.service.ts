@@ -21,17 +21,45 @@ export class ServiceabilityService {
   private static readonly TIER_1_CITIES = ["karachi", "lahore", "islamabad", "rawalpindi"];
 
   private static readonly FALLBACK_CITIES: Record<string, { province: string; isCodEligible: boolean; supportedCouriers: string[] }> = {
-    "Lahore": { province: "Punjab", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Karachi": { province: "Sindh", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Islamabad": { province: "Federal", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Rawalpindi": { province: "Punjab", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Faisalabad": { province: "Punjab", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Multan": { province: "Punjab", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Peshawar": { province: "KPK", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Quetta": { province: "Balochistan", isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
-    "Sialkot": { province: "Punjab", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Gujranwala": { province: "Punjab", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Hyderabad": { province: "Sindh", isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    // Punjab
+    "Lahore":              { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Rawalpindi":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Faisalabad":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Multan":              { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Sialkot":             { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Gujranwala":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Bahawalpur":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Sahiwal":             { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Sargodha":            { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Jhang":               { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Dera Ghazi Khan":     { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Gujrat":              { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Kasur":               { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Mianwali":            { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Sheikhupura":         { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    // Sindh
+    "Karachi":             { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Hyderabad":           { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Sukkur":              { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Larkana":             { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Nawabshah":           { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Mirpur Khas":         { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Jacobabad":           { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    // KPK
+    "Peshawar":            { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Abbottabad":          { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Mardan":              { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Mingora":             { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Dera Ismail Khan":    { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Nowshera":            { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    "Kohat":               { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
+    // Balochistan
+    "Quetta":              { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
+    "Turbat":              { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
+    "Gwadar":              { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
+    "Khuzdar":             { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
+    // Federal
+    "Islamabad":           { province: "Federal",       isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
   };
 
   /**

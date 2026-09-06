@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Store,
@@ -16,20 +16,7 @@ import {
   Phone,
   ChevronRight,
 } from "lucide-react";
-
-const PAKISTAN_CITIES = [
-  "Lahore",
-  "Karachi",
-  "Islamabad",
-  "Rawalpindi",
-  "Peshawar",
-  "Multan",
-  "Faisalabad",
-  "Sialkot",
-  "Gujranwala",
-  "Quetta",
-  "Hyderabad",
-];
+import { fetchServiceableCities, ServiceableCity } from "@/lib/api";
 
 const CATEGORIES = [
   "Leather & Footwear",
@@ -45,11 +32,12 @@ export default function SellOnWawPage() {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [applicationId, setApplicationId] = useState("");
+  const [serviceableCities, setServiceableCities] = useState<ServiceableCity[]>([]);
 
   const [formData, setFormData] = useState({
     storeName: "",
     category: CATEGORIES[0],
-    city: PAKISTAN_CITIES[0],
+    city: "Lahore",
     businessAddress: "",
     ownerName: "",
     cnic: "",
@@ -60,6 +48,17 @@ export default function SellOnWawPage() {
     accountTitle: "",
     iban: "",
   });
+
+  useEffect(() => {
+    fetchServiceableCities()
+      .then((cities) => {
+        setServiceableCities(cities);
+        if (cities.length > 0 && formData.city === "Lahore") {
+          setFormData((prev) => ({ ...prev, city: cities[0].cityName }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -260,11 +259,27 @@ export default function SellOnWawPage() {
                       onChange={(e) => handleChange("city", e.target.value)}
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 font-medium"
                     >
-                      {PAKISTAN_CITIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
+                      {serviceableCities.length > 0 ? (
+                        serviceableCities.map((c) => (
+                          <option key={c.cityName} value={c.cityName}>
+                            {c.cityName}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Lahore">Lahore</option>
+                          <option value="Karachi">Karachi</option>
+                          <option value="Islamabad">Islamabad</option>
+                          <option value="Rawalpindi">Rawalpindi</option>
+                          <option value="Peshawar">Peshawar</option>
+                          <option value="Multan">Multan</option>
+                          <option value="Faisalabad">Faisalabad</option>
+                          <option value="Sialkot">Sialkot</option>
+                          <option value="Gujranwala">Gujranwala</option>
+                          <option value="Quetta">Quetta</option>
+                          <option value="Hyderabad">Hyderabad</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>

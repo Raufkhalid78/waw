@@ -332,6 +332,22 @@ export async function fetchStores(): Promise<StoreSummary[]> {
   return [];
 }
 
+export interface ServiceableCity {
+  cityName: string;
+  province: string;
+  isCodEligible: boolean;
+  supportedCouriers: string[];
+}
+
+export async function fetchServiceableCities(): Promise<ServiceableCity[]> {
+  const res = await safeFetch<ServiceableCity[]>(
+    `${API_BASE_URL}/api/serviceability/cities`,
+    { cache: "no-store", timeoutMs: 6000 }
+  );
+  if (res.ok && Array.isArray(res.data)) return res.data;
+  return [];
+}
+
 export async function fetchStoreBySlug(
   slug: string,
 ): Promise<StoreDetail | undefined> {

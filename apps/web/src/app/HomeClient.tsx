@@ -7,15 +7,28 @@ import { CategoryCircles } from "@/components/home/CategoryCircles";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { JsonLdOrganization, JsonLdSearchBox } from "@/components/seo/JsonLd";
-import { Flame, ArrowRight, ChevronLeft, ChevronRight, ShieldCheck, Package, AlertCircle } from "lucide-react";
+import {
+  ShieldCheck,
+  Package,
+  AlertCircle,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Lock,
+  Truck,
+  Star,
+  Users,
+  MapPin,
+} from "lucide-react";
 import { fetchProducts, fetchCategories } from "@/lib/api";
-import { FadeIn, Stagger } from "@/components/Motion";
+import { FadeIn } from "@/components/Motion";
 import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
 
-// Lazy-load below-fold components for better LCP
+// Lazy-load below-fold components
 const FlashDeals = lazy(() => import("@/components/home/FlashDeals").then(m => ({ default: m.FlashDeals })));
-const FeaturedBrands = lazy(() => import("@/components/home/FeaturedBrands").then(m => ({ default: m.FeaturedBrands })));
-const StoreSpotlight = lazy(() => import("@/components/home/StoreSpotlight").then(m => ({ default: m.StoreSpotlight })));
+const WawExpressSection = lazy(() => import("@/components/home/WawExpressSection").then(m => ({ default: m.WawExpressSection })));
+const FeaturedStores = lazy(() => import("@/components/home/FeaturedStores").then(m => ({ default: m.FeaturedStores })));
 
 function ProductCardSkeleton() {
   return (
@@ -47,7 +60,6 @@ export default function HomeClient({ initialProducts, initialCategories, initial
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const isInitialRender = useRef(true);
   const [dbCategories, setDbCategories] = useState<{ name: string; slug: string }[]>(initialCategories || []);
-  const [cmsContent, setCmsContent] = useState<any>(initialContent || null);
 
   const checkTabScroll = () => {
     if (tabScrollRef.current) {
@@ -56,16 +68,6 @@ export default function HomeClient({ initialProducts, initialCategories, initial
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
     }
   };
-
-  // Load DB-backed categories for tabs
-  /* useEffect(() => {
-    fetchCategories("en")
-      .then((cats) => {
-        const flat = cats.flatMap((c: any) => [c, ...(c.children || [])]);
-        setDbCategories(flat.map((c: any) => ({ name: c.name, slug: c.slug })));
-      })
-      .catch(() => {});
-  }, []); */
 
   useEffect(() => {
     checkTabScroll();
@@ -88,7 +90,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
       setLiveProducts(data.items || []);
     } catch (err: any) {
       logger.error("Failed to load catalog", "Homepage", err);
-      setError("Unable to load latest offers from the marketplace catalog. Please check your connection or retry.");
+      setError("Unable to load latest offers. Please check your connection or retry.");
     } finally {
       setLoading(false);
     }
@@ -102,18 +104,6 @@ export default function HomeClient({ initialProducts, initialCategories, initial
     loadCatalog();
   }, [loadCatalog]);
 
-  /* useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/content`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data?.content)) {
-          const claim = data.content.find((c: any) => c.key_slug === 'buyer-protection-claim');
-          if (claim) setCmsContent(claim);
-        }
-      })
-      .catch((err) => logger.error("Failed to load CMS content", "Homepage", err));
-  }, []); */
-
   const scrollTabs = (direction: "left" | "right") => {
     if (tabScrollRef.current) {
       const amount = direction === "left" ? -220 : 220;
@@ -126,7 +116,8 @@ export default function HomeClient({ initialProducts, initialCategories, initial
     <div className="space-y-4 pb-20">
       <JsonLdOrganization />
       <JsonLdSearchBox />
-      {/* 1. Hero Banner Carousel */}
+
+      {/* 1. Hero Banner */}
       <FadeIn>
         <HeroBanner />
       </FadeIn>
@@ -138,13 +129,20 @@ export default function HomeClient({ initialProducts, initialCategories, initial
         </Suspense>
       </FadeIn>
 
-      {/* 3. DB-backed Category Circles */}
+      {/* 3. Category Circles */}
       <FadeIn delay={100}>
         <CategoryCircles />
       </FadeIn>
 
-      {/* 4. Live Marketplace Catalog */}
+      {/* 4. Waw Express Section */}
       <FadeIn delay={150}>
+        <Suspense fallback={<div className="h-48 bg-gray-50 animate-pulse rounded-xl" />}>
+          <WawExpressSection />
+        </Suspense>
+      </FadeIn>
+
+      {/* 5. Live Marketplace Catalog */}
+      <FadeIn delay={200}>
       <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Section Header & Category Tabs */}
@@ -227,9 +225,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                   <AlertCircle className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-gray-900">Catalog Temporarily Unavailable</h3>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                  {error}
-                </p>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">{error}</p>
                 <button
                   onClick={loadCatalog}
                   className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-900 px-5 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer"
@@ -270,6 +266,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                     imageUrl={prod.imageUrl}
                     isExpress={prod.isExpress}
                     sellerType={prod.sellerType}
+                    hasVariants={prod.hasVariants}
                   />
                 ))}
               </div>
@@ -280,7 +277,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
               <div className="text-center pt-5 border-t border-gray-100 mt-5">
                 <Link
                   href="/categories"
-                  className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all"
                 >
                   View All Products
                   <ArrowRight className="w-4 h-4" />
@@ -292,23 +289,19 @@ export default function HomeClient({ initialProducts, initialCategories, initial
       </section>
       </FadeIn>
 
-      {/* 5. Trust Badges */}
-      <FadeIn delay={200}>
+      {/* 6. Trust Badges — Redesigned with Lucide icons */}
+      <FadeIn delay={250}>
         <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: ShieldCheck, title: "100% Genuine", desc: "Verified sellers only", color: "text-green-600 bg-green-50" },
-              { icon: Package, title: "Free Delivery", desc: "On orders over PKR 5,000", color: "text-amber-600 bg-amber-50" },
-              { icon: "🔄", title: "7-Day Returns", desc: "Easy doorstep returns", color: "text-blue-600 bg-blue-50" },
-              { icon: "🔒", title: "Secure Checkout", desc: "Encrypted payments", color: "text-purple-600 bg-purple-50" },
+              { icon: ShieldCheck, title: "100% Genuine", desc: "Verified sellers only", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+              { icon: Truck, title: "Free Delivery", desc: "On orders over PKR 5,000", color: "text-amber-600 bg-amber-50 border-amber-100" },
+              { icon: RotateCcw, title: "7-Day Returns", desc: "Easy doorstep returns", color: "text-blue-600 bg-blue-50 border-blue-100" },
+              { icon: Lock, title: "Secure Checkout", desc: "Encrypted payments", color: "text-purple-600 bg-purple-50 border-purple-100" },
             ].map((badge, i) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 text-center hover:shadow-md transition-shadow">
-                <div className={`w-10 h-10 rounded-xl ${badge.color} flex items-center justify-center mx-auto mb-2`}>
-                  {typeof badge.icon === "string" ? (
-                    <span className="text-lg">{badge.icon}</span>
-                  ) : (
-                    <badge.icon className="w-5 h-5" />
-                  )}
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 text-center hover:shadow-md transition-shadow group">
+                <div className={`w-11 h-11 rounded-xl ${badge.color} border flex items-center justify-center mx-auto mb-2.5 group-hover:scale-110 transition-transform`}>
+                  <badge.icon className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-bold text-gray-900">{badge.title}</div>
                 <div className="text-[11px] text-gray-500 mt-0.5">{badge.desc}</div>
@@ -318,53 +311,92 @@ export default function HomeClient({ initialProducts, initialCategories, initial
         </section>
       </FadeIn>
 
-      {/* 6. Buyer Protection Banner */}
-      <FadeIn delay={250}>
+      {/* 7. Buyer Protection Banner — Redesigned with stats */}
+      <FadeIn delay={300}>
         <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10">
-        <div className="bg-gray-900 text-white rounded-xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold uppercase tracking-wider">
-              <ShieldCheck className="w-4 h-4" />
-              <span>{cmsContent?.title || "Secure Payments"}</span>
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold">
-              Shop with Confidence on WAW
-            </h3>
-            <p className="text-sm text-gray-400 leading-relaxed max-w-lg">
-              {cmsContent?.content_html || "Direct from verified Pakistani sellers with doorstep delivery, easy returns, and dedicated customer care."}
-            </p>
-          </div>
+          <div className="bg-gray-900 text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="flex items-center gap-3 shrink-0">
-            <Link
-              href="/buyer-protection"
-              className="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-all"
-            >
-              Learn More
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/help"
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold px-5 py-2.5 rounded-lg text-sm transition-all"
-            >
-              Help & Support
-            </Link>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Waw Buyer Protection</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold">
+                  Shop with Confidence
+                </h3>
+                <p className="text-sm text-gray-400 leading-relaxed max-w-lg">
+                  Every order is protected with secure payments, verified sellers, and hassle-free returns. Direct from Pakistani artisans and brands.
+                </p>
+
+                {/* Stats row */}
+                <div className="flex flex-wrap items-center gap-4 sm:gap-6 pt-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                      <Users className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">500+</div>
+                      <div className="text-[10px] text-gray-500">Verified Sellers</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                      <Package className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">10K+</div>
+                      <div className="text-[10px] text-gray-500">Orders Delivered</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                      <MapPin className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">35+</div>
+                      <div className="text-[10px] text-gray-500">Cities Covered</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                      <Star className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">4.8</div>
+                      <div className="text-[10px] text-gray-500">Avg. Rating</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
+                <Link
+                  href="/buyer-protection"
+                  className="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-all"
+                >
+                  Learn More
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  href="/help"
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold px-5 py-2.5 rounded-lg text-sm transition-all"
+                >
+                  Help & Support
+                </Link>
+              </div>
+            </div>
           </div>
-        </div>
         </section>
       </FadeIn>
 
-      {/* 7. Featured Brand Hubs */}
-      <FadeIn delay={300}>
-        <Suspense fallback={<div className="h-48 bg-gray-50 animate-pulse rounded-xl" />}>
-          <FeaturedBrands />
-        </Suspense>
-      </FadeIn>
-
-      {/* 8. Store Spotlight */}
+      {/* 8. Featured Stores */}
       <FadeIn delay={350}>
         <Suspense fallback={<div className="h-48 bg-gray-50 animate-pulse rounded-xl" />}>
-          <StoreSpotlight />
+          <FeaturedStores />
         </Suspense>
       </FadeIn>
 
@@ -373,6 +405,3 @@ export default function HomeClient({ initialProducts, initialCategories, initial
     </div>
   );
 }
-
-
-

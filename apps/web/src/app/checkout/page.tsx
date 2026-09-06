@@ -19,26 +19,16 @@ import {
   createOrderApi,
   createGuestOrderApi,
   initiatePaymentApi,
+  fetchServiceableCities,
+  ServiceableCity,
 } from "@/lib/api";
-
-const PK_CITIES = [
-  "Lahore",
-  "Karachi",
-  "Islamabad",
-  "Rawalpindi",
-  "Faisalabad",
-  "Multan",
-  "Peshawar",
-  "Quetta",
-  "Sialkot",
-  "Gujranwala",
-  "Hyderabad",
-];
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, paymentMethod, setPaymentMethod, clearCart, selectedCity } =
     useCartStore();
+
+  const [serviceableCities, setServiceableCities] = useState<ServiceableCity[]>([]);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -98,6 +88,13 @@ export default function CheckoutPage() {
       .then((r) => r.json())
       .then((data) => setIsLoggedIn(Boolean(data?.user?.id)))
       .catch(() => setIsLoggedIn(false));
+  }, []);
+
+  // Fetch serviceable cities from API
+  useEffect(() => {
+    fetchServiceableCities()
+      .then((cities) => setServiceableCities(cities))
+      .catch(() => setServiceableCities([]));
   }, []);
 
   // Fetch loyalty balance
@@ -378,11 +375,27 @@ export default function CheckoutPage() {
                   }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium cursor-pointer"
                 >
-                  {PK_CITIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
+                  {serviceableCities.length > 0 ? (
+                    serviceableCities.map((c) => (
+                      <option key={c.cityName} value={c.cityName}>
+                        {c.cityName}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Lahore">Lahore</option>
+                      <option value="Karachi">Karachi</option>
+                      <option value="Islamabad">Islamabad</option>
+                      <option value="Rawalpindi">Rawalpindi</option>
+                      <option value="Faisalabad">Faisalabad</option>
+                      <option value="Multan">Multan</option>
+                      <option value="Peshawar">Peshawar</option>
+                      <option value="Quetta">Quetta</option>
+                      <option value="Sialkot">Sialkot</option>
+                      <option value="Gujranwala">Gujranwala</option>
+                      <option value="Hyderabad">Hyderabad</option>
+                    </>
+                  )}
                 </select>
               </div>
 

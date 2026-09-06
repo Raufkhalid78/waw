@@ -48,16 +48,45 @@ ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.pare
 -- ── 3. Serviceable Cities ───────────────────────────────────────────────────
 
 INSERT INTO serviceable_cities (city_name, province, is_cod_eligible, is_active) VALUES
+  -- Punjab
   ('Lahore', 'Punjab', true, true),
-  ('Karachi', 'Sindh', true, true),
-  ('Islamabad', 'Federal', true, true),
   ('Rawalpindi', 'Punjab', true, true),
   ('Faisalabad', 'Punjab', true, true),
   ('Multan', 'Punjab', true, true),
-  ('Peshawar', 'KPK', true, true),
-  ('Quetta', 'Balochistan', true, true),
   ('Sialkot', 'Punjab', true, true),
-  ('Gujranwala', 'Punjab', true, true)
+  ('Gujranwala', 'Punjab', true, true),
+  ('Bahawalpur', 'Punjab', true, true),
+  ('Sahiwal', 'Punjab', true, true),
+  ('Sargodha', 'Punjab', true, true),
+  ('Jhang', 'Punjab', true, true),
+  ('Dera Ghazi Khan', 'Punjab', true, true),
+  ('Gujrat', 'Punjab', true, true),
+  ('Kasur', 'Punjab', true, true),
+  ('Mianwali', 'Punjab', true, true),
+  ('Sheikhupura', 'Punjab', true, true),
+  -- Sindh
+  ('Karachi', 'Sindh', true, true),
+  ('Hyderabad', 'Sindh', true, true),
+  ('Sukkur', 'Sindh', true, true),
+  ('Larkana', 'Sindh', true, true),
+  ('Nawabshah', 'Sindh', true, true),
+  ('Mirpur Khas', 'Sindh', true, true),
+  ('Jacobabad', 'Sindh', true, true),
+  -- KPK
+  ('Peshawar', 'KPK', true, true),
+  ('Abbottabad', 'KPK', true, true),
+  ('Mardan', 'KPK', true, true),
+  ('Mingora', 'KPK', true, true),
+  ('Dera Ismail Khan', 'KPK', true, true),
+  ('Nowshera', 'KPK', true, true),
+  ('Kohat', 'KPK', true, true),
+  -- Balochistan
+  ('Quetta', 'Balochistan', true, true),
+  ('Turbat', 'Balochistan', true, true),
+  ('Gwadar', 'Balochistan', true, true),
+  ('Khuzdar', 'Balochistan', true, true),
+  -- Federal / Islamabad
+  ('Islamabad', 'Federal', true, true)
 ON CONFLICT (city_name) DO NOTHING;
 
 -- ── 4. Search Suggestions ───────────────────────────────────────────────────
