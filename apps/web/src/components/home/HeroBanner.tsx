@@ -10,116 +10,62 @@ import {
   Zap,
   Truck,
   ShieldCheck,
-  Flame,
-  Star,
-  Sparkles,
   ShoppingBag,
   Clock,
-  Store,
-  Award,
   CheckCircle2,
+  Tag
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
-import { SellerType } from "@waw/types";
-import { fetchProducts, fetchContent } from "@/lib/api";
+import { fetchProducts } from "@/lib/api";
 import { ProductDetail } from "@/types/models";
 
 const FALLBACK_HERO_SLIDES = [
   {
     id: "slide_1",
-    badge: "🔥 FEATURED CRAFTS & TECH",
-    badgeBg: "bg-slate-950 text-amber-400 border border-amber-400/30",
-    title: "Authentic Goods Across Pakistan",
-    highlightText: "Direct from Verified Local Makers",
-    subtitle:
-      "Shop direct from authentic Karachi fashion houses, Lahore tech importers, Sialkot sports makers, and Peshawar leather craftsmen.",
-    primaryCta: "SHOP FEATURED DEALS",
-    primaryHref: "/category/mobiles-tech",
-    bgGradient: "from-amber-400 via-amber-500 to-yellow-500",
-    textColor: "text-slate-950",
-    productImage:
-      "https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80",
-    productTitle: "Handcrafted Cow Leather Bifold Wallet",
-    productPrice: "PKR 2,499",
-    productOriginalPrice: "PKR 3,800",
-    productRating: "Verified Merchant",
-    floatingBadge: "⚡ Fast Nationwide Delivery",
+    badge: "FESTIVE COLLECTION",
+    highlightText: "DIRECT TEXTILE MILL PRICES",
+    title: "Designer Lawn & Luxury Festive Suits",
+    description: "Authentic embroidered lawn from top fashion houses in Karachi & Lahore with free nationwide delivery.",
+    primaryCta: "Shop Collection",
+    primaryHref: "/category/fashion-lawn",
+    bgClass: "bg-slate-900",
+    textColor: "text-white",
+    badgeBg: "bg-white/10 text-white backdrop-blur-md border border-white/20",
+    productImage: "https://images.unsplash.com/photo-1620799140188-3b2a02fd9a77?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
   },
   {
     id: "slide_2",
-    badge: "👗 FESTIVE SUMMER LAWN",
-    badgeBg: "bg-slate-950 text-rose-400 border border-rose-400/30",
-    title: "Designer Lawn & Luxury Festive Suits",
-    highlightText: "Direct Textile Mill Prices",
-    subtitle:
-      "Authentic embroidered lawn from top fashion houses in Karachi & Lahore with free nationwide delivery above PKR 5,000.",
-    primaryCta: "EXPLORE LAWN COLLECTION",
-    primaryHref: "/category/womens-lawn",
-    bgGradient: "from-rose-500 via-rose-600 to-amber-500",
-    textColor: "text-white",
-    productImage:
-      "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80",
-    productTitle: "Embroidered 3-Piece Festive Lawn Suit",
-    productPrice: "PKR 4,499",
-    productOriginalPrice: "PKR 6,500",
-    productRating: "Pure Cotton",
-    floatingBadge: "✨ Premium Collection",
-  },
-  {
-    id: "slide_3",
-    badge: "🏏 SIALKOT EXPORT HUB",
-    badgeBg: "bg-slate-950 text-emerald-400 border border-emerald-400/30",
-    title: "Match Grade Footballs & Sports Gear",
-    highlightText: "World Famous Craftsmanship",
-    subtitle:
-      "Direct from certified Sialkot sports makers to your doorstep with fast tracked delivery.",
-    primaryCta: "SHOP SIALKOT SPORTS",
-    primaryHref: "/category/sialkot-sports",
-    bgGradient: "from-emerald-700 via-teal-800 to-slate-950",
-    textColor: "text-white",
-    productImage:
-      "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80",
-    productTitle: "Pro Thermally Bonded Match Football",
-    productPrice: "PKR 2,800",
-    productOriginalPrice: "PKR 4,200",
-    productRating: "Handcrafted",
-    floatingBadge: "🏆 Match Quality Spec",
-  },
+    badge: "PREMIUM TECH",
+    highlightText: "OFFICIAL WARRANTY",
+    title: "Next-Gen Audio & Smart Devices",
+    description: "Upgrade your lifestyle with our curated collection of verified electronics and premium accessories.",
+    primaryCta: "Explore Tech",
+    primaryHref: "/category/electronics",
+    bgClass: "bg-slate-50",
+    textColor: "text-slate-900",
+    badgeBg: "bg-slate-900/10 text-slate-900 backdrop-blur-md border border-slate-900/10",
+    productImage: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+  }
 ];
 
 export function HeroBanner() {
-  const [slides, setSlides] = useState(FALLBACK_HERO_SLIDES);
   const [currentSlide, setCurrentSlide] = useState(0);
-
-  useEffect(() => {
-    fetchContent().then((content) => {
-      const heroContent = content.find((c: any) => c.key_slug === "hero_slides");
-      if (heroContent && heroContent.content_html) {
-        try {
-          const parsed = JSON.parse(heroContent.content_html);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setSlides(parsed);
-          }
-        } catch (e) {
-          console.error("Failed to parse dynamic hero slides", e);
-        }
-      }
-    });
-  }, []);
+  const [dealProduct, setDealProduct] = useState<ProductDetail | null>(null);
+  const [dealAdded, setDealAdded] = useState(false);
+  const addItem = useCartStore((state) => state.addItem);
 
   const [timeLeft, setTimeLeft] = useState({
-    hours: 8,
-    minutes: 34,
-    seconds: 12,
+    hours: 12,
+    minutes: 45,
+    seconds: 0,
   });
-  const { addItem } = useCartStore();
-  const [dealAdded, setDealAdded] = useState(false);
-  const [dealProduct, setDealProduct] = useState<ProductDetail | null>(null);
+
+  const [slides, setSlides] = useState(FALLBACK_HERO_SLIDES);
 
   useEffect(() => {
-    fetchProducts({ sortBy: "rating", limit: 10 })
+    fetchProducts({ limit: 10 })
       .then(({ items }) => {
-        const discounted = items.filter((p) => p.discountPercent && p.discountPercent > 10);
+        const discounted = items.filter((p) => p.discountPercent && p.discountPercent > 5);
         if (discounted.length > 0) setDealProduct(discounted[0]);
       })
       .catch(() => {});
@@ -163,263 +109,187 @@ export function HeroBanner() {
   };
 
   return (
-    <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 pt-2.5 pb-1">
-      {/* ── 1. Hero Grid Showcase (Sleek Compact Proportions) ─────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
-        {/* Main 8-Col Slider Carousel */}
-        <div
-          className={`lg:col-span-8 rounded-3xl p-4.5 sm:p-6 lg:p-7 ${slide.textColor} bg-gradient-to-br ${slide.bgGradient} relative overflow-hidden shadow-lg flex flex-col justify-between min-h-[320px] sm:min-h-[350px] transition-all duration-700`}
-        >
-          {/* Ambient Lighting */}
-          <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-white/20 blur-3xl pointer-events-none" />
-          <div className="absolute right-1/4 -bottom-20 w-64 h-64 rounded-full bg-black/10 blur-2xl pointer-events-none" />
+    <section className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 pt-4 pb-2">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch min-h-[460px]">
+        
+        {/* 1. Main Hero Carousel (8 Cols) */}
+        <div className={`xl:col-span-8 rounded-[2rem] overflow-hidden relative group ${slide.bgClass} ${slide.textColor} transition-colors duration-700 ease-in-out`}>
+          
+          {/* Background Ambient Glow */}
+          <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/40 via-transparent to-transparent pointer-events-none" />
 
-          {/* Top Pill Badges */}
-          <div className="flex flex-wrap items-center gap-2 z-10">
-            <span
-              className={`inline-flex items-center gap-1.5 ${slide.badgeBg} text-[11px] sm:text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-xs`}
-            >
-              <Flame className="w-3.5 h-3.5 fill-current text-amber-400" />
-              <span>{slide.badge}</span>
-            </span>
-
-            <span className="inline-flex items-center gap-1 bg-white/95 backdrop-blur-md text-slate-950 text-[11px] sm:text-xs font-black px-3 py-1 rounded-full shadow-xs">
-              <Truck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Free Delivery Above PKR 5,000</span>
-            </span>
-          </div>
-
-          {/* Main Hero Content & 3D Visual Cutout */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center my-3 z-10">
-            {/* Left Copy (7 Cols) */}
-            <div className="md:col-span-7 space-y-2.5">
-              <div className="inline-block bg-slate-950/15 backdrop-blur-sm text-slate-950 px-2.5 py-0.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider">
-                {slide.highlightText}
+          <div className="absolute inset-0 flex flex-col md:flex-row items-center justify-between p-8 sm:p-10 lg:p-12 z-10 h-full">
+            
+            {/* Content Left */}
+            <div className="w-full md:w-1/2 flex flex-col justify-center space-y-6 h-full relative z-20">
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`inline-flex items-center gap-1.5 ${slide.badgeBg} text-xs font-semibold px-3.5 py-1.5 rounded-full tracking-wide`}>
+                  <Tag className="w-3.5 h-3.5" />
+                  {slide.badge}
+                </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight drop-shadow-xs">
-                {slide.title}
-              </h1>
+              <div className="space-y-3">
+                <h4 className="text-[11px] sm:text-xs font-bold tracking-[0.2em] uppercase opacity-80">
+                  {slide.highlightText}
+                </h4>
+                <h1 className="text-4xl sm:text-5xl font-medium tracking-tight leading-[1.1]">
+                  {slide.title}
+                </h1>
+                <p className="text-sm sm:text-base opacity-80 leading-relaxed max-w-sm font-light">
+                  {slide.description}
+                </p>
+              </div>
 
-              <p className="text-xs sm:text-sm font-medium leading-relaxed opacity-95 max-w-lg line-clamp-2">
-                {slide.subtitle}
-              </p>
-            </div>
-
-            {/* Right 3D Product Float Showcase (Enlarged Luxury Glassmorphism) */}
-            <div className="md:col-span-5 relative flex items-center justify-center">
-              <div className="relative group w-52 sm:w-60 md:w-68">
-                {/* Ambient Halo Glow */}
-                <div className="absolute inset-0 bg-white/25 rounded-3xl blur-2xl scale-95 transition-transform group-hover:scale-110 pointer-events-none" />
-
-                {/* Blended Glassmorphic Product Card */}
-                <div className="relative w-full rounded-3xl p-3.5 bg-black/30 backdrop-blur-xl border border-white/30 shadow-2xl flex flex-col justify-between overflow-hidden transform group-hover:-translate-y-1.5 transition-all duration-300">
-                  {/* Product Image Frame */}
-                  <div className="relative w-full h-36 sm:h-42 md:h-46 rounded-2xl overflow-hidden bg-black/20 border border-white/15 shadow-inner">
-                    <Image
-                      src={slide.productImage || "/placeholder.png"}
-                      alt={slide.productTitle}
-                      fill
-                      sizes="(max-width: 640px) 50vw, 25vw"
-                      className="object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                    <span className="absolute top-2.5 left-2.5 bg-slate-950/90 backdrop-blur-md text-amber-400 border border-amber-400/30 text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-lg shadow-sm">
-                      {slide.floatingBadge}
-                    </span>
-                  </div>
-
-                  {/* Blended Product Information */}
-                  <div className="pt-3 space-y-1.5 text-white">
-                    <div className="text-xs sm:text-sm font-bold text-white line-clamp-1 leading-snug drop-shadow-sm">
-                      {slide.productTitle}
-                    </div>
-                    <div className="flex items-center justify-between pt-0.5">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-base sm:text-lg lg:text-xl font-black text-amber-300 tracking-tight">
-                          {slide.productPrice}
-                        </span>
-                        <span className="text-xs text-white/60 line-through">
-                          {slide.productOriginalPrice}
-                        </span>
-                      </div>
-                      <span className="text-xs text-amber-300 font-black bg-white/20 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-white/20 shadow-xs">
-                        {slide.productRating}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+              <div className="pt-4 flex items-center gap-4">
+                <Link
+                  href={slide.primaryHref}
+                  className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                    slide.bgClass === 'bg-slate-900' 
+                      ? 'bg-white text-slate-900 hover:bg-slate-100' 
+                      : 'bg-slate-900 text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {slide.primaryCta}
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
             </div>
-          </div>
 
-          {/* Bottom Actions & Slider Controls */}
-          <div className="flex flex-row items-center justify-between gap-3 z-10 pt-3 border-t border-black/10">
-            <div className="flex items-center gap-3">
-              <Link
-                href={slide.primaryHref}
-                className="bg-slate-950 hover:bg-slate-900 text-white font-black px-6 py-2.5 rounded-xl text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-md hover:scale-105 transition-all"
-              >
-                <span>{slide.primaryCta}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-
-              {/* Slider Dots */}
-              <div className="flex items-center gap-1.5">
-                {slides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentSlide(idx)}
-                    className={`h-2 rounded-full transition-all cursor-pointer ${
-                      currentSlide === idx
-                        ? "w-6 bg-slate-950"
-                        : "w-2 bg-slate-950/30 hover:bg-slate-950/60"
-                    }`}
-                    aria-label={`Go to slide ${idx + 1}`}
+            {/* Image Right */}
+            <div className="w-full md:w-1/2 h-48 md:h-full relative mt-8 md:mt-0 flex items-center justify-end z-10">
+               <div className="relative w-full h-[120%] -right-12 md:-right-24 top-0 md:top-8 overflow-hidden rounded-[2rem] md:rounded-[3rem] shadow-2xl rotate-[-2deg] group-hover:rotate-[-1deg] group-hover:scale-105 transition-all duration-700 ease-out">
+                  <Image
+                    src={slide.productImage}
+                    alt={slide.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    priority
                   />
-                ))}
-              </div>
+               </div>
             </div>
+          </div>
 
-            {/* Slider Arrow Buttons */}
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() =>
-                  setCurrentSlide(
-                    (prev) =>
-                      (prev - 1 + slides.length) % slides.length,
-                  )
-                }
-                className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
-                aria-label="Previous slide"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() =>
-                  setCurrentSlide((prev) => (prev + 1) % slides.length)
-                }
-                className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-950 shadow-xs hover:scale-105 transition-all cursor-pointer"
-                aria-label="Next slide"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+          {/* Controls */}
+          <div className="absolute bottom-8 left-8 sm:left-10 lg:left-12 flex items-center gap-3 z-30">
+            <div className="flex gap-1.5">
+              {slides.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentSlide(idx)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    currentSlide === idx
+                      ? slide.bgClass === 'bg-slate-900' ? "w-8 bg-white" : "w-8 bg-slate-900"
+                      : slide.bgClass === 'bg-slate-900' ? "w-2 bg-white/30 hover:bg-white/50" : "w-2 bg-slate-900/30 hover:bg-slate-900/50"
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
             </div>
           </div>
         </div>
 
-        {/* ── 2. Right Side Showcase Cards (Compact Stack) ────────────────── */}
-        <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3.5">
-          {/* Card 1: Live Lightning Deal Product Showcase */}
-          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white rounded-3xl p-4 sm:p-5 border border-slate-800 flex flex-col justify-between shadow-md relative overflow-hidden group">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20 flex items-center gap-1">
-                <Zap className="w-3 h-3 fill-amber-400" />
-                <span>DEAL OF THE DAY</span>
+        {/* 2. Right Stack (4 Cols) */}
+        <div className="xl:col-span-4 flex flex-col gap-5 min-h-[460px]">
+          
+          {/* Card 1: Deal of the Day (Glass/Refined) */}
+          <div className="flex-1 bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between group">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-rose-600 bg-rose-50 px-3 py-1 rounded-full flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 fill-rose-600" />
+                Lightning Deal
               </span>
 
-              {/* Ticking countdown */}
-              <div className="flex items-center gap-1 font-mono font-black text-xs text-amber-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-white/10">
-                <Clock className="w-3 h-3" />
-                <span>{String(timeLeft.hours).padStart(2, "0")}:</span>
-                <span>{String(timeLeft.minutes).padStart(2, "0")}:</span>
-                <span>{String(timeLeft.seconds).padStart(2, "0")}</span>
+              <div className="flex items-center gap-1 font-medium text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                <Clock className="w-3.5 h-3.5" />
+                {String(timeLeft.hours).padStart(2, "0")}:{String(timeLeft.minutes).padStart(2, "0")}:{String(timeLeft.seconds).padStart(2, "0")}
               </div>
             </div>
 
-            {/* Featured Deal Product Visual Layout */}
-            <div className="flex items-center gap-3 my-2.5 bg-white/5 p-2.5 rounded-xl border border-white/10">
-              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 relative">
+            <div className="flex items-center gap-4 my-2">
+              <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shrink-0 relative">
                 {dealProduct?.imageUrl ? (
                   <Image
                     src={dealProduct.imageUrl}
                     alt={dealProduct.title}
                     fill
-                    sizes="64px"
-                    className="object-cover group-hover:scale-108 transition-transform duration-300"
+                    sizes="80px"
+                    className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-600">
+                  <div className="w-full h-full flex items-center justify-center text-slate-300">
                     <ShoppingBag className="w-6 h-6" />
                   </div>
                 )}
-                {dealProduct?.discountPercent ? (
-                  <span className="absolute top-0.5 left-0.5 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
-                    -{dealProduct.discountPercent}% OFF
-                  </span>
-                ) : null}
               </div>
 
-              <div className="min-w-0 space-y-0.5">
-                <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              <div className="min-w-0 space-y-1">
+                <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
                   <span className="truncate">{dealProduct?.storeName || "Waw Marketplace"}</span>
                 </div>
-                <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 leading-snug">
-                  {dealProduct?.title || "Loading deal..."}
+                <h4 className="text-sm font-medium text-slate-900 line-clamp-2 leading-snug">
+                  {dealProduct?.title || "Curating today's best deal..."}
                 </h4>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-sm font-black text-amber-400">
+                <div className="flex items-baseline gap-2 pt-1">
+                  <span className="text-base font-semibold text-slate-900">
                     PKR {(dealProduct?.pricePkr || 0).toLocaleString()}
                   </span>
                   {dealProduct?.originalPricePkr ? (
-                    <span className="text-[10px] text-slate-500 line-through">
-                      PKR {dealProduct.originalPricePkr.toLocaleString()}
+                    <span className="text-xs text-slate-400 line-through">
+                      {(dealProduct.originalPricePkr).toLocaleString()}
                     </span>
                   ) : null}
                 </div>
               </div>
             </div>
 
-            {/* 1-Click Buy Action */}
             <button
               onClick={handleQuickAdd}
-              className={`w-full py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer ${
+              className={`w-full mt-4 py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 transition-all ${
                 dealAdded
-                  ? "bg-emerald-600 text-white"
-                  : "bg-amber-400 hover:bg-amber-500 text-slate-950"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-slate-900 hover:bg-slate-800 text-white shadow-sm"
               }`}
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>
-                {dealAdded ? "ADDED TO CART!" : dealProduct ? `CLAIM DEAL FOR PKR ${dealProduct.pricePkr.toLocaleString()}` : "LOADING DEAL..."}
-              </span>
+              <ShoppingBag className="w-4 h-4" />
+              {dealAdded ? "Added to Cart" : "Claim Lightning Deal"}
             </button>
           </div>
 
-          {/* Card 2: 100% Buyer Protection & Smart Savings */}
-          <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 text-slate-950 rounded-3xl p-4 sm:p-5 border border-amber-300 flex flex-col justify-between shadow-md relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                <span>SECURE CHECKOUT</span>
-              </span>
-              <span className="text-[10px] font-black text-slate-950 bg-white/90 px-2 py-0.5 rounded-md border border-amber-200">
-                100% SAFE
+          {/* Card 2: Trust & Savings */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-[2rem] p-6 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              </div>
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                100% Safe Checkout
               </span>
             </div>
 
-            <div className="space-y-1 my-2">
-              <h3 className="text-sm sm:text-base font-black text-slate-950 leading-snug">
-                Save PKR 100 on Every Order!
+            <div className="space-y-1.5 mb-4">
+              <h3 className="text-base font-medium text-slate-900">
+                Save PKR 100 on Orders
               </h3>
-              <p className="text-xs text-slate-700 leading-snug font-medium line-clamp-2">
-                Pay online using Debit / Credit Card or Instant QR to waive the
-                standard COD handling fee.
+              <p className="text-sm text-slate-500 leading-relaxed max-w-[90%]">
+                Pay online using Debit / Credit Card to waive the standard COD fee.
               </p>
             </div>
 
             <Link
               href="/buyer-protection"
-              className="text-xs font-black text-slate-950 bg-white hover:bg-slate-950 hover:text-white px-3.5 py-2 rounded-xl border border-amber-300 shadow-2xs flex items-center justify-between transition-all group"
+              className="inline-flex items-center text-sm font-medium text-slate-900 hover:text-blue-600 transition-colors group/link"
             >
-              <span>Learn about Buyer Protection & Escrow</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              Learn about Buyer Protection
+              <ArrowRight className="w-4 h-4 ml-1 group-hover/link:translate-x-1 transition-transform" />
             </Link>
           </div>
+
         </div>
       </div>
-
-      
     </section>
   );
 }
