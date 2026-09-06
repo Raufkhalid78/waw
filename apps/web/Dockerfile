@@ -1,5 +1,6 @@
-# Stage 1: Build Next.js Web Storefront
-FROM node:20-alpine AS builder
+# Build context MUST be the monorepo root:
+#   docker build -f apps/web/Dockerfile -t waw-web .
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package*.json turbo.json ./
@@ -10,8 +11,8 @@ RUN npm ci --workspace=@waw/types --workspace=@waw/ui --workspace=@waw/web
 RUN npm run build --workspace=@waw/types
 RUN npm run build --workspace=@waw/web
 
-# Stage 2: Production Runner
-FROM node:20-alpine AS runner
+# ─── Stage 2: Production Runner ───────────────────────────────────────────────
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -23,4 +24,7 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 COPY --from=builder /app/apps/web/package.json ./apps/web/package.json
 
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
+
 CMD ["npm", "start", "--workspace=@waw/web"]

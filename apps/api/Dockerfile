@@ -1,7 +1,7 @@
 # ─── Stage 1: Build ────────────────────────────────────────────────────────────
 # Build context MUST be the monorepo root:
 #   docker build -f apps/api/Dockerfile -t waw-api .
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # 1. Copy workspace manifests first (better layer caching)
@@ -22,7 +22,7 @@ RUN npm run build --workspace=@waw/types
 RUN npm run build --workspace=@waw/api
 
 # ─── Stage 2: Production Runner ───────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
