@@ -55,11 +55,14 @@ export class ConfigService {
 
       const config: MarketplaceConfig = {};
       for (const row of data) {
-        // Try to parse as number, boolean, or keep as string
+        // Try to parse as number, boolean, or keep as string.
+        // IMPORTANT: only coerce PURE digit strings — values like phone
+        // numbers ("+923001234567") would silently lose their "+" via
+        // Number() and break string operations downstream.
         const val = row.value;
         if (val === "true") config[row.key] = true;
         else if (val === "false") config[row.key] = false;
-        else if (!isNaN(Number(val)) && val !== "") config[row.key] = Number(val);
+        else if (/^\d+$/.test(String(val))) config[row.key] = Number(val);
         else config[row.key] = val;
       }
 

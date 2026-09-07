@@ -20,11 +20,12 @@ export async function getMarketplaceConfig(_req: Request, res: Response) {
       dispatchWindowHours: config.dispatch_window_hours ?? 24,
       heavyParcelWeightKg: config.heavy_parcel_weight_kg ?? 5,
 
-      // Contact
-      whatsappNumber: config.whatsapp_number ?? "+923001234567",
-      supportEmail: config.support_email ?? "support@waw.pk",
-      careEmail: config.care_email ?? "care@waw.com.pk",
-      supportPhone: config.support_phone ?? "+92 300 1234567",
+      // Contact (String() — config values may be stored/typed numerically;
+      // phone numbers must always serialize as strings)
+      whatsappNumber: String(config.whatsapp_number ?? "+923001234567"),
+      supportEmail: String(config.support_email ?? "support@waw.pk"),
+      careEmail: String(config.care_email ?? "care@waw.com.pk"),
+      supportPhone: String(config.support_phone ?? "+92 300 1234567"),
 
       // URLs
       siteUrl: config.site_url ?? "https://waw.com.pk",

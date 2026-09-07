@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
 import { useLanguage } from "@/components/ui/LanguageProvider";
+import { getApiBaseUrl } from "@/lib/api";
 import { logger } from "@/lib/logger";
 import { CartDrawer } from "./CartDrawer";
 import { AuthModal } from "./AuthModal";
@@ -140,7 +141,8 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
   useEffect(() => {
     async function loadConfig() {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/config/storefront`);
+        // getApiBaseUrl() strips trailing slashes (avoids //api/... double-slash 404s)
+        const res = await fetch(`${getApiBaseUrl()}/api/config/storefront`);
         if (res.ok) {
           const data = await res.json();
           setConfig(data);

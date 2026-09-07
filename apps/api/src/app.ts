@@ -811,7 +811,7 @@ app.get("/api/marketplace-stats", async (_req, res) => {
 
     const [sellers, orders, storeCities, reviews] = await Promise.all([
       supabaseAdmin.from("stores").select("id", { count: "exact", head: true }).eq("status", "ACTIVE"),
-      supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("status", "DELIVERED"),
+      supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("global_status", "DELIVERED"),
       supabaseAdmin.from("stores").select("city").eq("status", "ACTIVE"),
       supabaseAdmin.from("reviews").select("rating").limit(1000),
     ]);

@@ -16,7 +16,7 @@ import {
   Phone,
   ChevronRight,
 } from "lucide-react";
-import { fetchServiceableCities, ServiceableCity, fetchCities, type City } from "@/lib/api";
+import { fetchServiceableCities, ServiceableCity, fetchCities, getApiBaseUrl, type City } from "@/lib/api";
 import { fetchWithCsrf } from "@/lib/csrf";
 
 const CATEGORIES = [
@@ -120,7 +120,7 @@ export default function SellOnWawPage() {
     setIsSubmitting(true);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const API_URL = getApiBaseUrl();
       const res = await fetchWithCsrf(`${API_URL}/api/seller/apply`, {
         method: "POST",
         credentials: "include",

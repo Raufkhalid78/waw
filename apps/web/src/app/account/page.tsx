@@ -20,7 +20,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { fetchUserOrders, fetchUserAddresses, createUserAddress, deleteUserAddress, fetchCities, type UserAddress, type City } from "@/lib/api";
+import { fetchUserOrders, fetchUserAddresses, createUserAddress, deleteUserAddress, fetchCities, getApiBaseUrl, type UserAddress, type City } from "@/lib/api";
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -77,7 +77,7 @@ export default function AccountPage() {
   useEffect(() => {
     async function loadSession() {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const API_URL = getApiBaseUrl();
         const res = await fetch(`${API_URL}/api/auth/session/me`, {
           credentials: "include",
         });
