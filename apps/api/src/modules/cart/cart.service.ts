@@ -211,7 +211,21 @@ export class CartService {
   /**
    * Merge guest cart into user cart after login
    */
+  /**
+   * Guest tokens are client-generated. We can't verify possession
+   * cryptographically, but we can enforce the canonical format the client
+   * produces so attackers can't probe arbitrary DB keys with junk strings.
+   * Format: guest_<ms timestamp>_<12 base36 chars>
+   */
+  private static isValidGuestToken(token: string): boolean {
+    return /^guest_\d{10,15}_[a-z0-9]{10,32}$/.test(token);
+  }
+
   static async mergeGuestCartToUser(guestToken: string, userId: string) {
+    if (!this.isValidGuestToken(guestToken)) {
+      throw new Error("Invalid guest token format");
+    }
+
     // Get or create user cart
     let { data: userCart } = await supabaseAdmin
       .from("carts")
@@ -248,6 +262,10 @@ export class CartService {
     let mergedCount = 0;
 
     for (const item of guestItems) {
+      // Clamp merged quantity to a sane bound (anti-abuse: no 1,000,000-unit rows)
+      const qty = Math.min(Math.max(1, Math.floor(Number(item.quantity) || 0)), 99);
+      if (qty < 1) continue;
+
       const { data: existingItem } = await supabaseAdmin
         .from("cart_items")
         .select("id, quantity")
@@ -257,9 +275,10 @@ export class CartService {
         .maybeSingle();
 
       if (existingItem) {
+        const newQty = Math.min(existingItem.quantity + qty, 99);
         await supabaseAdmin
           .from("cart_items")
-          .update({ quantity: existingItem.quantity + item.quantity })
+          .update({ quantity: newQty })
           .eq("id", existingItem.id);
       } else {
         await supabaseAdmin
@@ -268,17 +287,22 @@ export class CartService {
             cart_id: userCart.id,
             product_id: item.product_id,
             variant_id: item.variant_id,
-            quantity: item.quantity,
+            quantity: qty,
           });
       }
       mergedCount++;
     }
 
-    // Clear guest cart
+    // Clear guest cart items and remove the guest cart row
     await supabaseAdmin
       .from("cart_items")
       .delete()
       .eq("cart_id", guestCart.id);
+
+    await supabaseAdmin
+      .from("carts")
+      .delete()
+      .eq("id", guestCart.id);
 
     return { merged: mergedCount };
   }

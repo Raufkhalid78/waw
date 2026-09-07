@@ -41,9 +41,11 @@ export const ENV = {
   SUPABASE_URL: optionalEnv("SUPABASE_URL"),
   SUPABASE_ANON_KEY: optionalEnv("SUPABASE_ANON_KEY"),
   SUPABASE_SERVICE_ROLE_KEY: optionalEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  SELLER_PORTAL_URL: process.env.SELLER_PORTAL_URL || "https://seller.waw.com.pk",
 
   // Security & JWT
   JWT_SECRET: optionalEnv("JWT_SECRET"),
+  GUEST_TOKEN_SECRET: process.env.GUEST_TOKEN_SECRET || "",
   ALLOW_TEST_OTP: process.env.ALLOW_TEST_OTP === "true",
 
   // Redis for Queues & Concurrency Locks
@@ -148,6 +150,9 @@ if (ENV.NODE_ENV === "production") {
   const log = getLogger();
   const warn = (msg: string) => log ? log.warn(msg) : console.warn(msg);
 
+  if (!ENV.GUEST_TOKEN_SECRET) {
+    warn("[SECURITY] GUEST_TOKEN_SECRET not set - guest checkout will be REJECTED at runtime.");
+  }
   if (!FEATURES.COURIER_ENABLED) {
     warn("[SECURITY] POSTEX_API_TOKEN not set - courier booking is DISABLED.");
   }

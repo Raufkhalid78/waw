@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { HelpCircle, Mail } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
-import { fetchCategories, fetchStores } from "@/lib/api";
+import { fetchCategories, fetchStores, fetchMarketplaceConfig, type MarketplaceConfig } from "@/lib/api";
 
 export function Footer() {
   const [showComingSoon, setShowComingSoon] = useState(false);
@@ -26,6 +26,7 @@ export function Footer() {
   });
 
   const [topBrands, setTopBrands] = useState<{ name: string; slug: string; isVerified?: boolean }[]>([]);
+  const [config, setConfig] = useState<MarketplaceConfig | null>(null);
 
   useEffect(() => {
     async function loadFooterData() {
@@ -105,6 +106,7 @@ export function Footer() {
       }
     }
     loadFooterData();
+    fetchMarketplaceConfig().then(setConfig).catch(() => {});
   }, []);
 
   const { electronics, womensFashion, mensHeritage, beautyAttar, sports, homeHeritage } =
@@ -112,9 +114,9 @@ export function Footer() {
 
   return (
     <>
-    <footer className="bg-white border-t border-slate-200 text-slate-700 text-xs font-sans">
+    <footer className="bg-white border-t border-slate-200 text-slate-700 text-xs font-sans dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300">
       {/* ── 1. Top "We're Always Here To Help" Strip ────────────────────────── */}
-      <div className="bg-[#F7F7FA] border-b border-slate-200 py-7 px-3 sm:px-6 lg:px-10 xl:px-12">
+      <div className="bg-[#F7F7FA] border-b border-slate-200 py-7 px-3 sm:px-6 lg:px-10 xl:px-12 dark:bg-slate-800 dark:border-slate-700">
         <div className="w-full flex flex-col lg:flex-row items-center justify-between gap-6">
           {/* Left Title */}
           <div className="text-center lg:text-left space-y-1">
@@ -149,7 +151,7 @@ export function Footer() {
 
             {/* Email Support */}
             <a
-              href="mailto:care@waw.com.pk"
+              href={`mailto:${config?.careEmail ?? 'care@waw.com.pk'}`}
               className="flex items-center gap-3.5 group text-left hover:text-amber-600 transition-colors"
             >
               <div className="w-11 h-11 rounded-full border border-slate-300 bg-white flex items-center justify-center text-slate-700 group-hover:border-amber-400 group-hover:text-amber-600 transition-all shadow-xs group-hover:scale-105">
@@ -160,14 +162,14 @@ export function Footer() {
                   EMAIL SUPPORT
                 </div>
                 <div className="text-xs font-black text-slate-900 group-hover:text-amber-600 mt-0.5">
-                  care@waw.com.pk
+                  {config?.careEmail ?? 'care@waw.com.pk'}
                 </div>
               </div>
             </a>
 
             {/* WhatsApp 24/7 Helpline */}
             <a
-              href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "+923001234567").replace(/[^0-9]/g, "")}`}
+              href={`https://wa.me/${(config?.whatsappNumber || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "+923001234567").replace(/[^0-9]/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3.5 group text-left hover:text-emerald-600 transition-colors"
@@ -579,7 +581,7 @@ export function Footer() {
             <div className="flex items-center gap-2">
               {/* Facebook */}
               <a
-                href="https://facebook.com"
+                href={config?.facebookUrl || "https://facebook.com"}
                 target="_blank"
                 rel="noreferrer"
                 className="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 flex items-center justify-center transition-all hover:scale-110 shadow-xs"
@@ -592,7 +594,7 @@ export function Footer() {
 
               {/* X (Twitter) */}
               <a
-                href="https://twitter.com"
+                href={config?.twitterUrl || "https://twitter.com"}
                 target="_blank"
                 rel="noreferrer"
                 className="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 flex items-center justify-center transition-all hover:scale-110 shadow-xs"
@@ -605,7 +607,7 @@ export function Footer() {
 
               {/* Instagram */}
               <a
-                href="https://instagram.com"
+                href={config?.instagramUrl || "https://instagram.com"}
                 target="_blank"
                 rel="noreferrer"
                 className="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 flex items-center justify-center transition-all hover:scale-110 shadow-xs"
@@ -618,7 +620,7 @@ export function Footer() {
 
               {/* LinkedIn */}
               <a
-                href="https://linkedin.com"
+                href={config?.linkedinUrl || "https://linkedin.com"}
                 target="_blank"
                 rel="noreferrer"
                 className="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 flex items-center justify-center transition-all hover:scale-110 shadow-xs"
@@ -631,7 +633,7 @@ export function Footer() {
 
               {/* YouTube */}
               <a
-                href="https://youtube.com"
+                href={config?.youtubeUrl || "https://youtube.com"}
                 target="_blank"
                 rel="noreferrer"
                 className="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-500 text-slate-950 flex items-center justify-center transition-all hover:scale-110 shadow-xs"

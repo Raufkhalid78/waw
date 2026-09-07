@@ -3,13 +3,13 @@
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useCartStore } from "@/store/useCartStore";
+import { useLanguage } from "@/components/ui/LanguageProvider";
 import { ChevronLeft, ChevronRight, Grid3X3 } from "lucide-react";
 import { fetchCategories } from "@/lib/api";
 
 export function CategoryCircles() {
-  const { language } = useCartStore();
-  const isUrdu = language === "UR";
+  const { language } = useLanguage();
+  const isUrdu = language === "ur";
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);

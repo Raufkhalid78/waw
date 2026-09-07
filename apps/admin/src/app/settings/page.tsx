@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save, Globe, MessageSquare, CreditCard, Loader2, Shield } from "lucide-react";
+import { Save, Globe, MessageSquare, CreditCard, Loader2, Shield, Tag } from "lucide-react";
 import Link from "next/link";
 import { settingsApi, type MarketplaceSettings } from "@/lib/api";
 import { FadeIn, Stagger } from "@/components/Motion";
@@ -11,11 +11,18 @@ const DEFAULT_SETTINGS: MarketplaceSettings = {
   marketplace_name: "Waw",
   default_currency: "PKR",
   default_commission_pct: 10,
-  free_delivery_threshold: 5000,
-  default_shipping_fee: 200,
-  cod_fee: 100,
+  free_delivery_threshold_pkr: 5000,
+  default_shipping_fee_pkr: 200,
+  cod_handling_fee_pkr: 100,
+  gst_rate_percentage: 18,
   whatsapp_number: "",
   support_email: "",
+  discount_tier_1_threshold: 30,
+  discount_tier_2_threshold: 40,
+  discount_tier_3_threshold: 45,
+  best_seller_days: 30,
+  best_seller_limit: 20,
+  new_arrival_days: 14,
 };
 
 export default function SettingsPage() {
@@ -180,9 +187,9 @@ export default function SettingsPage() {
               </label>
               <input
                 type="number"
-                value={localSettings.free_delivery_threshold || 0}
+                value={localSettings.free_delivery_threshold_pkr || 0}
                 onChange={(e) =>
-                  handleChange("free_delivery_threshold", Number(e.target.value))
+                  handleChange("free_delivery_threshold_pkr", Number(e.target.value))
                 }
                 className="admin-input"
               />
@@ -193,9 +200,9 @@ export default function SettingsPage() {
               </label>
               <input
                 type="number"
-                value={localSettings.default_shipping_fee || 0}
+                value={localSettings.default_shipping_fee_pkr || 0}
                 onChange={(e) =>
-                  handleChange("default_shipping_fee", Number(e.target.value))
+                  handleChange("default_shipping_fee_pkr", Number(e.target.value))
                 }
                 className="admin-input"
               />
@@ -206,8 +213,100 @@ export default function SettingsPage() {
               </label>
               <input
                 type="number"
-                value={localSettings.cod_fee || 0}
-                onChange={(e) => handleChange("cod_fee", Number(e.target.value))}
+                value={localSettings.cod_handling_fee_pkr || 0}
+                onChange={(e) => handleChange("cod_handling_fee_pkr", Number(e.target.value))}
+                className="admin-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                GST Rate (%)
+              </label>
+              <input
+                type="number"
+                value={localSettings.gst_rate_percentage || 0}
+                onChange={(e) => handleChange("gst_rate_percentage", Number(e.target.value))}
+                className="admin-input"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Badges & Discovery */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+              <Tag className="w-4 h-4 text-gray-600" />
+            </div>
+            <h2 className="text-sm font-semibold text-gray-900">Badges &amp; Discovery</h2>
+          </div>
+          <p className="text-xs text-gray-500 mb-4">
+            Thresholds for product badges shown across the storefront. Changes apply within 5 minutes.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Waw Deal Tier 1 (min discount %)
+              </label>
+              <input
+                type="number"
+                value={localSettings.discount_tier_1_threshold ?? 30}
+                onChange={(e) => handleChange("discount_tier_1_threshold", Number(e.target.value))}
+                className="admin-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Hot Deal Tier 2 (min discount %)
+              </label>
+              <input
+                type="number"
+                value={localSettings.discount_tier_2_threshold ?? 40}
+                onChange={(e) => handleChange("discount_tier_2_threshold", Number(e.target.value))}
+                className="admin-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Mega Deal Tier 3 (min discount %)
+              </label>
+              <input
+                type="number"
+                value={localSettings.discount_tier_3_threshold ?? 45}
+                onChange={(e) => handleChange("discount_tier_3_threshold", Number(e.target.value))}
+                className="admin-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Best Seller Window (days)
+              </label>
+              <input
+                type="number"
+                value={localSettings.best_seller_days ?? 30}
+                onChange={(e) => handleChange("best_seller_days", Number(e.target.value))}
+                className="admin-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Best Seller Limit (products)
+              </label>
+              <input
+                type="number"
+                value={localSettings.best_seller_limit ?? 20}
+                onChange={(e) => handleChange("best_seller_limit", Number(e.target.value))}
+                className="admin-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                New Arrival Window (days)
+              </label>
+              <input
+                type="number"
+                value={localSettings.new_arrival_days ?? 14}
+                onChange={(e) => handleChange("new_arrival_days", Number(e.target.value))}
                 className="admin-input"
               />
             </div>

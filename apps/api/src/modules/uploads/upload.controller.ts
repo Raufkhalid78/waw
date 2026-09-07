@@ -119,8 +119,19 @@ export class UploadController {
         return;
       }
 
-      // Decode path from URL
       const decodedPath = decodeURIComponent(path);
+      const user = (req as any).user;
+
+      // Ownership check: path format is {userId}/{timestamp}-{random}.{ext}
+      // The first segment is the userId who uploaded the file
+      const pathOwner = decodedPath.split("/")[0];
+      const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+
+      if (!isAdmin && pathOwner !== user?.id) {
+        res.status(403).json({ error: "You can only delete your own files" });
+        return;
+      }
+
       await UploadService.delete(bucket as any, decodedPath);
 
       res.json({ success: true });

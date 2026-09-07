@@ -42,8 +42,7 @@ export async function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction,
-): Promise<void> {
-  const token = resolveAccessToken(req);
+): Promise<void> {  const token = resolveAccessToken(req);
   if (!token) {
     res
       .status(401)
@@ -155,4 +154,41 @@ export async function requireAuth(
   } catch (err: any) {
     res.status(401).json({ error: `Authentication failed: ${err.message}` });
   }
+}
+
+/**
+ * Attaches req.user when a valid session exists, but NEVER rejects.
+ * Used by endpoints that serve both authenticated users and guests
+ * (e.g. payment initiation — guests prove ownership via phone match).
+ */
+export async function attachOptionalUser(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const token = resolveAccessToken(req);
+  if (!token) return next();
+
+  try {
+    const session = await SessionService.validateSession(token);
+    if (!session) return next();
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("role, phone, email, is_banned")
+      .eq("id", session.userId)
+      .single();
+
+    if (profile?.is_banned) return next();
+
+    req.user = {
+      id: session.userId,
+      phone: profile?.phone || session.userPhone || "",
+      email: profile?.email || session.userEmail,
+      role: (profile?.role as UserRole) || UserRole.BUYER,
+    };
+  } catch {
+    // Invalid/expired token on an optional-auth endpoint = anonymous
+  }
+  next();
 }

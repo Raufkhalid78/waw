@@ -4,6 +4,7 @@ import { redis } from "../../config/redis.js";
 import { ENV } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 import { ServiceabilityService } from "../logistics/serviceability.service.js";
+import { ConfigService } from "../admin/config.service.js";
 import {
   CheckoutQuoteRequest,
   CheckoutQuoteResponse,
@@ -155,7 +156,7 @@ export class QuoteService {
         storeId: offerData.store_id,
         storeName: offerData.store.name,
         sellerCity: offerData.store.city,
-        commissionRatePercentage: offerData.store.commission_rate_percentage || 10,
+        commissionRatePercentage: offerData.store.commission_rate_percentage ?? 10,
         sellerType: SellerType.THIRD_PARTY,
         unitPricePkr: unitPrice,
         quantity: item.quantity,
@@ -163,12 +164,18 @@ export class QuoteService {
       });
     }
 
-    // 3. Delivery Fee Policy (Free Delivery >= PKR 5,000)
-    let shippingFeePkr = subtotalPkr >= (ENV.FREE_DELIVERY_THRESHOLD_PKR || 5000) ? 0 : 200;
+    // 3. Delivery Fee Policy — config-driven from marketplace_settings (DB),
+    // matching what the checkout RPCs read. Admin edits apply everywhere.
+    const [freeThreshold, shippingFee, codFee] = await Promise.all([
+      ConfigService.getNumber("free_delivery_threshold_pkr", 5000),
+      ConfigService.getNumber("default_shipping_fee_pkr", 200),
+      ConfigService.getNumber("cod_handling_fee_pkr", 100),
+    ]);
+    let shippingFeePkr = subtotalPkr >= freeThreshold ? 0 : shippingFee;
 
-    // 4. COD Fee Policy (+PKR 100)
+    // 4. COD Fee Policy
     const isCod = input.paymentMethod === PaymentMethod.COD;
-    const codFeePkr = isCod ? (ENV.DEFAULT_COD_FEE_PKR || 100) : 0;
+    const codFeePkr = isCod ? codFee : 0;
 
     let couponDiscountPkr = 0;
     let appliedCoupon: any = undefined;
@@ -217,9 +224,10 @@ export class QuoteService {
       }
     }
     
-    // GST (18%) on taxable amount
+    // GST on taxable amount (rate from marketplace config, default 18%)
+    const gstRate = await ConfigService.getNumber("gst_rate_percentage", 18) / 100;
     const taxableAmount = Math.max(0, subtotalPkr - couponDiscountPkr - loyaltyDiscountPkr) + shippingFeePkr + codFeePkr;
-    const gstPkr = Math.round(taxableAmount * 0.18);
+    const gstPkr = Math.round(taxableAmount * gstRate);
     const totalPkr = taxableAmount + gstPkr;
 
     // 5. Generate secure quote token

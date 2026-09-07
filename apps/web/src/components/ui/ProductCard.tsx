@@ -14,7 +14,10 @@ import {
   Truck,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
+import { useLanguage } from "@/components/ui/LanguageProvider";
 import { SellerType } from "@waw/types";
+import { Badge } from "@/lib/api";
+import { ProductBadge } from "./ProductBadge";
 
 export interface ProductCardProps {
   productId: string;
@@ -35,6 +38,8 @@ export interface ProductCardProps {
   sellerType?: SellerType;
   soldCount?: number;
   hasVariants?: boolean;
+  badges?: Badge[];
+  isFeaturedStore?: boolean;
 }
 
 export function ProductCard({
@@ -53,11 +58,15 @@ export function ProductCard({
   sellerType = SellerType.THIRD_PARTY,
   soldCount,
   hasVariants = false,
+  badges = [],
+  isFeaturedStore = false,
 }: ProductCardProps) {
-  const { addItem, toggleWishlist, isInWishlist, language } = useCartStore();
-  const isUrdu = language === "UR";
+  const { addItem, toggleWishlist, isInWishlist } = useCartStore();
+  const { language } = useLanguage();
+  const isUrdu = language === "ur";
   const wishlisted = isInWishlist(productId);
   const [added, setAdded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const isVerifiedMerchant = isExpress || sellerType === SellerType.FIRST_PARTY;
   const hasRealDiscount = originalPricePkr !== undefined && originalPricePkr > pricePkr;
@@ -87,27 +96,26 @@ export function ProductCard({
   const displayTitle = isUrdu && titleUrdu ? titleUrdu : title;
 
   return (
-    <div className="group relative bg-white rounded-xl border border-gray-200 hover:border-amber-400/60 hover:shadow-lg transition-all duration-200 flex flex-col overflow-hidden">
+    <div className="group relative bg-white rounded-xl border border-gray-200 hover:border-amber-400/60 hover:shadow-lg transition-all duration-200 flex flex-col overflow-hidden dark:bg-slate-800 dark:border-slate-700 dark:hover:border-amber-400/60">
       {/* Image Container */}
       <Link href={`/products/${productId}`} className="block relative aspect-square bg-gray-50 overflow-hidden">
         <Image
-          src={imageUrl || "/placeholder.png"}
+          src={imgError || !imageUrl ? "/placeholder.png" : imageUrl}
           alt={title}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           loading="lazy"
+          onError={() => setImgError(true)}
           className="object-cover group-hover:scale-105 transition-transform duration-300"
         />
 
-        {/* Discount Badge */}
-        {hasRealDiscount && discountPercent && discountPercent > 0 && (
-          <span className="absolute top-2 left-2 bg-red-600 text-white text-[11px] font-bold px-2 py-0.5 rounded">
-            -{discountPercent}%
-          </span>
-        )}
+        {/* Product badges (Best Seller / Waw Deal / New Arrival) */}
+        {badges.map((badge, i) => (
+          <ProductBadge key={`${badge.type}-${badge.tier || 0}-${i}`} badge={badge} size="sm" />
+        ))}
 
-        {/* Express Badge */}
-        {isExpress && (
+        {/* Express Badge — shown only if no badge occupies the right corner */}
+        {isExpress && !badges.some((b) => b.position === 'right') && (
           <span className="absolute top-2 right-2 bg-amber-400 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
             <Zap className="w-2.5 h-2.5 fill-current" />
             Express

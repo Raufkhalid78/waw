@@ -14,41 +14,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    // Step 1: Authenticate via API to get JWT
+    const loginRes = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await res.json();
+    const loginData = await loginRes.json();
 
-    if (!res.ok) {
+    if (!loginRes.ok) {
       return NextResponse.json(
-        { error: data.error || "Login failed" },
-        { status: res.status }
+        { error: loginData.error || "Login failed" },
+        { status: loginRes.status }
       );
     }
 
-    if (data.user?.role !== "ADMIN") {
+    if (loginData.user?.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Access denied. Admin only." },
         { status: 403 }
       );
     }
 
-    const response = NextResponse.json({
-      user: data.user,
-      token: data.token,
+    // Step 2: Create a proper server session using the JWT
+    const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: loginData.user.id,
+        authToken: loginData.token,
+        userRole: loginData.user.role,
+        userEmail: loginData.user.email,
+      }),
     });
 
-    // Set HttpOnly cookie server-side (cannot be read by JavaScript)
-    response.cookies.set("waw_admin_token", data.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-    });
+    if (!sessionRes.ok) {
+      return NextResponse.json(
+        { error: "Session creation failed" },
+        { status: 500 }
+      );
+    }
+
+    // Step 3: Forward session cookies from API to the browser
+    const response = NextResponse.json({ user: loginData.user });
+
+    const setCookies = sessionRes.headers.getSetCookie();
+    for (const cookieHeader of setCookies) {
+      response.headers.append("Set-Cookie", cookieHeader);
+    }
 
     return response;
   } catch (err: any) {

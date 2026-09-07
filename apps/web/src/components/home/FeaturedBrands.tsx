@@ -15,7 +15,7 @@ import {
   ChevronRight,
   Store,
 } from "lucide-react";
-import { useCartStore } from "@/store/useCartStore";
+import { useLanguage } from "@/components/ui/LanguageProvider";
 import { fetchStores, type StoreSummary } from "@/lib/api";
 
 const AVATAR_COLORS = [
@@ -28,8 +28,8 @@ const AVATAR_COLORS = [
 ];
 
 export function FeaturedBrands() {
-  const { language } = useCartStore();
-  const isUrdu = language === "UR";
+  const { language } = useLanguage();
+  const isUrdu = language === "ur";
   const [stores, setStores] = useState<StoreSummary[]>([]);
   const [loading, setLoading] = useState(true);
 

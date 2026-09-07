@@ -6,6 +6,7 @@
 import QRCode from "qrcode";
 import { ENV } from "../../config/env.js";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { ConfigService } from "../admin/config.service.js";
 
 export interface RaastQrPayloadInput {
   orderId: string;
@@ -28,9 +29,6 @@ export interface RaastQrResult {
 
 export class RaastService {
   private static readonly RAAST_PARTICIPANT_ID = "WAWPK001";
-  private static readonly DEFAULT_MERCHANT_ALIAS = "waw.market@hbl";
-  private static readonly DEFAULT_MERCHANT_NAME = "Waw Online Shopping PK";
-  private static readonly DEFAULT_MERCHANT_CITY = "Lahore";
 
   /**
    * Generates an EMVCo-compliant dynamic QR code payload with CRC16 checksum.
@@ -40,18 +38,21 @@ export class RaastService {
     input: RaastQrPayloadInput,
   ): Promise<RaastQrResult> {
     const referenceId = `RAAST-${input.orderNumber.replace(/[^A-Z0-9]/gi, "")}-${Date.now().toString().slice(-4)}`;
+    const defaultAlias = await ConfigService.get("raast_merchant_alias") || "waw.market@hbl";
+    const defaultName = await ConfigService.get("raast_merchant_name") || "Waw Online Shopping PK";
+    const defaultCity = await ConfigService.get("default_city") || "Lahore";
     const alias =
       input.merchantIbanOrAlias ||
       process.env.RAAST_MERCHANT_ALIAS ||
-      this.DEFAULT_MERCHANT_ALIAS;
+      defaultAlias;
     const name =
       input.merchantName ||
       process.env.RAAST_MERCHANT_NAME ||
-      this.DEFAULT_MERCHANT_NAME;
+      defaultName;
     const city =
       input.merchantCity ||
       process.env.RAAST_MERCHANT_CITY ||
-      this.DEFAULT_MERCHANT_CITY;
+      defaultCity;
     const formattedAmount = input.amountPkr.toFixed(2);
 
     // EMVCo Tag-Length-Value (TLV) construction

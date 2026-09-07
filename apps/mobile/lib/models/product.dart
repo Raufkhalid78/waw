@@ -19,6 +19,7 @@ class Product {
   final StoreInfo? store;
   final List<ProductVariant>? variants;
   final Map<String, dynamic>? attributes;
+  final Map<String, dynamic>? deliveryEstimate;
   final DateTime? createdAt;
 
   Product({
@@ -42,6 +43,7 @@ class Product {
     this.store,
     this.variants,
     this.attributes,
+    this.deliveryEstimate,
     this.createdAt,
   });
 
@@ -87,6 +89,9 @@ class Product {
           : null,
       attributes: json['attributes'] is Map
           ? Map<String, dynamic>.from(json['attributes'])
+          : null,
+      deliveryEstimate: json['deliveryEstimate'] is Map
+          ? Map<String, dynamic>.from(json['deliveryEstimate'])
           : null,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])

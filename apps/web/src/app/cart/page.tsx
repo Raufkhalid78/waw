@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 import {
@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { MARKETPLACE_CONFIG, PaymentMethod, SellerType } from "@waw/types";
 import { FadeIn } from "@/components/Motion";
+import { fetchMarketplaceConfig, type MarketplaceConfig } from "@/lib/api";
+import { fetchWithCsrf } from "@/lib/csrf";
 
 export default function CartPage() {
   const { items, paymentMethod, setPaymentMethod, updateQuantity, removeItem, getSummary } = useCartStore();
@@ -17,6 +19,11 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPkr: number } | null>(null);
   const [couponError, setCouponError] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
+  const [config, setConfig] = useState<MarketplaceConfig | null>(null);
+
+  useEffect(() => {
+    fetchMarketplaceConfig().then(setConfig).catch(() => {});
+  }, []);
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim().toUpperCase();
@@ -25,7 +32,7 @@ export default function CartPage() {
     setCouponError("");
     try {
       const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
-      const res = await fetch(`${API_BASE_URL}/api/checkout/apply-coupon`, {
+      const res = await fetchWithCsrf(`${API_BASE_URL}/api/checkout/apply-coupon`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -41,6 +48,9 @@ export default function CartPage() {
       }
       const data = await res.json();
       setAppliedCoupon({ code, discountPkr: data.discountPkr || 0 });
+      try {
+        sessionStorage.setItem("waw-cart-coupon", JSON.stringify({ code, discountPkr: data.discountPkr || 0 }));
+      } catch {}
       setCouponCode("");
     } catch {
       setCouponError("Failed to validate coupon");
@@ -50,7 +60,7 @@ export default function CartPage() {
   };
 
   const progressPercentage = Math.min(100, Math.round(
-    (summary.subtotalPkr / MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR) * 100
+    (summary.subtotalPkr / (config?.freeDeliveryThresholdPkr ?? MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR)) * 100
   ));
 
   return (
@@ -220,7 +230,10 @@ export default function CartPage() {
                       )}
                     </div>
                     <button
-                      onClick={() => setAppliedCoupon(null)}
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        try { sessionStorage.removeItem("waw-cart-coupon"); } catch {}
+                      }}
                       className="p-1 text-gray-400 hover:text-red-500 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -271,7 +284,7 @@ export default function CartPage() {
                 )}
                 {summary.gstPkr > 0 && (
                   <div className="flex justify-between text-gray-600">
-                    <span>GST (18%)</span>
+                    <span>GST ({config?.gstRatePercentage ?? 18}%)</span>
                     <span className="font-medium text-gray-900">PKR {summary.gstPkr.toLocaleString()}</span>
                   </div>
                 )}
@@ -283,7 +296,7 @@ export default function CartPage() {
                 )}
                 <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-200">
                   <span>Total</span>
-                  <span>PKR {summary.totalPkr.toLocaleString()}</span>
+                  <span>PKR {Math.max(0, summary.totalPkr - (appliedCoupon?.discountPkr || 0)).toLocaleString()}</span>
                 </div>
               </div>
 

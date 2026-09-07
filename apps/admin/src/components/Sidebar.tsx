@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Star,
   Wallet,
+  CreditCard,
   BadgeCheck,
   BarChart3,
   Sparkles,
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/stores", label: "Stores", icon: Store },
   { href: "/payouts", label: "Payouts", icon: Wallet },
+  { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
   { href: "/disputes", label: "Disputes", icon: AlertTriangle },
   { href: "/returns", label: "Returns", icon: RotateCcw },
   { href: "/reviews", label: "Reviews", icon: Star },
@@ -60,8 +62,8 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         credentials: "include",
       });
     } catch {}
-    // Clear the admin token cookie
-    document.cookie = "waw_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    // Clear the session cookie
+    document.cookie = "waw_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     window.location.href = "/login";
   };
 

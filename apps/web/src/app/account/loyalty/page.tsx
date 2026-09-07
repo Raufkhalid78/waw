@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getApiBaseUrl } from "@/lib/api";
 
 interface LoyaltyTransaction {
   id: string;
@@ -19,8 +20,13 @@ export default function LoyaltyPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/loyalty/history?page=${page}&limit=20`)
-      .then((r) => r.json())
+    fetch(`${getApiBaseUrl()}/api/loyalty/history?page=${page}&limit=20`, {
+      credentials: "include",
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load loyalty history");
+        return r.json();
+      })
       .then((data) => {
         setTransactions(data.transactions || []);
         setTotalPages(data.totalPages || 1);

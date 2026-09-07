@@ -49,11 +49,29 @@ export async function GET(request: NextRequest) {
 
           const syncData = await syncRes.json();
 
-          // Redirect with token
-          const redirectUrl = new URL("/", origin);
-          redirectUrl.searchParams.set("auth_token", syncData.token || tokenData.access_token);
-          redirectUrl.searchParams.set("auth_user", JSON.stringify(syncData.user || tokenData.user));
-          return NextResponse.redirect(redirectUrl);
+          // SECURITY: Create server-side session and transfer cookies — never put tokens in URLs
+          const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: syncData.user?.id || tokenData.user?.id,
+              authToken: tokenData.access_token,
+              userPhone: syncData.user?.phone || tokenData.user?.phone || "",
+              userEmail: syncData.user?.email || tokenData.user?.email || "",
+            }),
+          });
+
+          // Build redirect response and transfer session cookies from API
+          const redirectResponse = NextResponse.redirect(new URL("/", origin));
+
+          const setCookies = sessionRes.headers.getSetCookie();
+          for (const cookieHeader of setCookies) {
+            redirectResponse.headers.append("Set-Cookie", cookieHeader);
+          }
+
+          return redirectResponse;
         }
       }
     } catch (err) {

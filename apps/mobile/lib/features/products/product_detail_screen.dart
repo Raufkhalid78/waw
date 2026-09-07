@@ -22,18 +22,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     context.read<ProductCubit>().loadProductBySlug(widget.slug);
   }
 
-  String _getDeliveryEstimate(String? sellerCity) {
-    final city = sellerCity?.toLowerCase() ?? '';
-    if (city.contains('lahore')) {
-      return '1-2 business days (Lahore)';
-    } else if (city.contains('karachi')) {
-      return '2-3 business days (Karachi)';
-    } else if (city.contains('islamabad') || city.contains('rawalpindi')) {
-      return '2-3 business days (Islamabad)';
-    } else if (city.contains('sialkot')) {
-      return '2-4 business days (Sialkot)';
+  String _getDeliveryEstimate(Map<String, dynamic>? deliveryEstimate) {
+    if (deliveryEstimate != null) {
+      final min = deliveryEstimate['min'] ?? 2;
+      final max = deliveryEstimate['max'] ?? 5;
+      return '$min-$max business days';
     }
-    return '3-5 business days (Nationwide)';
+    return '2-5 business days';
   }
 
   @override
@@ -251,7 +246,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                                     ),
                                     Text(
-                                      _getDeliveryEstimate(product.store?.city),
+                                      _getDeliveryEstimate(product.deliveryEstimate),
                                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                     ),
                                     if (product.pricePkr >= 5000)

@@ -3,6 +3,7 @@ import axios from "axios";
 import { ENV } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { ConfigService } from "../admin/config.service.js";
 import {
   OrderStatus,
   PaymentMethod,
@@ -11,6 +12,7 @@ import {
 import { WhatsAppService } from "../notifications/whatsapp.service.js";
 import { CourierService } from "../logistics/courier.service.js";
 import { InventoryLockService } from "../products/inventory-lock.service.js";
+import { SubscriptionService } from "../subscriptions/subscription.service.js";
 
 export interface XPayIntentResponse {
   intentId: string;
@@ -128,6 +130,76 @@ export class PostExXPayService {
   }
 
   /**
+   * Creates a direct payment intent for a fixed amount not tied to an order
+   * (e.g. seller subscription charges). Returns the checkout session URL.
+   */
+  static async createPaymentIntentDirect(input: {
+    orderId: string;
+    amountPkr: number;
+    customerPhone: string;
+    description: string;
+    method: string;
+    returnUrl: string;
+  }): Promise<{ checkoutUrl?: string; payment_url?: string; redirect_url?: string }> {
+    const merchantId = ENV.POSTEX_XPAY_MERCHANT_ID;
+
+    if (!merchantId || merchantId === "WAW-POSTEX-001") {
+      throw new Error(
+        "XPay merchant ID not configured. Set POSTEX_XPAY_MERCHANT_ID in .env",
+      );
+    }
+
+    const methodMap: Record<string, string> = {
+      XPAY_CARD: "CARD",
+      CARD: "CARD",
+      RAAST: "RAAST",
+      JAZZCASH: "JAZZCASH",
+      EASYPAISA: "EASYPAISA",
+    };
+
+    const response = await axios.post(
+      `${this.baseUrl}/checkout/create`,
+      {
+        merchantId,
+        orderNumber: input.orderId,
+        amount: input.amountPkr,
+        currency: "PKR",
+        paymentMethod: methodMap[input.method] || "CARD",
+        customerName: input.description,
+        customerPhone: input.customerPhone || undefined,
+        callbackUrl: `${ENV.SUPABASE_URL}/functions/v1/xpay-webhook`,
+        returnUrls: {
+          success: input.returnUrl,
+          failure: input.returnUrl,
+          cancel: input.returnUrl,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${ENV.POSTEX_XPAY_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      },
+    );
+
+    const { checkoutUrl, sessionId } = response.data;
+
+    if (!checkoutUrl && !sessionId) {
+      throw new Error(
+        `PostEx XPay API returned invalid response: ${JSON.stringify(response.data)}`,
+      );
+    }
+
+    const intentId = sessionId || `xpay_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+
+    return {
+      checkoutUrl: checkoutUrl || `${this.baseUrl}/checkout/${intentId}`,
+      payment_reference: intentId,
+    } as any;
+  }
+
+  /**
    * Verifies PostEx XPay timing-safe HMAC-SHA256 signature for incoming webhooks.
    * Optionally accepts a secret override for testing.
    */
@@ -204,6 +276,18 @@ export class PostExXPayService {
       throw insertErr;
     }
 
+    // Subscription charges (sub_* references) are not orders — activate the
+    // pending seller subscription and stop here.
+    if (orderRef.startsWith("sub_")) {
+      const activated = await SubscriptionService.activatePendingSubscription(orderRef);
+      return {
+        success: true,
+        message: activated
+          ? `Subscription activated for ${orderRef}`
+          : `No pending subscription found for ${orderRef}`,
+      };
+    }
+
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select("*, items:order_items(*)")
@@ -273,16 +357,18 @@ export class PostExXPayService {
   /**
    * Generates EMVCo compliant Raast Instant P2M QR payload with standard CRC16 checksum.
    */
-  static generateRaastQrPayload(params: {
+  static async generateRaastQrPayload(params: {
     orderNumber: string;
     amountPkr: number;
     merchantTitle: string;
     merchantId: string;
-  }): string {
+  }): Promise<string> {
     const p = (id: string, value: string) => {
       const len = value.length.toString().padStart(2, "0");
       return `${id}${len}${value}`;
     };
+
+    const defaultCity = await ConfigService.get("default_city") || "Islamabad";
 
     let raw = "";
     raw += p("00", "01"); // Format indicator
@@ -293,7 +379,7 @@ export class PostExXPayService {
     raw += p("54", params.amountPkr.toFixed(2));
     raw += p("58", "PK"); // Country
     raw += p("59", params.merchantTitle.substring(0, 25));
-    raw += p("60", "Islamabad");
+    raw += p("60", defaultCity.substring(0, 15));
     raw += p("62", p("05", params.orderNumber));
     raw += "6304";
 

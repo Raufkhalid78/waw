@@ -46,12 +46,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     return next();
   }
 
-  // Skip CSRF for API auth endpoints (login, OTP, OAuth)
-  // These are public endpoints that don't require session authentication
+  // Skip CSRF for API auth endpoints (login, OTP, OAuth, session bootstrap)
+  // These are public endpoints that don't require session authentication.
+  // session/create is protected by Supabase authToken verification in the
+  // controller (not cookie auth), so CSRF is not the relevant defense there.
   const publicAuthPaths = [
     "/api/auth/login",
     "/api/auth/whatsapp-otp/send",
     "/api/auth/whatsapp-otp/verify",
+    "/api/auth/session/create",
   ];
   if (publicAuthPaths.some((p) => req.path.startsWith(p))) {
     return next();

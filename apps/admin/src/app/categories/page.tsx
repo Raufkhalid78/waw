@@ -23,6 +23,7 @@ export default function CategoriesPage() {
     description: "",
     parent_id: "",
     image_url: "",
+    commission_percentage: "",
   });
 
   useEffect(() => {
@@ -60,15 +61,17 @@ export default function CategoriesPage() {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", name_urdu: "", slug: "", description: "", parent_id: "", image_url: "" });
+    setFormData({ name: "", name_urdu: "", slug: "", description: "", parent_id: "", image_url: "", commission_percentage: "" });
   };
 
   const handleCreate = async () => {
     try {
+      const { commission_percentage, ...rest } = formData;
       await categoriesApi.create({
-        ...formData,
+        ...rest,
         slug: formData.slug || generateSlug(formData.name),
         parent_id: formData.parent_id || undefined,
+        commission_percentage: commission_percentage === "" ? null : Number(commission_percentage),
       });
       setShowCreate(false);
       resetForm();
@@ -81,10 +84,12 @@ export default function CategoriesPage() {
   const handleUpdate = async () => {
     if (!editingId) return;
     try {
+      const { commission_percentage, ...rest } = formData;
       await categoriesApi.update(editingId, {
-        ...formData,
+        ...rest,
         slug: formData.slug || generateSlug(formData.name),
         parent_id: formData.parent_id || undefined,
+        commission_percentage: commission_percentage === "" ? null : Number(commission_percentage),
       });
       setEditingId(null);
       resetForm();
@@ -122,8 +127,21 @@ export default function CategoriesPage() {
       description: cat.description || "",
       parent_id: cat.parent_id || "",
       image_url: cat.image_url || "",
+      commission_percentage:
+        cat.commission_percentage != null ? String(cat.commission_percentage) : "",
     });
   };
+
+  const commissionBadge = (pct?: number | null) =>
+    pct != null ? (
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+        {pct}%
+      </span>
+    ) : (
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-50 text-gray-400 border border-gray-200 shrink-0">
+        Default
+      </span>
+    );
 
   const parentCategories = categories.filter((c) => !c.parent_id);
   const getChildCategories = (parentId: string) => categories.filter((c) => c.parent_id === parentId);
@@ -185,6 +203,19 @@ export default function CategoriesPage() {
             <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
+      </div>
+      <div>
+        <label className="text-xs font-bold text-gray-700">Commission % (optional)</label>
+        <input
+          type="number"
+          min={0}
+          max={50}
+          step={0.5}
+          value={formData.commission_percentage}
+          onChange={(e) => setFormData({ ...formData, commission_percentage: e.target.value })}
+          placeholder="Blank = inherit platform default"
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+        />
       </div>
       <div>
         <label className="text-xs font-bold text-gray-700">Description</label>
@@ -312,6 +343,7 @@ export default function CategoriesPage() {
                       {cat.name_urdu && <span className="text-xs text-gray-400 mr-2" dir="rtl">{cat.name_urdu}</span>}
                       <span className="text-xs text-gray-400 ml-2 font-mono">/{cat.slug}</span>
                     </div>
+                    {commissionBadge(cat.commission_percentage)}
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => toggleActive(cat)}
@@ -342,6 +374,7 @@ export default function CategoriesPage() {
                             {child.name_urdu && <span className="text-xs text-gray-400 mr-2" dir="rtl">{child.name_urdu}</span>}
                             <span className="text-xs text-gray-400 ml-2 font-mono">/{child.slug}</span>
                           </div>
+                          {commissionBadge(child.commission_percentage)}
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => toggleActive(child)}

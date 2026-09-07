@@ -22,7 +22,7 @@ export function MobileBottomNav({ onMenuOpen }: MobileBottomNavProps) {
   const items = useCartStore((s) => s.items);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-area-bottom lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-area-bottom lg:hidden dark:bg-slate-900 dark:border-slate-700">
       <div className="flex items-center justify-around h-14">
         {navItems.map((item) => {
           const isActive =

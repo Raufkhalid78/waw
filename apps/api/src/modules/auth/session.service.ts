@@ -86,9 +86,12 @@ export class SessionService {
       );
 
       // Track all active sessions for this user (for revocation)
+      // Store {sessionId, accessToken, refreshToken} so we can delete Redis keys on revocation
+      const existingSessions = await SessionService.getUserSessions(params.userId);
+      existingSessions.push({ sessionId, accessToken, refreshToken });
       await redis.set(
         userSessionsKey,
-        JSON.stringify([...(await SessionService.getUserSessions(params.userId)), sessionId]),
+        JSON.stringify(existingSessions),
         { ex: REFRESH_TTL_SECONDS },
       );
     } catch (err) {
@@ -178,11 +181,11 @@ export class SessionService {
         { ex: REFRESH_TTL_SECONDS },
       );
 
-      // Update user sessions tracking
+      // Update user sessions tracking — replace old entry with new tokens
       const userSessionsKey = `user_sessions:${session.userId}`;
       const sessions = await SessionService.getUserSessions(session.userId);
       const updatedSessions = sessions.map((s) =>
-        s === sessionId ? sessionId : s,
+        s.sessionId === sessionId ? { sessionId, accessToken: newAccessToken, refreshToken: newRefreshToken } : s,
       );
       await redis.set(
         userSessionsKey,
@@ -212,13 +215,13 @@ export class SessionService {
 
       const session: SessionData = JSON.parse(data);
 
-      // Delete the session
+      // Delete the session key
       await redis.del(sessionKey);
 
       // Remove from user sessions tracking
       const userSessionsKey = `user_sessions:${session.userId}`;
       const sessions = await SessionService.getUserSessions(session.userId);
-      const updatedSessions = sessions.filter((s) => s !== session.sessionId);
+      const updatedSessions = sessions.filter((s) => s.accessToken !== accessToken);
       await redis.set(
         userSessionsKey,
         JSON.stringify(updatedSessions),
@@ -244,21 +247,20 @@ export class SessionService {
       const sessions = await SessionService.getUserSessions(userId);
       const userSessionsKey = `user_sessions:${userId}`;
 
-      // Delete the user sessions tracking list first
+      // Delete individual session and refresh keys
+      for (const session of sessions) {
+        if (session.accessToken) {
+          await redis.del(`session:${session.accessToken}`);
+        }
+        if (session.refreshToken) {
+          await redis.del(`refresh:${session.refreshToken}`);
+        }
+      }
+
+      // Delete the user sessions tracking list
       await redis.del(userSessionsKey);
 
-      // Note: We track sessions by sessionId but store them by accessToken.
-      // To fully revoke, we need to invalidate the refresh tokens too.
-      // Since we cannot reverse-map sessionId -> accessToken efficiently,
-      // we rely on the refresh token being deleted when the session tracking
-      // list is cleared. New access tokens cannot be issued without a valid
-      // refresh token mapping.
-      //
-      // For maximum security, also scan and delete any refresh tokens
-      // associated with this user by clearing the user_sessions list above.
-      // The old access tokens will expire naturally within SESSION_TTL_SECONDS.
-
-      logger.info(`Revoked session tracking for user ${userId} (${sessions.length} sessions invalidated)`);
+      logger.info(`Revoked all sessions for user ${userId} (${sessions.length} sessions invalidated)`);
     } catch (err) {
       logger.error("Failed to revoke all sessions", {
         userId,
@@ -270,10 +272,16 @@ export class SessionService {
   /**
    * Get list of active session IDs for a user.
    */
-  static async getUserSessions(userId: string): Promise<string[]> {
+  static async getUserSessions(userId: string): Promise<{ sessionId: string; accessToken: string; refreshToken: string }[]> {
     try {
       const data = await redis.get(`user_sessions:${userId}`);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      // Handle backward compatibility: if old format (array of strings), return empty
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "string") {
+        return [];
+      }
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }

@@ -10,7 +10,7 @@ const redisClient =
   ENV.UPSTASH_REDIS_REST_URL && redisPassword
     ? new Redis(ENV.UPSTASH_REDIS_REST_URL.replace("https://", "rediss://"), {
         password: redisPassword,
-        tls: { rejectUnauthorized: false },
+        tls: { rejectUnauthorized: true },
         lazyConnect: true,
         maxRetriesPerRequest: 1,
       })
@@ -27,6 +27,34 @@ if (redisClient) {
 
 const defaultKeyGenerator = (req: any) => req.ip || "unknown";
 
+const isProduction = ENV.NODE_ENV === "production";
+
+/**
+ * Returns a RedisStore if Redis is configured, otherwise falls back to
+ * express-rate-limit's in-memory store (per-instance limits). The in-memory
+ * fallback is intentional: blocking ALL traffic because the shared store is
+ * missing would take the entire API down, which is worse than per-instance
+ * rate limiting. A loud warning is logged in production so the operator
+ * knows limits are per-instance.
+ */
+let warnedNoRedis = false;
+function getStore(prefix: string) {
+  if (redisClient) {
+    return new RedisStore({
+      sendCommand: (...args: string[]) =>
+        redisClient.call(args[0], ...args.slice(1)) as any,
+      prefix,
+    });
+  }
+  if (isProduction && !warnedNoRedis) {
+    warnedNoRedis = true;
+    logger.warn(
+      "RATE LIMITER: Redis is not configured — falling back to in-memory rate limiting (per-instance). Configure UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for shared limits across instances.",
+    );
+  }
+  return undefined;
+}
+
 /**
  * Strict rate limiter for WhatsApp OTP requests (5 requests per 15 minutes per IP/Phone)
  */
@@ -36,13 +64,7 @@ export const otpRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_otp:",
-      })
-    : undefined,
+  store: getStore("rl_otp:"),
   message: {
     error:
       "Too many OTP requests from this IP. Please try again after 15 minutes.",
@@ -58,13 +80,7 @@ export const apiRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_api:",
-      })
-    : undefined,
+  store: getStore("rl_api:"),
   message: {
     error: "Rate limit exceeded. Please slow down requests.",
   },
@@ -84,13 +100,7 @@ export const cartRateLimiter = rateLimit({
     const userId = (req as any).user?.id || "";
     return guestToken || userId || defaultKeyGenerator(req);
   },
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_cart:",
-      })
-    : undefined,
+  store: getStore("rl_cart:"),
   message: {
     error: "Too many cart requests. Please slow down.",
   },
@@ -106,13 +116,7 @@ export const orderRateLimiter = rateLimit({
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => (req as any).user?.id || defaultKeyGenerator(req),
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_order:",
-      })
-    : undefined,
+  store: getStore("rl_order:"),
   message: { error: "Too many order attempts. Please wait before trying again." },
 });
 
@@ -126,13 +130,7 @@ export const reviewRateLimiter = rateLimit({
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => (req as any).user?.id || defaultKeyGenerator(req),
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_review:",
-      })
-    : undefined,
+  store: getStore("rl_review:"),
   message: { error: "Too many review submissions. Please slow down." },
 });
 
@@ -146,13 +144,7 @@ export const wishlistRateLimiter = rateLimit({
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => (req as any).user?.id || defaultKeyGenerator(req),
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_wishlist:",
-      })
-    : undefined,
+  store: getStore("rl_wishlist:"),
   message: { error: "Too many wishlist requests. Please slow down." },
 });
 
@@ -166,13 +158,7 @@ export const loginRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_login:",
-      })
-    : undefined,
+  store: getStore("rl_login:"),
   message: {
     error:
       "Too many login attempts from this IP. Please try again after 15 minutes.",
@@ -193,13 +179,7 @@ export const otpVerifyRateLimiter = rateLimit({
     const phone = req.body?.phone || "";
     return phone || defaultKeyGenerator(req);
   },
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_otp_verify:",
-      })
-    : undefined,
+  store: getStore("rl_otp_verify:"),
   message: {
     error:
       "Too many OTP verification attempts. Please request a new code.",
@@ -216,12 +196,6 @@ export const supportRateLimiter = rateLimit({
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => (req as any).user?.id || defaultKeyGenerator(req),
-  store: redisClient
-    ? new RedisStore({
-        sendCommand: (...args: string[]) =>
-          redisClient.call(args[0], ...args.slice(1)) as any,
-        prefix: "rl_support:",
-      })
-    : undefined,
+  store: getStore("rl_support:"),
   message: { error: "Too many support tickets. Please wait before creating another." },
 });

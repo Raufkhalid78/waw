@@ -45,7 +45,9 @@ export class SubscriptionController {
   }
 
   /**
-   * POST /api/seller/subscribe — Subscribe to a plan
+   * POST /api/seller/subscribe — Subscribe to a plan.
+   * Paid plans return an XPay checkout session; the subscription activates
+   * via the payment webhook. Free plan activates immediately.
    */
   static async subscribe(req: Request, res: Response): Promise<void> {
     try {
@@ -68,8 +70,27 @@ export class SubscriptionController {
         return;
       }
 
-      const subscription = await SubscriptionService.subscribe(store.id, plan);
-      res.json({ subscription });
+      // Look up plan price to decide flow
+      const { data: planData } = await supabaseAdmin
+        .from("subscription_plans")
+        .select("price_pkr")
+        .eq("name", plan)
+        .single();
+
+      if (!planData) {
+        res.status(400).json({ error: "Invalid plan" });
+        return;
+      }
+
+      if (planData.price_pkr === 0) {
+        const subscription = await SubscriptionService.subscribe(store.id, plan);
+        res.json({ subscription, paymentRequired: false });
+        return;
+      }
+
+      // Paid plan: create PENDING subscription + XPay checkout session
+      const payment = await SubscriptionService.initiateSubscriptionPayment(store.id, plan);
+      res.json({ paymentRequired: true, ...payment });
     } catch (err: any) {
       logger.error("Failed to subscribe", { error: err.message });
       res.status(400).json({ error: err.message });

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { ENV } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
+import { ConfigService } from "../admin/config.service.js";
 
 export interface WhatsAppMessagePayload {
   toPhone: string; // e.g. "+923001234567"
@@ -110,6 +111,7 @@ export class WhatsAppService {
     isCod: boolean,
   ): Promise<void> {
     const paymentText = isCod ? "Cash on Delivery (COD)" : "Prepaid Online";
+    const webUrl = await ConfigService.get("website_url") || "https://waw.com.pk";
     const message = [
       `✨ *Waw (واو) Order Confirmed!*`,
       ``,
@@ -118,7 +120,7 @@ export class WhatsAppService {
       `Payment: *${paymentText}*`,
       ``,
       `Track your order anytime at:`,
-      `https://waw.com.pk/orders/${orderNumber}`,
+      `${webUrl}/orders/${orderNumber}`,
       ``,
       `Thank you for shopping on Waw! 🛍️`,
     ].join("\n");
@@ -135,7 +137,9 @@ export class WhatsAppService {
     courierName: string,
     trackingNumber: string,
     trackingUrl: string,
+    estimatedDaysLabel?: string,
   ): Promise<void> {
+    const deliveryText = estimatedDaysLabel || "2-5 business days";
     const message = [
       `🚚 *Waw (واو) Shipment Dispatched!*`,
       ``,
@@ -144,7 +148,7 @@ export class WhatsAppService {
       `Tracking Number: *${trackingNumber}*`,
       `Live Tracking: ${trackingUrl}`,
       ``,
-      `Estimated delivery: 2-5 business days`,
+      `Estimated delivery: ${deliveryText}`,
     ].join("\n");
 
     await this.sendMetaMessage(phone, message);
@@ -163,6 +167,7 @@ export class WhatsAppService {
       ? `\nPayment of *PKR ${totalPkr.toLocaleString()}* was collected as Cash on Delivery.`
       : "";
 
+    const webUrl = await ConfigService.get("website_url") || "https://waw.com.pk";
     const message = [
       `🎉 *Waw (واو) Order Delivered!*`,
       ``,
@@ -171,9 +176,9 @@ export class WhatsAppService {
       ``,
       `We hope you love your purchase!`,
       `Leave a review to help other shoppers:`,
-      `https://waw.com.pk/orders/${orderNumber}/review`,
+      `${webUrl}/orders/${orderNumber}/review`,
       ``,
-      `Need help? Reply to this message or visit waw.com.pk/support`,
+      `Need help? Reply to this message or visit ${webUrl}/support`,
     ].join("\n");
 
     await this.sendMetaMessage(phone, message);
@@ -188,6 +193,7 @@ export class WhatsAppService {
     reason?: string,
   ): Promise<void> {
     const reasonText = reason ? `\nReason: *${reason}*` : "";
+    const webUrl = await ConfigService.get("website_url") || "https://waw.com.pk";
 
     const message = [
       `❌ *Waw (واو) Order Cancelled*`,
@@ -196,7 +202,7 @@ export class WhatsAppService {
       reasonText,
       ``,
       `If you believe this is an error, please contact support:`,
-      `https://waw.com.pk/support`,
+      `${webUrl}/support`,
       ``,
       `We're sorry for the inconvenience.`,
     ].join("\n");
@@ -213,6 +219,7 @@ export class WhatsAppService {
     returnId: string,
     reason: string,
   ): Promise<void> {
+    const webUrl = await ConfigService.get("website_url") || "https://waw.com.pk";
     const message = [
       `📦 *Waw (واو) Return Request Received*`,
       ``,
@@ -223,7 +230,7 @@ export class WhatsAppService {
       `Our team will review your request within 24-48 hours.`,
       `You'll receive a reverse pickup schedule shortly.`,
       ``,
-      `Track return status: https://waw.com.pk/returns/${returnId}`,
+      `Track return status: ${webUrl}/returns/${returnId}`,
     ].join("\n");
 
     await this.sendMetaMessage(phone, message);
@@ -239,6 +246,7 @@ export class WhatsAppService {
     itemSummary: string,
     totalPkr: number,
   ): Promise<void> {
+    const sellerUrl = await ConfigService.get("seller_portal_url") || "https://seller.waw.com.pk";
     const message = [
       `🛒 *New Order for ${storeName}!*`,
       ``,
@@ -247,7 +255,7 @@ export class WhatsAppService {
       `Payout: *PKR ${totalPkr.toLocaleString()}*`,
       ``,
       `Log in to fulfill this order:`,
-      `https://seller.waw.com.pk/orders`,
+      `${sellerUrl}/orders`,
       ``,
       `Pack and dispatch within 24 hours for best seller rating.`,
     ].join("\n");

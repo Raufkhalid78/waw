@@ -85,6 +85,11 @@ class AccountScreen extends StatelessWidget {
                   onTap: () {},
                 ),
                 _buildMenuItem(
+                  icon: Icons.settings_outlined,
+                  title: 'Settings',
+                  onTap: () => Navigator.of(context).pushNamed('/settings'),
+                ),
+                _buildMenuItem(
                   icon: Icons.info_outline,
                   title: 'About Waw',
                   onTap: () {},

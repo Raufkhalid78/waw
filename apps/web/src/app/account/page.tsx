@@ -20,7 +20,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { fetchUserOrders, fetchUserAddresses, createUserAddress, deleteUserAddress, type UserAddress } from "@/lib/api";
+import { fetchUserOrders, fetchUserAddresses, createUserAddress, deleteUserAddress, fetchCities, type UserAddress, type City } from "@/lib/api";
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -68,6 +68,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [showAddressForm, setShowAddressForm] = useState(false);
+  const [cities, setCities] = useState<City[]>([]);
   const [newAddress, setNewAddress] = useState({
     full_name: "", phone: "", street_address: "", city: "", province: "Punjab", postal_code: "", is_default: false,
   });
@@ -103,6 +104,7 @@ export default function AccountPage() {
       }
     }
     loadData();
+    fetchCities().then(setCities).catch(() => {});
   }, []);
 
   const totalSpent = orders.reduce(
@@ -455,11 +457,23 @@ export default function AccountPage() {
                       onChange={(e) => setNewAddress((p) => ({ ...p, province: e.target.value }))}
                       className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
                     >
-                      <option>Punjab</option>
-                      <option>Sindh</option>
-                      <option>Khyber Pakhtunkhwa</option>
-                      <option>Balochistan</option>
-                      <option>Islamabad</option>
+                      {(() => {
+                        const provinces = [...new Set(cities.map((c) => c.province).filter(Boolean))];
+                        if (provinces.length === 0) {
+                          return (
+                            <>
+                              <option>Punjab</option>
+                              <option>Sindh</option>
+                              <option>Khyber Pakhtunkhwa</option>
+                              <option>Balochistan</option>
+                              <option>Islamabad</option>
+                            </>
+                          );
+                        }
+                        return provinces.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ));
+                      })()}
                     </select>
                     <input
                       type="text"

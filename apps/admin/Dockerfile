@@ -1,5 +1,5 @@
 # Stage 1: Build Next.js Admin Control Center
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package*.json turbo.json ./
@@ -11,7 +11,7 @@ RUN npm run build --workspace=@waw/types
 RUN npm run build --workspace=@waw/admin
 
 # Stage 2: Production Runner
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001

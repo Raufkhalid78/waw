@@ -55,6 +55,17 @@ function clearSessionCookies(res: Response): void {
 
 export class SessionController {
   /**
+   * GET /api/auth/csrf
+   * Issues a CSRF token and cookie so clients can bootstrap
+   * the x-csrf-token header before creating a session.
+   */
+  static issueCsrf(req: Request, res: Response): void {
+    const token = generateCsrfToken();
+    setCsrfCookie(res, token);
+    res.json({ csrfToken: token });
+  }
+
+  /**
    * POST /api/auth/session/create
    * Creates a new session after successful authentication.
    * Called by the login page after OTP/email verification succeeds.
@@ -63,8 +74,8 @@ export class SessionController {
     try {
       const { userId, userRole, userPhone, userEmail, storeId, authToken } = req.body;
 
-      if (!userId || !userRole) {
-        res.status(400).json({ error: "userId and userRole are required" });
+      if (!userId) {
+        res.status(400).json({ error: "userId is required" });
         return;
       }
 
@@ -91,14 +102,34 @@ export class SessionController {
         }
       }
 
+      // SECURITY: Never trust client-supplied role. Load authoritative role from database.
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("role, phone, email")
+        .eq("id", userId)
+        .single();
+
+      const authoritativeRole = profile?.role || "BUYER";
+      const authoritativePhone = profile?.phone || userPhone || "";
+      const authoritativeEmail = profile?.email || userEmail || "";
+
+      // Reject if client-supplied role differs from database role (prevents escalation)
+      if (userRole && userRole !== authoritativeRole) {
+        logger.warn("Session creation role mismatch rejected", {
+          userId,
+          requestedRole: userRole,
+          dbRole: authoritativeRole,
+        });
+      }
+
       const ip = req.ip || req.socket.remoteAddress || "unknown";
       const userAgent = req.headers["user-agent"] || "unknown";
 
       const tokens = await SessionService.createSession({
         userId,
-        userRole,
-        userPhone: userPhone || "",
-        userEmail,
+        userRole: authoritativeRole,
+        userPhone: authoritativePhone,
+        userEmail: authoritativeEmail,
         storeId,
         ip,
         userAgent,
@@ -108,7 +139,7 @@ export class SessionController {
 
       res.json({
         success: true,
-        user: { id: userId, role: userRole, phone: userPhone, email: userEmail },
+        user: { id: userId, role: authoritativeRole, phone: authoritativePhone, email: authoritativeEmail },
         expiresAt: tokens.expiresAt,
       });
     } catch (err: any) {
@@ -195,12 +226,19 @@ export class SessionController {
         return;
       }
 
+      // SECURITY: Always load authoritative role from database, never trust Redis-stored role
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("role, phone, email")
+        .eq("id", session.userId)
+        .single();
+
       res.json({
         user: {
           id: session.userId,
-          role: session.userRole,
-          phone: session.userPhone,
-          email: session.userEmail,
+          role: profile?.role || session.userRole,
+          phone: profile?.phone || session.userPhone,
+          email: profile?.email || session.userEmail,
           storeId: session.storeId,
         },
       });

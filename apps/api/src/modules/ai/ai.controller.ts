@@ -47,8 +47,8 @@ export class AIController {
 
       res.json({ description, product_id: product_id || null });
     } catch (err: any) {
-      if (err.message.includes("token limit")) {
-        res.status(429).json({ error: err.message, code: "TOKEN_LIMIT_REACHED" });
+      if (err.message.includes("token limit") || err.message.includes("daily request limit") || err.message.includes("request limit has been reached")) {
+        res.status(429).json({ error: err.message, code: "AI_LIMIT_REACHED" });
         return;
       }
       logger.error("AI description generation failed", { error: err.message });
@@ -87,8 +87,8 @@ export class AIController {
       const response = await openRouterService.chatWithProductContext(query, productInfo, user?.id);
       res.json({ response });
     } catch (err: any) {
-      if (err.message.includes("token limit")) {
-        res.status(429).json({ error: err.message, code: "TOKEN_LIMIT_REACHED" });
+      if (err.message.includes("token limit") || err.message.includes("daily request limit") || err.message.includes("request limit has been reached")) {
+        res.status(429).json({ error: err.message, code: "AI_LIMIT_REACHED" });
         return;
       }
       logger.error("AI chat failed", { error: err.message });

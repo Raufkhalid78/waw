@@ -5,6 +5,7 @@ import { CartAbandonmentService } from "../cart/cart-abandonment.service.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { AuditService } from "../audit/audit.service.js";
 import { AuthorizationService } from "../auth/authorization.service.js";
+import { ConfigService } from "../admin/config.service.js";
 import { UserRole } from "../../types/index.js";
 
 export class OrderController {
@@ -23,18 +24,20 @@ export class OrderController {
 
   static async createGuestOrder(req: Request, res: Response): Promise<void> {
     try {
-      const { buyerName, buyerPhone, shippingAddress, shippingCity, shippingProvince, paymentMethod, notes, items, guestToken } = req.body;
+      const { buyerName, buyerPhone, shippingAddress, shippingCity, shippingProvince, paymentMethod, notes, items, quoteToken } = req.body;
 
-      if (!buyerName || !buyerPhone || !shippingAddress || !shippingCity) {
-        res.status(400).json({ error: "buyerName, buyerPhone, shippingAddress, and shippingCity are required" });
+      if (!buyerName || !buyerPhone || !shippingAddress || !shippingCity || !paymentMethod) {
+        res.status(400).json({ error: "buyerName, buyerPhone, shippingAddress, shippingCity, and paymentMethod are required" });
         return;
       }
 
-      // Create a guest user profile
-      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      if ((!items || items.length === 0) && !quoteToken) {
+        res.status(400).json({ error: "Order must contain a valid quoteToken or items list" });
+        return;
+      }
 
       const result = await OrderService.createOrder({
-        quoteToken: req.body.quoteToken,
+        quoteToken,
         buyerName,
         buyerPhone,
         shippingAddress,
@@ -42,7 +45,8 @@ export class OrderController {
         shippingProvince,
         paymentMethod,
         notes,
-      }, { id: guestId, role: "BUYER" });
+        items,
+      }, null);
 
       res.status(201).json(result);
     } catch (err: any) {
@@ -240,6 +244,15 @@ export class OrderController {
         return;
       }
 
+      // Guest orders (buyer_id NULL) are only accessible to whoever knows the guest's phone
+      if (!order.buyer_id) {
+        const phone = (req.query.phone as string || "").trim();
+        if (!phone || phone !== order.buyer_phone) {
+          res.status(403).json({ error: "Not authorized to download this invoice" });
+          return;
+        }
+      }
+
       const allItems: any[] = [];
       const storeOrders = order.store_orders || [];
       for (const so of storeOrders) {
@@ -256,7 +269,7 @@ export class OrderController {
       }
 
       const invoiceData = {
-        orderNumber: order.order_number || order.id,
+        orderNumber: order.order_number,
         createdAt: order.created_at,
         buyerName: order.buyer_name || "Customer",
         buyerPhone: order.buyer_phone || "",
@@ -271,6 +284,9 @@ export class OrderController {
         discountPkr: order.discount_pkr || 0,
         gstPkr: order.gst_pkr || 0,
         totalPkr: order.total_amount_pkr || 0,
+        gstRatePercentage: await ConfigService.getNumber("gst_rate_percentage", 18),
+        supportEmail: await ConfigService.get("support_email") || "support@waw.pk",
+        supportPhone: await ConfigService.get("support_phone") || "+92 300 1234567",
       };
 
       const pdfStream = generateInvoicePdf(invoiceData);

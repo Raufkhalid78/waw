@@ -44,25 +44,23 @@ export class CourierService {
    * Tier 1 major cities -> PostEx (Speed & dense hub coverage)
    * Heavy parcels (> 5kg) -> Trax Logistics (Better bulk weight rates)
    */
-  static selectCourier(
+  static async selectCourier(
     destinationCity: string,
     weightKg: number = 0.5,
-  ): CourierProvider {
-    const TIER_1_CITIES = [
-      "karachi",
-      "lahore",
-      "islamabad",
-      "rawalpindi",
-      "faisalabad",
-      "multan",
-      "peshawar",
-    ];
+  ): Promise<CourierProvider> {
     const normalizedCity = (destinationCity || "").trim().toLowerCase();
 
     if (weightKg > 5.0) {
       return CourierProvider.TRAX;
     }
-    if (TIER_1_CITIES.includes(normalizedCity)) {
+
+    const { data } = await supabaseAdmin
+      .from("serviceable_cities")
+      .select("tier")
+      .ilike("city_name", destinationCity)
+      .maybeSingle();
+
+    if (data?.tier === 1) {
       return CourierProvider.POSTEX;
     }
     return CourierProvider.POSTEX;
@@ -72,7 +70,7 @@ export class CourierService {
    * Automatically books courier dispatch for an order (both COD & Prepaid Waw Express).
    */
   static async bookCourierShipment(input: PostExShipmentInput) {
-    const selectedProvider = this.selectCourier(input.destinationCity);
+    const selectedProvider = await this.selectCourier(input.destinationCity);
     let trackingNumber = `PTX-${input.orderNumber.replace(/[^0-9]/g, "").slice(-6) || Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     let trackingUrl = `https://postex.pk/tracking?cn=${trackingNumber}`;
     logger.info(

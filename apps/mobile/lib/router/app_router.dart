@@ -10,6 +10,7 @@ import '../features/orders/order_history_screen.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/account/account_screen.dart';
+import '../features/settings/settings_screen.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -57,6 +58,9 @@ class AppRouter {
       case '/account':
         return MaterialPageRoute(builder: (_) => const AccountScreen());
 
+      case '/settings':
+        return MaterialPageRoute(builder: (_) => const SettingsScreen());
+
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
@@ -88,13 +92,16 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        backgroundColor: Colors.white,
-        indicatorColor: const Color(0xFFFEF3C7),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        indicatorColor: isDark
+            ? const Color(0xFFFEF3C7).withOpacity(0.2)
+            : const Color(0xFFFEF3C7),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),

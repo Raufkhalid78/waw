@@ -201,14 +201,14 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     }, /Checkout quote has expired/);
   });
 
-  it("should smart-route Tier 1 city parcels to PostEx and heavy parcels > 5kg to Trax", () => {
-    const courierLahore = CourierService.selectCourier("Lahore", 1.5);
+  it("should smart-route Tier 1 city parcels to PostEx and heavy parcels > 5kg to Trax", async () => {
+    const courierLahore = await CourierService.selectCourier("Lahore", 1.5);
     assert.strictEqual(courierLahore, "POSTEX");
 
-    const courierKarachi = CourierService.selectCourier("Karachi", 2.0);
+    const courierKarachi = await CourierService.selectCourier("Karachi", 2.0);
     assert.strictEqual(courierKarachi, "POSTEX");
 
-    const courierHeavy = CourierService.selectCourier("Islamabad", 8.5);
+    const courierHeavy = await CourierService.selectCourier("Islamabad", 8.5);
     assert.strictEqual(courierHeavy, "TRAX");
   });
 

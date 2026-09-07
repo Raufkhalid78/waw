@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { storesApi } from "@/lib/api";
-import { Store, Check, X, Inbox } from "lucide-react";
+import { storesApi, sellersApi } from "@/lib/api";
+import { Store, Check, X, Inbox, Percent } from "lucide-react";
 import { useState } from "react";
 import { FadeIn } from "@/components/Motion";
 
@@ -40,6 +40,42 @@ export default function StoresPage() {
     mutationFn: storesApi.reject,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-stores"] }),
   });
+
+  const commissionMutation = useMutation({
+    mutationFn: ({ storeId, value }: { storeId: string; value: number | null }) =>
+      sellersApi.update(storeId, { commission_rate_percentage: value }),
+    onSuccess: () => {
+      setCommissionEditing(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-stores"] });
+    },
+  });
+
+  const [commissionEditing, setCommissionEditing] = useState<string | null>(null);
+  const [commissionValue, setCommissionValue] = useState("");
+  const [commissionSaving, setCommissionSaving] = useState(false);
+
+  const startCommissionEdit = (store: any) => {
+    setCommissionEditing(store.id);
+    setCommissionValue(
+      store.commission_rate_percentage != null
+        ? String(store.commission_rate_percentage)
+        : ""
+    );
+  };
+
+  const saveCommission = async (storeId: string) => {
+    setCommissionSaving(true);
+    try {
+      await commissionMutation.mutateAsync({
+        storeId,
+        value: commissionValue === "" ? null : Number(commissionValue),
+      });
+    } catch (err) {
+      console.error("Failed to update commission", err);
+    } finally {
+      setCommissionSaving(false);
+    }
+  };
 
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
 
@@ -103,6 +139,7 @@ export default function StoresPage() {
                     <th>Store</th>
                     <th className="hidden sm:table-cell">Seller</th>
                     <th>Status</th>
+                    <th className="hidden md:table-cell">Commission</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -129,6 +166,56 @@ export default function StoresPage() {
                         <span className={`badge ${STATUS_BADGE[store.status] || "badge-neutral"}`}>
                           {store.status}
                         </span>
+                      </td>
+                      <td className="hidden md:table-cell">
+                        {commissionEditing === store.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={0}
+                              max={50}
+                              step={0.5}
+                              value={commissionValue}
+                              onChange={(e) => setCommissionValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveCommission(store.id);
+                                if (e.key === "Escape") setCommissionEditing(null);
+                              }}
+                              placeholder="Default"
+                              className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-amber-400 outline-none"
+                            />
+                            <button
+                              onClick={() => saveCommission(store.id)}
+                              disabled={commissionSaving}
+                              className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors active:scale-95 disabled:opacity-40"
+                              title="Save commission"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setCommissionEditing(null)}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors active:scale-95"
+                              title="Cancel"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => startCommissionEdit(store)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                            title="Edit commission override"
+                          >
+                            <Percent className="w-3 h-3 text-gray-400" />
+                            {store.commission_rate_percentage != null ? (
+                              <span className="font-medium text-gray-900">
+                                {store.commission_rate_percentage}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">Default</span>
+                            )}
+                          </button>
+                        )}
                       </td>
                       <td>
                         <div className="flex items-center gap-1">

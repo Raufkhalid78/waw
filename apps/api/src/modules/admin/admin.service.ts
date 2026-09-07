@@ -418,8 +418,8 @@ export class AdminService {
    */
   static async updateSellerStatus(
     storeId: string,
-    status: StoreStatus,
-    commissionRatePercentage?: number,
+    status?: StoreStatus,
+    commissionRatePercentage?: number | null,
     adminId?: string
   ) {
     // 1. Fetch previous state for audit log
@@ -429,15 +429,23 @@ export class AdminService {
       .eq("id", storeId)
       .single();
 
-    // 2. Perform update
+    // 2. Perform update — status/is_verified only when a status change is
+    //    requested so a commission-only PATCH does not clobber them.
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (status) {
+      updatePayload.status = status;
+      updatePayload.is_verified = status === StoreStatus.ACTIVE;
+    }
+    // undefined = leave unchanged; null = clear override (inherit default)
+    if (commissionRatePercentage !== undefined) {
+      updatePayload.commission_rate_percentage = commissionRatePercentage;
+    }
+
     const { data: updatedStore, error } = await supabaseAdmin
       .from("stores")
-      .update({
-        status,
-        is_verified: status === StoreStatus.ACTIVE,
-        commission_rate_percentage: commissionRatePercentage ?? 10,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", storeId)
       .select()
       .single();
@@ -454,7 +462,9 @@ export class AdminService {
       targetResourceId: storeId,
       previousState: previousStore,
       newState: updatedStore,
-      reason: `Status changed to ${status}`,
+      reason: status
+        ? `Status changed to ${status}`
+        : `Commission rate updated`,
     });
 
     return updatedStore;
@@ -870,21 +880,21 @@ export class AdminService {
   }
 
   static async createFlashSale(input: {
-    name: string;
-    starts_at: string;
-    ends_at: string;
-    discount_percent?: number;
+    title: string;
+    start_time: string;
+    end_time: string;
+    title_urdu?: string;
+    banner_url?: string;
   }) {
     const { data, error } = await supabaseAdmin
       .from("flash_sales")
       .insert({
-        id: `fs_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        name: input.name,
-        starts_at: input.starts_at,
-        ends_at: input.ends_at,
-        discount_percent: input.discount_percent || 0,
+        title: input.title,
+        title_urdu: input.title_urdu || null,
+        banner_url: input.banner_url || null,
+        start_time: input.start_time,
+        end_time: input.end_time,
         is_active: true,
-        created_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -893,10 +903,10 @@ export class AdminService {
     return data;
   }
 
-  static async updateFlashSale(id: string, input: { name?: string; starts_at?: string; ends_at?: string; is_active?: boolean; discount_percent?: number }) {
+  static async updateFlashSale(id: string, input: { title?: string; title_urdu?: string; banner_url?: string; start_time?: string; end_time?: string; is_active?: boolean }) {
     const { data, error } = await supabaseAdmin
       .from("flash_sales")
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update(input)
       .eq("id", id)
       .select()
       .single();
@@ -915,16 +925,14 @@ export class AdminService {
     return { success: true };
   }
 
-  static async addFlashSaleItem(flashSaleId: string, productId: string, salePricePkr: number, stockQuantity: number) {
+  static async addFlashSaleItem(flashSaleId: string, variantId: string, salePricePkr: number, stockQuantity: number) {
     const { data, error } = await supabaseAdmin
       .from("flash_sale_items")
       .insert({
-        id: `fsi_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         flash_sale_id: flashSaleId,
-        product_id: productId,
-        sale_price_pkr: salePricePkr,
-        stock_quantity: stockQuantity,
-        created_at: new Date().toISOString(),
+        variant_id: variantId,
+        promotional_price_pkr: salePricePkr,
+        allocated_stock: stockQuantity,
       })
       .select()
       .single();
@@ -1026,6 +1034,7 @@ export class AdminService {
     description?: string;
     parent_id?: string;
     image_url?: string;
+    commission_percentage?: number | null;
   }) {
     const { data, error } = await supabaseAdmin
       .from("categories")
@@ -1037,6 +1046,7 @@ export class AdminService {
         description: input.description || "",
         parent_id: input.parent_id || null,
         image_url: input.image_url || "",
+        commission_percentage: input.commission_percentage ?? null,
         is_active: true,
         created_at: new Date().toISOString(),
       })
@@ -1047,10 +1057,16 @@ export class AdminService {
     return data;
   }
 
-  static async updateCategory(id: string, input: { name?: string; name_urdu?: string; slug?: string; description?: string; is_active?: boolean; image_url?: string }) {
+  static async updateCategory(id: string, input: { name?: string; name_urdu?: string; slug?: string; description?: string; is_active?: boolean; image_url?: string; commission_percentage?: number | null }) {
+    const { commission_percentage, ...rest } = input;
+    const updatePayload: Record<string, unknown> = { ...rest };
+    // Explicit null clears the override (inherit platform default); omit when not provided
+    if (commission_percentage !== undefined) {
+      updatePayload.commission_percentage = commission_percentage;
+    }
     const { data, error } = await supabaseAdmin
       .from("categories")
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update({ ...updatePayload, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single();

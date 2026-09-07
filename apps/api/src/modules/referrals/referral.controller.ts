@@ -54,4 +54,25 @@ export class ReferralController {
       res.status(500).json({ error: "Failed to validate referral code" });
     }
   }
+
+  /**
+   * POST /api/referrals/apply — Apply a referral code to the current user.
+   * Called after signup/login when the user arrived with ?ref=CODE.
+   */
+  static async applyCode(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const { code } = req.body;
+      if (!code) {
+        res.status(400).json({ error: "code is required" });
+        return;
+      }
+
+      const result = await ReferralService.applyReferral(user.id, code);
+      res.json(result);
+    } catch (err: any) {
+      logger.error("Failed to apply referral code", { error: err.message });
+      res.status(400).json({ error: err.message || "Failed to apply referral code" });
+    }
+  }
 }

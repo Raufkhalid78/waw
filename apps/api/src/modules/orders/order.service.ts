@@ -8,6 +8,7 @@ import { InventoryService } from "../products/inventory.service.js";
 import { JobQueueManager } from "../../jobs/queue.service.js";
 import { AuthorizationService } from "../auth/authorization.service.js";
 import { CheckoutSessionService } from "../checkout/checkout-session.service.js";
+import { GuestTokenService } from "./guest-token.service.js";
 import {
   calculateOrderSummary,
   OrderItemPricingInput,
@@ -127,18 +128,39 @@ export class OrderService {
       quantity: i.quantity,
     }));
 
-    // 4. Execute checkout transaction via RPC
-    const { data: result, error } = await supabaseAdmin.rpc('checkout_transaction', {
-      p_buyer_id: buyerId || null,
-      p_buyer_name: input.buyerName,
-      p_buyer_phone: input.buyerPhone,
-      p_shipping_address: input.shippingAddress,
-      p_shipping_city: input.shippingCity,
-      p_payment_method: input.paymentMethod,
-      p_items: rpcItems,
-      p_coupon_code: input.couponCode || null,
-      p_idempotency_key: input.idempotencyKey || null,
-    });
+    // 4. Execute checkout transaction via RPC.
+    // Discount amounts come from the server-signed quote JWT (authoritative).
+    // The RPC clamps them so (subtotal - discounts) can never go negative.
+    // Guests (no authenticated buyer) use the HMAC token-based guest RPC,
+    // which accepts the same coupon/loyalty discounts (no loyalty points —
+    // loyalty requires an account).
+    const { data: result, error } = buyerId
+      ? await supabaseAdmin.rpc('checkout_transaction', {
+          p_buyer_id: buyerId,
+          p_buyer_name: input.buyerName,
+          p_buyer_phone: input.buyerPhone,
+          p_shipping_address: input.shippingAddress,
+          p_shipping_city: input.shippingCity,
+          p_payment_method: input.paymentMethod,
+          p_items: rpcItems,
+          p_coupon_code: input.couponCode || null,
+          p_idempotency_key: input.idempotencyKey || null,
+          p_coupon_discount_pkr: quote.couponDiscountPkr || 0,
+          p_loyalty_discount_pkr: quote.loyaltyDiscountPkr || 0,
+          p_loyalty_points_used: quote.loyaltyPointsUsed || 0,
+        })
+      : await supabaseAdmin.rpc('guest_checkout_transaction', {
+          p_guest_session_token: GuestTokenService.issueGuestSessionToken(input.buyerPhone),
+          p_buyer_name: input.buyerName,
+          p_buyer_phone: input.buyerPhone,
+          p_shipping_address: input.shippingAddress,
+          p_shipping_city: input.shippingCity,
+          p_payment_method: input.paymentMethod,
+          p_items: rpcItems,
+          p_idempotency_key: input.idempotencyKey || null,
+          p_coupon_discount_pkr: quote.couponDiscountPkr || 0,
+          p_loyalty_discount_pkr: 0,
+        });
 
     if (error || !result?.success) {
       // Mark session as failed so it can be retried
@@ -151,6 +173,21 @@ export class OrderService {
     // 5. Commit the session atomically after successful order creation
     if (sessionId) {
       await CheckoutSessionService.commitSession(sessionId, result.order_id);
+    }
+
+    // 5b. Redeem the coupon exactly once, after the order is placed.
+    // Quote-time validation did NOT burn a use (recordUsage=false).
+    if (quote.couponCode && quote.couponDiscountPkr > 0) {
+      try {
+        await this.applyCoupon(quote.couponCode, quote.items, true);
+      } catch (couponErr: any) {
+        // Order stands even if redemption bookkeeping fails — log for reconciliation
+        logger.error("Coupon redemption failed after order placement", {
+          orderId: result.order_id,
+          couponCode: quote.couponCode,
+          error: couponErr.message,
+        });
+      }
     }
 
     const response = {
@@ -392,8 +429,15 @@ export class OrderService {
   /**
    * Validates and applies a coupon code to a cart total.
    * Returns the discount amount and final total.
+   *
+   * recordUsage=false (default) performs validation only — used at quote time.
+   * recordUsage=true burns a use — called once, after order placement.
    */
-  static async applyCoupon(couponCode: string, cartItems: CartItem[]) {
+  static async applyCoupon(
+    couponCode: string,
+    cartItems: CartItem[],
+    recordUsage = false,
+  ) {
     const cartTotal = cartItems.reduce(
       (s, i) => s + (i.unitPricePkr || 0) * i.quantity,
       0,
@@ -441,16 +485,18 @@ export class OrderService {
     }
 
     // Increment usage counter with optimistic concurrency guard.
-    // .lte() ensures the update only applies if current_uses hasn't exceeded max_uses
-    // since we last read it — not perfectly atomic but eliminates the TOCTOU gap.
-    const { error: couponUpdateErr } = await supabaseAdmin
-      .from("coupons")
-      .update({ current_uses: coupon.current_uses + 1 })
-      .eq("id", coupon.id)
-      .lte("current_uses", coupon.max_uses ? coupon.max_uses - 1 : 999999);
+    // Only done when `recordUsage` is true — quote-time validation must NOT
+    // burn a use; redemption happens once, after the order is actually placed.
+    if (recordUsage) {
+      const { error: couponUpdateErr } = await supabaseAdmin
+        .from("coupons")
+        .update({ current_uses: coupon.current_uses + 1 })
+        .eq("id", coupon.id)
+        .lte("current_uses", coupon.max_uses ? coupon.max_uses - 1 : 999999);
 
-    if (couponUpdateErr) {
-      throw new Error("Coupon usage limit reached or concurrent modification detected");
+      if (couponUpdateErr) {
+        throw new Error("Coupon usage limit reached or concurrent modification detected");
+      }
     }
 
     return {

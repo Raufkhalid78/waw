@@ -16,7 +16,8 @@ import {
   Phone,
   ChevronRight,
 } from "lucide-react";
-import { fetchServiceableCities, ServiceableCity } from "@/lib/api";
+import { fetchServiceableCities, ServiceableCity, fetchCities, type City } from "@/lib/api";
+import { fetchWithCsrf } from "@/lib/csrf";
 
 const CATEGORIES = [
   "Leather & Footwear",
@@ -33,11 +34,12 @@ export default function SellOnWawPage() {
   const [submitted, setSubmitted] = useState(false);
   const [applicationId, setApplicationId] = useState("");
   const [serviceableCities, setServiceableCities] = useState<ServiceableCity[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
 
   const [formData, setFormData] = useState({
     storeName: "",
     category: CATEGORIES[0],
-    city: "Lahore",
+    city: "",
     businessAddress: "",
     ownerName: "",
     cnic: "",
@@ -53,8 +55,16 @@ export default function SellOnWawPage() {
     fetchServiceableCities()
       .then((cities) => {
         setServiceableCities(cities);
-        if (cities.length > 0 && formData.city === "Lahore") {
+        if (cities.length > 0 && !formData.city) {
           setFormData((prev) => ({ ...prev, city: cities[0].cityName }));
+        }
+      })
+      .catch(() => {});
+    fetchCities()
+      .then((c) => {
+        setCities(c);
+        if (c.length > 0 && !formData.city) {
+          setFormData((prev) => ({ ...prev, city: c[0].name }));
         }
       })
       .catch(() => {});
@@ -67,14 +77,51 @@ export default function SellOnWawPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // ── Format validators (Pakistani market) ────────────────────────────────
+  const CNIC_REGEX = /^\d{5}-\d{7}-\d$/;
+  const IBAN_REGEX = /^PK\d{2}[A-Z0-9]{20}$/;
+  const PHONE_REGEX = /^[+]?[0-9]{10,13}$/;
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const normalizePhone = (phone: string) => phone.replace(/[\s-]/g, "");
+
+  const validateStep1 = (): string | null => {
+    if (!formData.storeName?.trim()) return "Store name is required.";
+    if (!formData.city) return "Please select your city.";
+    if (!formData.businessAddress?.trim() || formData.businessAddress.trim().length < 10)
+      return "Please enter your full business address.";
+    return null;
+  };
+
+  const validateStep2 = (): string | null => {
+    if (!formData.ownerName?.trim()) return "Owner full name is required.";
+    if (!CNIC_REGEX.test(formData.cnic || ""))
+      return "CNIC must be in the format 42101-1234567-1.";
+    if (!PHONE_REGEX.test(normalizePhone(formData.whatsappPhone || "")))
+      return "Enter a valid phone number (e.g. +92 300 1234567).";
+    if (formData.email && !EMAIL_REGEX.test(formData.email))
+      return "Please enter a valid email address.";
+    return null;
+  };
+
+  const validateStep3 = (): string | null => {
+    if (!formData.bankName) return "Please select your bank.";
+    if (!formData.accountTitle?.trim()) return "Account title is required.";
+    if (!IBAN_REGEX.test((formData.iban || "").replace(/\s/g, "").toUpperCase()))
+      return "Enter a valid 24-digit Pakistani IBAN (e.g. PK36MEZN0001234567890123).";
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const stepErr = validateStep3();
+    if (stepErr) { setErrorMsg(stepErr); return; }
     setErrorMsg(null);
     setIsSubmitting(true);
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      const res = await fetch(`${API_URL}/api/seller/apply`, {
+      const res = await fetchWithCsrf(`${API_URL}/api/seller/apply`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -265,20 +312,14 @@ export default function SellOnWawPage() {
                             {c.cityName}
                           </option>
                         ))
+                      ) : cities.length > 0 ? (
+                        cities.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))
                       ) : (
-                        <>
-                          <option value="Lahore">Lahore</option>
-                          <option value="Karachi">Karachi</option>
-                          <option value="Islamabad">Islamabad</option>
-                          <option value="Rawalpindi">Rawalpindi</option>
-                          <option value="Peshawar">Peshawar</option>
-                          <option value="Multan">Multan</option>
-                          <option value="Faisalabad">Faisalabad</option>
-                          <option value="Sialkot">Sialkot</option>
-                          <option value="Gujranwala">Gujranwala</option>
-                          <option value="Quetta">Quetta</option>
-                          <option value="Hyderabad">Hyderabad</option>
-                        </>
+                        <option value="">Select a city</option>
                       )}
                     </select>
                   </div>
@@ -300,13 +341,20 @@ export default function SellOnWawPage() {
                   />
                 </div>
 
+                {errorMsg && (
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
+                    {errorMsg}
+                  </div>
+                )}
+
                 <button
                   type="button"
-                  onClick={() =>
-                    formData.storeName && formData.businessAddress
-                      ? setStep(2)
-                      : alert("Please fill in your store details.")
-                  }
+                  onClick={() => {
+                    const err = validateStep1();
+                    if (err) { setErrorMsg(err); return; }
+                    setErrorMsg(null);
+                    setStep(2);
+                  }}
                   className="w-full py-3.5 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
                   <span>Continue to CNIC Verification</span>
@@ -392,23 +440,28 @@ export default function SellOnWawPage() {
                   </div>
                 </div>
 
+                {errorMsg && (
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
+                    {errorMsg}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => { setErrorMsg(null); setStep(1); }}
                     className="w-1/3 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
                   >
                     Back
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      formData.ownerName &&
-                      formData.cnic &&
-                      formData.whatsappPhone
-                        ? setStep(3)
-                        : alert("Please fill in your CNIC and contact details.")
-                    }
+                    onClick={() => {
+                      const err = validateStep2();
+                      if (err) { setErrorMsg(err); return; }
+                      setErrorMsg(null);
+                      setStep(3);
+                    }}
                     className="w-2/3 py-3.5 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     <span>Continue to Bank Details</span>
@@ -497,7 +550,7 @@ export default function SellOnWawPage() {
                 <div className="flex items-center gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setStep(2)}
+                    onClick={() => { setErrorMsg(null); setStep(2); }}
                     disabled={isSubmitting}
                     className="w-1/3 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
                   >

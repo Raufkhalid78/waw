@@ -21,6 +21,9 @@ export const ADVISORY_LOCKS = {
 
   // Notifications
   OUTBOX_PROCESSOR:          30001,
+
+  // Subscriptions
+  SUBSCRIPTION_EXPIRY:       50001,
 } as const satisfies Record<string, number>;
 
 export type AdvisoryLockName = keyof typeof ADVISORY_LOCKS;

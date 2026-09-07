@@ -3,7 +3,9 @@ import { UserRole } from "../types/index.js";
 
 /**
  * Role-Based Access Control (RBAC) middleware.
- * Ensures the authenticated user possesses the required role.
+ * Ensures the authenticated user possesses one of the required roles.
+ * SUPER_ADMIN always has access. Sub-admin roles (OPS_AGENT, FINANCE, MODERATOR)
+ * must be explicitly listed — they are NOT treated as ADMIN by default.
  */
 export function requireRole(...allowedRoles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -19,12 +21,8 @@ export function requireRole(...allowedRoles: UserRole[]) {
       return next();
     }
 
-    // If endpoint requires ADMIN, allow any sub-admin role to access (assuming broad admin route), 
-    // unless strictly locked down. For granular access, routes should specify OPS_AGENT, FINANCE etc.
-    const isAdminRoute = allowedRoles.includes(UserRole.ADMIN);
-    const hasSubAdminRole = [UserRole.OPS_AGENT, UserRole.FINANCE, UserRole.MODERATOR, UserRole.ADMIN].includes(userRole);
-
-    if (allowedRoles.includes(userRole) || (isAdminRoute && hasSubAdminRole)) {
+    // Direct role match — only the explicitly listed roles are allowed
+    if (allowedRoles.includes(userRole as UserRole)) {
       return next();
     }
 

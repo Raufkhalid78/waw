@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { FadeIn } from "@/components/Motion";
 import { bannersApi, uploadApi, AdminBanner } from "@/lib/api";
 import {
-  Image, Plus, Trash2, X, Eye, EyeOff, Upload, GripVertical,
+  ImageIcon, Plus, Trash2, X, Eye, EyeOff, Upload, GripVertical,
 } from "lucide-react";
 
 export default function BannersPage() {
@@ -310,7 +310,7 @@ export default function BannersPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-              <Image className="w-6 h-6 text-amber-500" />
+              <ImageIcon className="w-6 h-6 text-amber-500" aria-hidden="true" />
               Banners & Campaigns
             </h1>
             <p className="text-sm text-gray-500 mt-1">Manage homepage and promotional banners</p>
@@ -364,7 +364,7 @@ export default function BannersPage() {
         </div>
       ) : banners.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
-          <Image className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <ImageIcon className="w-10 h-10 text-gray-300 mx-auto mb-3" aria-hidden="true" />
           <h3 className="text-base font-bold text-gray-900 mb-1">No Banners</h3>
           <p className="text-sm text-gray-500">Create your first banner to promote deals.</p>
         </div>
@@ -380,7 +380,7 @@ export default function BannersPage() {
                   <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    <Image className="w-6 h-6" />
+                    <ImageIcon className="w-6 h-6" aria-hidden="true" />
                   </div>
                 )}
               </div>

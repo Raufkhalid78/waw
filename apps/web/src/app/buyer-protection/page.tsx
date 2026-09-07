@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import {
@@ -13,8 +14,15 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
+import { fetchMarketplaceConfig, type MarketplaceConfig } from "@/lib/api";
 
 export default function BuyerProtectionPage() {
+  const [config, setConfig] = useState<MarketplaceConfig | null>(null);
+
+  useEffect(() => {
+    fetchMarketplaceConfig().then(setConfig).catch(() => {});
+  }, []);
+
   return (
     <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 py-8 space-y-12">
       {/* ── Breadcrumb ───────────────────────────────────────────────────── */}
@@ -164,7 +172,7 @@ export default function BuyerProtectionPage() {
           </p>
         </div>
         <a
-          href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
+          href={`https://wa.me/${(config?.whatsappNumber || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
           target="_blank"
           rel="noopener noreferrer"
           className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all self-start sm:self-auto"

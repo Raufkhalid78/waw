@@ -10,7 +10,7 @@ export class PaymentController {
    */
   static async initiateXPay(req: Request, res: Response): Promise<void> {
     try {
-      const { orderId, method } = req.body;
+      const { orderId, method, customerPhone } = req.body;
       const user = (req as any).user;
 
       if (!orderId) {
@@ -19,10 +19,10 @@ export class PaymentController {
       }
 
       // Ownership check: verify the order belongs to the authenticated user (unless admin)
-      if (user.role !== "ADMIN") {
+      if (user?.role !== "ADMIN") {
         const { data: order, error } = await supabaseAdmin
           .from("orders")
-          .select("id, buyer_id")
+          .select("id, buyer_id, buyer_phone")
           .eq("id", orderId)
           .single();
 
@@ -31,9 +31,21 @@ export class PaymentController {
           return;
         }
 
-        if (order.buyer_id !== user.id) {
-          res.status(403).json({ error: "Forbidden: You can only initiate payment for your own orders" });
-          return;
+        if (order.buyer_id) {
+          // Account order: must be the owner
+          if (!user || order.buyer_id !== user.id) {
+            res.status(403).json({ error: "Forbidden: You can only initiate payment for your own orders" });
+            return;
+          }
+        } else {
+          // Guest orders (buyer_id NULL): guest must prove ownership by
+          // supplying the exact phone the order was placed with.
+          const phone = String(customerPhone || "").replace(/[\s-]/g, "");
+          const orderPhone = String(order.buyer_phone || "").replace(/[\s-]/g, "");
+          if (!phone || phone !== orderPhone) {
+            res.status(403).json({ error: "Forbidden: Phone verification failed for this order" });
+            return;
+          }
         }
       }
 
@@ -43,7 +55,7 @@ export class PaymentController {
       );
       res.json(session);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Failed to initiate payment" });
     }
   }
 

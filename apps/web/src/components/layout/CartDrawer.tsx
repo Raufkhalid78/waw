@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { SellerType } from "@waw/types";
+import { fetchMarketplaceConfig, type MarketplaceConfig } from "@/lib/api";
 
 export function CartDrawer({
   isOpen,
@@ -29,9 +31,16 @@ export function CartDrawer({
   const summary = getSummary();
   const cartCount = items.reduce((s, i) => s + i.quantity, 0);
 
+  const [config, setConfig] = useState<MarketplaceConfig | null>(null);
+
+  useEffect(() => {
+    fetchMarketplaceConfig().then(setConfig).catch(() => {});
+  }, []);
+
   if (!isOpen) return null;
 
-  const freeDeliveryThreshold = 5000;
+  const freeDeliveryThreshold = config?.freeDeliveryThresholdPkr ?? 5000;
+  const gstRate = config?.gstRatePercentage ?? 18;
   const remainingForFreeDelivery = Math.max(
     0,
     freeDeliveryThreshold - summary.subtotalPkr,
@@ -60,7 +69,7 @@ export function CartDrawer({
       />
 
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col animate-slide-in">
+        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col animate-slide-in dark:bg-slate-900">
           {/* Header */}
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-900 text-white">
             <div className="flex items-center gap-2">
@@ -221,7 +230,7 @@ export function CartDrawer({
 
           {/* Footer Summary & Checkout */}
           {items.length > 0 && (
-            <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3">
+            <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3 dark:bg-slate-800 dark:border-slate-700">
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal</span>
@@ -241,7 +250,7 @@ export function CartDrawer({
                 </div>
                 {summary.gstPkr > 0 && (
                   <div className="flex justify-between text-slate-600">
-                    <span>GST (18%)</span>
+                    <span>GST ({gstRate}%)</span>
                     <span className="font-bold text-slate-900">
                       PKR {summary.gstPkr.toLocaleString()}
                     </span>

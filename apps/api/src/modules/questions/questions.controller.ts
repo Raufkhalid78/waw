@@ -35,11 +35,11 @@ export const answerQuestion = async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     if (!answer) return res.status(400).json({ error: 'Answer is required.' });
 
-    // Verify user owns the store
+    // Verify user owns a store
     const { data: store, error: storeError } = await supabaseAdmin
-      .from('seller_profiles')
-      .select('store_id')
-      .eq('id', userId)
+      .from('stores')
+      .select('id')
+      .eq('owner_id', userId)
       .single();
 
     if (storeError || !store) return res.status(403).json({ error: 'Unauthorized' });
@@ -47,11 +47,11 @@ export const answerQuestion = async (req: Request, res: Response) => {
     // Verify question belongs to seller's product
     const { data: question, error: questionError } = await supabaseAdmin
       .from('product_questions')
-      .select('product_id, products!inner(store_id)')
+      .select('product_id, seller_offers!inner(store_id)')
       .eq('id', id)
       .single();
 
-    if (questionError || !question || (question.products as any).store_id !== store.store_id) {
+    if (questionError || !question || (question.seller_offers as any).store_id !== store.id) {
       return res.status(403).json({ error: 'Not authorized to answer this question.' });
     }
 

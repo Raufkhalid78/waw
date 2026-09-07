@@ -19,6 +19,7 @@ const nextConfig = {
       { protocol: 'https', hostname: 'plus.unsplash.com' },
       { protocol: 'https', hostname: '**.supabase.co' },
       { protocol: 'https', hostname: '**.postex.pk' },
+      { protocol: 'https', hostname: '**' },
     ],
   },
   poweredByHeader: false,

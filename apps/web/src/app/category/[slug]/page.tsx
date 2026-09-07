@@ -6,7 +6,7 @@ import Link from "next/link";
 import { fetchCategoryBySlug, fetchProducts } from "@/lib/api";
 import { logger } from "@/lib/logger";
 import { ProductCard } from "@/components/ui/ProductCard";
-import { useCartStore } from "@/store/useCartStore";
+import { useLanguage } from "@/components/ui/LanguageProvider";
 import { Category } from "@waw/types";
 import { ProductDetail } from "@/types/models";
 import {
@@ -37,8 +37,8 @@ function ProductCardSkeleton() {
 export default function CategoryPage() {
   const params = useParams();
   const slug = (params.slug as string) || "leather-craft";
-  const { language } = useCartStore();
-  const isUrdu = language === "UR";
+  const { language } = useLanguage();
+  const isUrdu = language === "ur";
 
   const [category, setCategory] = useState<Category | null>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -97,7 +97,7 @@ export default function CategoryPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [slug, selectedCity, selectedSellerType, userMaxPrice, minRating, inStockOnly, sortBy]);
+  }, [slug, category, selectedCity, selectedSellerType, userMaxPrice, minRating, inStockOnly, sortBy]);
 
   useEffect(() => {
     setPage(1);

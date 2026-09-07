@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Copy, Check, Share2 } from "lucide-react";
+import { getApiBaseUrl } from "@/lib/api";
+import { fetchWithCsrf } from "@/lib/csrf";
 
 interface ReferralStats {
   code: string | null;
@@ -22,20 +24,40 @@ export default function ReferralsPage() {
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/referrals/stats")
-      .then((r) => r.json())
-      .then(setStats)
-      .catch(() => setStats(null))
-      .finally(() => setLoading(false));
+    async function loadStats() {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/api/referrals/stats`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to load referral stats");
+        setStats(data);
+      } catch {
+        setStats(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
   }, []);
 
   const handleGenerateCode = async () => {
-    const res = await fetch("/api/referrals/generate", { method: "POST" });
-    const data = await res.json();
-    if (data.code) {
-      setStats((prev) => (prev ? { ...prev, code: data.code } : null));
+    setError(null);
+    try {
+      const res = await fetchWithCsrf(`${getApiBaseUrl()}/api/referrals/generate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to generate referral code");
+      if (data.code) {
+        setStats((prev) => (prev ? { ...prev, code: data.code } : null));
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to generate referral code");
     }
   };
 
@@ -48,7 +70,7 @@ export default function ReferralsPage() {
 
   const shareReferral = () => {
     if (!stats?.code) return;
-    const url = `https://waw.com.pk/signup?ref=${stats.code}`;
+    const url = `https://waw.com.pk/?ref=${stats.code}`;
     if (navigator.share) {
       navigator.share({
         title: "Join Waw Marketplace",
@@ -73,7 +95,7 @@ export default function ReferralsPage() {
     );
   }
 
-  const referralUrl = stats?.code ? `https://waw.com.pk/signup?ref=${stats.code}` : "";
+  const referralUrl = stats?.code ? `https://waw.com.pk/?ref=${stats.code}` : "";
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -83,6 +105,12 @@ export default function ReferralsPage() {
           ← Back to Account
         </Link>
       </div>
+
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-lg p-3 mb-6 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Referral Code Card */}
       <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6 mb-6">

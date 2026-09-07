@@ -5,6 +5,7 @@ import { MobileBottomNav } from "./MobileBottomNav";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { AiChatWidget } from "@/components/ai/AiChatWidget";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -16,6 +17,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
       <Footer />
+      <AiChatWidget />
       <MobileBottomNav onMenuOpen={() => setMenuOpen(!menuOpen)} />
     </>
   );

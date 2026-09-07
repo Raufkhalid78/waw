@@ -22,6 +22,7 @@ export default function WishlistPage() {
   const { wishlist, toggleWishlist, addItem } = useCartStore();
   const [serverWishlist, setServerWishlist] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failedImgs, setFailedImgs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     async function loadWishlist() {
@@ -140,10 +141,13 @@ export default function WishlistPage() {
                   className="block relative aspect-square rounded-2xl overflow-hidden bg-slate-50"
                 >
                   <Image
-                    src={item.imageUrl || "/placeholder.png"}
+                    src={failedImgs[item.productId] || !item.imageUrl ? "/placeholder.png" : item.imageUrl}
                     alt={item.title}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    onError={() =>
+                      setFailedImgs((prev) => ({ ...prev, [item.productId]: true }))
+                    }
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <button

@@ -36,6 +36,7 @@ android/local.properties
 .env
 .env*.local
 .env.production
+.env.staging
 !.env.example
 
 # IDE

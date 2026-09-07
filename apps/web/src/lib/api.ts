@@ -1,6 +1,8 @@
 import { ProductDetail } from "@/types/models";
+export type { ProductDetail } from "@/types/models";
 import { StoreDetail } from "@/types/models";
 import { logger } from "./logger";
+import { fetchWithCsrf } from "./csrf";
 import {
   Category,
   CheckoutQuoteRequest,
@@ -16,6 +18,8 @@ const API_BASE_URL = (
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   logger.debug(`Client API Origin: ${API_BASE_URL}`, "API");
 }
+
+export const getApiBaseUrl = () => API_BASE_URL;
 
 function mapApiProductToDetail(p: any): ProductDetail {
   const basePrice = Number(p.base_price_pkr ?? p.price_pkr ?? p.basePricePkr ?? p.pricePkr ?? 0);
@@ -131,10 +135,12 @@ export async function safeFetch<T>(
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const headers = new Headers(options?.headers || {});
-      headers.set("X-Correlation-Id", correlationId);
+      const headers: Record<string, string> = {
+        ...((options?.headers as Record<string, string>) || {}),
+        "X-Correlation-Id": correlationId,
+      };
 
-      const res = await fetch(url, {
+      const res = await fetchWithCsrf(url, {
         ...options,
         signal: controller.signal,
         headers,
@@ -293,13 +299,15 @@ export interface MarketplaceStats {
   avgRating: number;
 }
 
-export async function fetchMarketplaceStats(): Promise<MarketplaceStats> {
+export async function fetchMarketplaceStats(): Promise<MarketplaceStats | null> {
   const res = await safeFetch<MarketplaceStats>(
     `${API_BASE_URL}/api/marketplace-stats`,
     { cache: "no-store", timeoutMs: 5000 }
   );
+  // Real numbers only — null on failure so the UI hides the section
+  // instead of displaying fabricated "500 sellers / 10K orders".
   if (res.ok && res.data) return res.data;
-  return { verifiedSellers: 500, ordersDelivered: 10000, citiesCovered: 35, avgRating: 4.8 };
+  return null;
 }
 
 export async function fetchProductById(
@@ -516,7 +524,7 @@ export async function createUserAddress(addr: {
   is_default?: boolean;
 }): Promise<UserAddress> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/addresses`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/user/addresses`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -536,7 +544,7 @@ export async function createUserAddress(addr: {
 
 export async function deleteUserAddress(id: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/addresses/${id}`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/user/addresses/${id}`, {
       method: "DELETE",
       credentials: "include",
     });
@@ -562,7 +570,7 @@ export async function submitOrderReturn(
   },
 ): Promise<any> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/return`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/orders/${orderId}/return`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -592,7 +600,7 @@ export async function initiatePaymentApi(paymentInput: {
   qrPayload?: string;
 }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/payments/xpay/initiate`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/payments/xpay/initiate`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -634,7 +642,7 @@ export async function fetchUserWishlist(): Promise<WishlistItem[]> {
 
 export async function addToWishlist(productId: string): Promise<any> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/wishlist`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/user/wishlist`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -654,7 +662,7 @@ export async function addToWishlist(productId: string): Promise<any> {
 
 export async function removeFromWishlist(productId: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/wishlist/${encodeURIComponent(productId)}`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/user/wishlist/${encodeURIComponent(productId)}`, {
       method: "DELETE",
       credentials: "include",
     });
@@ -688,5 +696,289 @@ export async function fetchActiveFlashSale(): Promise<any> {
     return data.flashSale || null;
   } catch {
     return null;
+  }
+}
+
+export async function fetchProductQuestions(productId: string): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/questions/${productId}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function submitProductQuestion(productId: string, question: string): Promise<any> {
+  const res = await fetchWithCsrf(`${API_BASE_URL}/api/questions`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productId, question }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to submit question" }));
+    throw new Error(err.error || "Failed to submit question");
+  }
+  return res.json();
+}
+
+// ── Cities (from database) ────────────────────────────────────────────────
+export interface City {
+  name: string;
+  province: string;
+  tier: number;
+  isCodEligible: boolean;
+  supportedCouriers: string[];
+}
+
+let citiesCache: City[] | null = null;
+let citiesCacheExpiry = 0;
+
+export async function fetchCities(): Promise<City[]> {
+  const now = Date.now();
+  if (citiesCache && now < citiesCacheExpiry) return citiesCache;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/cities`, { next: { revalidate: 300 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    citiesCache = data.cities || [];
+    citiesCacheExpiry = now + 5 * 60 * 1000;
+    return citiesCache!;
+  } catch {
+    return [];
+  }
+}
+
+// ── Marketplace Config (from database) ────────────────────────────────────
+export interface MarketplaceConfig {
+  freeDeliveryThresholdPkr: number;
+  defaultShippingFeePkr: number;
+  codHandlingFeePkr: number;
+  gstRatePercentage: number;
+  returnWindowDays: number;
+  payoutSettlementDays: number;
+  dispatchWindowHours: number;
+  heavyParcelWeightKg: number;
+  whatsappNumber: string;
+  supportEmail: string;
+  careEmail: string;
+  supportPhone: string;
+  siteUrl: string;
+  siteUrlWww: string;
+  adminUrl: string;
+  sellerUrl: string;
+  facebookUrl: string;
+  twitterUrl: string;
+  instagramUrl: string;
+  linkedinUrl: string;
+  youtubeUrl: string;
+  businessName: string;
+  businessNameUrdu: string;
+  businessTagline: string;
+  businessCity: string;
+  businessCountry: string;
+  currency: string;
+  currencySymbol: string;
+  defaultCommissionPct: number;
+  raastMerchantAlias: string;
+  raastMerchantName: string;
+  raastMerchantCity: string;
+  defaultCity: string;
+}
+
+let configCache: MarketplaceConfig | null = null;
+let configCacheExpiry = 0;
+
+export async function fetchMarketplaceConfig(): Promise<MarketplaceConfig> {
+  const now = Date.now();
+  if (configCache && now < configCacheExpiry) return configCache;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/marketplace-config`, { next: { revalidate: 300 } });
+    if (!res.ok) return getDefaultConfig();
+    configCache = await res.json();
+    configCacheExpiry = now + 5 * 60 * 1000;
+    return configCache!;
+  } catch {
+    return getDefaultConfig();
+  }
+}
+
+function getDefaultConfig(): MarketplaceConfig {
+  return {
+    freeDeliveryThresholdPkr: 5000,
+    defaultShippingFeePkr: 200,
+    codHandlingFeePkr: 100,
+    gstRatePercentage: 18,
+    returnWindowDays: 7,
+    payoutSettlementDays: 7,
+    dispatchWindowHours: 24,
+    heavyParcelWeightKg: 5,
+    whatsappNumber: "+923001234567",
+    supportEmail: "support@waw.pk",
+    careEmail: "care@waw.com.pk",
+    supportPhone: "+92 300 1234567",
+    siteUrl: "https://waw.com.pk",
+    siteUrlWww: "https://www.waw.com.pk",
+    adminUrl: "https://admin.waw.com.pk",
+    sellerUrl: "https://seller.waw.com.pk",
+    facebookUrl: "#",
+    twitterUrl: "#",
+    instagramUrl: "#",
+    linkedinUrl: "#",
+    youtubeUrl: "#",
+    businessName: "Waw Pakistan",
+    businessNameUrdu: "واو پاکستان",
+    businessTagline: "Pakistan's premium online marketplace",
+    businessCity: "Lahore",
+    businessCountry: "Pakistan",
+    currency: "PKR",
+    currencySymbol: "Rs",
+    defaultCommissionPct: 10,
+    raastMerchantAlias: "",
+    raastMerchantName: "",
+    raastMerchantCity: "Lahore",
+    defaultCity: "Lahore",
+  };
+}
+
+// ── User Preferences ──────────────────────────────────────────────────────
+export interface UserPreferences {
+  theme: "light" | "dark" | "system";
+  language: "en" | "ur";
+  city: string | null;
+}
+
+export async function fetchUserPreferences(): Promise<UserPreferences> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/user/preferences`, {
+      credentials: "include",
+    });
+    if (!res.ok) return { theme: "light", language: "en", city: null };
+    return await res.json();
+  } catch {
+    return { theme: "light", language: "en", city: null };
+  }
+}
+
+export async function updateUserPreferences(prefs: Partial<UserPreferences>): Promise<UserPreferences | null> {
+  try {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/user/preferences`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prefs),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── AI ─────────────────────────────────────────────────────────────────────
+
+export async function fetchAiRecommendations(productId: string): Promise<ProductDetail[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/ai/recommendations/${encodeURIComponent(productId)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = Array.isArray(data?.recommendations) ? data.recommendations : [];
+    return items.map((p: any) => ({
+      id: p.id,
+      productId: p.slug || p.id,
+      slug: p.slug || p.id,
+      title: p.title || "Product",
+      pricePkr: Number(p.offers?.[0]?.price_pkr ?? p.price_pkr ?? p.pricePkr ?? 0),
+      originalPricePkr: p.offers?.[0]?.original_price_pkr ?? undefined,
+      rating:
+        p.offers?.[0]?.avg_rating !== undefined && p.offers?.[0]?.avg_rating !== null
+          ? Number(p.offers[0].avg_rating)
+          : 0,
+      reviewsCount: Number(p.offers?.[0]?.review_count ?? 0),
+      soldCount: 0,
+      isExpress: false,
+      sellerType: SellerType.THIRD_PARTY,
+      storeName: "Waw Store",
+      storeSlug: "",
+      sellerCity: "Pakistan",
+      imageUrl: (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : p.thumbnail) || "",
+      images: Array.isArray(p.images) && p.images.length > 0 ? p.images : p.thumbnail ? [p.thumbnail] : [],
+      description: "",
+      highlights: [],
+      specifications: {},
+      inStock: true,
+      stockCount: 0,
+      sku: "",
+      variants: [],
+      reviews: [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function aiChat(
+  messages: { role: "user" | "assistant"; content: string }[],
+  productId?: string,
+): Promise<string> {
+  let res: Response;
+  try {
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content || "";
+    res = await fetchWithCsrf(`${API_BASE_URL}/api/ai/chat`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      // `query`/`product_id` match the current controller contract; `messages`/`productId`
+      // are sent for forward-compatibility with a conversational handler.
+      body: JSON.stringify({ messages, productId, query: lastUserMessage, product_id: productId }),
+    });
+  } catch {
+    throw new Error("AI assistant is unavailable right now.");
+  }
+
+  if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error("Daily AI limit reached. Please try again tomorrow.");
+    }
+    if (res.status === 401) {
+      const err = new Error("Please log in to chat with the assistant.");
+      (err as any).status = 401;
+      throw err;
+    }
+    throw new Error("AI assistant is unavailable right now.");
+  }
+
+  try {
+    const data = await res.json();
+    return data.reply || data.response || data.message || data.content || "";
+  } catch {
+    throw new Error("AI assistant is unavailable right now.");
+  }
+}
+
+// ── Badge types ───────────────────────────────────────────────────────────
+export interface Badge {
+  type: 'best_seller' | 'waw_deal' | 'new_arrival';
+  tier?: 1 | 2 | 3;
+  label: string;
+  position: 'left' | 'right';
+}
+
+// ── Best Sellers ───────────────────────────────────────────────────────────
+export async function fetchBestSellers(limit = 20): Promise<ProductDetail[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/products/best-sellers?limit=${limit}`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.items || []).map(mapApiProductToDetail);
+  } catch {
+    return [];
   }
 }

@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { typesenseClient } from "../../config/typesense.js";
+import { redis } from "../../config/redis.js";
 import { CategoryService } from "../categories/category.service.js";
+import { ConfigService } from "../admin/config.service.js";
 
 export class ProductService {
   /**
@@ -31,7 +33,7 @@ export class ProductService {
         price_pkr, 
         original_price_pkr, 
         is_express, 
-        catalog_product:catalog_products!inner(id, title, slug, thumbnail, images, category_id, is_active),
+        catalog_product:catalog_products!inner(id, title, slug, thumbnail, images, category_id, is_active, rating_average, rating_count),
         store:stores!inner(id, name, slug, city, rating_average, seller_type),
         variants:offer_variants(id, variant_name, price_adjustment_pkr)
       `, { count: "exact" })
@@ -106,6 +108,27 @@ export class ProductService {
       });
     }
     
+    // Featured store boost: when no explicit sort is requested, offers from
+    // Enterprise stores with an active subscription are prioritized (stable sort).
+    let featuredStoreIds = new Set<string>();
+    if (!query.sortBy) {
+      const { data: featuredStores } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("subscription_active", true)
+        .eq("subscription_plan", "enterprise");
+      featuredStoreIds = new Set((featuredStores || []).map((s: any) => s.id));
+      if (featuredStoreIds.size > 0) {
+        items = items
+          .map((offer: any) => ({
+            offer,
+            featured: featuredStoreIds.has(offer.store?.id),
+          }))
+          .sort((a, b) => Number(b.featured) - Number(a.featured))
+          .map((entry) => entry.offer);
+      }
+    }
+
     // Map to frontend expectation (product-centric view)
     const mappedItems = items.map((offer: any) => ({
       id: offer.id,
@@ -124,10 +147,12 @@ export class ProductService {
       storeName: offer.store.name,
       sellerCity: offer.store.city,
       sellerType: offer.store.seller_type,
-      rating: offer.store.rating_average,
-      reviewsCount: 0,
+      rating: offer.catalog_product.rating_average || offer.store.rating_average,
+      reviewsCount: offer.catalog_product.rating_count || 0,
       soldCount: 0,
       isExpress: offer.is_express,
+      isFeaturedStore: !query.sortBy && featuredStoreIds.has(offer.store?.id),
+      createdAt: offer.catalog_product.created_at,
       variants: offer.variants
     }));
 
@@ -149,7 +174,7 @@ export class ProductService {
     let catQuery = supabaseAdmin
       .from("catalog_products")
       .select(`
-        id, title, title_urdu, slug, description, attributes, images, thumbnail, is_active,
+        id, title, title_urdu, slug, description, attributes, images, thumbnail, is_active, rating_average, rating_count,
         category:categories(id, name, name_urdu, slug),
         offers:seller_offers(
           id, sku, price_pkr, original_price_pkr, condition, is_express, status,
@@ -180,6 +205,25 @@ export class ProductService {
         const reviews = (reviewsData.data || []).map(r => ({ id: r.id, rating: r.rating, comment: r.comment, date: new Date(r.created_at).toLocaleDateString(), author: (r.profiles as any)?.full_name || 'Anonymous', verifiedPurchase: r.is_verified_purchase, sellerReply: r.seller_reply }));
         const questions = (questionsData.data || []).map(q => ({ id: q.id, question: q.question, answer: q.answer, author: (q.profiles as any)?.full_name || 'Anonymous' }));
 
+        // Server-authoritative delivery estimate based on seller city tier
+        const sellerCity = (Array.isArray(bestOffer.store) ? bestOffer.store[0] : bestOffer.store)?.city || await ConfigService.get("default_city") || "Lahore";
+        const isExpress = bestOffer.is_express;
+
+        const { data: sellerTierRow } = await supabaseAdmin
+          .from("serviceable_cities")
+          .select("tier, intra_city_days_min, intra_city_days_max, inter_tier1_days_min, inter_tier1_days_max, inter_other_days_min, inter_other_days_max")
+          .ilike("city_name", sellerCity)
+          .maybeSingle();
+
+        const isSellerInTier1 = sellerTierRow?.tier === 1;
+        const expressDays = isSellerInTier1
+          ? { min: await ConfigService.getNumber("express_tier1_days_min", 1), max: await ConfigService.getNumber("express_tier1_days_max", 2) }
+          : { min: await ConfigService.getNumber("express_other_days_min", 2), max: await ConfigService.getNumber("express_other_days_max", 3) };
+        const standardDays = isSellerInTier1
+          ? { min: sellerTierRow?.inter_tier1_days_min ?? await ConfigService.getNumber("standard_tier1_days_min", 3), max: sellerTierRow?.inter_tier1_days_max ?? await ConfigService.getNumber("standard_tier1_days_max", 5) }
+          : { min: sellerTierRow?.inter_other_days_min ?? await ConfigService.getNumber("standard_other_days_min", 4), max: sellerTierRow?.inter_other_days_max ?? await ConfigService.getNumber("standard_other_days_max", 7) };
+        const deliveryEstimate = isExpress ? expressDays : standardDays;
+
         return {
           id: bestOffer.id,
           productId: catProduct.id,
@@ -198,8 +242,13 @@ export class ProductService {
           category: catProduct.category,
           variants: bestOffer.variants || [],
           reviews,
+          reviewsCount: reviews.length,
+          averageRating: reviews.length > 0
+            ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
+            : (catProduct.rating_average ? Number(catProduct.rating_average) : undefined),
           questions,
-          otherOffers
+          otherOffers,
+          deliveryEstimate
         };
       }
     }
@@ -233,6 +282,25 @@ export class ProductService {
       const reviews = (reviewsData.data || []).map(r => ({ id: r.id, rating: r.rating, comment: r.comment, date: new Date(r.created_at).toLocaleDateString(), author: (r.profiles as any)?.full_name || 'Anonymous', verifiedPurchase: r.is_verified_purchase, sellerReply: r.seller_reply }));
       const questions = (questionsData.data || []).map(q => ({ id: q.id, question: q.question, answer: q.answer, author: (q.profiles as any)?.full_name || 'Anonymous' }));
 
+      // Server-authoritative delivery estimate based on seller city tier
+      const sellerCity2 = (Array.isArray(offerData.store) ? offerData.store[0] : offerData.store)?.city || await ConfigService.get("default_city") || "Lahore";
+      const isExpress2 = offerData.is_express;
+
+      const { data: sellerTierRow2 } = await supabaseAdmin
+        .from("serviceable_cities")
+        .select("tier, intra_city_days_min, intra_city_days_max, inter_tier1_days_min, inter_tier1_days_max, inter_other_days_min, inter_other_days_max")
+        .ilike("city_name", sellerCity2)
+        .maybeSingle();
+
+      const isSellerInTier1_2 = sellerTierRow2?.tier === 1;
+      const expressDays2 = isSellerInTier1_2
+        ? { min: await ConfigService.getNumber("express_tier1_days_min", 1), max: await ConfigService.getNumber("express_tier1_days_max", 2) }
+        : { min: await ConfigService.getNumber("express_other_days_min", 2), max: await ConfigService.getNumber("express_other_days_max", 3) };
+      const standardDays2 = isSellerInTier1_2
+        ? { min: sellerTierRow2?.inter_tier1_days_min ?? await ConfigService.getNumber("standard_tier1_days_min", 3), max: sellerTierRow2?.inter_tier1_days_max ?? await ConfigService.getNumber("standard_tier1_days_max", 5) }
+        : { min: sellerTierRow2?.inter_other_days_min ?? await ConfigService.getNumber("standard_other_days_min", 4), max: sellerTierRow2?.inter_other_days_max ?? await ConfigService.getNumber("standard_other_days_max", 7) };
+      const deliveryEstimate2 = isExpress2 ? expressDays2 : standardDays2;
+
       return {
         id: offerData.id,
         productId: offerData.catalog_product.id,
@@ -251,8 +319,13 @@ export class ProductService {
         category: offerData.catalog_product.category,
         variants: offerData.variants || [],
         reviews,
+        reviewsCount: reviews.length,
+        averageRating: reviews.length > 0
+          ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
+          : (offerData.catalog_product.rating_average ? Number(offerData.catalog_product.rating_average) : undefined),
         questions,
-        otherOffers: []
+        otherOffers: [],
+        deliveryEstimate: deliveryEstimate2
       };
     }
 
@@ -355,6 +428,214 @@ export class ProductService {
     }
 
     return offer;
+  }
+
+  // ── Badge computation ─────────────────────────────────────────────────────
+  // Server-side badge logic: every product list/detail response includes a
+  // `badges` array so the frontend renders consistently without re-deriving.
+
+  private static _badgeConfigCache: {
+    tier1: number;
+    tier2: number;
+    tier3: number;
+    bestSellerDays: number;
+    bestSellerLimit: number;
+    newArrivalDays: number;
+    expires: number;
+  } | null = null;
+
+  private static async _getBadgeConfig() {
+    const now = Date.now();
+    if (this._badgeConfigCache && now < this._badgeConfigCache.expires) {
+      return this._badgeConfigCache;
+    }
+    const [t1, t2, t3, bsd, bsl, nad] = await Promise.all([
+      ConfigService.getNumber("discount_tier_1_threshold", 30),
+      ConfigService.getNumber("discount_tier_2_threshold", 40),
+      ConfigService.getNumber("discount_tier_3_threshold", 45),
+      ConfigService.getNumber("best_seller_days", 30),
+      ConfigService.getNumber("best_seller_limit", 20),
+      ConfigService.getNumber("new_arrival_days", 14),
+    ]);
+    this._badgeConfigCache = {
+      tier1: t1, tier2: t2, tier3: t3,
+      bestSellerDays: bsd, bestSellerLimit: bsl, newArrivalDays: nad,
+      expires: now + 5 * 60 * 1000,
+    };
+    return this._badgeConfigCache;
+  }
+
+  private static _bestSellerCache: { ids: Set<string>; rank: Map<string, number>; expires: number } | null = null;
+
+  private static async _getBestSellerIds(): Promise<{ ids: Set<string>; rank: Map<string, number> }> {
+    const now = Date.now();
+    if (this._bestSellerCache && now < this._bestSellerCache.expires) {
+      return { ids: this._bestSellerCache.ids, rank: this._bestSellerCache.rank };
+    }
+
+    const cfg = await this._getBadgeConfig();
+    const cacheKey = "badge:best-sellers";
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const ids = new Set<string>(parsed.ids);
+        const rank = new Map<string, number>(parsed.rank.map(([k, v]: [string, number]) => [k, v]));
+        this._bestSellerCache = { ids, rank, expires: now + 5 * 60 * 1000 };
+        return { ids, rank };
+      }
+    } catch { /* ignore cache miss */ }
+
+    // Aggregate units sold per catalog product from delivered/completed orders
+    const since = new Date();
+    since.setDate(since.getDate() - cfg.bestSellerDays);
+
+    const { data } = await supabaseAdmin.rpc("aggregate_product_sales", {
+      since_date: since.toISOString(),
+      result_limit: cfg.bestSellerLimit,
+    });
+
+    const ids = new Set<string>();
+    const rank = new Map<string, number>();
+    let r = 1;
+    for (const row of data || []) {
+      ids.add(row.product_id);
+      rank.set(row.product_id, r++);
+    }
+
+    this._bestSellerCache = { ids, rank, expires: now + 5 * 60 * 1000 };
+    try {
+      await redis.set(cacheKey, JSON.stringify({
+        ids: Array.from(ids),
+        rank: Array.from(rank.entries()),
+      }), { ex: 300 });
+    } catch { /* ignore cache write */ }
+
+    return { ids, rank };
+  }
+
+  /**
+   * Computes the badge list for a single product. Max 2 badges per card.
+   * Priority: new_arrival > best_seller > waw_deal.
+   */
+  static async computeBadges(
+    productId: string,
+    discountPercent: number,
+    createdAt?: string,
+  ): Promise<Array<{ type: string; tier?: number; label: string; position: "left" | "right" }>> {
+    const cfg = await this._getBadgeConfig();
+    const badges: Array<{ type: string; tier?: number; label: string; position: "left" | "right" }> = [];
+
+    // New Arrival
+    if (createdAt) {
+      const created = new Date(createdAt).getTime();
+      const cutoff = Date.now() - cfg.newArrivalDays * 24 * 60 * 60 * 1000;
+      if (created >= cutoff) {
+        badges.push({ type: "new_arrival", label: "NEW", position: "left" });
+      }
+    }
+
+    // Best Seller
+    const { ids, rank } = await this._getBestSellerIds();
+    if (ids.has(productId)) {
+      const r = rank.get(productId);
+      badges.push({
+        type: "best_seller",
+        label: r && r <= 3 ? `#${r}` : "Best Seller",
+        position: badges.length === 0 ? "left" : "right",
+      });
+    }
+
+    // Waw Deal tiers
+    if (discountPercent >= cfg.tier3) {
+      badges.push({ type: "waw_deal", tier: 3, label: "MEGA DEAL", position: "right" });
+    } else if (discountPercent >= cfg.tier2) {
+      badges.push({ type: "waw_deal", tier: 2, label: "HOT DEAL", position: "right" });
+    } else if (discountPercent >= cfg.tier1) {
+      badges.push({ type: "waw_deal", tier: 1, label: "WAW DEAL", position: "right" });
+    }
+
+    // Cap at 2 badges, priority: new_arrival > best_seller > waw_deal
+    if (badges.length > 2) {
+      const priority = { new_arrival: 0, best_seller: 1, waw_deal: 2 };
+      badges.sort((a, b) => priority[a.type as keyof typeof priority] - priority[b.type as keyof typeof priority]);
+      return badges.slice(0, 2);
+    }
+    return badges;
+  }
+
+  /**
+   * GET /api/products/best-sellers — top N products by units sold in the
+   * configured rolling window. Returns standard product list shape.
+   */
+  static async getBestSellers(limit?: number): Promise<any[]> {
+    const cfg = await this._getBadgeConfig();
+    const n = limit || cfg.bestSellerLimit;
+
+    const since = new Date();
+    since.setDate(since.getDate() - cfg.bestSellerDays);
+
+    const { data: sales } = await supabaseAdmin.rpc("aggregate_product_sales", {
+      since_date: since.toISOString(),
+      result_limit: n,
+    });
+
+    if (!sales || sales.length === 0) return [];
+
+    // Fetch full product data for these IDs
+    const productIds = (sales as any[]).map((s: any) => s.product_id);
+    const { data: offers } = await supabaseAdmin
+      .from("seller_offers")
+      .select(`
+        id, price_pkr, original_price_pkr, is_express, status,
+        catalog_product:catalog_products!inner(id, title, title_urdu, slug, thumbnail, images, is_active, rating_average, rating_count, created_at),
+        store:stores!inner(id, name, slug, city, rating_average, seller_type),
+        variants:offer_variants(id, variant_name, price_adjustment_pkr)
+      `)
+      .in("catalog_product_id", productIds)
+      .eq("status", "ACTIVE")
+      .eq("catalog_product.is_active", true);
+
+    if (!offers) return [];
+
+    const { ids, rank } = await this._getBestSellerIds();
+    const result: any[] = [];
+
+    for (const offer of offers) {
+      const cp: any = offer.catalog_product;
+      const store: any = Array.isArray(offer.store) ? offer.store[0] : offer.store;
+      if (!store || !cp) continue;
+      const discountPercent = offer.original_price_pkr
+        ? Math.round(((offer.original_price_pkr - offer.price_pkr) / offer.original_price_pkr) * 100)
+        : 0;
+      const badges = await this.computeBadges(cp.id, discountPercent, cp.created_at);
+      result.push({
+        id: offer.id,
+        productId: cp.id,
+        slug: cp.slug,
+        title: cp.title,
+        titleUrdu: cp.title_urdu,
+        imageUrl: (Array.isArray(cp.images) && cp.images.length > 0) ? cp.images[0] : cp.thumbnail,
+        pricePkr: offer.price_pkr,
+        originalPricePkr: offer.original_price_pkr,
+        discountPercent,
+        storeId: store.id,
+        storeName: store.name,
+        storeSlug: store.slug,
+        sellerCity: store.city,
+        sellerType: store.seller_type,
+        rating: cp.rating_average || store.rating_average,
+        reviewsCount: cp.rating_count || 0,
+        isExpress: offer.is_express,
+        isFeaturedStore: false,
+        badges,
+        variants: offer.variants,
+      });
+    }
+
+    // Sort by best seller rank
+    result.sort((a, b) => (rank.get(a.productId) || 999) - (rank.get(b.productId) || 999));
+    return result;
   }
 }
 

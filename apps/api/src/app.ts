@@ -13,10 +13,11 @@ import { supabaseAdmin } from "./config/supabase.js";
 import { redis } from "./config/redis.js";
 import { typesenseClient } from "./config/typesense.js";
 import { requestTracer, logger } from "./config/logger.js";
+import { ConfigService } from "./modules/admin/config.service.js";
 import { performanceTracker } from "./middleware/performance.middleware.js";
 
 // Middlewares
-import { requireAuth } from "./middleware/auth.middleware.js";
+import { requireAuth, attachOptionalUser } from "./middleware/auth.middleware.js";
 import { requireActiveStore } from "./middleware/require-active-store.middleware.js";
 import { requireRole } from "./middleware/require-role.middleware.js";
 import { csrfProtection } from "./middleware/csrf.middleware.js";
@@ -75,6 +76,11 @@ import { AIController } from "./modules/ai/ai.controller.js";
 import { LoyaltyController } from "./modules/loyalty/loyalty.controller.js";
 import { ReferralController } from "./modules/referrals/referral.controller.js";
 import { SubscriptionController } from "./modules/subscriptions/subscription.controller.js";
+import { SubscriptionService } from "./modules/subscriptions/subscription.service.js";
+import citiesRouter from "./modules/cities/cities.routes.js";
+import preferencesRouter from "./modules/user/preferences.routes.js";
+import { getMarketplaceConfig } from "./modules/admin/marketplace-config.controller.js";
+import { getActiveFlashSale } from "./modules/sales/flash-sales.controller.js";
 import { UploadController } from "./modules/uploads/upload.controller.js";
 import { uploadSingle, uploadMultiple } from "./middleware/upload.middleware.js";
 import { sentryRequestContext, sentryErrorHandler } from "./config/sentry.js";
@@ -142,11 +148,19 @@ const TRUSTED_ORIGINS = [
   "http://localhost:4000",
 ];
 
-const dynamicOrigins = process.env.CORS_ORIGIN
+// Load additional CORS origins from marketplace config
+const dynamicOriginsFromConfig: string[] = [];
+ConfigService.get("cors_allowed_origins").then((val) => {
+  if (val) {
+    val.split(",").map((o: string) => o.trim()).filter(Boolean).forEach((o: string) => dynamicOriginsFromConfig.push(o));
+  }
+}).catch(() => {});
+
+const dynamicOriginsEnv = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
   : [];
 
-const allowedOriginSet = new Set([...TRUSTED_ORIGINS, ...dynamicOrigins]);
+const allowedOriginSet = new Set([...TRUSTED_ORIGINS, ...dynamicOriginsEnv, ...dynamicOriginsFromConfig]);
 
 const WEBHOOK_PATHS = ["/api/logistics/postex/webhook", "/api/payments/xpay/webhook", "/api/payments/raast/webhook"];
 
@@ -197,49 +211,55 @@ app.use(apiVersioning);
 app.use(sanitizeInput);
 app.use(csrfProtection);
 
-// -- Swagger API Documentation ----------------------------------------------
-try {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const openapiDoc = YAML.load(path.join(__dirname, "../../openapi.yaml"));
-  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiDoc, {
-    customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "Waw API Documentation",
-  }));
-} catch (err) {
-  logger.warn("Failed to load OpenAPI docs", { error: (err as Error).message });
+// -- Swagger API Documentation (dev/staging only — never in production) ----
+if (ENV.NODE_ENV !== "production") {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const openapiDoc = YAML.load(path.join(__dirname, "../../openapi.yaml"));
+    app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiDoc, {
+      customCss: ".swagger-ui .topbar { display: none }",
+      customSiteTitle: "Waw API Documentation",
+    }));
+  } catch (err) {
+    logger.warn("Failed to load OpenAPI docs", { error: (err as Error).message });
+  }
 }
 
 // ── Health & Diagnostics ──────────────────────────────────────────────────
-app.get("/health", (req, res) => {
-  const uptime = process.uptime();
-  const memUsage = process.memoryUsage();
-
+// Minimal liveness probe — no sensitive information exposed
+app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
-    service: "Waw (واو) API Engine",
-    version: process.env.npm_package_version || "1.0.0",
-    country: "Pakistan (PKR)",
-    environment: ENV.NODE_ENV || "development",
-    supabaseBackend: "Connected (PostgreSQL / Auth / Storage)",
-    freeDeliveryThreshold: ENV.FREE_DELIVERY_THRESHOLD_PKR,
-    codHandlingFee: ENV.DEFAULT_COD_FEE_PKR,
-    uptime: {
-      seconds: Math.floor(uptime),
-      human: formatUptime(uptime),
-    },
-    memory: {
-      rss: formatBytes(memUsage.rss),
-      heapUsed: formatBytes(memUsage.heapUsed),
-      heapTotal: formatBytes(memUsage.heapTotal),
-      external: formatBytes(memUsage.external),
-    },
     timestamp: new Date().toISOString(),
   });
 });
 
-// Deep Readiness & Dependency Probe
+// Deep Readiness & Dependency Probe — detailed info requires admin auth
 app.get("/readyz", async (req, res) => {
+  // Check for admin auth — detailed diagnostics are admin-only
+  const isAdmin = await (async () => {
+    try {
+      const accessToken = req.cookies?.waw_session;
+      if (!accessToken) return false;
+      const { SessionService } = await import("./modules/auth/session.service.js");
+      const session = await SessionService.validateSession(accessToken);
+      if (!session) return false;
+      const { supabaseAdmin: sa } = await import("./config/supabase.js");
+      const { data: profile } = await sa.from("profiles").select("role").eq("id", session.userId).single();
+      return profile?.role === "ADMIN" || profile?.role === "SUPER_ADMIN";
+    } catch {
+      return false;
+    }
+  })();
+
+  if (!isAdmin) {
+    // Minimal response for load balancers / k8s probes
+    res.status(200).json({ status: "ok" });
+    return;
+  }
+
+  // Full diagnostics for admin users only
   const checks: Record<string, { status: string; latencyMs?: number; details?: any }> = {};
   let isHealthy = true;
   const startTime = Date.now();
@@ -253,15 +273,10 @@ app.get("/readyz", async (req, res) => {
     checks.supabasePostgres = {
       status: error ? "unhealthy" : "healthy",
       latencyMs: Date.now() - startDb,
-      details: error ? { message: error.message } : { rowCount: count },
     };
     if (error) isHealthy = false;
-  } catch (err: any) {
-    checks.supabasePostgres = {
-      status: "unhealthy",
-      latencyMs: Date.now() - startDb,
-      details: { message: err.message },
-    };
+  } catch {
+    checks.supabasePostgres = { status: "unhealthy", latencyMs: Date.now() - startDb };
     isHealthy = false;
   }
 
@@ -269,63 +284,30 @@ app.get("/readyz", async (req, res) => {
   const startRedis = Date.now();
   try {
     await redis.set("healthcheck", "1", { ex: 10 });
-    const redisLatency = Date.now() - startRedis;
     checks.redis = {
-      status: redisLatency > 1000 ? "degraded" : "healthy",
-      latencyMs: redisLatency,
-    };
-  } catch (err: any) {
-    checks.redis = {
-      status: "degraded_fallback",
+      status: (Date.now() - startRedis) > 1000 ? "degraded" : "healthy",
       latencyMs: Date.now() - startRedis,
-      details: { message: err.message },
     };
+  } catch {
+    checks.redis = { status: "degraded_fallback", latencyMs: Date.now() - startRedis };
   }
 
   // 3. Typesense Ping
-  const startTypesense = Date.now();
+  const startTs = Date.now();
   try {
     const health = await typesenseClient.health.retrieve();
     checks.typesense = {
       status: health.ok ? "healthy" : "unhealthy",
-      latencyMs: Date.now() - startTypesense,
+      latencyMs: Date.now() - startTs,
     };
-  } catch (err: any) {
-    checks.typesense = {
-      status: "degraded_fallback",
-      latencyMs: Date.now() - startTypesense,
-      details: { message: err.message },
-    };
+  } catch {
+    checks.typesense = { status: "degraded_fallback", latencyMs: Date.now() - startTs };
   }
-
-  // 4. Memory Check
-  const memUsage = process.memoryUsage();
-  const heapUsedMB = memUsage.heapUsed / 1024 / 1024;
-  checks.memory = {
-    status: heapUsedMB > 512 ? "warning" : "healthy",
-    details: {
-      heapUsedMB: Math.round(heapUsedMB),
-      heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
-      rssMB: Math.round(memUsage.rss / 1024 / 1024),
-    },
-  };
-
-  // 5. Event Loop Lag Check
-  const startLoop = Date.now();
-  await new Promise((resolve) => setImmediate(resolve));
-  const eventLoopLag = Date.now() - startLoop;
-  checks.eventLoop = {
-    status: eventLoopLag > 100 ? "degraded" : "healthy",
-    latencyMs: eventLoopLag,
-  };
 
   const totalLatency = Date.now() - startTime;
 
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? "ready" : "degraded",
-    service: "Waw (واو) API Engine",
-    version: process.env.npm_package_version || "1.0.0",
-    environment: ENV.NODE_ENV || "development",
     checks,
     totalLatencyMs: totalLatency,
     timestamp: new Date().toISOString(),
@@ -355,6 +337,9 @@ app.post(
 );
 
 app.post("/api/auth/oauth/sync", requireAuth, AuthController.syncOAuth);
+
+// -- CSRF Token Issuance (public, GET) ------------------------------
+app.get("/api/auth/csrf", SessionController.issueCsrf);
 
 // -- Session Management (HttpOnly Cookie-based) ---------------------
 app.post("/api/auth/session/create", SessionController.createSession);
@@ -387,6 +372,7 @@ app.get("/api/categories/:slug", CategoryController.getBySlug);
 
 // -- Product Routes ----------------------------------------------------------
 app.get("/api/products", ProductController.list);
+app.get("/api/products/best-sellers", ProductController.bestSellers);
 app.get("/api/products/:slug", ProductController.getBySlug);
 
 // -- Store Routes -----------------------------------------------------------
@@ -427,9 +413,10 @@ app.post("/api/checkout/quote", async (req, res) => {
       }
     }
     const { QuoteService } = await import("./modules/orders/quote.service.js");
+    const defaultCity = await ConfigService.get("default_city") || "Lahore";
     const quote = await QuoteService.generateQuote({
       items,
-      shippingCity: shippingCity || "Lahore",
+      shippingCity: shippingCity || defaultCity,
       paymentMethod: paymentMethod || PaymentMethod.COD,
       couponCode,
       useLoyaltyPoints: useLoyaltyPoints && userId ? true : false,
@@ -530,9 +517,11 @@ app.post("/api/support/tickets/:id/messages", requireAuth, validateBody(SupportM
 app.post("/api/logistics/postex/webhook", LogisticsController.handlePostExWebhook);
 
 // ── Payment Routes (PostEx XPay Unified Fintech Engine) ────────────────────
+// Auth is optional: logged-in users pay their own orders; guests must supply
+// the exact phone the order was placed with (validated in the controller).
 app.post(
   "/api/payments/xpay/initiate",
-  requireAuth,
+  attachOptionalUser,
   PaymentController.initiateXPay,
 );
 app.post("/api/payments/xpay/webhook", PaymentController.xpayWebhook);
@@ -664,6 +653,11 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
     if (payment?.order) {
       const order = payment.order;
 
+      // Idempotency: skip if already processed
+      if (payment.status === "PAID" && order.payment_status === "PAID") {
+        return res.json({ received: true, idempotent: true });
+      }
+
       // Update order status
       await supabaseAdmin
         .from("orders")
@@ -750,12 +744,57 @@ app.post("/api/loyalty/redeem", requireAuth, LoyaltyController.calculateRedempti
 app.get("/api/referrals/stats", requireAuth, ReferralController.getStats);
 app.post("/api/referrals/generate", requireAuth, ReferralController.generateCode);
 app.post("/api/referrals/validate", ReferralController.validateCode);
+app.post("/api/referrals/apply", requireAuth, ReferralController.applyCode);
 
 // -- Subscription Routes -----------------------------------------------------
 app.get("/api/subscriptions/plans", SubscriptionController.getPlans);
 app.get("/api/seller/subscription", requireAuth, SubscriptionController.getCurrentSubscription);
 app.post("/api/seller/subscribe", requireAuth, SubscriptionController.subscribe);
 app.delete("/api/seller/subscription", requireAuth, SubscriptionController.cancel);
+
+// -- Admin Subscription Management ---------------------------------------------
+// Lists every store with its plan/expiry for the admin Subscriptions page.
+app.get("/api/admin/subscriptions", requireAuth, requireRole(UserRole.ADMIN), async (_req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("stores")
+      .select(`
+        id, name, slug, city, status,
+        subscription_plan, subscription_active, subscription_expires_at,
+        owner:owner_user_id(full_name, phone),
+        subscription:seller_subscriptions(id, status, started_at, expires_at, payment_reference, plan:subscription_plans(display_name, price_pkr))
+      `)
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+    res.json({ stores: data || [] });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load subscriptions" });
+  }
+});
+
+// Admin: manually activate/extend a store's subscription (e.g. bank transfer)
+app.post("/api/admin/subscriptions/:storeId/activate", requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const months = Math.min(Math.max(parseInt(String(req.body?.months) || "1", 10) || 1, 1), 24);
+    const result = await SubscriptionService.adminActivateSubscription(storeId, months);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin: revoke a store's paid subscription (downgrade to Free)
+app.post("/api/admin/subscriptions/:storeId/revoke", requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    await SubscriptionService.cancel(storeId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 // ── Search Routes (Typesense Engine) ──────────────────────────────────────
 app.get("/api/search", SearchController.search);
@@ -781,12 +820,14 @@ app.get("/api/marketplace-stats", async (_req, res) => {
     const reviewData = reviews.data || [];
     const avgRating = reviewData.length
       ? (reviewData.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / reviewData.length).toFixed(1)
-      : "4.8";
+      : "0";
 
+    // Real numbers only — no fabricated fallbacks. Zeros are honest while
+    // the marketplace grows; fake "500 sellers" is not.
     const stats = {
-      verifiedSellers: sellers.count || 500,
-      ordersDelivered: orders.count || 10000,
-      citiesCovered: uniqueCities.size || 35,
+      verifiedSellers: sellers.count || 0,
+      ordersDelivered: orders.count || 0,
+      citiesCovered: uniqueCities.size || 0,
       avgRating: parseFloat(avgRating),
     };
 
@@ -794,7 +835,8 @@ app.get("/api/marketplace-stats", async (_req, res) => {
     res.json(stats);
   } catch (err: any) {
     logger.error("Marketplace stats error", "API", err);
-    res.json({ verifiedSellers: 500, ordersDelivered: 10000, citiesCovered: 35, avgRating: 4.8 });
+    // Signal failure explicitly; the frontend hides the section on null.
+    res.status(503).json({ error: "Stats temporarily unavailable" });
   }
 });
 
@@ -1117,6 +1159,7 @@ app.patch(
       }
 
       res.json({ success: true, message: "Settings updated" });
+      ConfigService.invalidateCache();
     } catch (err: any) {
       logger.error("Admin settings update error:", err);
       res.status(500).json({ error: err.message });
@@ -1126,6 +1169,21 @@ app.patch(
 
 // -- Admin MFA (TOTP) Routes ---------------------------------------------
 app.use("/api/admin/mfa", mfaRoutes);
+
+// -- Product Q&A Routes -------------------------------------------------
+app.use("/api/questions", questionsRouter);
+
+// -- Cities (public) ----------------------------------------------------
+app.use("/api/cities", citiesRouter);
+
+// -- Active Flash Sale (public, for storefront) -------------------------
+app.get("/api/flash-sales/active", getActiveFlashSale);
+
+// -- User Preferences (authenticated) -----------------------------------
+app.use("/api/user/preferences", preferencesRouter);
+
+// -- Marketplace Config (public, for frontend) --------------------------
+app.get("/api/marketplace-config", getMarketplaceConfig);
 
 // -- Buyer Product Review Submission (Account & Purchase Verified) -----------
 app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBody(CreateReviewSchema), async (req, res) => {
@@ -1141,11 +1199,13 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
 
     const { supabaseAdmin } = await import("./config/supabase.js");
 
-    // Optimized verified-purchase check: use a targeted subquery instead of fetching all orders
+    // Verified-purchase check: the reviewed entity is a catalog product; a
+    // qualifying order item's variant belongs to a seller offer of that
+    // product. order_items -> offer_variants!inner -> seller_offers!inner.
     const { data: orderItem } = await supabaseAdmin
       .from("order_items")
-      .select("id, order_id!inner(buyer_id, global_status)")
-      .eq("offer_variant_id", productId)
+      .select("id, offer_variants!inner(seller_offers!inner(id, catalog_product_id))")
+      .eq("offer_variants.seller_offers.catalog_product_id", productId)
       .eq("order_id.buyer_id", user.id)
       .in("order_id.global_status", ["DELIVERED", "COMPLETED"])
       .limit(1)
@@ -1170,21 +1230,30 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
 
     if (error) throw error;
 
-    // Recalculate and update product rating average
-    const { data: allReviews } = await supabaseAdmin
-      .from("reviews")
-      .select("rating")
-      .eq("product_id", productId);
+    // Recalculate and persist rating aggregation on the catalog product
+    try {
+      const { data: agg } = await supabaseAdmin
+        .from("reviews")
+        .select("rating")
+        .eq("product_id", productId)
+        .eq("status", "APPROVED");
 
-    if (allReviews && allReviews.length > 0) {
-      const avg =
-        allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
-      await supabaseAdmin
-        .from("catalog_products")
-        .update({
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", productId);
+      if (agg) {
+        const count = agg.length;
+        const avg = count > 0
+          ? Math.round((agg.reduce((sum, r) => sum + r.rating, 0) / count) * 100) / 100
+          : 0;
+        await supabaseAdmin
+          .from("catalog_products")
+          .update({
+            rating_average: avg,
+            rating_count: count,
+          })
+          .eq("id", productId);
+      }
+    } catch (aggErr: any) {
+      // Aggregation failure must not fail the review submission
+      logger.warn("Rating aggregation failed after review", { error: aggErr.message });
     }
 
     res.status(201).json(review);

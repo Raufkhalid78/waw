@@ -124,11 +124,18 @@ export interface MarketplaceSettings {
   marketplace_name?: string;
   default_currency?: string;
   default_commission_pct?: number;
-  free_delivery_threshold?: number;
-  default_shipping_fee?: number;
-  cod_fee?: number;
+  free_delivery_threshold_pkr?: number;
+  default_shipping_fee_pkr?: number;
+  cod_handling_fee_pkr?: number;
+  gst_rate_percentage?: number;
   whatsapp_number?: string;
   support_email?: string;
+  discount_tier_1_threshold?: number;
+  discount_tier_2_threshold?: number;
+  discount_tier_3_threshold?: number;
+  best_seller_days?: number;
+  best_seller_limit?: number;
+  new_arrival_days?: number;
 }
 
 export interface AdminDispute {
@@ -394,11 +401,48 @@ export const kycApi = {
 
 // Sellers
 export const sellersApi = {
-  update: (id: string, data: { status?: string; commission_rate_percentage?: number }) =>
+  update: (
+    id: string,
+    data: { status?: string; commission_rate_percentage?: number | null }
+  ) =>
     adminFetch<{ success: boolean }>(`/api/admin/sellers/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
+};
+
+// Subscriptions
+export interface AdminStoreSubscription {
+  id: string;
+  name: string;
+  slug: string;
+  city?: string;
+  status: string;
+  subscription_plan?: string;
+  subscription_active?: boolean;
+  subscription_expires_at?: string;
+  owner?: { full_name?: string; phone?: string } | null;
+  subscription?: {
+    status?: string;
+    expires_at?: string;
+    payment_reference?: string;
+    plan?: { display_name?: string; price_pkr?: number } | null;
+  } | null;
+}
+
+export const subscriptionsApi = {
+  list: () =>
+    adminFetch<{ stores: AdminStoreSubscription[] }>("/api/admin/subscriptions"),
+  activate: (storeId: string, months: number) =>
+    adminFetch<{ success: boolean; planName: string; expiresAt: string }>(
+      `/api/admin/subscriptions/${storeId}/activate`,
+      { method: "POST", body: JSON.stringify({ months }) }
+    ),
+  revoke: (storeId: string) =>
+    adminFetch<{ success: boolean }>(
+      `/api/admin/subscriptions/${storeId}/revoke`,
+      { method: "POST" }
+    ),
 };
 
 // Flash Sales
@@ -498,6 +542,7 @@ export interface AdminCategory {
   image_url?: string;
   is_active: boolean;
   sort_order?: number;
+  commission_percentage?: number | null;
   created_at: string;
 }
 

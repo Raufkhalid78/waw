@@ -26,6 +26,9 @@ export interface InvoiceData {
   gstPkr: number;
   totalPkr: number;
   storeName?: string;
+  gstRatePercentage?: number;
+  supportEmail?: string;
+  supportPhone?: string;
 }
 
 function formatPKR(amount: number): string {
@@ -165,8 +168,9 @@ export function generateInvoicePdf(data: InvoiceData): PassThrough {
     doc.text(`-${formatPKR(data.discountPkr)}`, 460, doc.y - 8, { width: 85, align: "right" });
   }
 
-  // 18% GST row
-  doc.text("GST (18%):", totalsLabelX, doc.y + 4, { width: 100, align: "left" });
+  // GST row
+  const gstLabel = `GST (${data.gstRatePercentage ?? 18}%):`;
+  doc.text(gstLabel, totalsLabelX, doc.y + 4, { width: 100, align: "left" });
   doc.text(formatPKR(data.gstPkr), 460, doc.y - 8, { width: 85, align: "right" });
 
   doc.moveDown(0.5);
@@ -227,7 +231,7 @@ export function generateInvoicePdf(data: InvoiceData): PassThrough {
     .font("Helvetica")
     .fillColor("#9CA3AF")
     .text("This is a computer-generated receipt from Waw Marketplace.", 50, doc.y, { align: "center" })
-    .text("For support, contact us at support@waw.pk or WhatsApp +92 300 1234567", { align: "center" });
+    .text(`For support, contact us at ${data.supportEmail || "support@waw.pk"} or WhatsApp ${data.supportPhone || "+92 300 1234567"}`, { align: "center" });
 
   doc.end();
 

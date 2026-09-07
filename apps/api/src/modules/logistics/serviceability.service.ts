@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { PaymentMethod } from "../../types/index.js";
 import { logger } from "../../config/logger.js";
+import { ConfigService } from "../admin/config.service.js";
 
 export interface DeliveryWindow {
   min: number;
@@ -18,80 +19,43 @@ export interface ServiceabilityResult {
 }
 
 export class ServiceabilityService {
-  private static readonly TIER_1_CITIES = ["karachi", "lahore", "islamabad", "rawalpindi"];
-
-  private static readonly FALLBACK_CITIES: Record<string, { province: string; isCodEligible: boolean; supportedCouriers: string[] }> = {
-    // Punjab
-    "Lahore":              { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Rawalpindi":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Faisalabad":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Multan":              { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Sialkot":             { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Gujranwala":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Bahawalpur":          { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Sahiwal":             { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Sargodha":            { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Jhang":               { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Dera Ghazi Khan":     { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Gujrat":              { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Kasur":               { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Mianwali":            { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Sheikhupura":         { province: "Punjab",        isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    // Sindh
-    "Karachi":             { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Hyderabad":           { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Sukkur":              { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Larkana":             { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Nawabshah":           { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Mirpur Khas":         { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Jacobabad":           { province: "Sindh",         isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    // KPK
-    "Peshawar":            { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Abbottabad":          { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Mardan":              { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Mingora":             { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Dera Ismail Khan":    { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Nowshera":            { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    "Kohat":               { province: "KPK",           isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-    // Balochistan
-    "Quetta":              { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
-    "Turbat":              { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
-    "Gwadar":              { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
-    "Khuzdar":             { province: "Balochistan",   isCodEligible: true, supportedCouriers: ["TRAX", "POSTEX"] },
-    // Federal
-    "Islamabad":           { province: "Federal",       isCodEligible: true, supportedCouriers: ["POSTEX", "TRAX"] },
-  };
-
   /**
    * Lists all active serviceable Pakistani cities with metadata.
    */
   static async listServiceableCities(): Promise<any[]> {
-    try {
-      const { data: cities, error } = await supabaseAdmin
-        .from("serviceable_cities")
-        .select("city_name, province, is_cod_eligible, supported_couriers, is_active")
-        .eq("is_active", true)
-        .order("city_name", { ascending: true });
+    const { data: cities, error } = await supabaseAdmin
+      .from("serviceable_cities")
+      .select("city_name, province, tier, is_cod_eligible, supported_couriers, is_active")
+      .eq("is_active", true)
+      .order("city_name", { ascending: true });
 
-      if (!error && cities && cities.length > 0) {
-        return cities.map((c) => ({
-          cityName: c.city_name,
-          province: c.province,
-          isCodEligible: c.is_cod_eligible,
-          supportedCouriers: c.supported_couriers || ["POSTEX"],
-        }));
-      }
-    } catch (err) {
-      logger.warn("Failed to fetch serviceable cities from DB", { error: (err as Error).message });
+    if (error) throw new Error(`Failed to fetch serviceable cities: ${error.message}`);
+
+    return (cities || []).map((c) => ({
+      cityName: c.city_name,
+      province: c.province,
+      tier: c.tier,
+      isCodEligible: c.is_cod_eligible,
+      supportedCouriers: c.supported_couriers || ["POSTEX"],
+    }));
+  }
+
+  /**
+   * Fetches tier-1 cities from the database.
+   */
+  static async getTier1Cities(): Promise<string[]> {
+    const { data, error } = await supabaseAdmin
+      .from("serviceable_cities")
+      .select("city_name")
+      .eq("tier", 1)
+      .eq("is_active", true);
+
+    if (error) {
+      logger.warn("Failed to fetch tier-1 cities from DB", { error: error.message });
+      return [];
     }
 
-    // Fallback if table not populated yet
-    return Object.entries(this.FALLBACK_CITIES).map(([cityName, meta]) => ({
-      cityName,
-      province: meta.province,
-      isCodEligible: meta.isCodEligible,
-      supportedCouriers: meta.supportedCouriers,
-    }));
+    return (data || []).map((c: any) => c.city_name.toLowerCase());
   }
 
   /**
@@ -108,81 +72,66 @@ export class ServiceabilityService {
     }
 
     const normDest = destinationCity.trim();
-    const normSeller = (sellerCity || "Lahore").trim().toLowerCase();
+    const defaultCity = await ConfigService.get("default_city");
+    const normSeller = (sellerCity || defaultCity || "Lahore").trim().toLowerCase();
     const normDestLower = normDest.toLowerCase();
 
-    let cityRecord: any = null;
+    // Query destination city from database
+    const { data: destRecord, error: destError } = await supabaseAdmin
+      .from("serviceable_cities")
+      .select("city_name, province, tier, is_cod_eligible, supported_couriers, is_active, intra_city_days_min, intra_city_days_max, inter_tier1_days_min, inter_tier1_days_max, inter_other_days_min, inter_other_days_max")
+      .ilike("city_name", normDest)
+      .maybeSingle();
 
-    // 1. Fast in-memory registry check
-    const match = Object.keys(this.FALLBACK_CITIES).find(
-      (c) => c.toLowerCase() === normDestLower,
-    );
-    if (match) {
-      const meta = this.FALLBACK_CITIES[match];
-      cityRecord = {
-        city_name: match,
-        province: meta.province,
-        is_cod_eligible: meta.isCodEligible,
-        supported_couriers: meta.supportedCouriers,
-        is_active: true,
-      };
-    } else {
-      // 2. Query dynamic database table with fast timeout guard
-      try {
-        const queryPromise = supabaseAdmin
-          .from("serviceable_cities")
-          .select("city_name, province, is_cod_eligible, supported_couriers, is_active")
-          .ilike("city_name", normDest)
-          .maybeSingle();
-
-        const timeoutPromise = new Promise<{ data: null; error: null }>((resolve) =>
-          setTimeout(() => resolve({ data: null, error: null }), 600)
-        );
-
-        const result: any = await Promise.race([queryPromise, timeoutPromise]);
-        if (result?.data) {
-          cityRecord = result.data;
-        }
-      } catch (err) {
-        logger.warn("Failed to fetch city record for serviceability check", { city: normDest, error: (err as Error).message });
-      }
+    if (destError) {
+      logger.warn("Failed to fetch destination city for serviceability check", { city: normDest, error: destError.message });
     }
 
-    if (!cityRecord || !cityRecord.is_active) {
+    if (!destRecord || !destRecord.is_active) {
       throw new Error(`Delivery is currently not available to "${normDest}". Please select a supported city.`);
     }
 
     // COD Eligibility Restriction
-    if (paymentMethod === PaymentMethod.COD && !cityRecord.is_cod_eligible) {
+    if (paymentMethod === PaymentMethod.COD && !destRecord.is_cod_eligible) {
       throw new Error(
-        `Cash on Delivery (COD) is not available in ${cityRecord.city_name}. Please choose an online payment method (Card or Raast QR).`
+        `Cash on Delivery (COD) is not available in ${destRecord.city_name}. Please choose an online payment method (Card or Raast QR).`
       );
     }
 
-    // Calculate Delivery Time Window
-    const isIntraCity = normSeller === normDestLower;
-    const isInterCityTier1 =
-      this.TIER_1_CITIES.includes(normSeller) && this.TIER_1_CITIES.includes(normDestLower);
+    // Query seller city tier for delivery estimation
+    const { data: sellerRecord } = await supabaseAdmin
+      .from("serviceable_cities")
+      .select("tier")
+      .ilike("city_name", normSeller)
+      .maybeSingle();
 
+    const sellerTier = sellerRecord?.tier || 2;
+    const destTier = destRecord.tier || 2;
+    const isIntraCity = normSeller === normDestLower;
+
+    // Calculate Delivery Time Window from DB columns
     let estimatedDays: DeliveryWindow;
     if (isIntraCity) {
-      // Intra-city (e.g. Lahore seller to Lahore buyer): 2-3 business days
-      estimatedDays = { min: 2, max: 3, label: "2–3 business days" };
-    } else if (isInterCityTier1) {
-      // Inter-city Tier 1 (e.g. Karachi to Lahore / Islamabad): 3–5 business days
-      estimatedDays = { min: 3, max: 5, label: "3–5 business days" };
+      const min = destRecord.intra_city_days_min ?? 2;
+      const max = destRecord.intra_city_days_max ?? 3;
+      estimatedDays = { min, max, label: `${min}–${max} business days` };
+    } else if (sellerTier === 1 && destTier === 1) {
+      const min = destRecord.inter_tier1_days_min ?? 3;
+      const max = destRecord.inter_tier1_days_max ?? 5;
+      estimatedDays = { min, max, label: `${min}–${max} business days` };
     } else {
-      // Inter-city Other (e.g. Peshawar, Quetta, Multan, Faisalabad): 5-7 business days
-      estimatedDays = { min: 5, max: 7, label: "5–7 business days" };
+      const min = destRecord.inter_other_days_min ?? 5;
+      const max = destRecord.inter_other_days_max ?? 7;
+      estimatedDays = { min, max, label: `${min}–${max} business days` };
     }
 
     return {
       isServiceable: true,
-      cityName: cityRecord.city_name,
-      province: cityRecord.province,
-      isCodEligible: Boolean(cityRecord.is_cod_eligible),
+      cityName: destRecord.city_name,
+      province: destRecord.province,
+      isCodEligible: Boolean(destRecord.is_cod_eligible),
       estimatedDays,
-      supportedCouriers: cityRecord.supported_couriers || ["POSTEX"],
+      supportedCouriers: destRecord.supported_couriers || ["POSTEX"],
     };
   }
 }

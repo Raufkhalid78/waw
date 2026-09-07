@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { AuditService } from "../audit/audit.service.js";
+import { ConfigService } from "../admin/config.service.js";
 import { UserRole } from "../../types/index.js";
 
 function formatAndValidateCnic(rawCnic?: string): string {
@@ -67,7 +68,8 @@ export class SellerController {
       const validCnic = formatAndValidateCnic(cnic);
       const validAccount = validateIbanOrAccount(iban || bankAccount);
       const resolvedAccountTitle = accountTitle || bankTitle || storeName;
-      const resolvedAddress = address || businessAddress || "Lahore, Pakistan";
+      const defaultCity = await ConfigService.get("default_city") || "Lahore";
+      const resolvedAddress = address || businessAddress || `${defaultCity}, Pakistan`;
 
       const baseSlug = storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
       const slug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
@@ -78,7 +80,7 @@ export class SellerController {
           owner_id: user.id,
           name: storeName.trim(),
           slug,
-          city: city || "Lahore",
+          city: city || defaultCity,
           address: resolvedAddress,
           cnic: validCnic,
           cnic_number: validCnic,

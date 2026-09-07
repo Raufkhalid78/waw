@@ -30,11 +30,13 @@ export class AdminController {
   static async updateSeller(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { status, commissionRatePercentage } = req.body;
+      const { status, commissionRatePercentage, commission_rate_percentage } = req.body;
       const updated = await AdminService.updateSellerStatus(
         id,
         status,
-        commissionRatePercentage,
+        commissionRatePercentage !== undefined
+          ? commissionRatePercentage
+          : commission_rate_percentage,
       );
       res.json(updated);
     } catch (err: any) {
@@ -370,8 +372,12 @@ export class AdminController {
   static async addFlashSaleItem(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { productId, salePricePkr, stockQuantity } = req.body;
-      const item = await AdminService.addFlashSaleItem(id, productId, salePricePkr, stockQuantity);
+      const { variantId, salePricePkr, stockQuantity } = req.body;
+      if (!variantId || !salePricePkr) {
+        res.status(400).json({ error: "variantId and salePricePkr are required" });
+        return;
+      }
+      const item = await AdminService.addFlashSaleItem(id, variantId, salePricePkr, stockQuantity || 0);
       res.status(201).json(item);
     } catch (err: any) {
       res.status(400).json({ error: err.message });

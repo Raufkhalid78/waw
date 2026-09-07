@@ -206,19 +206,26 @@ export class SearchController {
       const { q, categoryId, storeId, minPrice, maxPrice, page, limit } =
         req.query;
 
+      // Safe numeric parsing — never let NaN/garbage reach Typesense/Supabase
+      const parseSafeInt = (val: any, fallback: number, min: number, max: number): number => {
+        const n = parseInt(String(val ?? ""), 10);
+        if (isNaN(n)) return fallback;
+        return Math.min(Math.max(n, min), max);
+      };
+
       const results = await SearchService.search({
         query: q as string,
         categoryId: categoryId as string,
         storeId: storeId as string,
-        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
-        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
-        page: page ? parseInt(page as string, 10) : 1,
-        limit: limit ? parseInt(limit as string, 10) : 20,
+        minPrice: minPrice !== undefined ? parseSafeInt(minPrice, 0, 0, 10_000_000) : undefined,
+        maxPrice: maxPrice !== undefined ? parseSafeInt(maxPrice, 0, 10_000_000, 10_000_000) : undefined,
+        page: parseSafeInt(page, 1, 1, 1000),
+        limit: parseSafeInt(limit, 20, 1, 100),
       });
 
       res.json(results);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Search is temporarily unavailable" });
     }
   }
 }

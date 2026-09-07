@@ -36,6 +36,7 @@ export interface ProductDetail {
     sku?: string;
     stock_quantity?: number;
   }[];
+  deliveryEstimate?: { min: number; max: number };
   questions?: any[];
     otherOffers?: any[];
     reviews: {

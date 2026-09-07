@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { FadeIn } from "@/components/Motion";
+import { fetchWithCsrf } from "@/lib/csrf";
 import {
   fetchCheckoutQuote,
   createOrderApi,
@@ -21,6 +22,11 @@ import {
   initiatePaymentApi,
   fetchServiceableCities,
   ServiceableCity,
+  fetchCities,
+  fetchMarketplaceConfig,
+  getApiBaseUrl,
+  type City,
+  type MarketplaceConfig,
 } from "@/lib/api";
 
 export default function CheckoutPage() {
@@ -29,17 +35,20 @@ export default function CheckoutPage() {
     useCartStore();
 
   const [serviceableCities, setServiceableCities] = useState<ServiceableCity[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [config, setConfig] = useState<MarketplaceConfig | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
     address: "",
-    city: selectedCity || "Lahore",
-    province: "Punjab",
+    city: selectedCity || "",
+    province: "",
     notes: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [quoteData, setQuoteData] = useState<CheckoutQuoteResponse | null>(
@@ -50,8 +59,24 @@ export default function CheckoutPage() {
     code: string;
     discountPkr: number;
     description: string;
-  } | null>(null);
+  } | null>(() => {
+    // Restore coupon carried over from the cart page
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem("waw-cart-coupon");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.code) return { code: parsed.code, discountPkr: parsed.discountPkr || 0, description: `Promo Code ${parsed.code}` };
+        }
+      } catch {}
+    }
+    return null;
+  });
   const [voucherError, setVoucherError] = useState("");
+  const [guestConfirmation, setGuestConfirmation] = useState<{
+    orderNumber: string;
+    totalPkr: number;
+  } | null>(null);
 
   // Loyalty points
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
@@ -84,8 +109,8 @@ export default function CheckoutPage() {
 
   // Check auth session via API instead of cookie sniffing
   useEffect(() => {
-    fetch("/api/auth/session")
-      .then((r) => r.json())
+    fetch(`${getApiBaseUrl()}/api/auth/session/me`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => setIsLoggedIn(Boolean(data?.user?.id)))
       .catch(() => setIsLoggedIn(false));
   }, []);
@@ -97,10 +122,21 @@ export default function CheckoutPage() {
       .catch(() => setServiceableCities([]));
   }, []);
 
+  // Fetch cities and config from API
+  useEffect(() => {
+    fetchCities().then((c) => {
+      setCities(c);
+      if (!selectedCity && c.length > 0) {
+        setFormData((prev) => ({ ...prev, city: c[0].name, province: c[0].province }));
+      }
+    }).catch(() => {});
+    fetchMarketplaceConfig().then(setConfig).catch(() => {});
+  }, [selectedCity]);
+
   // Fetch loyalty balance
   useEffect(() => {
-    fetch("/api/loyalty/balance")
-      .then((r) => r.json())
+    fetch(`${getApiBaseUrl()}/api/loyalty/balance`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => setLoyaltyBalance(data?.points_balance || 0))
       .catch(() => setLoyaltyBalance(0));
   }, []);
@@ -147,18 +183,37 @@ export default function CheckoutPage() {
     };
   }, [items, formData.city, paymentMethod, appliedVoucher, useLoyalty]);
 
-  const handleApplyVoucher = (e: React.FormEvent) => {
+  const handleApplyVoucher = async (e: React.FormEvent) => {
     e.preventDefault();
     setVoucherError("");
     const code = voucherInput.trim().toUpperCase();
 
     if (!code) return;
-    setAppliedVoucher({
-      code,
-      discountPkr: 0,
-      description: `Promo Code ${code}`,
-    });
-    setVoucherInput("");
+    try {
+      const res = await fetchWithCsrf(`${getApiBaseUrl()}/api/checkout/apply-coupon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          couponCode: code,
+          items: items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Invalid coupon" }));
+        setVoucherError(err.error || "Invalid coupon code");
+        return;
+      }
+      const data = await res.json();
+      setAppliedVoucher({
+        code,
+        discountPkr: data.discountPkr || 0,
+        description: `Promo Code ${code}`,
+      });
+      setVoucherInput("");
+    } catch {
+      setVoucherError("Failed to validate coupon. Try again.");
+    }
   };
 
   const finalTotalPkr = Math.max(0, (quoteData?.totalPkr || 0));
@@ -182,6 +237,26 @@ export default function CheckoutPage() {
       return;
     }
     if (isSubmitting) return;
+
+    setFormError(null);
+
+    const normalizedPhone = formData.phone.replace(/[\s-]/g, "");
+    if (!formData.fullName.trim()) {
+      setFormError("Please enter the recipient's full name.");
+      return;
+    }
+    if (!/^[+]?[0-9]{10,13}$/.test(normalizedPhone)) {
+      setFormError("Please enter a valid mobile number (e.g. +92 300 1234567).");
+      return;
+    }
+    if (!formData.address?.trim() || formData.address.trim().length < 10) {
+      setFormError("Please enter a complete street address (at least 10 characters).");
+      return;
+    }
+    if (!formData.city?.trim()) {
+      setFormError("Please select a delivery city.");
+      return;
+    }
 
     setIsSubmitting(true);
     setQuoteError(null);
@@ -226,8 +301,18 @@ export default function CheckoutPage() {
       }
 
       // COD or default success
+      try { sessionStorage.removeItem("waw-cart-coupon"); } catch {}
       clearCart();
-      router.push(`/orders/${orderId}`);
+      if (isLoggedIn) {
+        router.push(`/orders/${orderId}`);
+      } else {
+        // Guests have no account to view order history — show inline confirmation
+        setGuestConfirmation({
+          orderNumber: orderResult.orderNumber || "",
+          totalPkr: orderResult.totalAmountPkr || 0,
+        });
+        setIsSubmitting(false);
+      }
     } catch (err: any) {
       setQuoteError(
         err.message || "Failed to complete order placement. Please try again.",
@@ -235,6 +320,32 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
     }
   };
+  if (guestConfirmation) {
+    return (
+      <div className="w-full max-w-xl mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto text-green-600">
+          <CheckCircle2 className="w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900">Order Placed!</h1>
+        <p className="text-sm text-slate-500">
+          Thank you for shopping with Waw. Your order
+          {guestConfirmation.orderNumber ? (
+            <> <span className="font-bold text-slate-900">{guestConfirmation.orderNumber}</span></>
+          ) : null}
+          {guestConfirmation.totalPkr > 0 ? (
+            <> totalling <span className="font-bold text-slate-900">PKR {guestConfirmation.totalPkr.toLocaleString()}</span></>
+          ) : null}{" "}
+          has been confirmed. You&apos;ll receive a WhatsApp confirmation shortly.
+        </p>
+        <Link
+          href="/"
+          className="inline-block bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-3 px-8 rounded-xl text-sm transition-all cursor-pointer"
+        >
+          Continue Shopping
+        </Link>
+      </div>
+    );
+  }
   if (items.length === 0) {
     return (
       <div className="w-full max-w-xl mx-auto px-4 py-20 text-center space-y-6">
@@ -369,33 +480,27 @@ export default function CheckoutPage() {
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700">City</label>
                 <select
+                  required
                   value={formData.city}
                   onChange={(e) =>
                     setFormData({ ...formData, city: e.target.value })
                   }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium cursor-pointer"
                 >
-                  {serviceableCities.length > 0 ? (
-                    serviceableCities.map((c) => (
-                      <option key={c.cityName} value={c.cityName}>
-                        {c.cityName}
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Lahore">Lahore</option>
-                      <option value="Karachi">Karachi</option>
-                      <option value="Islamabad">Islamabad</option>
-                      <option value="Rawalpindi">Rawalpindi</option>
-                      <option value="Faisalabad">Faisalabad</option>
-                      <option value="Multan">Multan</option>
-                      <option value="Peshawar">Peshawar</option>
-                      <option value="Quetta">Quetta</option>
-                      <option value="Sialkot">Sialkot</option>
-                      <option value="Gujranwala">Gujranwala</option>
-                      <option value="Hyderabad">Hyderabad</option>
-                    </>
-                  )}
+                  {serviceableCities.length > 0
+                    ? serviceableCities.map((c) => (
+                        <option key={c.cityName} value={c.cityName}>
+                          {c.cityName}
+                        </option>
+                      ))
+                    : cities.length > 0
+                      ? cities.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))
+                      : <option value="">Select a city</option>
+                  }
                 </select>
               </div>
 
@@ -403,14 +508,31 @@ export default function CheckoutPage() {
                 <label className="text-xs font-bold text-slate-700">
                   Province
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.province}
                   onChange={(e) =>
                     setFormData({ ...formData, province: e.target.value })
                   }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium"
-                />
+                >
+                  {(() => {
+                    const provinces = [...new Set(cities.map((c) => c.province).filter(Boolean))];
+                    if (provinces.length === 0) {
+                      return (
+                        <>
+                          <option value="Punjab">Punjab</option>
+                          <option value="Sindh">Sindh</option>
+                          <option value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</option>
+                          <option value="Balochistan">Balochistan</option>
+                          <option value="Islamabad Capital Territory">Islamabad Capital Territory</option>
+                        </>
+                      );
+                    }
+                    return provinces.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ));
+                  })()}
+                </select>
               </div>
             </div>
           </div>
@@ -542,17 +664,25 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <span>Processing Order...</span>
-            ) : (
-              <span>Confirm Order (PKR {finalTotalPkr.toLocaleString()})</span>
+          <div className="space-y-3">
+            {formError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
             )}
-          </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-4 rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <span>Processing Order...</span>
+              ) : (
+                <span>Confirm Order (PKR {finalTotalPkr.toLocaleString()})</span>
+              )}
+            </button>
+          </div>
         </form>
 
         {/* Right Column: Order Summary (5 Cols) */}
@@ -650,7 +780,7 @@ export default function CheckoutPage() {
                     <span>PostEx Express Delivery</span>
                     {shippingFeePkr === 0 ? (
                       <span className="font-black text-emerald-600">
-                        FREE (Orders &gt; 5,000)
+                        FREE (Orders &gt; {(config?.freeDeliveryThresholdPkr ?? 5000).toLocaleString()})
                       </span>
                     ) : (
                       <span className="font-bold text-slate-900">
@@ -668,7 +798,7 @@ export default function CheckoutPage() {
 
                   {(quoteData?.gstPkr || 0) > 0 && (
                     <div className="flex justify-between">
-                      <span>GST (18%)</span>
+                      <span>GST ({config?.gstRatePercentage ?? 18}%)</span>
                       <span className="font-bold text-slate-900">
                         PKR {quoteData!.gstPkr.toLocaleString()}
                       </span>

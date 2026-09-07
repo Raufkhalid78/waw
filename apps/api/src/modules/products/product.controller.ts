@@ -18,22 +18,49 @@ export class ProductController {
         page,
         limit,
       } = req.query;
+
+      // Safe numeric parsing — never let NaN/garbage reach Supabase
+      const parseSafeInt = (val: any, fallback: number, min: number, max: number): number => {
+        const n = parseInt(String(val ?? ""), 10);
+        if (isNaN(n)) return fallback;
+        return Math.min(Math.max(n, min), max);
+      };
+
       const result = await ProductService.listProducts({
         categoryId: categoryId as string,
         categorySlug: categorySlug as string,
         storeId: storeId as string,
         city: city as string,
         inStock: inStock === "true" ? true : undefined,
-        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
-        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
-        minRating: minRating ? parseFloat(minRating as string) : undefined,
+        minPrice: minPrice !== undefined ? parseSafeInt(minPrice, 0, 0, 10_000_000) : undefined,
+        maxPrice: maxPrice !== undefined ? parseSafeInt(maxPrice, 0, 0, 10_000_000) : undefined,
+        minRating: minRating !== undefined ? Math.min(Math.max(parseFloat(String(minRating)) || 0, 0), 5) : undefined,
         sortBy: sortBy as any,
-        page: page ? parseInt(page as string, 10) : 1,
-        limit: limit ? parseInt(limit as string, 10) : 20,
+        page: parseSafeInt(page, 1, 1, 1000),
+        limit: parseSafeInt(limit, 20, 1, 100),
       });
-      res.json(result);
+
+      // Enrich items with badges (best seller, waw deal, new arrival)
+      const enrichedItems = await Promise.all(
+        result.items.map(async (item: any) => {
+          const badges = await ProductService.computeBadges(item.productId, item.discountPercent, item.createdAt);
+          return { ...item, badges };
+        })
+      );
+
+      res.json({ ...result, items: enrichedItems });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  }
+
+  static async bestSellers(req: Request, res: Response): Promise<void> {
+    try {
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
+      const items = await ProductService.getBestSellers(limit);
+      res.json({ items });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch best sellers" });
     }
   }
 
@@ -47,7 +74,7 @@ export class ProductController {
       }
       res.json(product);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Failed to fetch product" });
     }
   }
 

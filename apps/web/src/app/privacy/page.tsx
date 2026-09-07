@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { ShieldCheck, Lock, Eye, FileText, ArrowLeft } from "lucide-react";
-import { useCartStore } from "@/store/useCartStore";
+import { useLanguage } from "@/components/ui/LanguageProvider";
 
 export default function PrivacyPolicyPage() {
-  const { language } = useCartStore();
-  const isUrdu = language === "UR";
+  const { language } = useLanguage();
+  const isUrdu = language === "ur";
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 space-y-8">

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react"
 import Link from "next/link";
 import { logger } from "@/lib/logger";
 import { CategoryCircles } from "@/components/home/CategoryCircles";
+import { BestSellers } from "@/components/home/BestSellers";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { JsonLdOrganization, JsonLdSearchBox } from "@/components/seo/JsonLd";
@@ -60,7 +61,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const isInitialRender = useRef(true);
   const [dbCategories, setDbCategories] = useState<{ name: string; slug: string }[]>(initialCategories || []);
-  const [stats, setStats] = useState<MarketplaceStats>({ verifiedSellers: 500, ordersDelivered: 10000, citiesCovered: 35, avgRating: 4.8 });
+  const [stats, setStats] = useState<MarketplaceStats | null>(null);
 
   useEffect(() => {
     fetchMarketplaceStats().then(setStats).catch(() => {});
@@ -119,7 +120,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
   };
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4 pb-20 dark:bg-slate-900 min-h-screen">
       <JsonLdOrganization />
       <JsonLdSearchBox />
 
@@ -133,6 +134,11 @@ export default function HomeClient({ initialProducts, initialCategories, initial
         <Suspense fallback={<div className="h-64 bg-gray-50 animate-pulse rounded-xl" />}>
           <FlashDeals />
         </Suspense>
+      </FadeIn>
+
+      {/* 2b. Best Sellers */}
+      <FadeIn delay={75}>
+        <BestSellers />
       </FadeIn>
 
       {/* 3. Category Circles */}
@@ -150,14 +156,14 @@ export default function HomeClient({ initialProducts, initialCategories, initial
       {/* 5. Live Marketplace Catalog */}
       <FadeIn delay={200}>
       <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12">
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
           {/* Section Header & Category Tabs */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 px-5 py-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-700 px-5 py-4">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">
                 Trending in Pakistan
               </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                 Discover authentic products from verified merchants across Pakistan.
               </p>
             </div>
@@ -168,7 +174,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                 {canScrollLeft && (
                   <button
                     onClick={() => scrollTabs("left")}
-                    className="p-1.5 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-amber-600 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:text-amber-600 shrink-0 cursor-pointer"
                     aria-label="Scroll left"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -184,7 +190,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                       activeCategory === null
                         ? "bg-amber-400 text-slate-900"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600"
                     }`}
                   >
                     All Products
@@ -196,7 +202,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                         activeCategory === cat.slug
                           ? "bg-amber-400 text-slate-900"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600"
                       }`}
                     >
                       {cat.name}
@@ -207,7 +213,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                 {canScrollRight && (
                   <button
                     onClick={() => scrollTabs("right")}
-                    className="p-1.5 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-amber-600 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:text-amber-600 shrink-0 cursor-pointer"
                     aria-label="Scroll right"
                   >
                     <ChevronRight className="w-4 h-4" />
@@ -230,8 +236,8 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                 <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
                   <AlertCircle className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-gray-900">Catalog Temporarily Unavailable</h3>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto">{error}</p>
+                <h3 className="text-base font-bold text-gray-900 dark:text-slate-100">Catalog Temporarily Unavailable</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mx-auto">{error}</p>
                 <button
                   onClick={loadCatalog}
                   className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-900 px-5 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer"
@@ -242,7 +248,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
             ) : liveProducts.length === 0 ? (
               <div className="text-center py-16 space-y-3">
                 <Package className="w-10 h-10 text-gray-300 mx-auto" />
-                <p className="text-sm text-gray-500 font-medium">
+                <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">
                   No products found in this category yet.
                 </p>
                 {activeCategory && (
@@ -280,7 +286,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
 
             {/* View More */}
             {liveProducts.length > 0 && (
-              <div className="text-center pt-5 border-t border-gray-100 mt-5">
+              <div className="text-center pt-5 border-t border-gray-100 dark:border-slate-700 mt-5">
                 <Link
                   href="/categories"
                   className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all"
@@ -305,12 +311,12 @@ export default function HomeClient({ initialProducts, initialCategories, initial
               { icon: RotateCcw, title: "7-Day Returns", desc: "Easy doorstep returns", color: "text-blue-600 bg-blue-50 border-blue-100" },
               { icon: Lock, title: "Secure Checkout", desc: "Encrypted payments", color: "text-purple-600 bg-purple-50 border-purple-100" },
             ].map((badge, i) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 text-center hover:shadow-md transition-shadow group">
+              <div key={i} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 text-center hover:shadow-md transition-shadow group">
                 <div className={`w-11 h-11 rounded-xl ${badge.color} border flex items-center justify-center mx-auto mb-2.5 group-hover:scale-110 transition-transform`}>
                   <badge.icon className="w-5 h-5" />
                 </div>
-                <div className="text-xs font-bold text-gray-900">{badge.title}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5">{badge.desc}</div>
+                <div className="text-xs font-bold text-gray-900 dark:text-slate-100">{badge.title}</div>
+                <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">{badge.desc}</div>
               </div>
             ))}
           </div>
@@ -320,7 +326,7 @@ export default function HomeClient({ initialProducts, initialCategories, initial
       {/* 7. Buyer Protection Banner — Redesigned with dynamic stats */}
       <FadeIn delay={300}>
         <section className="w-full px-3 sm:px-6 lg:px-10 xl:px-12">
-          <div className="bg-gray-900 text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden">
+          <div className="bg-gray-900 dark:bg-slate-800 text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden">
             {/* Background decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -338,45 +344,49 @@ export default function HomeClient({ initialProducts, initialCategories, initial
                   Every order is protected with secure payments, verified sellers, and hassle-free returns. Direct from Pakistani artisans and brands.
                 </p>
 
-                {/* Stats row — dynamic from API */}
-                <div className="flex flex-wrap items-center gap-4 sm:gap-6 pt-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                      <Users className="w-4 h-4 text-amber-400" />
+                {/* Stats row — dynamic from API, hidden until real data loads */}
+                {stats && (
+                  <div className="flex flex-wrap items-center gap-4 sm:gap-6 pt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white">{stats.verifiedSellers}+</div>
+                        <div className="text-[10px] text-gray-500">Verified Sellers</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">{stats.verifiedSellers}+</div>
-                      <div className="text-[10px] text-gray-500">Verified Sellers</div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                        <Package className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white">{stats.ordersDelivered >= 1000 ? `${Math.round(stats.ordersDelivered / 1000)}K+` : `${stats.ordersDelivered}+`}</div>
+                        <div className="text-[10px] text-gray-500">Orders Delivered</div>
+                      </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                        <MapPin className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white">{stats.citiesCovered}+</div>
+                        <div className="text-[10px] text-gray-500">Cities Covered</div>
+                      </div>
+                    </div>
+                    {stats.avgRating > 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                          <Star className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-white">{stats.avgRating}</div>
+                          <div className="text-[10px] text-gray-500">Avg. Rating</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                      <Package className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">{stats.ordersDelivered >= 1000 ? `${Math.round(stats.ordersDelivered / 1000)}K+` : `${stats.ordersDelivered}+`}</div>
-                      <div className="text-[10px] text-gray-500">Orders Delivered</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                      <MapPin className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">{stats.citiesCovered}+</div>
-                      <div className="text-[10px] text-gray-500">Cities Covered</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                      <Star className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">{stats.avgRating}</div>
-                      <div className="text-[10px] text-gray-500">Avg. Rating</div>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">

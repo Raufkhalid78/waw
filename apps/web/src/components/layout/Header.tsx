@@ -4,10 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
+import { useLanguage } from "@/components/ui/LanguageProvider";
 import { logger } from "@/lib/logger";
 import { CartDrawer } from "./CartDrawer";
 import { AuthModal } from "./AuthModal";
 import { Logo } from "@/components/ui/Logo";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
   Search,
   ShoppingBag,
@@ -63,6 +65,7 @@ const TRANSLATIONS = {
     allCategoriesBtn: "ALL CATEGORIES",
     categoriesHeader: "Waw Categories",
     langToggle: "اردو",
+    signOut: "Sign Out",
   },
   UR: {
     deliverTo: "ترسیل برائے",
@@ -80,6 +83,7 @@ const TRANSLATIONS = {
     allCategoriesBtn: "تمام کیٹیگریز",
     categoriesHeader: "واو کیٹیگریز",
     langToggle: "English",
+    signOut: "لاگ آؤٹ کریں",
   },
 };
 
@@ -95,11 +99,10 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
     selectedCity,
     setSelectedCity,
     wishlist,
-    language,
-    setLanguage,
     user,
     logout,
   } = useCartStore();
+  const { language, setLanguage } = useLanguage();
   const cartCount = items.reduce((s, i) => s + i.quantity, 0);
   const wishlistCount = wishlist.length;
 
@@ -132,7 +135,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
   });
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const t = TRANSLATIONS[language] || TRANSLATIONS.EN;
+  const t = (language === "ur" ? TRANSLATIONS.UR : TRANSLATIONS.EN);
 
   useEffect(() => {
     async function loadConfig() {
@@ -149,6 +152,18 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
     loadConfig();
   }, []);
 
+  // Capture referral code from landing URL (?ref=CODE) for post-signup application
+  useEffect(() => {
+    try {
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      if (ref) {
+        localStorage.setItem("waw-referral-code", ref.trim());
+      }
+    } catch {
+      // Storage unavailable — ignore
+    }
+  }, []);
+
   useEffect(() => {
     async function loadCats() {
       try {
@@ -156,11 +171,11 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
         const cats = await fetchCategories(language.toLowerCase());
         setRawCategories(cats);
         const dynamicLinks = cats.map(c => ({
-          label: language === "UR" ? (c.nameUrdu || c.name_urdu || c.name) : c.name,
+          label: language === "ur" ? (c.nameUrdu || c.name_urdu || c.name) : c.name,
           href: `/category/${c.slug}`
         }));
         
-        const staticLinks = language === "UR" ? [
+        const staticLinks = language === "ur" ? [
           { label: "⚡ واو ایکسپریس", href: "/search?sellerType=1P", highlight: "express" },
           { label: "🔥 میگا ڈیلز", href: "/search", highlight: "deals" },
           { label: "🏬 تصدیق شدہ دکانیں", href: "/search?sellerType=3P", highlight: "shops" }
@@ -211,7 +226,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
         window.webkitSpeechRecognition;
       if (!SpeechRecognition) return;
       const recognition = new SpeechRecognition();
-      recognition.lang = language === "UR" ? "ur-PK" : "en-PK";
+      recognition.lang = language === "ur" ? "ur-PK" : "en-PK";
       recognition.interimResults = false;
 
       recognition.addEventListener("start", () => setIsListening(true));
@@ -265,8 +280,8 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
   useEffect(() => {
     if (typeof document !== "undefined") {
-      document.documentElement.dir = language === "UR" ? "rtl" : "ltr";
-      document.documentElement.lang = language === "UR" ? "ur" : "en";
+      document.documentElement.dir = language === "ur" ? "rtl" : "ltr";
+      document.documentElement.lang = language === "ur" ? "ur" : "en";
     }
     const el = catScrollRef.current;
     if (el) {
@@ -314,7 +329,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
+      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs dark:bg-slate-900 dark:border-slate-700">
         {/* ── Tier 1: Dynamic Admin Promotional & Announcement Ticker ───────── */}
         <div className="bg-[#0B0F19] text-white text-[11px] font-medium py-1.5 px-3 sm:px-6 lg:px-10 xl:px-12 border-b border-slate-800">
           <div className="w-full flex items-center justify-between gap-4">
@@ -379,7 +394,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
                 {/* City Picker Dropdown */}
                 {showCityModal && (
-                  <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 text-slate-900 animate-fade-up">
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 text-slate-900 animate-fade-up dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
                     <div className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
                       {t.selectCity}
                     </div>
@@ -416,7 +431,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
             >
               <form
                 onSubmit={handleSearchSubmit}
-                className="flex items-center rounded-full bg-white shadow-xs border border-slate-200 hover:border-slate-400 focus-within:ring-2 focus-within:ring-slate-950 overflow-hidden transition-all px-3.5 py-1.5"
+                className="flex items-center rounded-full bg-white shadow-xs border border-slate-200 hover:border-slate-400 focus-within:ring-2 focus-within:ring-slate-950 overflow-hidden transition-all px-3.5 py-1.5 dark:bg-slate-800 dark:border-slate-600 dark:focus-within:ring-amber-400"
               >
                 <Search className="w-4 h-4 text-slate-500 shrink-0 mr-2" />
                 <input
@@ -425,7 +440,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
                   onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   placeholder={t.searchPlaceholder}
-                  className="w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 outline-none font-semibold"
+                  className="w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 outline-none font-semibold dark:text-slate-100 dark:placeholder-slate-400"
                 />
                 {query && (
                   <button
@@ -454,7 +469,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
               {/* Autocomplete & Trending Searches Dropdown */}
               {searchFocused && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 animate-fade-up">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 animate-fade-up dark:bg-slate-800 dark:border-slate-700">
                   {/* Search Suggestions (when typing) */}
                   {query.length >= 2 && searchSuggestions.length > 0 && (
                     <div className="mb-3">
@@ -473,7 +488,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
                               setSearchFocused(false);
                               router.push(`/search?q=${encodeURIComponent(suggestion)}`);
                             }}
-                            className="w-full text-left text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-900 rounded-xl px-3 py-2 transition-all flex items-center gap-2 cursor-pointer"
+                            className="w-full text-left text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-900 rounded-xl px-3 py-2 transition-all flex items-center gap-2 cursor-pointer dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-amber-400"
                           >
                             <Search className="w-3 h-3 text-slate-400 shrink-0" />
                             <span className="truncate">{suggestion}</span>
@@ -499,7 +514,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
                           setSearchFocused(false);
                           router.push(`/search?q=${encodeURIComponent(tag)}`);
                         }}
-                        className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-amber-100 hover:text-amber-900 border border-slate-200 hover:border-amber-300 rounded-xl px-3 py-1.5 transition-all flex items-center gap-1.5 cursor-pointer"
+                        className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-amber-100 hover:text-amber-900 border border-slate-200 hover:border-amber-300 rounded-xl px-3 py-1.5 transition-all flex items-center gap-1.5 cursor-pointer dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-amber-400/20 dark:hover:text-amber-400 dark:hover:border-amber-400/50"
                       >
                         <Search className="w-3 h-3 text-slate-400" />
                         <span>{tag}</span>
@@ -510,11 +525,16 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
               )}
             </div>
 
-            {/* Right: Language, User Profile, Orders, Wishlist, Cart */}
-            <div className="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm font-black text-slate-950">
+            {/* Right: Theme, Language, User Profile, Orders, Wishlist, Cart */}
+            <div className="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm font-black text-slate-950 dark:text-slate-100">
+              {/* Theme Toggle */}
+              <div className="hidden lg:block">
+                <ThemeToggle />
+              </div>
+
               {/* Language Switch */}
               <button
-                onClick={() => setLanguage(language === "EN" ? "UR" : "EN")}
+                onClick={() => setLanguage(language === "en" ? "ur" : "en")}
                 className="hidden lg:flex items-center gap-1.5 hover:bg-black/10 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer font-bold"
               >
                 <Globe className="w-3.5 h-3.5 text-slate-900" />
@@ -543,8 +563,8 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
                   {/* Dropdown Menu */}
                   {showUserMenu && (
-                    <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 text-slate-900 overflow-hidden animate-fade-up">
-                      <div className="p-3 bg-slate-50 border-b border-slate-100">
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 text-slate-900 overflow-hidden animate-fade-up dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
+                      <div className="p-3 bg-slate-50 border-b border-slate-100 dark:bg-slate-900 dark:border-slate-700">
                         <p className="text-xs font-black text-slate-900 truncate">
                           {user.name}
                         </p>
@@ -604,7 +624,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
                         >
                           <LogOut className="w-4 h-4 text-rose-600" />
                           <span>
-                            {language === "UR" ? "لاگ آؤٹ کریں" : "Sign Out"}
+                            {t.signOut}
                           </span>
                         </button>
                       </div>
@@ -699,21 +719,21 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
           {/* Mobile Search Bar */}
           <div className="mt-2.5 sm:hidden">
-            <div className="flex items-center rounded-full bg-white shadow-xs border border-transparent px-3.5 py-2">
+            <div className="flex items-center rounded-full bg-white shadow-xs border border-transparent px-3.5 py-2 dark:bg-slate-800 dark:border-slate-600">
               <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t.mobileSearchPlaceholder}
-                className="w-full bg-transparent text-xs text-slate-900 outline-none"
+                className="w-full bg-transparent text-xs text-slate-900 outline-none dark:text-slate-100 dark:placeholder-slate-400"
               />
             </div>
           </div>
         </div>
 
         {/* ── Tier 3: Category Strip (Noon Style) ─────────────────────────────── */}
-        <div className="bg-white border-b border-slate-200/80 hidden sm:block relative shadow-xs">
+        <div className="bg-white border-b border-slate-200/80 hidden sm:block relative shadow-xs dark:bg-slate-900 dark:border-slate-700">
           <div className="w-full px-3 sm:px-6 lg:px-10 xl:px-12 flex items-center justify-between gap-3 py-0.5">
             {/* Left: Mega Categories Button */}
             <div
@@ -728,7 +748,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
               {/* Mega Menu Dropdown */}
               {megaMenuOpen && (
-                <div className="absolute top-full left-0 mt-1 w-[600px] bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 z-50 animate-fade-up grid grid-cols-2 gap-6">
+                <div className="absolute top-full left-0 mt-1 w-[600px] bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 z-50 animate-fade-up grid grid-cols-2 gap-6 dark:bg-slate-800 dark:border-slate-700">
                   <div>
                     <h4 className="font-black text-slate-900 mb-3 flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-amber-500" />
@@ -739,10 +759,10 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
                         <li key={cat.slug || cat.id} className="group/item">
                           <Link
                             href={`/category/${cat.slug}`}
-                            className="text-sm font-bold text-slate-600 hover:text-amber-600 flex items-center gap-2 transition-colors"
+                            className="text-sm font-bold text-slate-600 hover:text-amber-600 flex items-center gap-2 transition-colors dark:text-slate-300 dark:hover:text-amber-400"
                           >
                             <ArrowRight className="w-3 h-3 text-slate-300 group-hover/item:text-amber-500 transition-colors" />
-                            {language === "UR" ? (cat.nameUrdu || cat.name_urdu || cat.name) : cat.name}
+                            {language === "ur" ? (cat.nameUrdu || cat.name_urdu || cat.name) : cat.name}
                           </Link>
                         </li>
                       ))}
@@ -776,7 +796,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
               {canScrollLeft && (
                 <button
                   onClick={() => scrollCategories("left")}
-                  className="absolute left-0 z-10 p-1.5 rounded-full bg-white border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -ml-1 cursor-pointer"
+                  className="absolute left-0 z-10 p-1.5 rounded-full bg-white border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -ml-1 cursor-pointer dark:bg-slate-800 dark:border-slate-600 dark:text-slate-200 dark:hover:text-amber-400"
                   aria-label="Scroll left"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
@@ -816,7 +836,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
               {canScrollRight && (
                 <button
                   onClick={() => scrollCategories("right")}
-                  className="absolute right-0 z-10 p-1.5 rounded-full bg-white/95 border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -mr-1 cursor-pointer"
+                  className="absolute right-0 z-10 p-1.5 rounded-full bg-white/95 border border-slate-300 shadow-md text-slate-800 hover:text-amber-600 hover:bg-white transition-all -mr-1 cursor-pointer dark:bg-slate-800/95 dark:border-slate-600 dark:text-slate-200 dark:hover:text-amber-400"
                   aria-label="Scroll right"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -834,7 +854,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
             onClick={toggleMenu}
             className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
           />
-          <div className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl p-5 flex flex-col justify-between">
+          <div className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl p-5 flex flex-col justify-between dark:bg-slate-900">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <Logo size="md" />
@@ -849,7 +869,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
                     key={link.label}
                     href={link.href}
                     onClick={toggleMenu}
-                    className="flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-amber-50 hover:text-amber-700"
+                    className="flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-amber-50 hover:text-amber-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-amber-400"
                   >
                     <span>{link.label}</span>
                     <ArrowRight className="w-3.5 h-3.5 text-slate-400" />

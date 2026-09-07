@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import {
@@ -16,6 +16,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { FadeIn } from "@/components/Motion";
+import { fetchMarketplaceConfig, type MarketplaceConfig } from "@/lib/api";
 
 const FAQS = [
   {
@@ -48,6 +49,11 @@ const FAQS = [
 export default function HelpCenterPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const [config, setConfig] = useState<MarketplaceConfig | null>(null);
+
+  useEffect(() => {
+    fetchMarketplaceConfig().then(setConfig).catch(() => {});
+  }, []);
 
   const filteredFaqs = FAQS.filter(
     (f) =>
@@ -139,7 +145,7 @@ export default function HelpCenterPage() {
             or English.
           </p>
           <a
-            href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
+            href={`https://wa.me/${(config?.whatsappNumber || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '+923001234567').replace(/[^0-9]/g, '')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-900 underline"

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { logger } from "@/lib/logger";
+import { fetchWithCsrf } from "@/lib/csrf";
 import {
   calculateOrderSummary,
   MARKETPLACE_CONFIG,
@@ -38,7 +39,21 @@ function getOrCreateGuestToken(): string {
   if (typeof window === "undefined") return "";
   let token = localStorage.getItem("waw_guest_token");
   if (!token) {
-    token = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    // 24 base36 chars from crypto-quality randomness (~124 bits).
+    // Format must match the server's guest token validation:
+    // guest_<ms timestamp>_<10-32 base36 chars>
+    let rand = "";
+    try {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      rand = Array.from(bytes)
+        .map((b) => b.toString(36).padStart(2, "0"))
+        .join("")
+        .slice(0, 24);
+    } catch {
+      rand = Math.random().toString(36).substring(2, 14) + Math.random().toString(36).substring(2, 14);
+    }
+    token = `guest_${Date.now()}_${rand}`;
     localStorage.setItem("waw_guest_token", token);
   }
   return token;
@@ -50,7 +65,7 @@ async function syncCartToServer(items: CartItem[]): Promise<void> {
     if (!guestToken) return;
 
     // Atomic cart replacement (fixes race condition from clear-then-add)
-    const res = await fetch(`${API_BASE_URL}/api/cart`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/cart`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -135,7 +150,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   items: [],
   wishlist: [],
   paymentMethod: PaymentMethod.COD,
-  selectedCity: "Lahore",
+  selectedCity: "",
   language: "EN",
   guestToken: "",
   isSyncing: false,
@@ -145,7 +160,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
     // Sync guest cart to user after login
     const guestToken = get().guestToken;
     if (guestToken) {
-      fetch(`${API_BASE_URL}/api/cart/merge`, {
+      fetchWithCsrf(`${API_BASE_URL}/api/cart/merge`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

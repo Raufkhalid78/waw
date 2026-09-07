@@ -15,6 +15,7 @@ import {
   Flame,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
+import { useLanguage } from "@/components/ui/LanguageProvider";
 import { SellerType } from "@waw/types";
 import { fetchStores, type StoreSummary } from "@/lib/api";
 
@@ -35,8 +36,9 @@ const BANNER_GRADIENTS = [
 ];
 
 export function FeaturedStores() {
-  const { language, addItem } = useCartStore();
-  const isUrdu = language === "UR";
+  const { addItem } = useCartStore();
+  const { language } = useLanguage();
+  const isUrdu = language === "ur";
   const [stores, setStores] = useState<StoreSummary[]>([]);
   const [loading, setLoading] = useState(true);
 

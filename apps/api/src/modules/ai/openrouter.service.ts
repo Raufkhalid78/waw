@@ -16,6 +16,7 @@ export class OpenRouterService {
   private apiKey: string;
   private model: string;
   private dailyRequestLimit: number;
+  private userDailyRequestLimit = 50;
   private baseUrl = "https://openrouter.ai/api/v1";
 
   constructor() {
@@ -33,15 +34,21 @@ export class OpenRouterService {
     };
   }
 
-  private async getTodayRequestCount(): Promise<number> {
+  private async getTodayRequestCount(userId?: string): Promise<number> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayStart = today.toISOString();
 
-    const { count, error } = await supabaseAdmin
+    let dbQuery = supabaseAdmin
       .from("ai_usage")
       .select("id", { count: "exact", head: true })
       .gte("created_at", todayStart);
+
+    if (userId) {
+      dbQuery = dbQuery.eq("user_id", userId);
+    }
+
+    const { count, error } = await dbQuery;
 
     if (error) {
       logger.error("Failed to check AI daily usage", { error: error.message });
@@ -71,6 +78,18 @@ export class OpenRouterService {
   ): Promise<string> {
     if (!this.apiKey) {
       throw new Error("OPENROUTER_API_KEY is not configured");
+    }
+
+    if (options?.userId) {
+      const userTodayCount = await this.getTodayRequestCount(options.userId);
+      if (userTodayCount >= this.userDailyRequestLimit) {
+        logger.warn("Per-user AI daily request limit reached", {
+          userId: options.userId,
+          todayCount: userTodayCount,
+          limit: this.userDailyRequestLimit,
+        });
+        throw new Error("Your daily AI request limit has been reached. Please try again tomorrow.");
+      }
     }
 
     const todayCount = await this.getTodayRequestCount();

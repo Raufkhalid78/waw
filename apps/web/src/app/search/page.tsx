@@ -32,6 +32,11 @@ function SearchContent() {
   const categoryParam =
     searchParams.get("category") || searchParams.get("cat") || "All Categories";
   const cityParam = searchParams.get("city") || "All Cities";
+  const sellerTypeParamRaw = searchParams.get("sellerType");
+  const sellerTypeParam: "ALL" | "1P" | "3P" =
+    sellerTypeParamRaw === "1P" || sellerTypeParamRaw === "3P"
+      ? sellerTypeParamRaw
+      : "ALL";
 
   const [searchQuery, setSearchQuery] = useState(queryParam);
   const [selectedCategory, setSelectedCategory] = useState(categoryParam);
@@ -41,15 +46,16 @@ function SearchContent() {
     setSearchQuery(queryParam);
     setSelectedCategory(categoryParam);
     setSelectedCity(cityParam);
-  }, [queryParam, categoryParam, cityParam]);
+    setSelectedSellerType(sellerTypeParam);
+  }, [queryParam, categoryParam, cityParam, sellerTypeParam]);
   const [selectedSellerType, setSelectedSellerType] = useState<
     "ALL" | "1P" | "3P"
-  >("ALL");
+  >(sellerTypeParam);
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
   const [minRating, setMinRating] = useState<number>(0);
   const [sortBy, setSortBy] = useState<
-    "featured" | "price_asc" | "price_desc" | "rating" | "popular"
+    "featured" | "price_asc" | "price_desc" | "rating" | "popular" | "best_sellers"
   >("featured");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
@@ -64,6 +70,7 @@ function SearchContent() {
       q: searchQuery.trim() ? searchQuery : undefined,
       category:
         selectedCategory !== "All Categories" ? selectedCategory : undefined,
+      sellerType: selectedSellerType,
     }).then((data) => {
       if (active) {
         setProducts(data?.items || []);
@@ -76,7 +83,7 @@ function SearchContent() {
     return () => {
       active = false;
     };
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, selectedSellerType]);
 
   // Filter & Sort Products
   const filteredProducts = useMemo(() => {
@@ -144,6 +151,11 @@ function SearchContent() {
         if (sortBy === "price_desc") return b.pricePkr - a.pricePkr;
         if (sortBy === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
         if (sortBy === "popular") return (b.soldCount ?? 0) - (a.soldCount ?? 0);
+        if (sortBy === "best_sellers") {
+          const aRank = (a as any).badges?.find((b: any) => b.type === 'best_seller');
+          const bRank = (b as any).badges?.find((b: any) => b.type === 'best_seller');
+          return (aRank ? 0 : 1) - (bRank ? 0 : 1);
+        }
         return 0; // 'featured'
       });
   }, [
@@ -217,10 +229,11 @@ function SearchContent() {
               </span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "featured" | "price_asc" | "price_desc" | "rating" | "popular")}
+                onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-slate-50 border border-slate-200 text-slate-900 font-bold px-3 py-2.5 rounded-2xl outline-none cursor-pointer text-xs focus:ring-2 focus:ring-amber-400"
               >
                 <option value="featured">Featured / Best Match</option>
+                <option value="best_sellers">Best Sellers</option>
                 <option value="popular">Most Popular / High Sales</option>
                 <option value="rating">Highest Customer Rating</option>
                 <option value="price_asc">Price: Low to High</option>

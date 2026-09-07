@@ -5,6 +5,10 @@ import Link from "next/link";
 import { X, Mail, Smartphone, CheckCircle2, ChevronLeft } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useCartStore } from "@/store/useCartStore";
+import { getApiBaseUrl } from "@/lib/api";
+import { fetchWithCsrf } from "@/lib/csrf";
+
+import { useLanguage } from "@/components/ui/LanguageProvider";
 
 export function AuthModal({
   isOpen,
@@ -15,8 +19,9 @@ export function AuthModal({
   onClose: () => void;
   onSuccess?: (identifier: string) => void;
 }) {
-  const { language, login } = useCartStore();
-  const isUrdu = language === "UR";
+  const { login } = useCartStore();
+  const { language } = useLanguage();
+  const isUrdu = language === "ur";
 
   const [mode, setMode] = useState<"LOGIN" | "SIGNUP">("LOGIN");
   const [step, setStep] = useState<"INPUT" | "OTP" | "SUCCESS">("INPUT");
@@ -57,9 +62,29 @@ export function AuthModal({
     return "Waw Customer";
   };
 
-  const API_BASE = (
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
-  ).replace(/\/+$/, "");
+  const API_BASE = getApiBaseUrl();
+
+  // Fire-and-forget: apply any captured referral code after successful login/signup
+  const applyReferralCode = () => {
+    try {
+      const refCode = localStorage.getItem("waw-referral-code");
+      if (!refCode) return;
+      fetchWithCsrf(`${API_BASE}/api/referrals/apply`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: refCode }),
+      })
+        .catch(() => {})
+        .finally(() => {
+          try {
+            localStorage.removeItem("waw-referral-code");
+          } catch {}
+        });
+    } catch {
+      // Never block login on referral errors
+    }
+  };
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +98,7 @@ export function AuthModal({
         setStep("OTP");
       } else {
         // Phone — send WhatsApp OTP
-        const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/send`, {
+        const res = await fetchWithCsrf(`${API_BASE}/api/auth/whatsapp-otp/send`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone: formattedTarget }),
@@ -110,7 +135,7 @@ export function AuthModal({
       const otpCode = otp.join("");
       if (!isEmail) {
         // Phone OTP verification via API
-        const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
+        const res = await fetchWithCsrf(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone: formattedTarget, otp: otpCode }),
@@ -119,7 +144,7 @@ export function AuthModal({
         if (!res.ok) throw new Error(data.error || "Invalid OTP");
 
         // Create httpOnly session cookie (replaces localStorage token)
-        await fetch(`${API_BASE}/api/auth/session/create`, {
+        await fetchWithCsrf(`${API_BASE}/api/auth/session/create`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -143,6 +168,7 @@ export function AuthModal({
         });
       }
 
+      applyReferralCode();
       setStep("SUCCESS");
       setTimeout(() => {
         if (onSuccess) onSuccess(identifier);
@@ -175,6 +201,7 @@ export function AuthModal({
           name: userName,
           emailOrPhone: "",
         });
+        applyReferralCode();
         setStep("SUCCESS");
         setTimeout(() => {
           if (onSuccess) onSuccess("");
@@ -196,7 +223,7 @@ export function AuthModal({
       />
 
       {/* Modal Card */}
-      <div className="relative bg-white rounded-[36px] overflow-hidden max-w-[430px] w-full shadow-2xl border border-slate-100 z-10 animate-scale-up my-auto">
+      <div className="relative bg-white rounded-[36px] overflow-hidden max-w-[430px] w-full shadow-2xl border border-slate-100 z-10 animate-scale-up my-auto dark:bg-slate-900 dark:border-slate-700">
         {/* Floating Close Button */}
         <button
           onClick={onClose}

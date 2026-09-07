@@ -1,65 +1,64 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const JWT_SECRET = process.env.JWT_SECRET || "";
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+).replace(/\/+$/, "");
 
-async function verifyJwt(token: string): Promise<{ valid: boolean; payload?: any }> {
-  if (!token || token.length < 10) return { valid: false };
-  const parts = token.split(".");
-  if (parts.length !== 3) return { valid: false };
+/**
+ * Validate session by calling the API's server-authoritative session endpoint.
+ * Never parse tokens locally — always trust the API's session verification.
+ */
+async function validateSession(cookieHeader: string): Promise<{ valid: boolean; role?: string }> {
   try {
-    const header = JSON.parse(atob(parts[0]));
-    const payload = JSON.parse(atob(parts[1]));
-
-    if (payload.exp && payload.exp * 1000 < Date.now()) return { valid: false };
-    if (payload.iss && payload.iss !== "waw-marketplace") return { valid: false };
-    if (payload.role !== "SELLER") return { valid: false };
-
-    if (JWT_SECRET && header.alg === "HS256") {
-      const encoder = new TextEncoder();
-      const key = await crypto.subtle.importKey(
-        "raw",
-        encoder.encode(JWT_SECRET),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["verify"]
-      );
-      const signatureValid = await crypto.subtle.verify(
-        "HMAC",
-        key,
-        Uint8Array.from(atob(parts[2]), c => c.charCodeAt(0)),
-        encoder.encode(`${parts[0]}.${parts[1]}`)
-      );
-      if (!signatureValid) return { valid: false };
-    }
-
-    return { valid: true, payload };
+    const res = await fetch(`${API_BASE}/api/auth/session/me`, {
+      headers: { Cookie: cookieHeader },
+      cache: "no-store",
+    });
+    if (!res.ok) return { valid: false };
+    const data = await res.json();
+    return { valid: true, role: data.user?.role };
   } catch {
     return { valid: false };
   }
 }
 
 export async function middleware(request: NextRequest) {
-  const token = request.cookies.get("waw_session")?.value;
+  const sessionCookie = request.cookies.get("waw_session")?.value;
   const isLoginPage = request.nextUrl.pathname === "/login";
 
+  // Build cookie header for API call
+  const cookieHeader = request.cookies.toString();
+
   if (isLoginPage) {
-    if (token && (await verifyJwt(token)).valid) {
-      return NextResponse.redirect(new URL("/", request.url));
+    if (sessionCookie) {
+      const { valid, role } = await validateSession(cookieHeader);
+      if (valid && role === "SELLER") {
+        return NextResponse.redirect(new URL("/", request.url));
+      }
     }
+    // Clear invalid session cookie
     const response = NextResponse.next();
-    if (token && !(await verifyJwt(token)).valid) {
+    if (sessionCookie) {
       response.cookies.delete("waw_session");
     }
     return response;
   }
 
-  const { valid } = await verifyJwt(token || "");
-  if (!token || !valid) {
+  // All non-login routes require a valid SELLER session
+  if (!sessionCookie) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const { valid, role } = await validateSession(cookieHeader);
+
+  if (!valid || role !== "SELLER") {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", request.nextUrl.pathname);
     const response = NextResponse.redirect(loginUrl);
-    if (token) response.cookies.delete("waw_session");
+    response.cookies.delete("waw_session");
     return response;
   }
 
