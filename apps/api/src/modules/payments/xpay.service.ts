@@ -40,7 +40,7 @@ export function verifyProviderPaymentAgainstOrder(input: {
   orderPaymentStatus?: string;
   expectedCurrency?: string;
 }): PaymentVerificationResult {
-  const expectedCurrency = input.expectedCurrency || "PKR";
+  const expectedCurrency = (input.expectedCurrency || "PKR").toUpperCase();
 
   // Already paid — idempotent no-op.
   if (input.orderPaymentStatus === "PAID") {
@@ -60,9 +60,19 @@ export function verifyProviderPaymentAgainstOrder(input: {
     };
   }
 
-  // Currency must match exactly.
-  const providerCurrency = String(input.providerCurrency || expectedCurrency).toUpperCase();
-  if (providerCurrency !== expectedCurrency.toUpperCase()) {
+  // Currency must be present. A MISSING currency can never be interpreted
+  // as the expected currency — an unsigned-with-currency-omitted payload
+  // must be rejected, not defaulted.
+  if (
+    input.providerCurrency === undefined ||
+    input.providerCurrency === null ||
+    String(input.providerCurrency).trim() === ""
+  ) {
+    return { ok: false, reason: "currency_missing" };
+  }
+
+  const providerCurrency = String(input.providerCurrency).trim().toUpperCase();
+  if (providerCurrency !== expectedCurrency) {
     return {
       ok: false,
       reason: `currency_mismatch: expected ${expectedCurrency}, received ${providerCurrency}`,
@@ -328,17 +338,57 @@ export class PostExXPayService {
     if (!orderRef)
       throw new Error("Missing order reference in PostEx XPay webhook payload");
 
-    // Idempotency Check — single atomic insert; if transaction_id already exists, skip
+    // ── Event-state machine (migration 041) ────────────────────────────────
+    // The log row is no longer a flat idempotency key. It moves through:
+    //   received → applied     (payment settled — terminal for the tx)
+    //   received → rejected    (verification failed — retryable slot)
+    // A REJECTED row frees the transaction_id: a corrected retry with the
+    // same txId inserts a new attempt and is fully re-verified. Only an
+    // APPLIED row blocks reprocessing (true idempotency).
+    const payloadHash = crypto
+      .createHash("sha256")
+      .update(JSON.stringify(event))
+      .digest("hex");
+
+    const { data: priorEvent } = await supabaseAdmin
+      .from("xpay_webhooks_log")
+      .select("id, status, rejection_reason, attempt")
+      .eq("transaction_id", txId)
+      .in("status", ["applied", "received"])
+      .maybeSingle();
+
+    if (priorEvent?.status === "applied") {
+      return {
+        success: true,
+        message: `Webhook for tx ${txId} already APPLIED (Idempotency Guard)`,
+      };
+    }
+    if (priorEvent?.status === "received") {
+      // A concurrent duplicate while the first is mid-flight — let the
+      // first one finish; do not double-process.
+      return {
+        success: true,
+        message: `Webhook for tx ${txId} is currently being processed`,
+      };
+    }
+
+    // No active row — insert a fresh 'received' row (also clears any prior
+    // rejected attempt by exclusion from the in-filter above).
     const { error: insertErr } = await supabaseAdmin
       .from("xpay_webhooks_log")
-      .insert({ transaction_id: txId, event_type: eventType });
+      .insert({
+        transaction_id: txId,
+        event_type: eventType,
+        status: "received",
+        payload_hash: payloadHash,
+      });
 
     if (insertErr) {
-      // Unique constraint violation means this webhook was already processed
+      // 23505 on the partial unique index == concurrent insert won the race
       if (insertErr.code === "23505") {
         return {
           success: true,
-          message: `Webhook for tx ${txId} already processed (Idempotency Guard)`,
+          message: `Webhook for tx ${txId} already received (concurrent guard)`,
         };
       }
       throw insertErr;
@@ -382,7 +432,19 @@ export class PostExXPayService {
       };
     }
 
-    if (!verification.ok) {
+    if (!verification.ok && verification.reason !== "already_paid") {
+      // Mark the event row REJECTED — the transaction slot is now retryable.
+      // A corrected callback with the same txId will insert a fresh attempt.
+      await supabaseAdmin
+        .from("xpay_webhooks_log")
+        .update({
+          status: "rejected",
+          rejection_reason: verification.reason,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("transaction_id", txId)
+        .eq("status", "received");
+
       logger.error("XPay webhook payment verification failed — order NOT marked paid", {
         orderNumber: order.order_number,
         orderAmountPkr: order.total_amount_pkr,
@@ -392,11 +454,13 @@ export class PostExXPayService {
         reason: verification.reason,
       });
       throw new Error(
-        `Payment verification failed for order ${order.order_number}: ${verification.reason}. Order quarantined — manual review required.`,
+        `Payment verification failed for order ${order.order_number}: ${verification.reason}. Event recorded as REJECTED — corrected retry accepted.`,
       );
     }
 
-    // All gates passed — transition Order to Confirmed and Paid
+    // All gates passed — transition Order to Confirmed and Paid, then mark
+    // the event APPLIED. If the crash happens between the two, a replay will
+    // re-insert (received row still present) and re-apply idempotently.
     await supabaseAdmin
       .from("orders")
       .update({
@@ -405,6 +469,12 @@ export class PostExXPayService {
         updated_at: new Date().toISOString(),
       })
       .eq("id", order.id);
+
+    await supabaseAdmin
+      .from("xpay_webhooks_log")
+      .update({ status: "applied", updated_at: new Date().toISOString() })
+      .eq("transaction_id", txId)
+      .eq("status", "received");
 
     // 2. Finalize Inventory stock deductions
     if (order.items && order.items.length > 0) {

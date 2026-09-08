@@ -474,6 +474,27 @@ CREATE TABLE IF NOT EXISTS return_items (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- 19b. Refund Executions — every gateway refund is recorded, idempotent, and
+-- auditable. Rows are created exclusively by the API worker / admin approval
+-- flow; direct client access is revoked.
+CREATE TABLE IF NOT EXISTS refund_executions (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  return_request_id TEXT REFERENCES return_requests(id) ON DELETE SET NULL,
+  provider TEXT NOT NULL,
+  provider_refund_id TEXT UNIQUE,
+  amount_pkr NUMERIC(12,2) NOT NULL CHECK (amount_pkr > 0),
+  currency TEXT NOT NULL DEFAULT 'PKR',
+  status TEXT NOT NULL DEFAULT 'PENDING'
+    CHECK (status IN ('PENDING','SUBMITTED','COMPLETED','FAILED','MANUAL_REVIEW')),
+  failure_reason TEXT,
+  provider_response JSONB,
+  idempotency_key TEXT UNIQUE NOT NULL,
+  executed_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- 20. Platform Audit Logs Table (Immutable Staff & Operational Trail)
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -494,7 +515,12 @@ CREATE TABLE IF NOT EXISTS xpay_webhooks_log (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   transaction_id TEXT UNIQUE NOT NULL,
   event_type TEXT NOT NULL,
-  processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+  status TEXT NOT NULL DEFAULT 'applied',
+  rejection_reason TEXT,
+  payload_hash TEXT,
+  attempt INTEGER NOT NULL DEFAULT 1,
+  processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 14. Atomic Inventory Deduction Function (Phase 2)
