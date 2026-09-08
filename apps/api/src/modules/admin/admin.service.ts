@@ -807,12 +807,23 @@ export class AdminService {
         .eq("id", returnReq.order_id);
     }
 
-    // 5. Issue automated Gateway Refund (XPay/Raast)
-    if (returnReq.order?.payment_method === 'XPAY' || returnReq.order?.payment_method === 'RAAST') {
-      // TODO: Call XPay/Raast refund API using the recorded transaction_id
-      console.log(`[PAYMENT GATEWAY] Triggering automated refund of PKR ${returnReq.refund_amount_pkr} to customer for order ${returnReq.order_id}`);
-      // Example:
-      // await PaymentGateway.issueRefund(returnReq.order.transaction_id, returnReq.refund_amount_pkr);
+    // 5. Issue automated Gateway Refund (XPay/Raast) — recorded in
+    // refund_executions; gateway failures land in MANUAL_REVIEW instead of
+    // blocking the approval flow.
+    if (returnReq.order?.payment_method) {
+      const { RefundService } = await import("../payments/refund.service.js");
+      const refundResult = await RefundService.executeRefund({
+        orderId: returnReq.order_id,
+        amountPkr: Number(returnReq.refund_amount_pkr || 0),
+        returnRequestId: returnId,
+        executedBy: adminId || "SYSTEM",
+        reason: `Return refund approved #${returnId}`,
+      });
+      if (refundResult.status === "FAILED" && refundResult.reason?.startsWith("over_refund")) {
+        logger.warn(
+          `Refund for return #${returnId} exceeded refundable amount — recorded FAILED, manual finance review required`,
+        );
+      }
     }
 
     // 6. Immutable Audit Log

@@ -277,6 +277,61 @@ export class PostExXPayService {
   }
 
   /**
+   * Submits a refund against a previously settled XPay transaction.
+   * Throws on any gateway/config failure — the caller (RefundService)
+   * owns retry and MANUAL_REVIEW escalation, so no fake success exists.
+   */
+  static async submitProviderRefund(input: {
+    gatewayReference: string;
+    orderNumber: string;
+    amountPkr: number;
+    idempotencyKey: string;
+  }): Promise<{ refundId: string; response: unknown }> {
+    const merchantId = ENV.POSTEX_XPAY_MERCHANT_ID;
+
+    if (!merchantId || merchantId === "WAW-POSTEX-001") {
+      throw new Error(
+        "XPay merchant ID not configured. Set POSTEX_XPAY_MERCHANT_ID in .env",
+      );
+    }
+    if (!ENV.POSTEX_XPAY_TOKEN) {
+      throw new Error("XPay API token not configured. Set POSTEX_XPAY_TOKEN in .env");
+    }
+
+    const response = await axios.post(
+      `${this.baseUrl}/refunds`,
+      {
+        merchantId,
+        transactionId: input.gatewayReference,
+        orderNumber: input.orderNumber,
+        amount: input.amountPkr,
+        currency: "PKR",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${ENV.POSTEX_XPAY_TOKEN}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": input.idempotencyKey,
+        },
+        timeout: 15000,
+      },
+    );
+
+    const refundId =
+      response.data?.refundId ||
+      response.data?.id ||
+      response.data?.transactionId;
+
+    if (!refundId) {
+      throw new Error(
+        `PostEx XPay refund API returned no refund identifier: ${JSON.stringify(response.data)}`,
+      );
+    }
+
+    return { refundId, response: response.data };
+  }
+
+  /**
    * Verifies PostEx XPay timing-safe HMAC-SHA256 signature for incoming webhooks.
    * Optionally accepts a secret override for testing.
    */

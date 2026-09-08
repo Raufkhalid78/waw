@@ -186,7 +186,27 @@ export class ChargebackService {
         description: `Chargeback won for Order ${chargeback.order_id}`,
       });
     } else {
-      // Process refund for lost chargeback
+      // Execute the gateway refund for the lost chargeback, then record it
+      // in the ledger. The gateway call is idempotent via refund_executions;
+      // a gateway failure leaves the refund in MANUAL_REVIEW (never a fake
+      // success) while the ledger still reflects the chargeback liability.
+      try {
+        const { RefundService } = await import("./refund.service.js");
+        const refundResult = await RefundService.executeRefund({
+          orderId: chargeback.order_id,
+          amountPkr: Number(chargeback.refund_amount_pkr || 0),
+          executedBy: "SYSTEM",
+          reason: `Chargeback lost for Order ${chargeback.order_id}`,
+        });
+        if (refundResult.status !== "COMPLETED") {
+          logger.warn(
+            `Chargeback gateway refund did not complete (status: ${refundResult.status}) — manual finance review required`,
+          );
+        }
+      } catch (refundErr: any) {
+        logger.error(`Chargeback gateway refund execution error: ${refundErr?.message}`);
+      }
+
       await supabaseAdmin.from("financial_ledger").insert({
         transaction_type: "CHARGEBACK_REFUND",
         amount_pkr: -chargeback.refund_amount_pkr,

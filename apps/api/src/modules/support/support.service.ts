@@ -320,8 +320,26 @@ export class SupportService {
 
     // 1. Execute Financial Resolution
     if (input.resolution === "REFUND_BUYER") {
+      // Execute the gateway refund first — recorded in refund_executions;
+      // gateway failures land in MANUAL_REVIEW instead of blocking the
+      // dispute resolution. Order state below only flips to REFUNDED when
+      // the provider accepted the money movement.
+      let refundExecuted = false;
+      if (orderId && previousTicket?.order?.payment_method) {
+        const { RefundService } = await import("../payments/refund.service.js");
+        const refundResult = await RefundService.executeRefund({
+          orderId,
+          amountPkr: Number(
+            input.refundAmountPkr ?? previousTicket.order.total_amount_pkr ?? 0,
+          ),
+          executedBy: adminId || "SYSTEM",
+          reason: `Dispute resolution REFUND_BUYER for ticket ${ticketId}`,
+        });
+        refundExecuted = refundResult.status === "COMPLETED";
+      }
+
       // Mark order as REFUNDED
-      if (orderId) {
+      if (orderId && (refundExecuted || !previousTicket?.order?.payment_method)) {
         await supabaseAdmin
           .from("orders")
           .update({
