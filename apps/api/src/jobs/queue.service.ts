@@ -242,13 +242,17 @@ try {
 
               // Mark COD as collected if delivered
               if (shipment.is_cod && shipment.status === "DELIVERED") {
+                // Delivery != cash in the bank. PostEx collects the cash at
+                // the door and remits it in settlement cycles — the order
+                // only becomes PAID when remittance is provider-confirmed.
                 await supabaseAdmin
                   .from("orders")
                   .update({
-                    payment_status: "PAID",
+                    payment_status: "AWAITING_COD_REMITTANCE",
                     updated_at: new Date().toISOString(),
                   })
-                  .eq("id", shipment.order_id);
+                  .eq("id", shipment.order_id)
+                  .in("payment_status", ["PENDING", "UNPAID", "AWAITING_COD_REMITTANCE"]);
 
                 // Schedule T+7 payout
                 const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();

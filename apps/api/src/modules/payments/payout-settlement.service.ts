@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { logger } from "../../config/logger.js";
 import { AuditService } from "../audit/audit.service.js";
+import { shouldHoldCodPayout } from "./cod-remittance.service.js";
 
 /**
  * Provider-Confirmed Payout Settlement Service
@@ -49,20 +50,26 @@ export class PayoutSettlementService {
     // Check for active disputes/returns
     const orderId = payout.store_order?.order_id;
     if (orderId) {
-      const [{ data: returns }, { data: tickets }] = await Promise.all([
-        supabaseAdmin
-          .from("return_requests")
-          .select("id")
-          .eq("order_id", orderId)
-          .in("status", ["PENDING_REVIEW", "REVERSE_PICKUP_BOOKED", "RECEIVED", "DISPUTE_OPENED"])
-          .limit(1),
-        supabaseAdmin
-          .from("support_tickets")
-          .select("id")
-          .eq("order_id", orderId)
-          .in("status", ["OPEN", "UNDER_REVIEW"])
-          .limit(1),
-      ]);
+      const [{ data: returns }, { data: tickets }, { data: parentOrder }] =
+        await Promise.all([
+          supabaseAdmin
+            .from("return_requests")
+            .select("id")
+            .eq("order_id", orderId)
+            .in("status", ["PENDING_REVIEW", "REVERSE_PICKUP_BOOKED", "RECEIVED", "DISPUTE_OPENED"])
+            .limit(1),
+          supabaseAdmin
+            .from("support_tickets")
+            .select("id")
+            .eq("order_id", orderId)
+            .in("status", ["OPEN", "UNDER_REVIEW"])
+            .limit(1),
+          supabaseAdmin
+            .from("orders")
+            .select("payment_status")
+            .eq("id", orderId)
+            .single(),
+        ]);
 
       if ((returns && returns.length > 0) || (tickets && tickets.length > 0)) {
         await supabaseAdmin
@@ -80,6 +87,18 @@ export class PayoutSettlementService {
         });
 
         return { settled: false, reason: "Active dispute/return" };
+      }
+
+      // COD payouts cannot settle while the cash is still AWAITING_COD_REMITTANCE —
+      // sellers are never paid from uncollected cash.
+      if (
+        payout.payment_method === "COD" &&
+        shouldHoldCodPayout(parentOrder?.payment_status)
+      ) {
+        return {
+          settled: false,
+          reason: "COD cash not yet confirmed remitted to platform",
+        };
       }
     }
 

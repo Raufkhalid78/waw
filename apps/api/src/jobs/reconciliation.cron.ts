@@ -2,7 +2,6 @@ import { supabaseAdmin } from "../config/supabase.js";
 import {
   CourierProvider,
   OrderStatus,
-  PaymentStatus,
   PayoutStatus,
 } from "../types/index.js";
 import axios from "axios";
@@ -125,49 +124,47 @@ async function runCODRemittanceReconciliation(): Promise<{ remitted: number }> {
   try {
     const { data: awaitingOrders } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number")
+      .select("id, order_number, total_amount_pkr")
       .eq("payment_status", "AWAITING_COD_REMITTANCE");
 
     if (!awaitingOrders || awaitingOrders.length === 0) {
       return { remitted: 0 };
     }
 
+    if (!FEATURES.COD_REMITTANCE_POLLING) {
+      // SAFE DEFAULT: cash confirmation is never simulated. Without an
+      // explicitly enabled, provider-verified remittance check these orders
+      // simply remain AWAITING_COD_REMITTANCE and operations is alerted —
+      // sellers must not be paid from uncollected cash.
+      logger.warn(
+        `💰 COD remittance polling DISABLED — ${awaitingOrders.length} delivered COD order(s) held in AWAITING_COD_REMITTANCE. ` +
+          `Set POSTEX_REMITTANCE_ENABLED=true (after confirming the PostEx remittance endpoint) to enable provider verification.`,
+      );
+      return { remitted: 0 };
+    }
+
     logger.info(`💰 Checking COD remittance for ${awaitingOrders.length} orders...`);
 
-    const now = new Date().toISOString();
+    const { CodRemittanceService, decideRemittanceUpdate } = await import(
+      "../modules/payments/cod-remittance.service.js"
+    );
 
     for (const order of awaitingOrders) {
-      if (FEATURES.COURIER_ENABLED) {
-        try {
-          // Poll PostEx remittance API. (Mocked logic for WAW until exact PostEx route provided)
-          // In a real scenario, this would query a /remittance or /settlement endpoint.
-          // For now, if the API call succeeds, we assume remitted.
-          /*
-          const res = await axios.get(`${ENV.POSTEX_API_BASE}/order/v1/remittance-status`, {
-            params: { orderRef: order.order_number },
-            headers: { token: ENV.POSTEX_API_TOKEN },
-            timeout: 5000,
-          });
-          const isRemitted = res.data?.isRemitted;
-          */
-          
-          // Simulated true for demonstration if courier is enabled
-          const isRemitted = true; 
+      const providerRemitted = await CodRemittanceService.checkPostExRemittance(
+        order.order_number,
+      );
+      const decision = decideRemittanceUpdate(providerRemitted);
 
-          if (isRemitted) {
-            await supabaseAdmin
-              .from("orders")
-              .update({
-                payment_status: PaymentStatus.PAID,
-                updated_at: now,
-              })
-              .eq("id", order.id);
-            remitted++;
-          }
-        } catch (err) {
-          logger.warn("Failed to check COD remittance", { orderId: order.id, error: (err as Error).message });
-        }
+      if (decision === "mark_paid") {
+        await CodRemittanceService.markRemitted(order);
+        remitted++;
+      } else if (decision === "unknown") {
+        logger.warn("COD remittance status unknown — order stays AWAITING", {
+          orderId: order.id,
+          orderNumber: order.order_number,
+        });
       }
+      // keep_awaiting: provider says not yet remitted — nothing to do.
     }
   } catch (err: any) {
     logger.error("❌ Error during COD remittance reconciliation:", err.message);

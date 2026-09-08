@@ -66,6 +66,9 @@ export const ENV = {
     process.env.POSTEX_API_BASE ||
     "https://api.postex.pk/services/integration/api",
   POSTEX_API_TOKEN: optionalEnv("POSTEX_API_TOKEN"),
+  // COD remittance polling: PostEx has no publicly documented remittance
+  // endpoint — enable ONLY after route/contract is confirmed with PostEx.
+  POSTEX_REMITTANCE_ENABLED: process.env.POSTEX_REMITTANCE_ENABLED === "true",
   POSTEX_XPAY_BASE_URL:
     process.env.POSTEX_XPAY_BASE_URL || "https://xpay.postexglobal.com/api",
   POSTEX_XPAY_MERCHANT_ID: optionalEnv("POSTEX_XPAY_MERCHANT_ID"),
@@ -123,6 +126,9 @@ export const FEATURES = {
   WHATSAPP_ENABLED: Boolean(ENV.META_WHATSAPP_TOKEN),
   OTP_ENABLED: Boolean(ENV.TWILIO_ACCOUNT_SID && ENV.TWILIO_AUTH_TOKEN),
   AI_ENABLED: Boolean(ENV.OPENROUTER_API_KEY),
+  // Requires BOTH a PostEx token AND the explicit remittance opt-in — cash
+  // confirmation must never be simulated by default.
+  COD_REMITTANCE_POLLING: Boolean(ENV.POSTEX_API_TOKEN) && ENV.POSTEX_REMITTANCE_ENABLED,
 };
 
 if (ENV.NODE_ENV === "production") {
