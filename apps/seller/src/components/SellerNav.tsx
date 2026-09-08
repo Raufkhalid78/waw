@@ -35,16 +35,8 @@ export function SellerNav() {
     setMounted(true);
     if (pathname === "/login") return;
 
-    function getCookie(name: string): string | null {
-      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-      return match ? decodeURIComponent(match[1]) : null;
-    }
-    const session = getCookie("waw_session");
-    if (!session) {
-      router.push("/login");
-      return;
-    }
-
+    // waw_session is httpOnly and unreadable from JS — validate with the
+    // server instead, which also returns store profile data.
     async function loadSession() {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/auth/session/me`, {
@@ -54,8 +46,12 @@ export function SellerNav() {
           const data = await res.json();
           if (data.storeName) setStoreName(data.storeName);
           if (data.city) setCity(data.city);
+        } else {
+          router.push("/login");
         }
-      } catch {}
+      } catch {
+        // Network error — keep rendering nav; middleware handles auth redirects
+      }
     }
     loadSession();
   }, [pathname, router]);

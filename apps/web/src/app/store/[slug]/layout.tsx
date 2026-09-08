@@ -8,10 +8,11 @@ const API_BASE_URL = (
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
+  const { slug } = await params;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/stores/${encodeURIComponent(params.slug)}`, {
+    const res = await fetch(`${API_BASE_URL}/api/stores/${encodeURIComponent(slug)}`, {
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
     });
@@ -21,7 +22,7 @@ export async function generateMetadata({
     const store = await res.json();
     return storeMetadata({
       name: store.name || "Store",
-      slug: store.slug || params.slug,
+      slug: store.slug || slug,
       description: store.description,
       logo_url: store.logo_url,
     });

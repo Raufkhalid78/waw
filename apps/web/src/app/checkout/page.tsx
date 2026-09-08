@@ -294,13 +294,27 @@ export default function CheckoutPage() {
         });
 
         if (paymentSession.checkoutUrl) {
-          clearCart();
+          // Do NOT clear the cart yet — payment is not confirmed. The cart is
+          // cleared only after the payment result page sees the order PAID.
+          // Persist the pending order so /payment/result can recover state.
+          try {
+            sessionStorage.setItem(
+              "waw-pending-payment-order",
+              JSON.stringify({
+                orderId,
+                orderNumber: orderResult.orderNumber || "",
+                totalPkr: orderResult.totalAmountPkr || 0,
+                phone: formData.phone,
+                createdAt: Date.now(),
+              }),
+            );
+          } catch {}
           window.location.href = paymentSession.checkoutUrl;
           return;
         }
       }
 
-      // COD or default success
+      // COD or default success — payment state is final at creation time.
       try { sessionStorage.removeItem("waw-cart-coupon"); } catch {}
       clearCart();
       if (isLoggedIn) {

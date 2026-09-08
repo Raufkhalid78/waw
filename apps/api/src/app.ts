@@ -435,6 +435,10 @@ app.post("/api/orders/guest", orderRateLimiter, OrderController.createGuestOrder
 
 app.get("/api/orders", requireAuth, OrderController.listUserOrders);
 
+// Guest order lookup by order number + phone — MUST be registered before the
+// :id param route so "lookup" is not captured as an id.
+app.get("/api/orders/lookup", OrderController.lookupGuestOrder);
+
 app.get("/api/orders/:id", requireAuth, OrderController.getOrder);
 
 app.get("/api/orders/:id/invoice", requireAuth, OrderController.downloadInvoice);

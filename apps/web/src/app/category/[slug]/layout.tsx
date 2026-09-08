@@ -8,10 +8,11 @@ const API_BASE_URL = (
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
+  const { slug } = await params;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(params.slug)}`, {
+    const res = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(slug)}`, {
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
     });
@@ -21,7 +22,7 @@ export async function generateMetadata({
     const cat = await res.json();
     return categoryMetadata({
       name: cat.name || "Category",
-      slug: cat.slug || params.slug,
+      slug: cat.slug || slug,
       description: cat.description,
     });
   } catch {

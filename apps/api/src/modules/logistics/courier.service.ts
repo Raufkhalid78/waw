@@ -35,6 +35,48 @@ export interface PostExReversePickupInput {
   itemsDescription: string;
 }
 
+/**
+ * Fulfillment lifecycle rank used to enforce monotonic order-status
+ * transitions. A courier event may never move an order backward.
+ */
+export const ORDER_STATUS_RANK: Record<OrderStatus, number> = {
+  [OrderStatus.PENDING]: 0,
+  [OrderStatus.CONFIRMED]: 1,
+  [OrderStatus.PROCESSING]: 2,
+  [OrderStatus.SHIPPED]: 3,
+  [OrderStatus.OUT_FOR_DELIVERY]: 4,
+  [OrderStatus.DELIVERED]: 5,
+  [OrderStatus.RETURN_REQUESTED]: 6,
+  [OrderStatus.RETURNED]: 7,
+  [OrderStatus.CANCELLED]: 8,
+};
+
+export type CourierEventDecision =
+  | { action: "apply" }
+  | { action: "reject-regression"; keepStatus: OrderStatus }
+  | { action: "ignore-duplicate" };
+
+/**
+ * Pure decision function for courier status events: determines whether an
+ * incoming status should be applied, rejected as a regression, or ignored as
+ * a duplicate. Exported for deterministic unit testing.
+ */
+export function decideCourierStatusEvent(
+  currentStatus: OrderStatus,
+  targetStatus: OrderStatus,
+): CourierEventDecision {
+  const currentRank = ORDER_STATUS_RANK[currentStatus] ?? -1;
+  const targetRank = ORDER_STATUS_RANK[targetStatus] ?? -1;
+
+  if (targetRank < currentRank) {
+    return { action: "reject-regression", keepStatus: currentStatus };
+  }
+  if (targetRank === currentRank) {
+    return { action: "ignore-duplicate" };
+  }
+  return { action: "apply" };
+}
+
 export class CourierService {
   private static readonly POSTEX_API_BASE =
     ENV.POSTEX_API_BASE || "https://api.postex.pk/services/integration/api";
@@ -224,7 +266,44 @@ export class CourierService {
       targetOrderStatus = OrderStatus.RETURNED;
     }
 
-    // 1. Update Shipment Record
+    // 1. Update Shipment Record (fetch current status for monotonicity)
+    const { data: existingShipment } = await supabaseAdmin
+      .from("shipments")
+      .select("status, order_id, store_order_id, is_cod")
+      .eq("tracking_number", trackingNumber)
+      .maybeSingle();
+
+    if (existingShipment?.status) {
+      const decision = decideCourierStatusEvent(
+        existingShipment.status as OrderStatus,
+        targetOrderStatus,
+      );
+
+      // Monotonic state machine: never move an order backward. A delayed
+      // SHIPPED/OUT_FOR_DELIVERY event after DELIVERED is discarded.
+      if (decision.action === "reject-regression") {
+        logger.warn(
+          `⛔ [PostEx Webhook] Rejected stale status regression ${existingShipment.status} → ${targetOrderStatus} for tracking #${trackingNumber}`,
+        );
+        return {
+          success: false,
+          trackingNumber,
+          newStatus: decision.keepStatus,
+          message: `Stale event rejected: cannot move from ${existingShipment.status} to ${targetOrderStatus}`,
+        };
+      }
+
+      // Idempotent no-op: same-status duplicate events change nothing.
+      if (decision.action === "ignore-duplicate") {
+        return {
+          success: true,
+          trackingNumber,
+          newStatus: existingShipment.status,
+          message: `Duplicate milestone ignored (${targetOrderStatus})`,
+        };
+      }
+    }
+
     const { data: shipment } = await supabaseAdmin
       .from("shipments")
       .update({

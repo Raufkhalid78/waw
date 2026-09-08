@@ -36,16 +36,8 @@ export default function SellerDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    function getCookie(name: string): string | null {
-      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-      return match ? decodeURIComponent(match[1]) : null;
-    }
-    const session = getCookie("waw_session");
-    if (!session) {
-      window.location.href = "/login";
-      return;
-    }
-
+    // waw_session is httpOnly — never readable from document.cookie.
+    // Server-authoritative auth is enforced by middleware; here we just load data.
     async function loadData() {
       try {
         const [s, o, p, a] = await Promise.all([

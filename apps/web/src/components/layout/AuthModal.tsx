@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { X, Mail, Smartphone, CheckCircle2, ChevronLeft } from "lucide-react";
-import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useCartStore } from "@/store/useCartStore";
 import { getApiBaseUrl } from "@/lib/api";
 import { fetchWithCsrf } from "@/lib/csrf";
@@ -29,6 +28,7 @@ export function AuthModal({
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(45);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: any;
@@ -89,13 +89,15 @@ export function AuthModal({
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasInput) return;
-
+    setError(null);
     setLoading(true);
     try {
       if (isEmail) {
-        // Email login — go directly to OTP step (email OTP flow)
-        setResendTimer(45);
-        setStep("OTP");
+        // Email login uses Supabase email/password — OTP via email is not
+        // configured. Prompt the user to use their phone number instead.
+        setError(
+          "Email sign-in with a one-time code is not available yet. Please sign in with your mobile number (WhatsApp OTP) or Google/Apple.",
+        );
       } else {
         // Phone — send WhatsApp OTP
         const res = await fetchWithCsrf(`${API_BASE}/api/auth/whatsapp-otp/send`, {
@@ -109,7 +111,7 @@ export function AuthModal({
         setStep("OTP");
       }
     } catch (err: any) {
-      alert(err.message || "Failed to send verification code");
+      setError(err.message || "Failed to send verification code");
     } finally {
       setLoading(false);
     }
@@ -130,43 +132,42 @@ export function AuthModal({
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
     try {
       const otpCode = otp.join("");
-      if (!isEmail) {
-        // Phone OTP verification via API
-        const res = await fetchWithCsrf(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: formattedTarget, otp: otpCode }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Invalid OTP");
+      // Phone OTP verification via API
+      const res = await fetchWithCsrf(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: formattedTarget, otp: otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Invalid OTP");
 
-        // Create httpOnly session cookie (replaces localStorage token)
-        await fetchWithCsrf(`${API_BASE}/api/auth/session/create`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: data.user?.id,
-            userRole: data.user?.role || "BUYER",
-            userPhone: data.user?.phone || formattedTarget,
-            userEmail: data.user?.email,
-          }),
-        });
-
-        login({
-          name: data.user?.full_name || parseDisplayName(identifier),
-          emailOrPhone: identifier,
-        });
-      } else {
-        // Email OTP — simulate for now (needs email OTP service)
-        login({
-          name: parseDisplayName(identifier),
-          emailOrPhone: identifier,
-        });
+      // Create httpOnly session cookie — server verifies the JWT before
+      // issuing the session. A failure here MUST block the success state.
+      const sessionRes = await fetchWithCsrf(`${API_BASE}/api/auth/session/create`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: data.user?.id,
+          authToken: data.token,
+          userRole: data.user?.role || "BUYER",
+          userPhone: data.user?.phone || formattedTarget,
+          userEmail: data.user?.email,
+        }),
+      });
+      if (!sessionRes.ok) {
+        const sessionErr = await sessionRes.json().catch(() => ({ error: "Session creation failed" }));
+        throw new Error(sessionErr.error || "Could not sign you in. Please try again.");
       }
+
+      login({
+        name: data.user?.full_name || parseDisplayName(identifier),
+        emailOrPhone: identifier,
+      });
 
       applyReferralCode();
       setStep("SUCCESS");
@@ -177,7 +178,7 @@ export function AuthModal({
         setOtp(["", "", "", "", "", ""]);
       }, 1000);
     } catch (err: any) {
-      alert(err.message || "Verification failed");
+      setError(err.message || "Verification failed");
     } finally {
       setLoading(false);
     }
@@ -185,31 +186,25 @@ export function AuthModal({
 
   const handleOAuthLogin = async (provider: "GOOGLE" | "APPLE") => {
     setLoading(true);
+    setError(null);
     try {
-      // Use Supabase OAuth redirect
+      // Use Supabase OAuth redirect — no simulated fallback in any environment.
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      
-      if (supabaseUrl && supabaseAnonKey) {
-        const redirectUrl = `${window.location.origin}/auth/callback`;
-        const providerLower = provider.toLowerCase();
-        window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=${providerLower}&redirect_to=${encodeURIComponent(redirectUrl)}`;
-      } else {
-        // Fallback: simulate OAuth for development
-        const userName = provider === "GOOGLE" ? "Google User" : "Apple User";
-        login({
-          name: userName,
-          emailOrPhone: "",
-        });
-        applyReferralCode();
-        setStep("SUCCESS");
-        setTimeout(() => {
-          if (onSuccess) onSuccess("");
-          onClose();
-          setStep("INPUT");
-        }, 1000);
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        setError(
+          `${provider} sign-in is not configured yet. Please use your mobile number instead.`,
+        );
+        setLoading(false);
+        return;
       }
+
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const providerLower = provider.toLowerCase();
+      window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=${providerLower}&redirect_to=${encodeURIComponent(redirectUrl)}`;
     } catch {
+      setError("Could not start social sign-in. Please try again.");
       setLoading(false);
     }
   };
@@ -303,6 +298,18 @@ export function AuthModal({
               {isUrdu ? "خوش آمدید! شروع کریں" : "Welcome! Let’s get started"}
             </h2>
           </div>
+
+          {/* Inline Error (replaces alert()) */}
+          {error && (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-semibold flex items-start gap-2"
+            >
+              <span className="mt-0.5 shrink-0">⚠</span>
+              <span>{error}</span>
+            </div>
+          )}
 
           {/* ── STEP 1: Entry Mode (Log in / Sign up + Email/Phone + OAuth) ──── */}
           {step === "INPUT" && (
@@ -431,26 +438,6 @@ export function AuthModal({
                 </button>
               </div>
 
-              {/* WhatsApp Quick OTP Trigger */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!identifier.trim()) {
-                    document.getElementById("waw-identifier-input")?.focus();
-                    return;
-                  }
-                  setStep("OTP");
-                }}
-                className="w-full flex items-center justify-center gap-2 p-2.5 bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-xs font-black text-emerald-800 transition-all shadow-xs cursor-pointer"
-              >
-                <WhatsAppIcon className="w-4 h-4" />
-                <span>
-                  {isUrdu
-                    ? "واٹس ایپ فاسٹ ون کلک لاگ ان"
-                    : "Fast WhatsApp Instant Login"}
-                </span>
-              </button>
-
               {/* Privacy Footer */}
               <p className="text-[11px] text-center text-slate-500 font-medium pt-0.5 leading-snug">
                 {isUrdu
@@ -530,7 +517,10 @@ export function AuthModal({
               <div className="flex items-center justify-between text-xs font-bold pt-1 text-slate-500">
                 <button
                   type="button"
-                  onClick={() => setStep("INPUT")}
+                  onClick={() => {
+                    setError(null);
+                    setStep("INPUT");
+                  }}
                   className="flex items-center gap-1 hover:text-slate-900 transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />

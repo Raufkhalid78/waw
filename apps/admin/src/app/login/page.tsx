@@ -21,12 +21,21 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const createSession = async (userId: string, userRole: string, userPhone?: string, userEmail?: string) => {
+  const createSession = async (
+    userId: string,
+    authToken: string,
+    userRole: string,
+    userPhone?: string,
+    userEmail?: string,
+  ) => {
+    if (!authToken) {
+      throw new Error("Login succeeded but no auth token was returned. Cannot create session.");
+    }
     const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ userId, userRole, userPhone, userEmail }),
+      body: JSON.stringify({ userId, authToken, userRole, userPhone, userEmail }),
     });
     if (!sessionRes.ok) {
       const err = await sessionRes.json().catch(() => ({ error: "Session creation failed" }));
@@ -57,7 +66,7 @@ export default function LoginPage() {
         throw new Error("Access denied. Admin only.");
       }
 
-      await createSession(data.user.id, data.user.role, data.user.phone, data.user.email);
+      await createSession(data.user.id, data.token, data.user.role, data.user.phone, data.user.email);
       router.push("/");
     } catch (err: any) {
       setError(err.message);
@@ -108,7 +117,7 @@ export default function LoginPage() {
         throw new Error("Access denied. Admin only.");
       }
 
-      await createSession(data.user.id, data.user.role, data.user.phone, data.user.email);
+      await createSession(data.user.id, data.token, data.user.role, data.user.phone, data.user.email);
       router.push("/");
     } catch (err: any) {
       setError(err.message);
@@ -118,27 +127,12 @@ export default function LoginPage() {
   };
 
   const handleOAuthLogin = async (provider: "GOOGLE" | "APPLE") => {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/oauth/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ provider }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(`${provider} login requires Supabase OAuth configuration. Please use email or mobile login.`);
-        setLoading(false);
-        return;
-      }
-      await createSession(data.user.id, data.user.role, data.user.phone, data.user.email);
-      router.push("/");
-    } catch {
-      setError(`${provider} login will be available once OAuth providers are configured in Supabase.`);
-      setLoading(false);
-    }
+    // OAuth/sync requires an existing authenticated session and is not a
+    // first-login flow. Admins must use email/password or mobile OTP.
+    setError(
+      `${provider} sign-in is not available for admin accounts. Please use email or mobile login.`,
+    );
+    setLoading(false);
   };
 
   return (

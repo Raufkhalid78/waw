@@ -67,6 +67,8 @@ class MemoryCacheFallback {
 // Instantiate live Upstash Redis client if configured
 let redisClient: any;
 
+const isProduction = ENV.NODE_ENV === "production";
+
 if (ENV.UPSTASH_REDIS_REST_URL && ENV.UPSTASH_REDIS_REST_TOKEN) {
   try {
     redisClient = new UpstashRedis({
@@ -75,12 +77,30 @@ if (ENV.UPSTASH_REDIS_REST_URL && ENV.UPSTASH_REDIS_REST_TOKEN) {
     });
     logger.info("Connected to Upstash Serverless Redis cluster successfully.");
   } catch (err) {
+    // Fail closed: a broken Redis must never degrade to a process-local
+    // cache in production — sessions, locks, and idempotency would diverge
+    // across replicas. Crash and let the orchestrator retry/rollback.
+    if (isProduction) {
+      logger.error(
+        "FATAL: Failed to connect to Upstash Redis in production — refusing to start with unsafe in-memory fallback.",
+        err,
+      );
+      throw err;
+    }
     logger.warn(
-      "Failed to connect to Upstash Redis, using in-memory fallback cache.",
+      "Failed to connect to Upstash Redis, using in-memory fallback cache (development only).",
       err,
     );
     redisClient = new MemoryCacheFallback();
   }
+} else if (isProduction) {
+  // Fail closed: production REQUIRES a distributed Redis. Without it the
+  // inventory mutex, OTP store, rate limits, and idempotency cache would be
+  // process-local and silently diverge between replicas.
+  throw new Error(
+    "FATAL: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production. " +
+      "The in-memory fallback is only permitted outside production.",
+  );
 } else {
   redisClient = new MemoryCacheFallback();
 }

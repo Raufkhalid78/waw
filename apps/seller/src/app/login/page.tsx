@@ -31,12 +31,22 @@ export default function SellerLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createSession = async (userId: string, userRole: string, userPhone?: string, userEmail?: string, storeId?: string) => {
+  const createSession = async (
+    userId: string,
+    authToken: string,
+    userRole: string,
+    userPhone?: string,
+    userEmail?: string,
+    storeId?: string,
+  ) => {
+    if (!authToken) {
+      throw new Error("Login succeeded but no auth token was returned. Cannot create session.");
+    }
     const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ userId, userRole, userPhone, userEmail, storeId }),
+      body: JSON.stringify({ userId, authToken, userRole, userPhone, userEmail, storeId }),
     });
     if (!sessionRes.ok) {
       const err = await sessionRes.json().catch(() => ({ error: "Session creation failed" }));
@@ -81,6 +91,7 @@ export default function SellerLoginPage() {
 
       await createSession(
         data.user.id,
+        data.token,
         data.user.role,
         data.user.phone,
         data.user.email,
@@ -110,6 +121,7 @@ export default function SellerLoginPage() {
 
       await createSession(
         data.user.id,
+        data.token,
         data.user.role,
         data.user.phone,
         data.user.email,

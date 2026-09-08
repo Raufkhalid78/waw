@@ -18,6 +18,38 @@ export interface ServiceabilityResult {
   supportedCouriers: string[];
 }
 
+/**
+ * Test seam: when set, all serviceability lookups resolve from this in-memory
+ * matrix instead of hitting the database. This keeps the delivery-window test
+ * deterministic and network-free in CI while production always uses Supabase.
+ */
+let testCityMatrix: Record<
+  string,
+  {
+    city_name: string;
+    province: string;
+    tier: number;
+    is_cod_eligible: boolean;
+    is_active: boolean;
+    supported_couriers: string[];
+    intra_city_days_min: number;
+    intra_city_days_max: number;
+    inter_tier1_days_min: number;
+    inter_tier1_days_max: number;
+    inter_other_days_min: number;
+    inter_other_days_max: number;
+  }
+> | null = null;
+
+export const ServiceabilityTestSeam = {
+  setCityMatrix(matrix: typeof testCityMatrix): void {
+    testCityMatrix = matrix;
+  },
+  clear(): void {
+    testCityMatrix = null;
+  },
+};
+
 export class ServiceabilityService {
   /**
    * Lists all active serviceable Pakistani cities with metadata.
@@ -76,15 +108,42 @@ export class ServiceabilityService {
     const normSeller = (sellerCity || defaultCity || "Lahore").trim().toLowerCase();
     const normDestLower = normDest.toLowerCase();
 
-    // Query destination city from database
-    const { data: destRecord, error: destError } = await supabaseAdmin
-      .from("serviceable_cities")
-      .select("city_name, province, tier, is_cod_eligible, supported_couriers, is_active, intra_city_days_min, intra_city_days_max, inter_tier1_days_min, inter_tier1_days_max, inter_other_days_min, inter_other_days_max")
-      .ilike("city_name", normDest)
-      .maybeSingle();
+    let destRecord: any;
+    let sellerTier: number;
 
-    if (destError) {
-      logger.warn("Failed to fetch destination city for serviceability check", { city: normDest, error: destError.message });
+    if (testCityMatrix) {
+      const matrixEntry =
+        testCityMatrix[normDestLower] ||
+        Object.values(testCityMatrix).find(
+          (c) => c.city_name.toLowerCase() === normDestLower,
+        );
+      destRecord = matrixEntry || null;
+      const sellerEntry =
+        testCityMatrix[normSeller] ||
+        Object.values(testCityMatrix).find(
+          (c) => c.city_name.toLowerCase() === normSeller,
+        );
+      sellerTier = sellerEntry?.tier || 2;
+    } else {
+      // Query destination city from database
+      const { data: destDbRecord, error: destError } = await supabaseAdmin
+        .from("serviceable_cities")
+        .select("city_name, province, tier, is_cod_eligible, supported_couriers, is_active, intra_city_days_min, intra_city_days_max, inter_tier1_days_min, inter_tier1_days_max, inter_other_days_min, inter_other_days_max")
+        .ilike("city_name", normDest)
+        .maybeSingle();
+
+      if (destError) {
+        logger.warn("Failed to fetch destination city for serviceability check", { city: normDest, error: destError.message });
+      }
+      destRecord = destDbRecord;
+
+      // Query seller city tier for delivery estimation
+      const { data: sellerRecord } = await supabaseAdmin
+        .from("serviceable_cities")
+        .select("tier")
+        .ilike("city_name", normSeller)
+        .maybeSingle();
+      sellerTier = sellerRecord?.tier || 2;
     }
 
     if (!destRecord || !destRecord.is_active) {
@@ -94,20 +153,12 @@ export class ServiceabilityService {
     // COD Eligibility Restriction
     if (paymentMethod === PaymentMethod.COD && !destRecord.is_cod_eligible) {
       throw new Error(
-        `Cash on Delivery (COD) is not available in ${destRecord.city_name}. Please choose an online payment method (Card or Raast QR).`
+        `Cash on Delivery (COD) is not available in ${destRecord.city_name}. Please choose an online payment method (Card or Raast QR).`,
       );
     }
 
-    // Query seller city tier for delivery estimation
-    const { data: sellerRecord } = await supabaseAdmin
-      .from("serviceable_cities")
-      .select("tier")
-      .ilike("city_name", normSeller)
-      .maybeSingle();
-
-    const sellerTier = sellerRecord?.tier || 2;
     const destTier = destRecord.tier || 2;
-    const isIntraCity = normSeller === normDestLower;
+    const isIntraCity = normSeller === destRecord.city_name.toLowerCase();
 
     // Calculate Delivery Time Window from DB columns
     let estimatedDays: DeliveryWindow;

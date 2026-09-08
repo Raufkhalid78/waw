@@ -112,6 +112,100 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     );
   });
 
+  it("P0-SEC: should accept a provider payment event only when amount and currency match the order", async () => {
+    const { verifyProviderPaymentAgainstOrder } = await import("../src/modules/payments/xpay.service.js");
+
+    // Exact match — accepted
+    assert.deepStrictEqual(
+      verifyProviderPaymentAgainstOrder({
+        providerAmount: 5500,
+        providerCurrency: "PKR",
+        orderAmountPkr: 5500,
+        orderPaymentStatus: "PENDING",
+      }),
+      { ok: true },
+    );
+
+    // Wrong amount — quarantined
+    const wrongAmount = verifyProviderPaymentAgainstOrder({
+      providerAmount: 100,
+      providerCurrency: "PKR",
+      orderAmountPkr: 5500,
+      orderPaymentStatus: "PENDING",
+    });
+    assert.strictEqual(wrongAmount.ok, false);
+    assert.ok(wrongAmount.reason?.includes("amount_mismatch"));
+
+    // Missing amount — quarantined
+    const missingAmount = verifyProviderPaymentAgainstOrder({
+      providerAmount: undefined,
+      providerCurrency: "PKR",
+      orderAmountPkr: 5500,
+      orderPaymentStatus: "PENDING",
+    });
+    assert.strictEqual(missingAmount.ok, false);
+
+    // Wrong currency — quarantined
+    const wrongCurrency = verifyProviderPaymentAgainstOrder({
+      providerAmount: 5500,
+      providerCurrency: "USD",
+      orderAmountPkr: 5500,
+      orderPaymentStatus: "PENDING",
+    });
+    assert.strictEqual(wrongCurrency.ok, false);
+    assert.ok(wrongCurrency.reason?.includes("currency_mismatch"));
+
+    // Already paid — idempotent no-op, never reprocessed
+    assert.deepStrictEqual(
+      verifyProviderPaymentAgainstOrder({
+        providerAmount: 5500,
+        providerCurrency: "PKR",
+        orderAmountPkr: 5500,
+        orderPaymentStatus: "PAID",
+      }),
+      { ok: true, reason: "already_paid" },
+    );
+  });
+
+  it("P0-SEC: should reject courier status regressions and ignore duplicate milestones", async () => {
+    const { decideCourierStatusEvent } = await import("../src/modules/logistics/courier.service.js");
+    const { OrderStatus } = await import("../src/types/index.js");
+
+    // Delayed TRANSIT event after DELIVERED — must be rejected
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.DELIVERED, OrderStatus.SHIPPED),
+      { action: "reject-regression", keepStatus: OrderStatus.DELIVERED },
+    );
+
+    // OUT_FOR_DELIVERY after DELIVERED — must be rejected
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.DELIVERED, OrderStatus.OUT_FOR_DELIVERY),
+      { action: "reject-regression", keepStatus: OrderStatus.DELIVERED },
+    );
+
+    // Duplicate DELIVERED — ignored (idempotent)
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.DELIVERED, OrderStatus.DELIVERED),
+      { action: "ignore-duplicate" },
+    );
+
+    // Normal forward progression — applied
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.SHIPPED, OrderStatus.OUT_FOR_DELIVERY),
+      { action: "apply" },
+    );
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED),
+      { action: "apply" },
+    );
+
+    // Failed delivery after OUT_FOR_DELIVERY — legitimate return flow, applied
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.OUT_FOR_DELIVERY, OrderStatus.RETURNED),
+      { action: "apply" },
+    );
+  });
+
   it("should issue and verify valid JWT tokens with role claims", () => {
     const secret = ENV.JWT_SECRET || "waw_dev_jwt_secret_key_2026";
     const token = jwt.sign(
@@ -382,33 +476,79 @@ describe("Waw Marketplace Core API Engine Tests", () => {
   });
 
   it("should compute exact Pakistani delivery windows (Intra-city: 2-3 days, Inter-city Tier 1: 3-5 days, Inter-city Other: 5-7 days)", async () => {
-    const { ServiceabilityService } = await import("../src/modules/logistics/serviceability.service.js");
+    const { ServiceabilityService, ServiceabilityTestSeam } = await import("../src/modules/logistics/serviceability.service.js");
 
-    // Intra-city (Lahore to Lahore)
-    const intra = await ServiceabilityService.checkDestination("Lahore", "Lahore");
-    assert.strictEqual(intra.estimatedDays.min, 2);
-    assert.strictEqual(intra.estimatedDays.max, 3);
-    assert.strictEqual(intra.estimatedDays.label, "2–3 business days");
+    // Deterministic CI: seed an in-memory city matrix instead of hitting the
+    // networked database. A separate live-staging test validates real PostEx
+    // serviceability against a seeded serviceable_cities table.
+    ServiceabilityTestSeam.setCityMatrix({
+      lahore: {
+        city_name: "Lahore", province: "Punjab", tier: 1, is_cod_eligible: true,
+        is_active: true, supported_couriers: ["POSTEX"],
+        intra_city_days_min: 2, intra_city_days_max: 3,
+        inter_tier1_days_min: 3, inter_tier1_days_max: 5,
+        inter_other_days_min: 5, inter_other_days_max: 7,
+      },
+      karachi: {
+        city_name: "Karachi", province: "Sindh", tier: 1, is_cod_eligible: true,
+        is_active: true, supported_couriers: ["POSTEX"],
+        intra_city_days_min: 2, intra_city_days_max: 3,
+        inter_tier1_days_min: 3, inter_tier1_days_max: 5,
+        inter_other_days_min: 5, inter_other_days_max: 7,
+      },
+      quetta: {
+        city_name: "Quetta", province: "Balochistan", tier: 2, is_cod_eligible: true,
+        is_active: true, supported_couriers: ["POSTEX"],
+        intra_city_days_min: 2, intra_city_days_max: 3,
+        inter_tier1_days_min: 3, inter_tier1_days_max: 5,
+        inter_other_days_min: 5, inter_other_days_max: 7,
+      },
+    });
 
-    // Inter-city Tier 1 (Karachi to Lahore)
-    const tier1 = await ServiceabilityService.checkDestination("Lahore", "Karachi");
-    assert.strictEqual(tier1.estimatedDays.min, 3);
-    assert.strictEqual(tier1.estimatedDays.max, 5);
-    assert.strictEqual(tier1.estimatedDays.label, "3–5 business days");
+    try {
+      // Intra-city (Lahore to Lahore)
+      const intra = await ServiceabilityService.checkDestination("Lahore", "Lahore");
+      assert.strictEqual(intra.estimatedDays.min, 2);
+      assert.strictEqual(intra.estimatedDays.max, 3);
+      assert.strictEqual(intra.estimatedDays.label, "2–3 business days");
 
-    // Inter-city Other (Quetta to Lahore)
-    const other = await ServiceabilityService.checkDestination("Quetta", "Lahore");
-    assert.strictEqual(other.estimatedDays.min, 5);
-    assert.strictEqual(other.estimatedDays.max, 7);
-    assert.strictEqual(other.estimatedDays.label, "5–7 business days");
+      // Inter-city Tier 1 (Karachi to Lahore)
+      const tier1 = await ServiceabilityService.checkDestination("Lahore", "Karachi");
+      assert.strictEqual(tier1.estimatedDays.min, 3);
+      assert.strictEqual(tier1.estimatedDays.max, 5);
+      assert.strictEqual(tier1.estimatedDays.label, "3–5 business days");
+
+      // Inter-city Other (Quetta to Lahore)
+      const other = await ServiceabilityService.checkDestination("Quetta", "Lahore");
+      assert.strictEqual(other.estimatedDays.min, 5);
+      assert.strictEqual(other.estimatedDays.max, 7);
+      assert.strictEqual(other.estimatedDays.label, "5–7 business days");
+    } finally {
+      ServiceabilityTestSeam.clear();
+    }
   });
 
   it("should reject unserviceable destination cities", async () => {
-    const { ServiceabilityService } = await import("../src/modules/logistics/serviceability.service.js");
-    await assert.rejects(
-      async () => ServiceabilityService.checkDestination("Atlantis"),
-      /Delivery is currently not available to "Atlantis"/
-    );
+    const { ServiceabilityService, ServiceabilityTestSeam } = await import("../src/modules/logistics/serviceability.service.js");
+
+    ServiceabilityTestSeam.setCityMatrix({
+      lahore: {
+        city_name: "Lahore", province: "Punjab", tier: 1, is_cod_eligible: true,
+        is_active: true, supported_couriers: ["POSTEX"],
+        intra_city_days_min: 2, intra_city_days_max: 3,
+        inter_tier1_days_min: 3, inter_tier1_days_max: 5,
+        inter_other_days_min: 5, inter_other_days_max: 7,
+      },
+    });
+
+    try {
+      await assert.rejects(
+        async () => ServiceabilityService.checkDestination("Atlantis"),
+        /Delivery is currently not available to "Atlantis"/
+      );
+    } finally {
+      ServiceabilityTestSeam.clear();
+    }
   });
 
   it("should enforce 7-day return policy (accept <= 7 days, reject > 7 days)", () => {

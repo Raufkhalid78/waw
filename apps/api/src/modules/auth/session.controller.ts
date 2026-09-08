@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import { SessionService } from "./session.service.js";
 import { setCsrfCookie, generateCsrfToken } from "../../middleware/csrf.middleware.js";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { ENV } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -79,25 +81,46 @@ export class SessionController {
         return;
       }
 
-      // Verify the caller's identity via Supabase auth token
-      if (authToken) {
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(authToken);
-        if (authError || !user || user.id !== userId) {
+      // SECURITY: An authToken is mandatory. It is either:
+      //  (a) a Supabase access token (OAuth / email+password flows), or
+      //  (b) an API-issued JWT from OTP/email login (signed with JWT_SECRET).
+      // Without a verified token, no session can ever be created.
+      if (!authToken) {
+        res.status(401).json({ error: "Authentication required: authToken missing" });
+        return;
+      }
+
+      // Try Supabase first (OAuth users, Supabase email/password accounts)
+      let verifiedUserId: string | null = null;
+      const { data: { user }, error: authError } = await supabaseAdmin.auth
+        .getUser(authToken)
+        .catch(() => ({ data: { user: null }, error: new Error("supabase unavailable") }));
+
+      if (!authError && user) {
+        if (user.id !== userId) {
           res.status(401).json({ error: "Invalid authentication token" });
           return;
         }
+        verifiedUserId = user.id;
       } else {
-        // Fallback: verify via the access token cookie if present
-        const accessToken = req.cookies?.waw_session;
-        if (accessToken) {
-          const session = await SessionService.validateSession(accessToken);
-          if (!session || session.userId !== userId) {
-            res.status(401).json({ error: "Session mismatch" });
+        // Fall back to API-issued JWT (phone OTP / email login flows)
+        try {
+          const decoded = jwt.verify(authToken, ENV.JWT_SECRET) as {
+            sub?: string;
+            phone?: string;
+            role?: string;
+          };
+          if (decoded.sub !== userId) {
+            res.status(401).json({ error: "Invalid authentication token" });
             return;
           }
-        } else {
-          // No token at all — reject
-          res.status(401).json({ error: "Authentication required" });
+          verifiedUserId = decoded.sub ?? null;
+          if (!verifiedUserId) {
+            res.status(401).json({ error: "Invalid authentication token" });
+            return;
+          }
+        } catch {
+          res.status(401).json({ error: "Invalid authentication token" });
           return;
         }
       }

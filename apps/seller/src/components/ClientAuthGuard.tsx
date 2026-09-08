@@ -20,18 +20,33 @@ export function ClientAuthGuard({
       return;
     }
 
-    function getCookie(name: string): string | null {
-      const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-      return match ? decodeURIComponent(match[1]) : null;
+    // waw_session is httpOnly — it can never be read from document.cookie.
+    // Ask the API server whether the session is valid (server-authoritative).
+    let cancelled = false;
+    async function checkSession() {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/auth/session/me`,
+          { credentials: "include" },
+        );
+        if (cancelled) return;
+        if (res.ok) {
+          setAuthState("authorized");
+        } else {
+          setAuthState("redirecting");
+          router.replace("/login");
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthState("redirecting");
+          router.replace("/login");
+        }
+      }
     }
-    const session = typeof window !== "undefined" ? getCookie("waw_session") : null;
-
-    if (!session) {
-      setAuthState("redirecting");
-      router.replace("/login");
-    } else {
-      setAuthState("authorized");
-    }
+    checkSession();
+    return () => {
+      cancelled = true;
+    };
   }, [pathname, router]);
 
   if (authState === "checking" || authState === "redirecting") {

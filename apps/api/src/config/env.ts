@@ -71,6 +71,9 @@ export const ENV = {
   POSTEX_XPAY_MERCHANT_ID: optionalEnv("POSTEX_XPAY_MERCHANT_ID"),
   POSTEX_XPAY_TOKEN: optionalEnv("POSTEX_XPAY_TOKEN"),
   POSTEX_XPAY_SECRET_KEY: optionalEnv("POSTEX_XPAY_SECRET_KEY"),
+  // Public base URL of THIS API server, used for provider webhooks and
+  // buyer-facing return URLs. Must be set in production.
+  PUBLIC_API_URL: optionalEnv("PUBLIC_API_URL"),
 
   // WhatsApp / Twilio (OTP)
   TWILIO_ACCOUNT_SID: optionalEnv("TWILIO_ACCOUNT_SID"),
@@ -152,6 +155,9 @@ if (ENV.NODE_ENV === "production") {
 
   if (!ENV.GUEST_TOKEN_SECRET) {
     warn("[SECURITY] GUEST_TOKEN_SECRET not set - guest checkout will be REJECTED at runtime.");
+  }
+  if (!ENV.PUBLIC_API_URL) {
+    warn("[SECURITY] PUBLIC_API_URL not set - XPay payment webhooks cannot be delivered. Digital payments will never confirm.");
   }
   if (!FEATURES.COURIER_ENABLED) {
     warn("[SECURITY] POSTEX_API_TOKEN not set - courier booking is DISABLED.");

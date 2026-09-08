@@ -17,7 +17,9 @@ test.describe("Products — Listing Page", () => {
     await page.waitForTimeout(3000);
     const cards = page.locator("[data-testid='product-card'], .product-card, article, [class*='product']");
     const count = await cards.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+    // Non-vacuous: a live catalog page MUST render product cards. An empty
+    // or broken catalog API must fail this test, not pass silently.
+    expect(count).toBeGreaterThan(0);
   });
 });
 

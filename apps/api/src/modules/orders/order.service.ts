@@ -73,7 +73,8 @@ export class OrderService {
         };
       }
 
-      // If pending session exists but no order yet, this is a concurrent retry
+      // Pending session WITH an order: the RPC created the order but the
+      // commit/confirm response was lost — return the existing order safely.
       if (!isDuplicate && session.status === "pending" && session.order_id) {
         return {
           orderId: session.order_id,
@@ -81,6 +82,28 @@ export class OrderService {
           status: "already_processed",
           idempotentReplay: true,
         };
+      }
+
+      // Pending session with NO order: a concurrent retry OR a stale pending
+      // session from a lost response. Stale sessions (older than 2 minutes)
+      // are failed so the buyer can retry — a network-lost response must not
+      // lock the quote forever.
+      if (!isDuplicate && session.status === "pending" && !session.order_id) {
+        const sessionAgeMs =
+          Date.now() - new Date(session.updated_at || session.created_at).getTime();
+        if (sessionAgeMs > 2 * 60 * 1000) {
+          await CheckoutSessionService.failSession(
+            session.id,
+            "Stale pending session — released for retry",
+          );
+        } else {
+          return {
+            orderId: session.id,
+            orderNumber: session.id.slice(0, 8),
+            status: "already_processed",
+            idempotentReplay: true,
+          };
+        }
       }
     }
 

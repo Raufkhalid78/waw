@@ -54,6 +54,55 @@ export class OrderController {
     }
   }
 
+  /**
+   * GET /api/orders/lookup?orderNumber=WAW-XXXX&phone=+92...
+   * Public guest order lookup. A guest proves ownership with the exact phone
+   * the order was placed with — knowledge of the phone is the guest's
+   * capability token. Returns only non-sensitive fulfillment state.
+   */
+  static async lookupGuestOrder(req: Request, res: Response): Promise<void> {
+    try {
+      const orderNumber = String(req.query.orderNumber || "").trim();
+      const phone = String(req.query.phone || "").replace(/[\s-]/g, "");
+
+      if (!orderNumber || !phone) {
+        res.status(400).json({ error: "orderNumber and phone are required" });
+        return;
+      }
+
+      const { data: order, error } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_number, payment_status, global_status, total_amount_pkr, buyer_phone, created_at")
+        .eq("order_number", orderNumber)
+        .maybeSingle();
+
+      if (error || !order) {
+        res.status(404).json({ error: "Order not found" });
+        return;
+      }
+
+      const orderPhone = String(order.buyer_phone || "").replace(/[\s-]/g, "");
+      if (orderPhone !== phone) {
+        // Do not leak order existence to callers without the matching phone.
+        res.status(404).json({ error: "Order not found" });
+        return;
+      }
+
+      res.json({
+        order: {
+          id: order.id,
+          order_number: order.order_number,
+          payment_status: order.payment_status,
+          global_status: order.global_status,
+          total_amount_pkr: order.total_amount_pkr,
+          created_at: order.created_at,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
   static async listUserOrders(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;

@@ -5,11 +5,12 @@ import ProductDetailClient from './ProductDetailClient';
 import { ProductDetail } from '@/types/models';
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const product = await fetchProductById(params.id);
+  const { id } = await params;
+  const product = await fetchProductById(id);
   
   if (!product) {
     return {
@@ -39,7 +40,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProductDetailPage({ params }: Props) {
-  const product = await fetchProductById(params.id);
+  const { id } = await params;
+  const product = await fetchProductById(id);
   
   if (!product) {
     notFound();

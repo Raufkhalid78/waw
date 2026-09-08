@@ -22,9 +22,74 @@ export interface XPayIntentResponse {
   qrPayload?: string;
 }
 
+export interface PaymentVerificationResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Pure payment-verification gate: a provider payment event may only settle an
+ * order when the amount matches the authoritative order total (within a 0.5
+ * paisa float tolerance) and the currency is PKR. Exported for deterministic
+ * signed-fixture testing without a database.
+ */
+export function verifyProviderPaymentAgainstOrder(input: {
+  providerAmount: unknown;
+  providerCurrency: unknown;
+  orderAmountPkr: number;
+  orderPaymentStatus?: string;
+  expectedCurrency?: string;
+}): PaymentVerificationResult {
+  const expectedCurrency = input.expectedCurrency || "PKR";
+
+  // Already paid — idempotent no-op.
+  if (input.orderPaymentStatus === "PAID") {
+    return { ok: true, reason: "already_paid" };
+  }
+
+  // Amount must be a finite number matching the authoritative total.
+  const providerAmount = Number(input.providerAmount);
+  const orderAmount = Number(input.orderAmountPkr || 0);
+  if (!Number.isFinite(providerAmount)) {
+    return { ok: false, reason: "amount_missing_or_not_numeric" };
+  }
+  if (Math.abs(providerAmount - orderAmount) > 0.005) {
+    return {
+      ok: false,
+      reason: `amount_mismatch: expected ${orderAmount}, received ${providerAmount}`,
+    };
+  }
+
+  // Currency must match exactly.
+  const providerCurrency = String(input.providerCurrency || expectedCurrency).toUpperCase();
+  if (providerCurrency !== expectedCurrency.toUpperCase()) {
+    return {
+      ok: false,
+      reason: `currency_mismatch: expected ${expectedCurrency}, received ${providerCurrency}`,
+    };
+  }
+
+  return { ok: true };
+}
+
 export class PostExXPayService {
   private static baseUrl =
     ENV.POSTEX_XPAY_BASE_URL || "https://xpay.postexglobal.com/api";
+
+  /**
+   * The webhook endpoint PostEx XPay calls with signed payment events.
+   * This is the Express route in THIS API server — verified and versioned in
+   * the repository. Never point at external/edge endpoints that are not
+   * deployed from this codebase.
+   */
+  private static get webhookUrl(): string {
+    if (ENV.PUBLIC_API_URL) {
+      return `${ENV.PUBLIC_API_URL.replace(/\/+$/, "")}/api/payments/xpay/webhook`;
+    }
+    throw new Error(
+      "PUBLIC_API_URL is not configured. Set it to the public base URL of this API so XPay can deliver payment callbacks.",
+    );
+  }
 
   /**
    * Creates a real PostEx XPay checkout session via their REST API.
@@ -79,11 +144,13 @@ export class PostExXPayService {
         customerName: order.buyer_name,
         customerPhone: order.buyer_phone,
         customerEmail: order.notes || undefined,
-        callbackUrl: `${ENV.SUPABASE_URL}/functions/v1/xpay-webhook`,
+        callbackUrl: this.webhookUrl,
         returnUrls: {
-          success: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/order/${order.order_number}/success`,
-          failure: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/order/${order.order_number}/failed`,
-          cancel: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/order/${order.order_number}/cancelled`,
+          // /payment/result is the buyer-facing payment outcome page that
+          // maps order_number -> order and shows the current payment state.
+          success: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/payment/result?order=${order.order_number}`,
+          failure: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/payment/result?order=${order.order_number}&status=failed`,
+          cancel: `${process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk"}/payment/result?order=${order.order_number}&status=cancelled`,
         },
       },
       {
@@ -167,7 +234,7 @@ export class PostExXPayService {
         paymentMethod: methodMap[input.method] || "CARD",
         customerName: input.description,
         customerPhone: input.customerPhone || undefined,
-        callbackUrl: `${ENV.SUPABASE_URL}/functions/v1/xpay-webhook`,
+        callbackUrl: this.webhookUrl,
         returnUrls: {
           success: input.returnUrl,
           failure: input.returnUrl,
@@ -242,6 +309,7 @@ export class PostExXPayService {
       orderNumber?: string;
       transactionId?: string;
       amount?: number;
+      currency?: string;
       status?: string;
     };
   }) {
@@ -296,7 +364,39 @@ export class PostExXPayService {
 
     if (!order) throw new Error(`Order ${orderRef} not found in database`);
 
-    // 1. Transition Order to Confirmed and Paid
+    // ── SECURITY GATES: already-paid / amount / currency ─────────────────
+    // Any mismatch is quarantined — the order is NEVER marked paid.
+    const verification = verifyProviderPaymentAgainstOrder({
+      providerAmount: data.amount,
+      providerCurrency: data.currency,
+      orderAmountPkr: order.total_amount_pkr,
+      orderPaymentStatus: order.payment_status,
+    });
+
+    if (!verification.ok && verification.reason === "already_paid") {
+      return {
+        success: true,
+        orderNumber: order.order_number,
+        status: PaymentStatus.PAID,
+        message: "Order already paid — no state change",
+      };
+    }
+
+    if (!verification.ok) {
+      logger.error("XPay webhook payment verification failed — order NOT marked paid", {
+        orderNumber: order.order_number,
+        orderAmountPkr: order.total_amount_pkr,
+        providerAmountPkr: data.amount,
+        providerCurrency: data.currency,
+        transactionId: txId,
+        reason: verification.reason,
+      });
+      throw new Error(
+        `Payment verification failed for order ${order.order_number}: ${verification.reason}. Order quarantined — manual review required.`,
+      );
+    }
+
+    // All gates passed — transition Order to Confirmed and Paid
     await supabaseAdmin
       .from("orders")
       .update({
