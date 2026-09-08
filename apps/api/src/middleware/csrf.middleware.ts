@@ -50,11 +50,17 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   // These are public endpoints that don't require session authentication.
   // session/create is protected by Supabase authToken verification in the
   // controller (not cookie auth), so CSRF is not the relevant defense there.
+  // session/refresh and session/revoke rotate or destroy the caller's own
+  // tokens; cookie-based clients are already protected by SameSite=strict
+  // cookies, and token-based (mobile) clients have no ambient credentials
+  // for CSRF to abuse.
   const publicAuthPaths = [
     "/api/auth/login",
     "/api/auth/whatsapp-otp/send",
     "/api/auth/whatsapp-otp/verify",
     "/api/auth/session/create",
+    "/api/auth/session/refresh",
+    "/api/auth/session/revoke",
   ];
   if (publicAuthPaths.some((p) => req.path.startsWith(p))) {
     return next();

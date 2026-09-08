@@ -25,7 +25,7 @@ declare global {
  * 1. Authorization: Bearer <token> header (legacy/mobile)
  * 2. waw_session httpOnly cookie (new session-based auth)
  */
-function resolveAccessToken(req: Request): string | null {
+export function resolveAccessToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.split(" ")[1];

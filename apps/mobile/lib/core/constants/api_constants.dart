@@ -7,6 +7,7 @@ class ApiConstants {
   // Auth
   static const String sendOtp = '/api/auth/whatsapp-otp/send';
   static const String verifyOtp = '/api/auth/whatsapp-otp/verify';
+  static const String createSession = '/api/auth/session/create';
   static const String refreshToken = '/api/auth/session/refresh';
   static const String revokeSession = '/api/auth/session/revoke';
   static const String currentProfile = '/api/auth/session/me';

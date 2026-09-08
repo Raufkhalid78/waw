@@ -31,11 +31,30 @@ class AuthRepository {
     }
   }
 
+  Future<Map<String, dynamic>> createSession({
+    required String userId,
+    required String authToken,
+  }) async {
+    try {
+      final response = await _api.dio.post(
+        ApiConstants.createSession,
+        data: {'userId': userId, 'authToken': authToken},
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } on DioException catch (e) {
+      throw ApiError.fromDioError(e);
+    }
+  }
+
   Future<User?> getCurrentProfile() async {
     try {
       final response = await _api.dio.get(ApiConstants.currentProfile);
       if (response.data != null && response.data is Map) {
-        return User.fromJson(response.data);
+        final data = Map<String, dynamic>.from(response.data as Map);
+        final userData = data['user'] is Map
+            ? Map<String, dynamic>.from(data['user'] as Map)
+            : data;
+        return User.fromJson(userData);
       }
       return null;
     } on DioException catch (e) {

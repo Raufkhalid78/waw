@@ -98,9 +98,32 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final result = await _authRepo.verifyOtp(_pendingPhone!, otp);
 
-      final accessToken = result['accessToken'] ?? result['access_token'];
-      final refreshToken = result['refreshToken'] ?? result['refresh_token'];
-      final userId = result['userId'] ?? result['user_id'] ?? result['user']?['id'];
+      final identityToken =
+          (result['token'] ?? result['accessToken'] ?? result['access_token'])
+              as String?;
+      final userId =
+          (result['userId'] ?? result['user_id'] ?? result['user']?['id'])
+              as String?;
+
+      String? accessToken = identityToken;
+      String? refreshToken =
+          result['refreshToken'] ?? result['refresh_token'] as String?;
+
+      if (identityToken != null && userId != null) {
+        try {
+          final session = await _authRepo.createSession(
+            userId: userId,
+            authToken: identityToken,
+          );
+          accessToken =
+              (session['accessToken'] ?? session['access_token']) as String?;
+          refreshToken =
+              (session['refreshToken'] ?? session['refresh_token']) as String?;
+        } on ApiError {
+          accessToken = identityToken;
+          refreshToken = null;
+        }
+      }
 
       if (accessToken != null) {
         await _tokenStorage.saveTokens(

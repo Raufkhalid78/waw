@@ -5,6 +5,7 @@ import { setCsrfCookie, generateCsrfToken } from "../../middleware/csrf.middlewa
 import { supabaseAdmin } from "../../config/supabase.js";
 import { ENV } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
+import { resolveAccessToken } from "../../middleware/auth.middleware.js";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -163,6 +164,10 @@ export class SessionController {
       res.json({
         success: true,
         user: { id: userId, role: authoritativeRole, phone: authoritativePhone, email: authoritativeEmail },
+        // Body tokens for non-cookie clients (mobile) — cookie clients
+        // ignore these and keep using the httpOnly cookies set above.
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
       });
     } catch (err: any) {
@@ -177,7 +182,9 @@ export class SessionController {
    */
   static async refreshSession(req: Request, res: Response): Promise<void> {
     try {
-      const refreshToken = req.cookies?.waw_refresh;
+      // Cookie clients carry the refresh token in waw_refresh; token-based
+      // clients (mobile) send it in the JSON body.
+      const refreshToken = req.cookies?.waw_refresh || req.body?.refreshToken;
 
       if (!refreshToken) {
         res.status(401).json({ error: "No refresh token found" });
@@ -190,7 +197,7 @@ export class SessionController {
       const tokens = await SessionService.refreshSession(refreshToken, ip, userAgent);
 
       if (!tokens) {
-        clearSessionCookies(res);
+        if (!req.body?.refreshToken) clearSessionCookies(res);
         res.status(401).json({ error: "Session expired or invalid" });
         return;
       }
@@ -199,6 +206,9 @@ export class SessionController {
 
       res.json({
         success: true,
+        // Body tokens for non-cookie clients (mobile).
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
       });
     } catch (err: any) {
@@ -213,7 +223,7 @@ export class SessionController {
    */
   static async revokeSession(req: Request, res: Response): Promise<void> {
     try {
-      const accessToken = req.cookies?.waw_session;
+      const accessToken = resolveAccessToken(req);
 
       if (accessToken) {
         await SessionService.revokeSession(accessToken);
@@ -234,7 +244,7 @@ export class SessionController {
    */
   static async getCurrentUser(req: Request, res: Response): Promise<void> {
     try {
-      const accessToken = req.cookies?.waw_session;
+      const accessToken = resolveAccessToken(req);
 
       if (!accessToken) {
         res.status(401).json({ error: "Not authenticated" });

@@ -54,7 +54,7 @@ class ApiClient {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data;
+        final data = Map<String, dynamic>.from(response.data as Map);
         final newAccessToken = data['accessToken'] ?? data['access_token'];
         final newRefreshToken = data['refreshToken'] ?? data['refresh_token'];
 
