@@ -55,16 +55,16 @@ export default function SellOnWawPage() {
     fetchServiceableCities()
       .then((cities) => {
         setServiceableCities(cities);
-        if (cities.length > 0 && !formData.city) {
-          setFormData((prev) => ({ ...prev, city: cities[0].cityName }));
+        if (cities.length > 0) {
+          setFormData((prev) => (prev.city ? prev : { ...prev, city: cities[0].cityName }));
         }
       })
       .catch(() => {});
     fetchCities()
       .then((c) => {
         setCities(c);
-        if (c.length > 0 && !formData.city) {
-          setFormData((prev) => ({ ...prev, city: c[0].name }));
+        if (c.length > 0) {
+          setFormData((prev) => (prev.city ? prev : { ...prev, city: c[0].name }));
         }
       })
       .catch(() => {});
