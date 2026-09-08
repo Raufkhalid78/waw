@@ -223,9 +223,23 @@ body {
 .dark .bg-white { background-color: #1e293b; }
 .dark .bg-gray-50 { background-color: #1e293b; }
 .dark .bg-gray-100 { background-color: #334155; }
+.dark .bg-gray-200 { background-color: #334155; }
+.dark .bg-gray-300 { background-color: #475569; }
 .dark .bg-slate-50 { background-color: #1e293b; }
 .dark .bg-slate-100 { background-color: #334155; }
 .dark .bg-slate-100\/70 { background-color: rgba(15, 23, 42, 0.85); }
+.dark .bg-slate-200 { background-color: #334155; }
+.dark .bg-slate-300 { background-color: #475569; }
+
+/* Translucent white overlays → translucent dark equivalents (unreadable
+   bright patches on cards/modals otherwise) */
+.dark .bg-white\/90 { background-color: rgba(15, 23, 42, 0.9); }
+.dark .bg-white\/95 { background-color: rgba(15, 23, 42, 0.95); }
+.dark .bg-white\/40 { background-color: rgba(15, 23, 42, 0.4); }
+.dark .bg-white\/30 { background-color: rgba(15, 23, 42, 0.3); }
+.dark .bg-white\/20 { background-color: rgba(148, 163, 184, 0.15); }
+.dark .bg-white\/15 { background-color: rgba(148, 163, 184, 0.12); }
+.dark .bg-white\/10 { background-color: rgba(148, 163, 184, 0.1); }
 
 /* ── Text Colors (4.5:1+ contrast on dark bg) ───────────────────────────── */
 .dark .text-gray-900 { color: #f1f5f9; }
@@ -234,11 +248,13 @@ body {
 .dark .text-gray-600 { color: #94a3b8; }
 .dark .text-gray-500 { color: #94a3b8; }
 .dark .text-gray-400 { color: #64748b; }
+.dark .text-gray-300 { color: #cbd5e1; }
 .dark .text-slate-950 { color: #f8fafc; }
 .dark .text-slate-900 { color: #f1f5f9; }
 .dark .text-slate-800 { color: #e2e8f0; }
 .dark .text-slate-700 { color: #cbd5e1; }
 .dark .text-slate-600 { color: #94a3b8; }
+.dark .text-slate-500 { color: #a8b3c4; }
 
 /* ── Borders ─────────────────────────────────────────────────────────────── */
 .dark .border-gray-200 { border-color: #334155; }
@@ -249,8 +265,11 @@ body {
 /* ── Hover States ────────────────────────────────────────────────────────── */
 .dark .hover\:bg-gray-50:hover { background-color: #334155; }
 .dark .hover\:bg-gray-100:hover { background-color: #334155; }
+.dark .hover\:bg-gray-200:hover { background-color: #475569; }
 .dark .hover\:bg-slate-50:hover { background-color: #334155; }
 .dark .hover\:bg-slate-100:hover { background-color: #334155; }
+.dark .hover\:bg-slate-200:hover { background-color: #475569; }
+.dark .hover\:bg-white:hover { background-color: #334155; }
 
 /* ── Input / Select Fields ───────────────────────────────────────────────── */
 .dark input[type="text"],
@@ -319,6 +338,21 @@ body {
 .dark .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4); }
 .dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4); }
 .dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4); }
+
+/* ── Light gradient stops → dark equivalents (glare patches) ─────────────── */
+.dark .from-white { --tw-gradient-from: #1e293b; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(30, 41, 59, 0)); }
+.dark .via-white { --tw-gradient-stops: var(--tw-gradient-from), #1e293b, var(--tw-gradient-to, rgba(30, 41, 59, 0)); }
+.dark .to-white { --tw-gradient-to: #1e293b; }
+.dark .from-slate-200 { --tw-gradient-from: #334155; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(51, 65, 85, 0)); }
+.dark .via-slate-100 { --tw-gradient-stops: var(--tw-gradient-from), #334155, var(--tw-gradient-to, rgba(51, 65, 85, 0)); }
+.dark .to-slate-200 { --tw-gradient-to: #475569; }
+.dark .from-gray-50 { --tw-gradient-from: #1e293b; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(30, 41, 59, 0)); }
+.dark .from-gray-100 { --tw-gradient-from: #334155; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(51, 65, 85, 0)); }
+.dark .to-gray-50 { --tw-gradient-to: #1e293b; }
+
+/* ── Amber button text stays dark for contrast on amber fills ───────────── */
+.dark .bg-amber-400 { background-color: #fbbf24; }
+.dark .bg-amber-500 { background-color: #f59e0b; }
 
 /* ── Selection ───────────────────────────────────────────────────────────── */
 .dark ::selection { background-color: rgba(251, 191, 36, 0.3); color: #f8fafc; }
