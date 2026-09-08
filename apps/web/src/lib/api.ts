@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@waw/config";
+
 import { ProductDetail } from "@/types/models";
 export type { ProductDetail } from "@/types/models";
 import { StoreDetail } from "@/types/models";
@@ -11,9 +13,6 @@ import {
   SellerType,
 } from "@waw/types";
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
-).replace(/\/+$/, "");
 
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   logger.debug(`Client API Origin: ${API_BASE_URL}`, "API");

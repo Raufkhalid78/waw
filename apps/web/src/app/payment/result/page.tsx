@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Clock, Loader2, ArrowRight } from "lucide-react";
@@ -45,7 +47,7 @@ function PaymentResultContent() {
     }
 
     const API_BASE = (
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+      API_BASE_URL
     ).replace(/\/+$/, "");
 
     // Look up the order by order number (or id) to learn its true payment state.

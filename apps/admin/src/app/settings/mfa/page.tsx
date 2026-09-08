@@ -1,10 +1,12 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useState, useEffect, useRef } from "react";
 import { FadeIn } from "@/components/Motion";
 import { Shield, QrCode, CheckCircle2, XCircle, AlertTriangle, Copy, Loader2 } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_BASE = API_BASE_URL;
 
 async function mfaApi(path: string, options?: RequestInit) {
   const res = await fetch(`${API_BASE}/api/admin/mfa${path}`, {

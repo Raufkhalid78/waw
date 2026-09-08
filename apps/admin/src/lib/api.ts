@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { API_BASE_URL } from "@waw/config";
+
+const API_BASE = API_BASE_URL;
 
 function getCsrfToken(): string {
   if (typeof document === "undefined") return "";

@@ -1,7 +1,9 @@
+import { API_BASE_URL } from "@waw/config";
+
 import { MetadataRoute } from "next";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://waw.com.pk").replace(/\/+$/, "");
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
+const API_BASE = (API_BASE_URL).replace(/\/+$/, "");
 
 async function fetchProducts(): Promise<MetadataRoute.Sitemap> {
   try {

@@ -1,9 +1,8 @@
+import { API_BASE_URL } from "@waw/config";
+
 import { Metadata } from "next";
 import { productMetadata } from "@/lib/seo";
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
-).replace(/\/+$/, "");
 
 export async function generateMetadata({
   params,

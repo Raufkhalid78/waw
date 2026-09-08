@@ -7,8 +7,9 @@ COPY package*.json turbo.json ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 
-RUN npm ci --workspace=@waw/types --workspace=@waw/ui --workspace=@waw/web
+RUN npm ci --workspace=@waw/types --workspace=@waw/config --workspace=@waw/ui --workspace=@waw/web
 RUN npm run build --workspace=@waw/types
+RUN npm run build --workspace=@waw/config
 RUN npm run build --workspace=@waw/web
 
 # ─── Stage 2: Production Runner ───────────────────────────────────────────────

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -203,7 +205,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
     }
     const timer = setTimeout(async () => {
       try {
-        const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
+        const API_BASE = (API_BASE_URL).replace(/\/+$/, "");
         const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=5`);
         if (res.ok) {
           const data = await res.json();

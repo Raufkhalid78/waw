@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { logger } from "@/lib/logger";
@@ -33,7 +35,7 @@ export default function OrderTrackingPage() {
   const handleDownloadInvoice = useCallback(async () => {
     setDownloadingInvoice(true);
     try {
-      const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
+      const API_BASE = (API_BASE_URL).replace(/\/+$/, "");
       const res = await fetch(`${API_BASE}/api/orders/${orderId}/invoice`, {
         credentials: "include",
       });

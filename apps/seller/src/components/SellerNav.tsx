@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -39,7 +41,7 @@ export function SellerNav() {
     // server instead, which also returns store profile data.
     async function loadSession() {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/auth/session/me`, {
+        const res = await fetch(`${API_BASE_URL}/api/auth/session/me`, {
           credentials: "include",
         });
         if (res.ok) {
@@ -62,7 +64,7 @@ export function SellerNav() {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/auth/session/revoke`, {
+      await fetch(`${API_BASE_URL}/api/auth/session/revoke`, {
         method: "POST",
         credentials: "include",
       });

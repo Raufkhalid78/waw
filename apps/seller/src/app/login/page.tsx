@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -14,7 +16,7 @@ import {
 } from "lucide-react";
 
 const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+  API_BASE_URL
 ).replace(/\/+$/, "");
 
 export default function SellerLoginPage() {

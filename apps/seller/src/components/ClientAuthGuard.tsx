@@ -1,4 +1,6 @@
 "use client";
+
+import { API_BASE_URL } from "@waw/config";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -26,7 +28,7 @@ export function ClientAuthGuard({
     async function checkSession() {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/auth/session/me`,
+          `${API_BASE_URL}/api/auth/session/me`,
           { credentials: "include" },
         );
         if (cancelled) return;

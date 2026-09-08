@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useState, useEffect } from "react";
 import { Sparkles, Activity, AlertCircle, RefreshCw } from "lucide-react";
 
@@ -20,7 +22,7 @@ export default function AdminAIPage() {
     setLoading(true);
     setError("");
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const API_BASE = API_BASE_URL;
       const res = await fetch(`${API_BASE}/api/ai/usage`, {
         credentials: "include",
       });

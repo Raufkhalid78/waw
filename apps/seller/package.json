@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "@waw/config": "*",
     "@waw/types": "file:../../packages/types",
     "clsx": "^2.1.1",
     "lucide-react": "^0.439.0",

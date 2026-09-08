@@ -1,8 +1,10 @@
+import { API_BASE_URL } from "@waw/config";
+
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+  API_BASE_URL
 ).replace(/\/+$/, "");
 
 /**

@@ -24,6 +24,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
       - run: npm ci
+      - name: Env guard - no silent localhost fallbacks in production source
+        run: |
+          HITS=$(grep -rn --include='*.ts' --include='*.tsx' -E 'process\.env\.NEXT_PUBLIC_API_URL\s*\|\|\s*"http://localhost:4000"' apps/web/src apps/admin/src apps/seller/src | wc -l)
+          if [ "$HITS" -gt 0 ]; then
+            echo "::error::$HITS file(s) use a silent localhost:4000 fallback. Import API_BASE_URL from @waw/config instead."
+            grep -rn --include='*.ts' --include='*.tsx' -E 'process\.env\.NEXT_PUBLIC_API_URL\s*\|\|\s*"http://localhost:4000"' apps/web/src apps/admin/src apps/seller/src
+            exit 1
+          fi
+          echo "Env guard passed: no silent localhost fallbacks"
       - run: npm run lint
 
   typecheck:
@@ -51,6 +60,10 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
+    env:
+      # The centralized API_BASE_URL config fails production builds without
+      # this — CI builds with a staging URL so bundles resolve correctly.
+      NEXT_PUBLIC_API_URL: https://api-staging.waw.com.pk
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -174,14 +187,42 @@ jobs:
     needs: [test, e2e, docker]
     if: github.ref == 'refs/heads/main'
     environment: staging
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_STAGING }}
+    # Required Railway setup (one-time):
+    #   1. Four services named exactly: api, web, admin, seller
+    #   2. On each service set the variable RAILWAY_CONFIG_NAME to its
+    #      matching config: api -> railway.toml, web -> railway.web.toml,
+    #      admin -> railway.admin.toml, seller -> railway.seller.toml
+    #   3. Secret RAILWAY_TOKEN_STAGING (environment: staging) + var STAGING_API_URL
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to staging server
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+      - name: Guard - verify deploy token is present
+        if: env.RAILWAY_TOKEN == ''
         run: |
-          echo "Staging deployment would go here"
-          echo "Steps:"
-          echo "1. Pull latest code"
-          echo "2. Run migrations against staging DB"
-          echo "3. Build and deploy apps"
-          echo "4. Verify health checks"
-          echo "5. Run smoke tests"
+          echo "::error::RAILWAY_TOKEN_STAGING secret is not set. Add it under Settings > Environments > staging to enable deploys."
+          exit 1
+      - name: Deploy API
+        run: railway up --service api --ci
+      - name: Deploy Web
+        run: railway up --service web --ci
+      - name: Deploy Admin
+        run: railway up --service admin --ci
+      - name: Deploy Seller
+        run: railway up --service seller --ci
+      - name: Verify API health
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 10 "$STAGING_API_URL/health" > /dev/null; then
+              echo "API healthy after deploy"
+              exit 0
+            fi
+            echo "Waiting for API health... ($i/12)"
+            sleep 10
+          done
+          echo "::error::API health check failed after deploy"
+          exit 1
+        env:
+          STAGING_API_URL: ${{ vars.STAGING_API_URL }}

@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@waw/config";
+
 import { create } from "zustand";
 import { logger } from "@/lib/logger";
 import { fetchWithCsrf } from "@/lib/csrf";
@@ -10,9 +12,6 @@ import {
   SellerType,
 } from "@waw/types";
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
-).replace(/\/+$/, "");
 
 export interface CartItem {
   productId: string;

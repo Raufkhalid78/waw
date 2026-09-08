@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useEffect, useState } from "react";
 import { Check, X, Zap, Building2, Crown } from "lucide-react";
 
@@ -49,7 +51,7 @@ const planColors: Record<string, string> = {
 };
 
 const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
+  API_BASE_URL
 ).replace(/\/+$/, "");
 
 export default function SubscriptionPage() {

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useState, useEffect } from "react";
 import {
   ShoppingBag,
@@ -234,7 +236,7 @@ export default function SellerOrdersPage() {
 
                 <button
                   onClick={() => {
-                    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+                    const API = API_BASE_URL;
                     window.open(`${API}/api/orders/${selectedOrder.id}/invoice`, "_blank");
                   }}
                   className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center gap-2 border border-slate-700 transition-colors"

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { API_BASE_URL } from "@waw/config";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
@@ -31,7 +33,6 @@ export default function CartPage() {
     setCouponLoading(true);
     setCouponError("");
     try {
-      const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
       const res = await fetchWithCsrf(`${API_BASE_URL}/api/checkout/apply-coupon`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
