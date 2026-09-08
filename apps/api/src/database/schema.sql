@@ -644,17 +644,26 @@ CREATE TABLE IF NOT EXISTS campaigns (
   tag TEXT,
   title TEXT NOT NULL,
   title_urdu TEXT,
+  subtitle TEXT,
+  image_url TEXT,
   banner_url TEXT,
   link_url TEXT,
   link_text TEXT,
   campaign_type TEXT NOT NULL DEFAULT 'PROMO_STRIP', -- e.g., TOP_BANNER, PROMO_STRIP, SHORTCUT_LINK
+  position TEXT DEFAULT 'homepage',
   start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   end_date TIMESTAMP WITH TIME ZONE,
+  starts_at TIMESTAMPTZ,
+  ends_at TIMESTAMPTZ,
   is_active BOOLEAN NOT NULL DEFAULT true,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_campaigns_active_hero
+  ON campaigns (position, starts_at, ends_at)
+  WHERE is_active = true;
 
 -- Initial seed for configuration
 INSERT INTO serviceability_locations (city_name, is_active) VALUES

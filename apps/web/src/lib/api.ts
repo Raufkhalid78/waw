@@ -698,6 +698,28 @@ export async function fetchActiveFlashSale(): Promise<any> {
   }
 }
 
+export interface HeroBannerSlide {
+  id: string;
+  badge: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  href: string;
+}
+
+export async function fetchHeroBanners(): Promise<HeroBannerSlide[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/config/hero-banners`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.banners) ? data.banners : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchProductQuestions(productId: string): Promise<any[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/questions/${productId}`, { cache: "no-store" });

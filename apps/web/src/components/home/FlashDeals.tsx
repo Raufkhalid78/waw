@@ -22,6 +22,7 @@ export function FlashDeals() {
   const { addItem, toggleWishlist, isInWishlist } = useCartStore();
   const [addedId, setAddedId] = useState<string | null>(null);
   const [targetTime, setTargetTime] = useState<number | null>(null);
+  const [hasActiveSale, setHasActiveSale] = useState(false);
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
     minutes: 0,
@@ -31,15 +32,13 @@ export function FlashDeals() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Fetch dynamic end time
+    // Fetch the CMS-configured sale end time. With no active sale there is
+    // NO countdown — a ticking clock to midnight would advertise urgency
+    // that does not exist.
     fetchActiveFlashSale().then((sale) => {
       if (sale && sale.end_time) {
         setTargetTime(new Date(sale.end_time).getTime());
-      } else {
-        // Fallback: end of current day
-        const endOfDay = new Date();
-        endOfDay.setHours(23, 59, 59, 999);
-        setTargetTime(endOfDay.getTime());
+        setHasActiveSale(true);
       }
     });
 
@@ -113,26 +112,28 @@ export function FlashDeals() {
             </div>
           </div>
 
-          {/* Countdown Clock */}
-          <div className="flex items-center gap-2 bg-slate-950/75 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 self-start sm:self-auto shadow-xs">
-            <Timer className="w-4 h-4 text-amber-400" />
-            <span className="text-[10px] uppercase font-black text-slate-300">
-              ENDS IN:
-            </span>
-            <div className="flex items-center gap-1 font-mono font-black text-xs sm:text-sm text-amber-300">
-              <span className="bg-white/15 px-2 py-0.5 rounded-md">
-                {String(timeLeft.hours).padStart(2, "0")}
+          {/* Countdown Clock — only rendered for a real, active sale */}
+          {hasActiveSale && targetTime ? (
+            <div className="flex items-center gap-2 bg-slate-950/75 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/20 self-start sm:self-auto shadow-xs">
+              <Timer className="w-4 h-4 text-amber-400" />
+              <span className="text-[10px] uppercase font-black text-slate-300">
+                ENDS IN:
               </span>
-              <span>:</span>
-              <span className="bg-white/15 px-2 py-0.5 rounded-md">
-                {String(timeLeft.minutes).padStart(2, "0")}
-              </span>
-              <span>:</span>
-              <span className="bg-white/15 px-2 py-0.5 rounded-md">
-                {String(timeLeft.seconds).padStart(2, "0")}
-              </span>
+              <div className="flex items-center gap-1 font-mono font-black text-xs sm:text-sm text-amber-300">
+                <span className="bg-white/15 px-2 py-0.5 rounded-md">
+                  {String(timeLeft.hours).padStart(2, "0")}
+                </span>
+                <span>:</span>
+                <span className="bg-white/15 px-2 py-0.5 rounded-md">
+                  {String(timeLeft.minutes).padStart(2, "0")}
+                </span>
+                <span>:</span>
+                <span className="bg-white/15 px-2 py-0.5 rounded-md">
+                  {String(timeLeft.seconds).padStart(2, "0")}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         {/* 4 Lightning Product Cards */}

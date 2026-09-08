@@ -5,46 +5,32 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   Zap,
-  Truck,
   ShieldCheck,
   ShoppingBag,
-  Clock,
   CheckCircle2,
   Tag
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
-import { fetchProducts } from "@/lib/api";
+import { fetchProducts, fetchHeroBanners, HeroBannerSlide } from "@/lib/api";
 import { ProductDetail } from "@/types/models";
 
-const FALLBACK_HERO_SLIDES = [
+const FALLBACK_HERO_SLIDES: HeroBannerSlide[] = [
   {
     id: "slide_1",
     badge: "FESTIVE COLLECTION",
-    highlightText: "DIRECT TEXTILE MILL PRICES",
     title: "Designer Lawn & Luxury Festive Suits",
     description: "Authentic embroidered lawn from top fashion houses in Karachi & Lahore with free nationwide delivery.",
-    primaryCta: "Shop Collection",
-    primaryHref: "/category/fashion-lawn",
-    bgClass: "bg-slate-900",
-    textColor: "text-white",
-    badgeBg: "bg-white/10 text-white backdrop-blur-md border border-white/20",
-    productImage: "https://images.unsplash.com/photo-1620799140188-3b2a02fd9a77?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1620799140188-3b2a02fd9a77?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    href: "/category/fashion-lawn",
   },
   {
     id: "slide_2",
     badge: "PREMIUM TECH",
-    highlightText: "OFFICIAL WARRANTY",
     title: "Next-Gen Audio & Smart Devices",
     description: "Upgrade your lifestyle with our curated collection of verified electronics and premium accessories.",
-    primaryCta: "Explore Tech",
-    primaryHref: "/category/electronics",
-    bgClass: "bg-slate-50",
-    textColor: "text-slate-900",
-    badgeBg: "bg-slate-900/10 text-slate-900 backdrop-blur-md border border-slate-900/10",
-    productImage: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    href: "/category/electronics",
   }
 ];
 
@@ -54,13 +40,13 @@ export function HeroBanner() {
   const [dealAdded, setDealAdded] = useState(false);
   const addItem = useCartStore((state) => state.addItem);
 
-  const [timeLeft, setTimeLeft] = useState({
-    hours: 12,
-    minutes: 45,
-    seconds: 0,
-  });
+  const [slides, setSlides] = useState<HeroBannerSlide[]>(FALLBACK_HERO_SLIDES);
 
-  const [slides, setSlides] = useState(FALLBACK_HERO_SLIDES);
+  useEffect(() => {
+    fetchHeroBanners().then((cmsSlides) => {
+      if (cmsSlides.length > 0) setSlides(cmsSlides);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchProducts({ limit: 10 })
@@ -78,20 +64,7 @@ export function HeroBanner() {
     return () => clearInterval(timer);
   }, [slides.length]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-        if (prev.minutes > 0) return { ...prev, minutes: 59, seconds: 59 };
-        if (prev.hours > 0)
-          return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        return { hours: 12, minutes: 0, seconds: 0 };
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const slide = slides[currentSlide];
+  const slide = slides[currentSlide] ?? FALLBACK_HERO_SLIDES[0];
 
   const handleQuickAdd = () => {
     if (!dealProduct) return;
@@ -113,7 +86,7 @@ export function HeroBanner() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch min-h-[460px]">
         
         {/* 1. Main Hero Carousel (8 Cols) */}
-        <div className={`xl:col-span-8 rounded-[2rem] overflow-hidden relative group ${slide.bgClass} ${slide.textColor} transition-colors duration-700 ease-in-out`}>
+          <div className={`xl:col-span-8 rounded-[2rem] overflow-hidden relative group bg-slate-900 text-white transition-colors duration-700 ease-in-out`}>
           
           {/* Background Ambient Glow */}
           <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/40 via-transparent to-transparent pointer-events-none" />
@@ -124,34 +97,29 @@ export function HeroBanner() {
             <div className="w-full md:w-1/2 flex flex-col justify-center space-y-6 h-full relative z-20">
               
               <div className="flex flex-wrap items-center gap-3">
-                <span className={`inline-flex items-center gap-1.5 ${slide.badgeBg} text-xs font-semibold px-3.5 py-1.5 rounded-full tracking-wide`}>
+                <span className="inline-flex items-center gap-1.5 bg-white/10 text-white backdrop-blur-md border border-white/20 text-xs font-semibold px-3.5 py-1.5 rounded-full tracking-wide">
                   <Tag className="w-3.5 h-3.5" />
                   {slide.badge}
                 </span>
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-[11px] sm:text-xs font-bold tracking-[0.2em] uppercase opacity-80">
-                  {slide.highlightText}
-                </h4>
                 <h1 className="text-4xl sm:text-5xl font-medium tracking-tight leading-[1.1]">
                   {slide.title}
                 </h1>
-                <p className="text-sm sm:text-base opacity-80 leading-relaxed max-w-sm font-light">
-                  {slide.description}
-                </p>
+                {slide.description ? (
+                  <p className="text-sm sm:text-base opacity-80 leading-relaxed max-w-sm font-light">
+                    {slide.description}
+                  </p>
+                ) : null}
               </div>
 
               <div className="pt-4 flex items-center gap-4">
                 <Link
-                  href={slide.primaryHref}
-                  className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98] ${
-                    slide.bgClass === 'bg-slate-900' 
-                      ? 'bg-white text-slate-900 hover:bg-slate-100' 
-                      : 'bg-slate-900 text-white hover:bg-slate-800'
-                  }`}
+                  href={slide.href}
+                  className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98] bg-white text-slate-900 hover:bg-slate-100"
                 >
-                  {slide.primaryCta}
+                  Shop Now
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -161,7 +129,7 @@ export function HeroBanner() {
             <div className="w-full md:w-1/2 h-48 md:h-full relative mt-8 md:mt-0 flex items-center justify-end z-10">
                <div className="relative w-full h-[120%] -right-12 md:-right-24 top-0 md:top-8 overflow-hidden rounded-[2rem] md:rounded-[3rem] shadow-2xl rotate-[-2deg] group-hover:rotate-[-1deg] group-hover:scale-105 transition-all duration-700 ease-out">
                   <Image
-                    src={slide.productImage}
+                    src={slide.imageUrl}
                     alt={slide.title}
                     fill
                     className="object-cover"
@@ -181,8 +149,8 @@ export function HeroBanner() {
                   onClick={() => setCurrentSlide(idx)}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
                     currentSlide === idx
-                      ? slide.bgClass === 'bg-slate-900' ? "w-8 bg-white" : "w-8 bg-slate-900"
-                      : slide.bgClass === 'bg-slate-900' ? "w-2 bg-white/30 hover:bg-white/50" : "w-2 bg-slate-900/30 hover:bg-slate-900/50"
+                      ? "w-8 bg-white"
+                      : "w-2 bg-white/30 hover:bg-white/50"
                   }`}
                   aria-label={`Go to slide ${idx + 1}`}
                 />
@@ -201,11 +169,6 @@ export function HeroBanner() {
                 <Zap className="w-3.5 h-3.5 fill-rose-600" />
                 Lightning Deal
               </span>
-
-              <div className="flex items-center gap-1 font-medium text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                <Clock className="w-3.5 h-3.5" />
-                {String(timeLeft.hours).padStart(2, "0")}:{String(timeLeft.minutes).padStart(2, "0")}:{String(timeLeft.seconds).padStart(2, "0")}
-              </div>
             </div>
 
             <div className="flex items-center gap-4 my-2">

@@ -2,6 +2,41 @@ import { Request, Response } from "express";
 import { supabaseAdmin } from "../../config/supabase.js";
 
 export class ConfigController {
+  /**
+   * GET /api/config/hero-banners
+   * Public: active homepage hero banners, newest window first. Falls back
+   * gracefully to an empty list — the storefront renders its static slides
+   * when the CMS has no banners yet.
+   */
+  static async getHeroBanners(_req: Request, res: Response): Promise<void> {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("campaigns")
+        .select("id, title, subtitle, image_url, link_url, tag, position, sort_order")
+        .eq("is_active", true)
+        .eq("position", "homepage")
+        .lte("starts_at", new Date().toISOString())
+        .or(`ends_at.is.null,ends_at.gte.${new Date().toISOString()}`)
+        .order("sort_order", { ascending: true })
+        .limit(6);
+
+      if (error) throw error;
+
+      res.json({
+        banners: (data || []).map((b: any) => ({
+          id: b.id,
+          badge: b.tag,
+          title: b.title,
+          description: b.subtitle,
+          imageUrl: b.image_url,
+          href: b.link_url || "/",
+        })),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
   static async getStorefrontConfig(req: Request, res: Response): Promise<void> {
     try {
       const [citiesRes, searchesRes, campaignsRes] = await Promise.all([

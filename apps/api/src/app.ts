@@ -364,7 +364,8 @@ app.get("/api/content", async (req, res) => {
   }
 });
 
-app.get("/api/config/storefront", ConfigController.getStorefrontConfig);
+  app.get("/api/config/storefront", ConfigController.getStorefrontConfig);
+  app.get("/api/config/hero-banners", ConfigController.getHeroBanners);
 
 // -- Category Taxonomy Routes (Hierarchical Database Tree) ---------------
 app.get("/api/categories", CategoryController.listTree);
