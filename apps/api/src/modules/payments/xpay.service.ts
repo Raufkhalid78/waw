@@ -572,6 +572,18 @@ export class PostExXPayService {
       logger.warn("WhatsApp alert dispatch notice:", notifErr);
     }
 
+    // 5. Push notification (FCM) — best-effort, never blocks settlement
+    try {
+      const { PushService } = await import("../notifications/push.service.js");
+      await PushService.sendToUser(order.buyer_id, {
+        title: "Order Confirmed ✓",
+        body: `Order ${order.order_number} is confirmed — PKR ${(order.total_amount_pkr || 0).toLocaleString()} paid.`,
+        data: { orderId: order.id, orderNumber: order.order_number, type: "ORDER_CONFIRMED" },
+      });
+    } catch (pushErr: any) {
+      logger.warn("Push notification dispatch notice:", pushErr?.message);
+    }
+
     return {
       success: true,
       orderNumber: order.order_number,

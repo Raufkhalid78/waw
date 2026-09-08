@@ -11,6 +11,7 @@ import { AuditService } from "../modules/audit/audit.service.js";
 import { PayoutSettlementService } from "../modules/payments/payout-settlement.service.js";
 import { OutboxService } from "../modules/outbox/outbox.service.js";
 import { ADVISORY_LOCKS } from "../config/advisory-locks.js";
+import { CourierService, MAX_BOOKING_ATTEMPTS } from "../modules/logistics/courier.service.js";
 
 export interface ReconciliationReport {
   payoutsSettled: number;
@@ -18,6 +19,8 @@ export interface ReconciliationReport {
   payoutsSkipped: number;
   shipmentsSynced: number;
   codRemitted: number;
+  courierBookingsRetried: number;
+  courierBookingsRecovered: number;
   timestamp: string;
 }
 
@@ -92,6 +95,8 @@ export async function executeReconciliationJob(): Promise<ReconciliationReport> 
       payoutsSkipped: 0,
       shipmentsSynced: 0,
       codRemitted: 0,
+      courierBookingsRetried: 0,
+      courierBookingsRecovered: 0,
       timestamp: new Date().toISOString(),
     };
   }
@@ -100,6 +105,7 @@ export async function executeReconciliationJob(): Promise<ReconciliationReport> 
     const payoutResult = await runPayoutReconciliation();
     const shipmentResult = await runShipmentReconciliation();
     const codResult = await runCODRemittanceReconciliation();
+    const bookingRetryResult = await runCourierBookingRetry();
 
     return {
       payoutsSettled: payoutResult.settled,
@@ -107,11 +113,50 @@ export async function executeReconciliationJob(): Promise<ReconciliationReport> 
       payoutsSkipped: payoutResult.skipped,
       shipmentsSynced: shipmentResult.synced,
       codRemitted: codResult.remitted,
+      courierBookingsRetried: bookingRetryResult.retried,
+      courierBookingsRecovered: bookingRetryResult.booked,
       timestamp: new Date().toISOString(),
     };
   } finally {
     await releaseReconciliationLock();
   }
+}
+
+/**
+ * 2b. Courier Booking Retry Sweep
+ * Re-attempts PostEx booking for shipments left in BOOKING_PENDING (booking
+ * failed at payment time — no tracking number was ever issued). Recovered
+ * bookings flip to PROCESSING with the real consignment number; failures
+ * increment booking_attempts until they dead-letter at MAX_BOOKING_ATTEMPTS.
+ */
+async function runCourierBookingRetry(): Promise<{ booked: number; retried: number }> {
+  let booked = 0;
+  let retried = 0;
+
+  try {
+    const { data: pending, error } = await supabaseAdmin
+      .from("shipments")
+      .select("id, order_id, is_cod, cod_amount_pkr, booking_attempts")
+      .eq("status", "BOOKING_PENDING")
+      .lt("booking_attempts", MAX_BOOKING_ATTEMPTS);
+
+    if (error) throw error;
+    if (!pending || pending.length === 0) return { booked: 0, retried: 0 };
+
+    logger.warn(
+      `🚚 Retrying ${pending.length} pending courier booking(s)...`,
+    );
+
+    for (const shipment of pending) {
+      const recovered = await CourierService.retryBooking(shipment);
+      retried++;
+      if (recovered) booked++;
+    }
+  } catch (err: any) {
+    logger.error("Error during courier booking retry sweep:", err.message);
+  }
+
+  return { booked, retried };
 }
 
 /**

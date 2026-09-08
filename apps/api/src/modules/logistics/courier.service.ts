@@ -77,6 +77,8 @@ export function decideCourierStatusEvent(
   return { action: "apply" };
 }
 
+export const MAX_BOOKING_ATTEMPTS = 5;
+
 export class CourierService {
   private static readonly POSTEX_API_BASE =
     ENV.POSTEX_API_BASE || "https://api.postex.pk/services/integration/api";
@@ -109,53 +111,83 @@ export class CourierService {
   }
 
   /**
+   * Single PostEx create-order attempt. Returns the consignment number on
+   * success, null on ANY failure — a fabricated tracking number must never
+   * reach a buyer.
+   */
+  private static async callPostExCreateOrder(input: PostExShipmentInput): Promise<{
+    trackingNumber: string;
+    trackingUrl: string;
+  } | null> {
+    if (!FEATURES.COURIER_ENABLED) return null;
+    try {
+      const response = await axios.post(
+        `${this.POSTEX_API_BASE}/order/v1/create-order`,
+        {
+          cityName: input.destinationCity,
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          deliveryAddress: input.deliveryAddress,
+          invoicePayment: input.isCod ? input.codAmountPkr : 0,
+          orderDetail: `Waw Order ${input.orderNumber}`,
+          orderRefNumber: input.orderNumber,
+          orderType: input.isCod ? "CashOnDelivery" : "Prepaid",
+          items: input.itemsCount || 1,
+        },
+        {
+          headers: {
+            token: ENV.POSTEX_API_TOKEN,
+            "Content-Type": "application/json",
+          },
+          timeout: 8000,
+        },
+      );
+
+      const cn = response.data?.trackingNumber || response.data?.distCode;
+      if (!cn) {
+        logger.warn("PostEx create-order returned no consignment number", {
+          orderNumber: input.orderNumber,
+          responseKeys: response.data ? Object.keys(response.data) : [],
+        });
+        return null;
+      }
+      return { trackingNumber: cn, trackingUrl: `https://postex.pk/tracking?cn=${cn}` };
+    } catch (err: any) {
+      logger.error("PostEx create-order failed", {
+        orderNumber: input.orderNumber,
+        error: err.response?.data || err.message,
+      });
+      return null;
+    }
+  }
+
+  /**
    * Automatically books courier dispatch for an order (both COD & Prepaid Waw Express).
+   * On provider failure the shipment is persisted as BOOKING_PENDING with NO
+   * tracking number — the reconciliation retry sweep re-attempts booking and
+   * the buyer is never shown a consignment number the courier did not issue.
    */
   static async bookCourierShipment(input: PostExShipmentInput) {
     const selectedProvider = await this.selectCourier(input.destinationCity);
-    let trackingNumber = `PTX-${input.orderNumber.replace(/[^0-9]/g, "").slice(-6) || Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
-    let trackingUrl = `https://postex.pk/tracking?cn=${trackingNumber}`;
     logger.info(
       `🚚 Smart Logistics Route: Selected ${selectedProvider} for delivery to ${input.destinationCity}`,
     );
 
-    // 1. Call PostEx Production / Sandbox API if token is configured
-    if (FEATURES.COURIER_ENABLED) {
-      try {
-        const response = await axios.post(
-          `${this.POSTEX_API_BASE}/order/v1/create-order`,
-          {
-            cityName: input.destinationCity,
-            customerName: input.customerName,
-            customerPhone: input.customerPhone,
-            deliveryAddress: input.deliveryAddress,
-            invoicePayment: input.isCod ? input.codAmountPkr : 0,
-            orderDetail: `Waw Order ${input.orderNumber}`,
-            orderRefNumber: input.orderNumber,
-            orderType: input.isCod ? "CashOnDelivery" : "Prepaid",
-            items: input.itemsCount || 1,
-          },
-          {
-            headers: {
-              token: ENV.POSTEX_API_TOKEN,
-              "Content-Type": "application/json",
-            },
-            timeout: 8000,
-          },
-        );
+    const booking = await this.callPostExCreateOrder(input);
 
-        if (response.data && response.data.distCode) {
-          trackingNumber =
-            response.data.trackingNumber || response.data.distCode;
-          trackingUrl = `https://postex.pk/tracking?cn=${trackingNumber}`;
-        }
-      } catch (err: any) {
-        logger.warn(
-          "⚠️ PostEx API call fallback to standard CN generator:",
-          err.response?.data || err.message,
-        );
-      }
+    let trackingNumber: string | null = null;
+    let trackingUrl: string | null = null;
+    if (booking) {
+      trackingNumber = booking.trackingNumber;
+      trackingUrl = booking.trackingUrl;
+    } else if (ENV.NODE_ENV !== "production") {
+      // Dev-only placeholder so local flows render a shippable state. The
+      // "DEV-" prefix makes it obvious this number does not exist upstream.
+      trackingNumber = `DEV-${input.orderNumber.replace(/[^0-9]/g, "").slice(-6) || Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+      trackingUrl = `https://postex.pk/tracking?cn=${trackingNumber}`;
     }
+
+    const status = trackingNumber ? OrderStatus.PROCESSING : "BOOKING_PENDING";
 
     const { data: shipment } = await supabaseAdmin
       .from("shipments")
@@ -164,7 +196,7 @@ export class CourierService {
         order_id: input.orderId,
         courier: CourierProvider.POSTEX,
         tracking_number: trackingNumber,
-        status: OrderStatus.PROCESSING,
+        status,
         is_cod: input.isCod,
         cod_amount_pkr: input.isCod ? input.codAmountPkr : 0,
         courier_cost_pkr: 180, // PostEx contracted base rate in PKR
@@ -177,18 +209,96 @@ export class CourierService {
       .select()
       .maybeSingle();
 
-    logger.info(
-      `📦 PostEx shipment successfully registered: CN #${trackingNumber} for Order ${input.orderNumber}`,
-    );
+    if (trackingNumber) {
+      logger.info(
+        `📦 PostEx shipment successfully registered: CN #${trackingNumber} for Order ${input.orderNumber}`,
+      );
+    } else {
+      logger.error(
+        `⛔ Courier booking FAILED for Order ${input.orderNumber} — shipment held in BOOKING_PENDING for retry sweep (no tracking number issued)`,
+      );
+    }
+
     return (
       shipment || {
         orderId: input.orderId,
         courier: CourierProvider.POSTEX,
         trackingNumber,
-        status: OrderStatus.PROCESSING,
+        status,
         trackingUrl,
       }
     );
+  }
+
+  /**
+   * Re-attempts a BOOKING_PENDING shipment against PostEx. Called by the
+   * reconciliation sweep; increments booking_attempts so permanently failing
+   * bookings dead-letter after MAX_BOOKING_ATTEMPTS instead of retrying
+   * forever.
+   */
+  static async retryBooking(shipment: {
+    id: string;
+    order_id: string;
+    is_cod: boolean | null;
+    cod_amount_pkr: number | null;
+    booking_attempts: number | null;
+  }): Promise<boolean> {
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("order_number, buyer_name, buyer_phone, shipping_address, shipping_city")
+      .eq("id", shipment.order_id)
+      .single();
+
+    if (!order) {
+      logger.error(`Booking retry: order ${shipment.order_id} not found`, {
+        shipmentId: shipment.id,
+      });
+      return false;
+    }
+
+    const booking = await this.callPostExCreateOrder({
+      orderId: shipment.order_id,
+      orderNumber: order.order_number,
+      customerName: order.buyer_name,
+      customerPhone: order.buyer_phone,
+      deliveryAddress: order.shipping_address,
+      destinationCity: order.shipping_city,
+      isCod: Boolean(shipment.is_cod),
+      codAmountPkr: Number(shipment.cod_amount_pkr || 0),
+      itemsCount: 1,
+    } as PostExShipmentInput);
+
+    const attempts = (shipment.booking_attempts || 0) + 1;
+    const now = new Date().toISOString();
+
+    if (booking) {
+      await supabaseAdmin
+        .from("shipments")
+        .update({
+          tracking_number: booking.trackingNumber,
+          tracking_url: booking.trackingUrl,
+          status: OrderStatus.PROCESSING,
+          booking_attempts: attempts,
+          updated_at: now,
+        })
+        .eq("id", shipment.id);
+      logger.info(
+        `📦 Booking retry succeeded: CN #${booking.trackingNumber} for Order ${order.order_number} (attempt ${attempts})`,
+      );
+      return true;
+    }
+
+    await supabaseAdmin
+      .from("shipments")
+      .update({ booking_attempts: attempts, updated_at: now })
+      .eq("id", shipment.id);
+
+    if (attempts >= MAX_BOOKING_ATTEMPTS) {
+      logger.error(
+        `🚨 DEAD LETTER: Courier booking for Order ${order.order_number} failed ${attempts} times — manual dispatch required (shipment ${shipment.id})`,
+      );
+    }
+    return false;
   }
 
   /**

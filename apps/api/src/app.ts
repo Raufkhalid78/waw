@@ -72,6 +72,7 @@ import { CartController } from "./modules/cart/cart.controller.js";
 import reviewsRouter from "./modules/reviews/reviews.routes.js";
 import questionsRouter from "./modules/questions/questions.routes.js";
 import { ConfigController } from "./modules/config/config.controller.js";
+import { PushController } from "./modules/notifications/push.controller.js";
 import { AIController } from "./modules/ai/ai.controller.js";
 import { LoyaltyController } from "./modules/loyalty/loyalty.controller.js";
 import { ReferralController } from "./modules/referrals/referral.controller.js";
@@ -366,6 +367,10 @@ app.get("/api/content", async (req, res) => {
 
   app.get("/api/config/storefront", ConfigController.getStorefrontConfig);
   app.get("/api/config/hero-banners", ConfigController.getHeroBanners);
+
+  // -- Push notifications (FCM, authenticated device tokens) ----------------
+  app.post("/api/push/tokens", requireAuth, PushController.registerToken);
+  app.delete("/api/push/tokens", requireAuth, PushController.removeToken);
 
 // -- Category Taxonomy Routes (Hierarchical Database Tree) ---------------
 app.get("/api/categories", CategoryController.listTree);

@@ -29,6 +29,10 @@ class ApiClient {
     }
   }
 
+  /// Test seam: inject a pre-configured Dio (mock) without interceptors.
+  ApiClient.forTest(this.dio, {SecureTokenStorage? tokenStorage})
+      : _tokenStorage = tokenStorage ?? SecureTokenStorage();
+
   Future<void> setAuthHeader(String token) async {
     dio.options.headers['Authorization'] = 'Bearer $token';
   }

@@ -69,6 +69,11 @@ export const ENV = {
   // COD remittance polling: PostEx has no publicly documented remittance
   // endpoint — enable ONLY after route/contract is confirmed with PostEx.
   POSTEX_REMITTANCE_ENABLED: process.env.POSTEX_REMITTANCE_ENABLED === "true",
+  // Firebase Cloud Messaging (push notifications) — HTTP v1 API with a
+  // service account. Push is disabled unless all three are set.
+  FCM_PROJECT_ID: optionalEnv("FCM_PROJECT_ID"),
+  FCM_CLIENT_EMAIL: optionalEnv("FCM_CLIENT_EMAIL"),
+  FCM_PRIVATE_KEY: optionalEnv("FCM_PRIVATE_KEY"),
   POSTEX_XPAY_BASE_URL:
     process.env.POSTEX_XPAY_BASE_URL || "https://xpay.postexglobal.com/api",
   POSTEX_XPAY_MERCHANT_ID: optionalEnv("POSTEX_XPAY_MERCHANT_ID"),
