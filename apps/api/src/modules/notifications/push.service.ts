@@ -81,8 +81,15 @@ export class PushService {
   /**
    * Sends one push via the Firebase HTTP v1 API. Returns false on any
    * failure — callers never block business flows on notification errors.
+   * ownerUserId scopes stale-token cleanup: invalid tokens are removed only
+   * for the row(s) belonging to this user (or all rows when the caller is a
+   * system sweep that has no ownership context — not used for user fan-out).
    */
-  static async sendToToken(token: string, payload: PushPayload): Promise<boolean> {
+  static async sendToToken(
+    token: string,
+    payload: PushPayload,
+    ownerUserId?: string,
+  ): Promise<boolean> {
     if (!isPushConfigured(ENV as any)) return false;
     const accessToken = await this.getAccessToken();
     if (!accessToken) return false;
@@ -108,10 +115,13 @@ export class PushService {
       );
       return res.status === 200;
     } catch (err: any) {
-      // Unregistered/invalid tokens are removed so stale devices don't accumulate.
+      // Unregistered/invalid tokens are removed so stale devices don't
+      // accumulate — scoped to the owner where the fan-out knows it.
       const status = err.response?.status;
       if (status === 404 || status === 410) {
-        await supabaseAdmin.from("device_tokens").delete().eq("token", token);
+        const del = supabaseAdmin.from("device_tokens").delete().eq("token", token);
+        if (ownerUserId) del.eq("user_id", ownerUserId);
+        await del;
       }
       logger.warn("FCM send failed", { status, error: err?.message });
       return false;
@@ -119,7 +129,9 @@ export class PushService {
   }
 
   /**
-   * Fan-out: sends to every registered device of a user.
+   * Fan-out: sends to every registered device of a user with bounded
+   * concurrency (never serial — a user with N devices cannot make a business
+   * event wait N × 10s provider timeouts).
    */
   static async sendToUser(userId: string, payload: PushPayload): Promise<{ sent: number; failed: number }> {
     const { data: rows, error } = await supabaseAdmin
@@ -129,11 +141,16 @@ export class PushService {
 
     if (error || !rows || rows.length === 0) return { sent: 0, failed: 0 };
 
+    const FCM_CONCURRENCY = 5;
     let sent = 0;
     let failed = 0;
-    for (const row of rows) {
-      const ok = await this.sendToToken(row.token, payload);
-      ok ? sent++ : failed++;
+
+    for (let i = 0; i < rows.length; i += FCM_CONCURRENCY) {
+      const batch = rows.slice(i, i + FCM_CONCURRENCY);
+      const results = await Promise.all(
+        batch.map((row) => this.sendToToken(row.token, payload, userId)),
+      );
+      for (const ok of results) ok ? sent++ : failed++;
     }
     return { sent, failed };
   }

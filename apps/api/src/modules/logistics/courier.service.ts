@@ -235,6 +235,11 @@ export class CourierService {
    * reconciliation sweep; increments booking_attempts so permanently failing
    * bookings dead-letter after MAX_BOOKING_ATTEMPTS instead of retrying
    * forever.
+   *
+   * Duplicate-booking guard: if any OTHER shipment for the same order already
+   * carries a provider tracking number (e.g. the first create-order actually
+   * succeeded but its response was lost), that consignment is ADOPTED instead
+   * of creating a second one.
    */
   static async retryBooking(shipment: {
     id: string;
@@ -243,6 +248,37 @@ export class CourierService {
     cod_amount_pkr: number | null;
     booking_attempts: number | null;
   }): Promise<boolean> {
+    // 1. Adopt an existing consignment for this order, if one exists.
+    const { data: existingTracked } = await supabaseAdmin
+      .from("shipments")
+      .select("id, tracking_number, tracking_url")
+      .eq("order_id", shipment.order_id)
+      .not("tracking_number", "is", null)
+      .neq("id", shipment.id)
+      .limit(1)
+      .maybeSingle();
+
+    const attempts = (shipment.booking_attempts || 0) + 1;
+    const now = new Date().toISOString();
+
+    if (existingTracked?.tracking_number) {
+      await supabaseAdmin
+        .from("shipments")
+        .update({
+          tracking_number: existingTracked.tracking_number,
+          tracking_url: existingTracked.tracking_url,
+          status: OrderStatus.PROCESSING,
+          booking_attempts: attempts,
+          updated_at: now,
+        })
+        .eq("id", shipment.id);
+      logger.info(
+        `📦 Booking retry ADOPTED existing CN #${existingTracked.tracking_number} for order ${shipment.order_id} (no duplicate booking created)`,
+      );
+      return true;
+    }
+
+    // 2. No consignment on record — re-attempt the provider booking.
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select("order_number, buyer_name, buyer_phone, shipping_address, shipping_city")
@@ -268,9 +304,6 @@ export class CourierService {
       itemsCount: 1,
     } as PostExShipmentInput);
 
-    const attempts = (shipment.booking_attempts || 0) + 1;
-    const now = new Date().toISOString();
-
     if (booking) {
       await supabaseAdmin
         .from("shipments")
@@ -279,6 +312,7 @@ export class CourierService {
           tracking_url: booking.trackingUrl,
           status: OrderStatus.PROCESSING,
           booking_attempts: attempts,
+          next_retry_at: null,
           updated_at: now,
         })
         .eq("id", shipment.id);
@@ -288,9 +322,20 @@ export class CourierService {
       return true;
     }
 
+    // 3. Failed — schedule the next attempt with exponential backoff
+    //    (attempts^2 × 30 min, capped at 24 h) so a flapping provider is not
+    //    hammered every cycle.
+    const backoffMs = Math.min(
+      attempts * attempts * 30 * 60 * 1000,
+      24 * 60 * 60 * 1000,
+    );
     await supabaseAdmin
       .from("shipments")
-      .update({ booking_attempts: attempts, updated_at: now })
+      .update({
+        booking_attempts: attempts,
+        next_retry_at: new Date(Date.now() + backoffMs).toISOString(),
+        updated_at: now,
+      })
       .eq("id", shipment.id);
 
     if (attempts >= MAX_BOOKING_ATTEMPTS) {

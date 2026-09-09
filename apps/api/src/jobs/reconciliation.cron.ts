@@ -138,7 +138,8 @@ async function runCourierBookingRetry(): Promise<{ booked: number; retried: numb
       .from("shipments")
       .select("id, order_id, is_cod, cod_amount_pkr, booking_attempts")
       .eq("status", "BOOKING_PENDING")
-      .lt("booking_attempts", MAX_BOOKING_ATTEMPTS);
+      .lt("booking_attempts", MAX_BOOKING_ATTEMPTS)
+      .or("next_retry_at.is.null,next_retry_at.lte." + new Date().toISOString());
 
     if (error) throw error;
     if (!pending || pending.length === 0) return { booked: 0, retried: 0 };
