@@ -2,10 +2,15 @@
 -- ⚠️ DEPRECATED — DO NOT USE FOR NEW INSTALLATIONS
 -- ==============================================================================
 -- This file is the ORIGINAL legacy schema and is kept for reference only.
--- For new installations or schema verification, use:
---   supabase/migrations/SCHEMA_COMPLETE.sql
--- For incremental migrations, use the numbered migration files:
---   supabase/migrations/002_* through 012_*
+-- The runtime source of truth is supabase/migrations/ (applied by
+-- `supabase db push`), currently SCHEMA_COMPLETE.sql + migrations 001-046.
+--
+-- Known drift vs the runtime schema: legacy table names (products /
+-- product_variants / serviceability_locations instead of catalog_products /
+-- seller_offers / serviceable_cities) and missing runtime tables
+-- (seller_offers, cart_abandonment, wishlists, admin_mfa, checkout_sessions,
+-- outbox_events, loyalty/referral tables, financial columns). Do NOT apply
+-- this file to a database.
 -- ==============================================================================
 
 -- ==============================================================================

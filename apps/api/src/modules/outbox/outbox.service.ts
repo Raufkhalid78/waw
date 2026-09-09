@@ -50,7 +50,9 @@ export class OutboxService {
         .from("outbox_events")
         .insert({
           event_type: eventType,
-          payload: JSON.stringify(payload),
+          // Column is JSONB — send the object directly; JSON.stringify here
+          // would double-encode and every consumer would parse twice.
+          payload,
           status: "PENDING",
           created_at: new Date().toISOString(),
         })
