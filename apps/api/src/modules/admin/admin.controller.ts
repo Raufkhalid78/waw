@@ -310,7 +310,8 @@ export class AdminController {
     try {
       const { id } = req.params;
       const { reason, reversalType } = req.body;
-      
+      const adminId = (req as any).user?.id;
+
       const { supabaseAdmin } = await import('../../config/supabase.js');
       const { data, error } = await supabaseAdmin.rpc('reverse_order_atomic', {
         p_order_id: id,
@@ -320,10 +321,29 @@ export class AdminController {
 
       if (error) throw error;
 
-      // Automated Gateway Refund (XPay/Raast) if atomic DB commit succeeded
-      console.log(`[PAYMENT GATEWAY] Triggering automated gateway refund via XPay for order ${id}`);
+      // Execute the real gateway refund against the idempotent
+      // refund_executions ledger. The atomic reversal above has settled the
+      // internal books (payout holds + ledger); this moves the buyer's money
+      // back through the provider. Failures land in MANUAL_REVIEW — they
+      // never fake success and never block the reversal response.
+      const totalRefundPkr = Number((data as any)?.total_refund_pkr || 0);
+      const idempotent = Boolean((data as any)?.idempotent);
+      let refundOutcome: string = "SKIPPED";
 
-      res.json(data);
+      if (idempotent) {
+        refundOutcome = "ALREADY_REVERSED";
+      } else if (totalRefundPkr > 0) {
+        const { RefundService } = await import('../payments/refund.service.js');
+        const refundResult = await RefundService.executeRefund({
+          orderId: id,
+          amountPkr: totalRefundPkr,
+          executedBy: adminId || "SYSTEM",
+          reason: `Admin order reversal: ${reason || "no reason given"}`,
+        });
+        refundOutcome = refundResult.status;
+      }
+
+      res.json({ ...(data as object), refundOutcome });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }

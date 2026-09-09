@@ -30,7 +30,7 @@ BEGIN
     RAISE EXCEPTION 'Order % not found', p_order_id;
   END IF;
 
-  IF v_order.status IN ('REFUNDED', 'CHARGEBACK') THEN
+  IF v_order.global_status IN ('REFUNDED', 'CHARGEBACK') THEN
     RETURN jsonb_build_object(
       'success', true,
       'idempotent', true,
@@ -63,9 +63,9 @@ BEGIN
     WHERE store_order_id = v_store_order.id AND status IN ('SCHEDULED', 'PROCESSING');
   END LOOP;
 
-  -- Update order statuses
-  UPDATE orders SET status = p_reversal_type, updated_at = NOW() WHERE id = p_order_id;
-  UPDATE store_orders SET order_status = p_reversal_type, updated_at = NOW() WHERE order_id = p_order_id;
+  -- Update order statuses (runtime columns: orders.global_status, store_orders.status)
+  UPDATE orders SET global_status = 'REFUNDED', updated_at = NOW() WHERE id = p_order_id;
+  UPDATE store_orders SET status = 'REFUNDED', updated_at = NOW() WHERE order_id = p_order_id;
 
   RETURN jsonb_build_object(
     'success', true,
