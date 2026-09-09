@@ -10,6 +10,7 @@ import {
   PaymentStatus,
 } from "../../types/index.js";
 import { WhatsAppService } from "../notifications/whatsapp.service.js";
+import { OutboxService } from "../outbox/outbox.service.js";
 import { CourierService } from "../logistics/courier.service.js";
 import { InventoryLockService } from "../products/inventory-lock.service.js";
 import { SubscriptionService } from "../subscriptions/subscription.service.js";
@@ -513,23 +514,49 @@ export class PostExXPayService {
       );
     }
 
-    // All gates passed — transition Order to Confirmed and Paid, then mark
-    // the event APPLIED. If the crash happens between the two, a replay will
-    // re-insert (received row still present) and re-apply idempotently.
-    await supabaseAdmin
-      .from("orders")
-      .update({
-        payment_status: PaymentStatus.PAID,
-        global_status: OrderStatus.CONFIRMED,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", order.id);
+    // ATOMIC SETTLEMENT: order -> PAID/CONFIRMED + webhook row -> applied in
+    // a single Postgres transaction (row-locked). Replays and concurrent
+    // webhooks converge on one outcome instead of racing two updates.
+    const { data: settlement, error: settleError } = await supabaseAdmin.rpc(
+      "settle_order_payment",
+      {
+        p_order_id: order.id,
+        p_transaction_id: txId,
+        p_amount_pkr: data.amount,
+      },
+    );
 
-    await supabaseAdmin
-      .from("xpay_webhooks_log")
-      .update({ status: "applied", updated_at: new Date().toISOString() })
-      .eq("transaction_id", txId)
-      .eq("status", "received");
+    if (settleError) {
+      throw new Error(`Atomic settlement failed: ${settleError.message}`);
+    }
+
+    const settlementAction = (settlement as any)?.action;
+    if (settlementAction === "amount-mismatch") {
+      logger.error("Settlement rejected: amount drifted between verification and write", {
+        orderNumber: order.order_number,
+        expected: (settlement as any)?.expected,
+        received: (settlement as any)?.received,
+      });
+      throw new Error(
+        `Settlement amount mismatch for order ${order.order_number}`,
+      );
+    }
+    if (settlementAction === "already-applied" || settlementAction === "already-paid") {
+      return {
+        success: true,
+        orderNumber: order.order_number,
+        status: PaymentStatus.PAID,
+      };
+    }
+    if (settlementAction !== "settled") {
+      throw new Error(
+        `Settlement did not complete (${settlementAction}) for order ${order.order_number}`,
+      );
+    }
+
+    // Post-commit side effects are enqueued in the durable outbox so a crash
+    // can never strand a paid order without its fulfilment flow; the queue
+    // worker retries until each effect succeeds.
 
     // 2. Finalize Inventory stock deductions
     if (order.items && order.items.length > 0) {
@@ -543,46 +570,20 @@ export class PostExXPayService {
       );
     }
 
-    // 3. Automatically book PostEx courier pickup and generate Air Waybill
-    try {
-      await CourierService.bookCourierShipment({
-        orderId: order.id,
-        orderNumber: order.order_number,
-        customerName: order.buyer_name,
-        customerPhone: order.buyer_phone,
-        deliveryAddress: order.shipping_address,
-        destinationCity: order.shipping_city,
-        codAmountPkr: 0,
-        isCod: false,
-        itemsCount: order.items?.length || 1,
-      });
-    } catch (courierErr) {
-      logger.warn("PostEx automatic consignment booking notice:", courierErr);
-    }
+    // 3. Courier booking via outbox (survives worker crashes)
+    await OutboxService.publish("BOOK_COURIER", {
+      orderId: order.id,
+      orderNumber: order.order_number,
+    });
 
-    // 4. Send instant WhatsApp confirmation to Pakistani buyer
-    try {
-      await WhatsAppService.sendOrderConfirmed(
-        order.buyer_phone,
-        order.order_number,
-        order.total_amount_pkr || 0,
-        false,
-      );
-    } catch (notifErr) {
-      logger.warn("WhatsApp alert dispatch notice:", notifErr);
-    }
-
-    // 5. Push notification (FCM) — best-effort, never blocks settlement
-    try {
-      const { PushService } = await import("../notifications/push.service.js");
-      await PushService.sendToUser(order.buyer_id, {
-        title: "Order Confirmed ✓",
-        body: `Order ${order.order_number} is confirmed — PKR ${(order.total_amount_pkr || 0).toLocaleString()} paid.`,
-        data: { orderId: order.id, orderNumber: order.order_number, type: "ORDER_CONFIRMED" },
-      });
-    } catch (pushErr: any) {
-      logger.warn("Push notification dispatch notice:", pushErr?.message);
-    }
+    // 4. WhatsApp + push confirmations via outbox
+    await OutboxService.publish("NOTIFY_ORDER_CONFIRMED", {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      buyerPhone: order.buyer_phone,
+      buyerId: order.buyer_id,
+      totalPkr: order.total_amount_pkr || 0,
+    });
 
     return {
       success: true,

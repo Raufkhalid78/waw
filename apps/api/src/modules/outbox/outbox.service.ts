@@ -15,7 +15,9 @@ export type OutboxEventType =
   | "PAYMENT_FAILED"
   | "CHARGEBACK_RECEIVED"
   | "INVENTORY_LOW_STOCK"
-  | "SELLER_PAYOUT_READY";
+  | "SELLER_PAYOUT_READY"
+  | "BOOK_COURIER"
+  | "NOTIFY_ORDER_CONFIRMED";
 
 export interface OutboxEventPayload {
   orderId?: string;

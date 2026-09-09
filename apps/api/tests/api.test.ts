@@ -849,3 +849,40 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     assert.strictEqual(matchesChappal, true);
   });
 });
+
+describe("Atomic transition contract (migration 045)", () => {
+  it("courier decision matrix stays in sync with the SQL status ranks", async () => {
+    const { decideCourierStatusEvent, ORDER_STATUS_RANK } = await import(
+      "../src/modules/logistics/courier.service.js"
+    );
+    const { OrderStatus } = await import("../src/types/index.js");
+
+    // The SQL courier_status_rank() must mirror these exact ranks.
+    const expectedRanks: Record<string, number> = {
+      PENDING: 0,
+      CONFIRMED: 1,
+      PROCESSING: 2,
+      SHIPPED: 3,
+      OUT_FOR_DELIVERY: 4,
+      DELIVERED: 5,
+      RETURN_REQUESTED: 6,
+      RETURNED: 7,
+      CANCELLED: 8,
+    };
+    assert.deepStrictEqual(ORDER_STATUS_RANK, expectedRanks);
+
+    // Spot-check the decision matrix the RPC relies on for outcomes.
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.DELIVERED, OrderStatus.OUT_FOR_DELIVERY),
+      { action: "reject-regression", keepStatus: OrderStatus.DELIVERED },
+    );
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.PROCESSING, OrderStatus.PROCESSING),
+      { action: "ignore-duplicate" },
+    );
+    assert.deepStrictEqual(
+      decideCourierStatusEvent(OrderStatus.PROCESSING, OrderStatus.OUT_FOR_DELIVERY),
+      { action: "apply" },
+    );
+  });
+});

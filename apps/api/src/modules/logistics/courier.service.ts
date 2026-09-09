@@ -384,6 +384,11 @@ export class CourierService {
   /**
    * Processes live PostEx Delivery Status Webhook events.
    * Maps PostEx milestones (InTransit, OutForDelivery, Delivered, Returned) to internal OrderStatus.
+   *
+   * The state transition is ATOMIC: a single Postgres RPC locks the shipment
+   * row, enforces monotonicity, and updates shipment + order + store order +
+   * payout together. Concurrent or replayed webhooks converge instead of
+   * racing between four separate table writes.
    */
   static async handlePostExWebhook(payload: any) {
     const trackingNumber =
@@ -401,12 +406,10 @@ export class CourierService {
 
     // Map PostEx status to internal OrderStatus
     let targetOrderStatus: OrderStatus = OrderStatus.PROCESSING;
-    let targetPaymentStatus: PaymentStatus | undefined = undefined;
 
     const normalized = (postexStatus || "").toUpperCase();
     if (normalized.includes("DELIVERED") || normalized === "COMPLETED") {
       targetOrderStatus = OrderStatus.DELIVERED;
-      targetPaymentStatus = PaymentStatus.COD_COLLECTED;
     } else if (
       normalized.includes("OUT") ||
       normalized.includes("DISPATCHED")
@@ -421,103 +424,62 @@ export class CourierService {
       targetOrderStatus = OrderStatus.RETURNED;
     }
 
-    // 1. Update Shipment Record (fetch current status for monotonicity)
-    const { data: existingShipment } = await supabaseAdmin
-      .from("shipments")
-      .select("status, order_id, store_order_id, is_cod")
-      .eq("tracking_number", trackingNumber)
-      .maybeSingle();
+    // Deterministic event id: provider-supplied when present, else a stable
+    // hash of the payload so replays converge on the same ledger row.
+    const eventId =
+      payload.eventId ||
+      payload.event_id ||
+      crypto.createHash("sha256").update(JSON.stringify({ trackingNumber, postexStatus, payload })).digest("hex");
 
-    if (existingShipment?.status) {
-      const decision = decideCourierStatusEvent(
-        existingShipment.status as OrderStatus,
-        targetOrderStatus,
-      );
+    const { data: result, error } = await supabaseAdmin.rpc(
+      "apply_courier_status_event",
+      {
+        p_tracking_number: trackingNumber,
+        p_new_status: targetOrderStatus,
+        p_event_id: eventId,
+        p_payload_hash: crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex"),
+      },
+    );
 
-      // Monotonic state machine: never move an order backward. A delayed
-      // SHIPPED/OUT_FOR_DELIVERY event after DELIVERED is discarded.
-      if (decision.action === "reject-regression") {
-        logger.warn(
-          `⛔ [PostEx Webhook] Rejected stale status regression ${existingShipment.status} → ${targetOrderStatus} for tracking #${trackingNumber}`,
-        );
-        return {
-          success: false,
-          trackingNumber,
-          newStatus: decision.keepStatus,
-          message: `Stale event rejected: cannot move from ${existingShipment.status} to ${targetOrderStatus}`,
-        };
-      }
-
-      // Idempotent no-op: same-status duplicate events change nothing.
-      if (decision.action === "ignore-duplicate") {
-        return {
-          success: true,
-          trackingNumber,
-          newStatus: existingShipment.status,
-          message: `Duplicate milestone ignored (${targetOrderStatus})`,
-        };
-      }
+    if (error) {
+      logger.error("Atomic courier transition failed", {
+        trackingNumber,
+        error: error.message,
+      });
+      throw new Error(`Courier status transition failed: ${error.message}`);
     }
 
-    const { data: shipment } = await supabaseAdmin
-      .from("shipments")
-      .update({
-        status: targetOrderStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("tracking_number", trackingNumber)
-      .select()
-      .maybeSingle();
+    const outcome = (result as any)?.action;
+    const currentStatus = (result as any)?.status;
 
-    // 2. Update Associated Order Record & Store Order
-    if (shipment && shipment.order_id) {
-      const orderUpdate: any = {
-        global_status: targetOrderStatus,
-        updated_at: new Date().toISOString(),
+    if (outcome === "shipment-not-found") {
+      return {
+        success: false,
+        trackingNumber,
+        newStatus: targetOrderStatus,
+        message: "No shipment matches this tracking number — event retained for retry",
       };
-      if (shipment.is_cod && targetPaymentStatus) {
-        orderUpdate.payment_status = targetPaymentStatus;
-      }
+    }
 
-      await supabaseAdmin
-        .from("orders")
-        .update(orderUpdate)
-        .eq("id", shipment.order_id);
-
-      if (shipment.store_order_id) {
-        await supabaseAdmin
-          .from("store_orders")
-          .update({ status: targetOrderStatus, updated_at: new Date().toISOString() })
-          .eq("id", shipment.store_order_id);
-      }
-
-      // If delivered, schedule payout maturity for 7-day returns SLA window
-      if (targetOrderStatus === OrderStatus.DELIVERED) {
-        const maturityDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        if (shipment.store_order_id) {
-          const { data: storeOrder } = await supabaseAdmin
-            .from("store_orders")
-            .select("store_id")
-            .eq("id", shipment.store_order_id)
-            .maybeSingle();
-
-          if (storeOrder?.store_id) {
-            await supabaseAdmin
-              .from("payouts")
-              .update({
-                status: "SCHEDULED",
-                scheduled_for: maturityDate,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("store_id", storeOrder.store_id)
-              .eq("status", "HELD_PENDING_DELIVERY");
-          }
-        }
-      }
-
-      logger.info(
-        `✅ Order ${shipment.order_id} updated to ${targetOrderStatus} via PostEx Webhook`,
+    if (outcome === "reject-regression") {
+      logger.warn(
+        `⛔ [PostEx Webhook] Rejected stale status regression → ${targetOrderStatus} for tracking #${trackingNumber} (kept ${currentStatus})`,
       );
+      return {
+        success: false,
+        trackingNumber,
+        newStatus: currentStatus,
+        message: `Stale event rejected: cannot move from ${currentStatus} to ${targetOrderStatus}`,
+      };
+    }
+
+    if (outcome === "ignore-duplicate" || outcome === "ignore-duplicate-event") {
+      return {
+        success: true,
+        trackingNumber,
+        newStatus: currentStatus || targetOrderStatus,
+        message: `Duplicate event ignored (${targetOrderStatus})`,
+      };
     }
 
     return { success: true, trackingNumber, newStatus: targetOrderStatus };
