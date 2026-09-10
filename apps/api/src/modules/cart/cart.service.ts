@@ -36,11 +36,11 @@ export class CartService {
         quantity,
         offer_variant:offer_variants(
           id,
-          sku,
           price_adjustment_pkr,
           stock_quantity,
           offer:seller_offers(
             id,
+            sku,
             price_pkr,
             original_price_pkr,
             store_id,

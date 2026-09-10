@@ -39,15 +39,19 @@ export default function WishlistPage() {
   }, []);
 
   const displayItems = serverWishlist.length > 0
-    ? serverWishlist.map((w) => ({
-        productId: w.product_id,
-        title: w.products?.title || "Product",
-        imageUrl: w.products?.images?.[0] || w.products?.thumbnail || "",
-        pricePkr: Number(w.products?.base_price_pkr ?? w.products?.price_pkr ?? 0),
-        sellerType: w.products?.is_first_party ? "FIRST_PARTY" : "THIRD_PARTY",
-        storeName: w.products?.store?.name || "Waw",
-        quantity: 1,
-      }))
+    ? serverWishlist.map((w) => {
+        const p = w.product || w.products; // catalog product embed
+        const activeOffer = (p?.offers || []).find((o: any) => o.status === "ACTIVE");
+        return {
+          productId: w.product_id,
+          title: p?.title || "Product",
+          imageUrl: p?.images?.[0] || p?.thumbnail || "",
+          pricePkr: Number(activeOffer?.price_pkr ?? p?.price_pkr ?? 0),
+          sellerType: "THIRD_PARTY" as const,
+          storeName: p?.store?.name || "Waw",
+          quantity: 1,
+        };
+      })
     : wishlist;
 
   const handleMoveToCart = (item: any) => {

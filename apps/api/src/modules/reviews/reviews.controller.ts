@@ -54,23 +54,25 @@ export const replyToReview = async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     if (!sellerReply) return res.status(400).json({ error: 'Reply content is required.' });
 
-    // Verify the seller owns the product that was reviewed
+    // Verify the seller owns the product that was reviewed.
+    // reviews.product_id references catalog_products (which has no store_id);
+    // ownership is proven via seller_offers on that catalog product.
     const { data: review, error: reviewError } = await supabaseAdmin
       .from('reviews')
-      .select('product_id, products!inner(store_id)')
+      .select('product_id')
       .eq('id', id)
       .single();
 
     if (reviewError || !review) return res.status(404).json({ error: 'Review not found.' });
 
-    // Verify user owns the store
-    const { data: store, error: storeError } = await supabaseAdmin
-      .from('seller_profiles')
-      .select('store_id')
-      .eq('id', userId)
-      .single();
+    const { data: owningOffer, error: offerError } = await supabaseAdmin
+      .from('seller_offers')
+      .select('id, store:stores(id, owner_id)')
+      .eq('catalog_product_id', review.product_id)
+      .limit(1)
+      .maybeSingle();
 
-    if (storeError || !store || store.store_id !== (review.products as any).store_id) {
+    if (offerError || !owningOffer || (owningOffer.store as any)?.owner_id !== userId) {
       return res.status(403).json({ error: 'You are not authorized to reply to this review.' });
     }
 

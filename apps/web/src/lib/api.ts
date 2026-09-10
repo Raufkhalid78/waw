@@ -623,7 +623,10 @@ export interface WishlistItem {
   id: string;
   product_id: string;
   created_at: string;
-  products: any;
+  /** Embedded catalog product (alias `product` from the API) */
+  product?: any;
+  /** Legacy alias kept for backward compatibility */
+  products?: any;
 }
 
 export async function fetchUserWishlist(): Promise<WishlistItem[]> {

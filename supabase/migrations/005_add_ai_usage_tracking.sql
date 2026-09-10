@@ -1,9 +1,10 @@
 -- 005: AI Usage Tracking for OpenRouter request limits
 -- Tracks daily request count per feature and platform-wide
+-- NOTE: user_id is profiles.id (TEXT) — the API passes req.user.id.
 
 CREATE TABLE IF NOT EXISTS ai_usage (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  user_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
   feature TEXT NOT NULL, -- 'description_generator', 'chatbot', 'recommendations', 'search'
   prompt_tokens INTEGER NOT NULL DEFAULT 0,
   completion_tokens INTEGER NOT NULL DEFAULT 0,

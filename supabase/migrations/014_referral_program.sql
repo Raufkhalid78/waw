@@ -7,19 +7,19 @@
 BEGIN;
 
 -- 1. Referral codes (one per user)
+-- NOTE: user_id is profiles.id (TEXT) — see 013 note.
 CREATE TABLE IF NOT EXISTS referral_codes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  user_id TEXT NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
   code TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(user_id)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 2. Referral tracking
 CREATE TABLE IF NOT EXISTS referrals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  referrer_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  referred_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  referrer_user_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  referred_user_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
   referral_code TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'COMPLETED', 'REWARDED')),
   reward_pkr INTEGER DEFAULT 0,
@@ -49,11 +49,11 @@ ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own referral code"
   ON referral_codes FOR SELECT
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::TEXT = user_id);
 
 CREATE POLICY "Users can view own referrals"
   ON referrals FOR SELECT
-  USING (auth.uid() = referrer_user_id OR auth.uid() = referred_user_id);
+  USING (auth.uid()::TEXT = referrer_user_id OR auth.uid()::TEXT = referred_user_id);
 
 CREATE POLICY "Service role can manage referral codes"
   ON referral_codes FOR ALL

@@ -5,7 +5,7 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION settle_payout_atomic(
-  p_payout_id UUID,
+  p_payout_id TEXT,
   p_provider_transfer_id TEXT,
   p_provider_payload_hash TEXT
 )
@@ -46,16 +46,16 @@ BEGIN
 
   v_net_payout := COALESCE(v_payout.amount_pkr, 0) - COALESCE(v_payout.commission_pkr, 0);
   v_commission := COALESCE(v_payout.commission_pkr, 0);
-  v_order_ref := COALESCE(v_payout.order_id::TEXT, v_payout.id::TEXT);
+  v_order_ref := COALESCE(v_payout.order_id, v_payout.id);
 
   -- 1. Insert double-entry ledger rows
   INSERT INTO financial_ledger (
     store_id, transaction_type, amount_pkr, entry_type, reference_id, description
   ) VALUES (
-    v_payout.store_id, 'PAYOUT_SETTLED', -v_net_payout, 'DEBIT', p_payout_id::TEXT,
+    v_payout.store_id, 'PAYOUT_SETTLED', -v_net_payout, 'DEBIT', p_payout_id,
     'Seller payout settled for Order ' || v_order_ref
   ), (
-    v_payout.store_id, 'COMMISSION_EARNED', v_commission, 'CREDIT', p_payout_id::TEXT,
+    v_payout.store_id, 'COMMISSION_EARNED', v_commission, 'CREDIT', p_payout_id,
     'Platform commission for Order ' || v_order_ref
   );
 

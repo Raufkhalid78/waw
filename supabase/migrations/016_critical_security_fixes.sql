@@ -79,7 +79,7 @@ CREATE POLICY "Store owners can view own shipments"
     store_order_id IN (
       SELECT so.id FROM store_orders so
       JOIN stores s ON s.id = so.store_id
-      WHERE s.owner_id = auth.uid()
+      WHERE s.owner_id = auth.uid()::TEXT
     )
   );
 
@@ -102,7 +102,7 @@ CREATE POLICY "Buyers can view own order items"
   ON order_items FOR SELECT
   USING (
     order_id IN (
-      SELECT id FROM orders WHERE buyer_id = auth.uid()
+      SELECT id FROM orders WHERE buyer_id = auth.uid()::TEXT
     )
   );
 
@@ -114,7 +114,7 @@ CREATE POLICY "Admin can view schema migrations"
 -- ai_usage: users can view own usage, admin can view all
 CREATE POLICY "Users can view own AI usage"
   ON ai_usage FOR SELECT
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid()::TEXT);
 
 CREATE POLICY "Admin can manage AI usage"
   ON ai_usage FOR ALL
@@ -132,7 +132,7 @@ BEGIN
   ) THEN
     CREATE POLICY "Sellers can create own store"
       ON stores FOR INSERT
-      WITH CHECK (owner_id = auth.uid());
+      WITH CHECK (owner_id = auth.uid()::TEXT);
     RAISE NOTICE 'Added stores INSERT policy';
   END IF;
 END $$;

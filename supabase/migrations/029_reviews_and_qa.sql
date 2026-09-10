@@ -40,11 +40,10 @@ BEGIN
   ) THEN
     CREATE POLICY "Sellers can update questions for their products" ON product_questions FOR UPDATE USING (
       EXISTS (
-        SELECT 1 FROM products 
-        WHERE products.id = product_questions.product_id 
-        AND products.store_id IN (
-          SELECT store_id FROM seller_profiles WHERE id = auth.uid()::TEXT
-        )
+        SELECT 1 FROM seller_offers so
+        JOIN stores s ON so.store_id = s.id
+        WHERE so.catalog_product_id = product_questions.product_id
+          AND s.owner_id = auth.uid()::TEXT
       )
     );
   END IF;
@@ -73,6 +72,8 @@ END;
 $$;
 
 -- Trigger to recalculate product rating when a review is added/updated
+-- NOTE: reviews.product_id references catalog_products (see migration 047);
+-- catalog_products defines rating_average / rating_count (001 + 036).
 CREATE OR REPLACE FUNCTION update_product_rating()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -80,14 +81,14 @@ SECURITY DEFINER
 AS $$
 BEGIN
   IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
-    UPDATE products
-    SET rating = (SELECT ROUND(AVG(rating), 2) FROM reviews WHERE product_id = NEW.product_id),
-        reviews_count = (SELECT COUNT(*) FROM reviews WHERE product_id = NEW.product_id)
+    UPDATE catalog_products
+    SET rating_average = (SELECT ROUND(AVG(rating), 2) FROM reviews WHERE product_id = NEW.product_id AND status = 'APPROVED'),
+        rating_count = (SELECT COUNT(*) FROM reviews WHERE product_id = NEW.product_id AND status = 'APPROVED')
     WHERE id = NEW.product_id;
   ELSIF (TG_OP = 'DELETE') THEN
-    UPDATE products
-    SET rating = (SELECT COALESCE(ROUND(AVG(rating), 2), 0) FROM reviews WHERE product_id = OLD.product_id),
-        reviews_count = (SELECT COUNT(*) FROM reviews WHERE product_id = OLD.product_id)
+    UPDATE catalog_products
+    SET rating_average = (SELECT COALESCE(ROUND(AVG(rating), 2), 0) FROM reviews WHERE product_id = OLD.product_id AND status = 'APPROVED'),
+        rating_count = (SELECT COUNT(*) FROM reviews WHERE product_id = OLD.product_id AND status = 'APPROVED')
     WHERE id = OLD.product_id;
   END IF;
   RETURN NULL;

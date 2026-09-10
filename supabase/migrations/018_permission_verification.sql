@@ -29,7 +29,7 @@ BEGIN
         'shipments', 'xpay_webhooks_log', 'outbox_events',
         'category_schemas', 'serviceable_cities',
         'subscription_plans', 'ai_usage', 'schema_migrations',
-        'checkout_sessions', 'admin_mfa', 'mfa_backup_codes',
+        'checkout_sessions', 'admin_mfa',
         'financial_ledger', 'ticket_messages', 'audit_logs',
         'catalog_products', 'products', 'product_variants'
       )
@@ -164,14 +164,14 @@ END $$;
 DO $$
 BEGIN
   -- Ensure only authenticated users can execute checkout/return RPCs
-  GRANT EXECUTE ON FUNCTION checkout_transaction(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) TO authenticated;
-  GRANT EXECUTE ON FUNCTION create_return_request(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, TEXT, JSONB) TO authenticated;
-  GRANT EXECUTE ON FUNCTION cancel_order(UUID, TEXT) TO authenticated;
+  GRANT EXECUTE ON FUNCTION checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) TO authenticated;
+  GRANT EXECUTE ON FUNCTION create_return_request(TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, TEXT, JSONB) TO authenticated;
+  GRANT EXECUTE ON FUNCTION cancel_order(TEXT, TEXT) TO authenticated;
 
   -- Revoke from anon (in case it was granted before)
-  REVOKE EXECUTE ON FUNCTION checkout_transaction(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) FROM anon;
-  REVOKE EXECUTE ON FUNCTION create_return_request(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, TEXT, JSONB) FROM anon;
-  REVOKE EXECUTE ON FUNCTION cancel_order(UUID, TEXT) FROM anon;
+  REVOKE EXECUTE ON FUNCTION checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT) FROM anon;
+  REVOKE EXECUTE ON FUNCTION create_return_request(TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, TEXT, JSONB) FROM anon;
+  REVOKE EXECUTE ON FUNCTION cancel_order(TEXT, TEXT) FROM anon;
 
   RAISE NOTICE 'Checkout/return/cancel RPCs restricted to authenticated role';
 END $$;

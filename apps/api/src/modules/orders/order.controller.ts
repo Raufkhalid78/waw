@@ -222,7 +222,7 @@ export class OrderController {
         await supabaseAdmin.from("shipments").insert({
           order_id: req.params.id,
           tracking_number: trackingNumber,
-          courier_name: courierProvider || "PostEx",
+          courier_provider: (courierProvider || "PostEx").toUpperCase(),
           status: "BOOKED",
         });
       }

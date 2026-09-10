@@ -1,8 +1,10 @@
 -- Migration 032: User preferences table for theme, language, and settings
 -- Stores per-user preferences (dark mode, language, etc.)
 
+-- NOTE: user_id is profiles.id (TEXT) — the API passes req.user.id, which is
+-- profiles.id (e.g. 'user_<timestamp>'), not an auth.users UUID.
 CREATE TABLE IF NOT EXISTS user_preferences (
-  user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  user_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
   theme TEXT NOT NULL DEFAULT 'light' CHECK (theme IN ('light', 'dark', 'system')),
   language TEXT NOT NULL DEFAULT 'en' CHECK (language IN ('en', 'ur')),
   city TEXT,
@@ -15,15 +17,15 @@ ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can read own preferences"
   ON user_preferences FOR SELECT
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::TEXT = user_id);
 
 CREATE POLICY "Users can insert own preferences"
   ON user_preferences FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid()::TEXT = user_id);
 
 CREATE POLICY "Users can update own preferences"
   ON user_preferences FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::TEXT = user_id);
 
 -- Index for fast lookups
 CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);

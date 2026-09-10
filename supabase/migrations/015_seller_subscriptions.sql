@@ -8,7 +8,7 @@ BEGIN;
 
 -- 1. Subscription plans config
 CREATE TABLE IF NOT EXISTS subscription_plans (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   name TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   price_pkr INTEGER NOT NULL DEFAULT 0,
@@ -26,10 +26,12 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 );
 
 -- 2. Subscription history
+-- NOTE: store_id is stores.id (TEXT) — canonical 001 schema uses TEXT ids.
+-- plan_id is subscription_plans.id (TEXT) to match.
 CREATE TABLE IF NOT EXISTS seller_subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  plan_id TEXT NOT NULL REFERENCES subscription_plans(id),
   status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'CANCELLED', 'EXPIRED', 'PENDING')),
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ,
@@ -38,9 +40,21 @@ CREATE TABLE IF NOT EXISTS seller_subscriptions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 3. Add subscription columns to stores if not exists
+-- 2b. Subscription columns on stores used by subscription.service.ts and
+-- the AI/description gating (subscription_plan / subscription_active) —
+-- these were referenced by the API but never created by any migration.
 DO $$
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'subscription_plan'
+  ) THEN
+    ALTER TABLE stores ADD COLUMN subscription_plan TEXT DEFAULT 'free';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'subscription_active'
+  ) THEN
+    ALTER TABLE stores ADD COLUMN subscription_active BOOLEAN NOT NULL DEFAULT TRUE;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'subscription_expires_at'
   ) THEN
@@ -71,7 +85,7 @@ CREATE POLICY "Anyone can view active plans"
 CREATE POLICY "Users can view own subscriptions"
   ON seller_subscriptions FOR SELECT
   USING (
-    store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid())
+    store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid()::TEXT)
   );
 
 CREATE POLICY "Service role can manage subscriptions"

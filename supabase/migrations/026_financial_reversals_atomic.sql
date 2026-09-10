@@ -4,7 +4,7 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION reverse_order_atomic(
-  p_order_id UUID,
+  p_order_id TEXT,
   p_reason TEXT,
   p_reversal_type TEXT -- 'REFUND', 'CHARGEBACK'
 )
@@ -50,11 +50,11 @@ BEGIN
     INSERT INTO financial_ledger (
       store_id, transaction_type, amount_pkr, entry_type, reference_id, description
     ) VALUES (
-      v_store_order.store_id, p_reversal_type, v_net_amount, 'DEBIT', p_order_id::TEXT,
-      p_reversal_type || ' for Order ' || p_order_id::TEXT || ' (' || p_reason || ')'
+      v_store_order.store_id, p_reversal_type, v_net_amount, 'DEBIT', p_order_id,
+      p_reversal_type || ' for Order ' || p_order_id || ' (' || p_reason || ')'
     ), (
-      v_store_order.store_id, 'COMMISSION_REVERSAL', -v_commission, 'DEBIT', p_order_id::TEXT,
-      'Platform commission reversal for Order ' || p_order_id::TEXT
+      v_store_order.store_id, 'COMMISSION_REVERSAL', -v_commission, 'DEBIT', p_order_id,
+      'Platform commission reversal for Order ' || p_order_id
     );
 
     -- Hold or reverse payouts

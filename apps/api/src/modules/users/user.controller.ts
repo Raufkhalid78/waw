@@ -105,7 +105,7 @@ export class UserController {
       const user = (req as any).user;
       const { data, error } = await supabaseAdmin
         .from("wishlists")
-        .select("id, product_id, created_at, products(*)")
+        .select(`id, product_id, created_at, product:catalog_products(id, title, slug, images, thumbnail, is_active, offers:seller_offers(price_pkr, original_price_pkr, status))`)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;

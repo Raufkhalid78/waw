@@ -7,24 +7,25 @@
 BEGIN;
 
 -- 1. Loyalty points balance per user
+-- NOTE: user_id is profiles.id (TEXT), not auth.users.id — the API passes
+-- req.user.id (profiles.id, e.g. 'user_<timestamp>') into this column.
 CREATE TABLE IF NOT EXISTS loyalty_points (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  user_id TEXT NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
   points_balance INTEGER NOT NULL DEFAULT 0,
   total_earned INTEGER NOT NULL DEFAULT 0,
   total_redeemed INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(user_id)
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 2. Loyalty transaction ledger
 CREATE TABLE IF NOT EXISTS loyalty_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  user_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('EARN', 'REDEEM', 'EXPIRE', 'ADJUSTMENT')),
   points INTEGER NOT NULL,
-  order_id UUID,
+  order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
   description TEXT NOT NULL,
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -50,11 +51,11 @@ ALTER TABLE loyalty_transactions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own loyalty points"
   ON loyalty_points FOR SELECT
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::TEXT = user_id);
 
 CREATE POLICY "Users can view own loyalty transactions"
   ON loyalty_transactions FOR SELECT
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::TEXT = user_id);
 
 CREATE POLICY "Service role can manage loyalty points"
   ON loyalty_points FOR ALL

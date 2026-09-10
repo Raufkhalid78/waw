@@ -10,8 +10,8 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION create_return_request(
-  p_order_id UUID,
-  p_buyer_id UUID,
+  p_order_id TEXT,
+  p_buyer_id TEXT,
   p_reason TEXT,
   p_comments TEXT DEFAULT NULL,
   p_evidence_images JSONB DEFAULT '[]'::JSONB,
@@ -27,13 +27,13 @@ SET search_path = public
 AS $$
 DECLARE
   v_order RECORD;
-  v_return_request_id UUID;
+  v_return_request_id TEXT;
   v_total_refund NUMERIC := 0;
   v_item JSONB;
   v_order_item RECORD;
   v_return_items JSONB := '[]'::JSONB;
   v_store_order RECORD;
-  v_seller_return_id UUID;
+  v_seller_return_id TEXT;
   v_seller_refund NUMERIC;
   v_seller_items JSONB;
   v_already_returned_qty INTEGER;
@@ -45,7 +45,7 @@ DECLARE
   v_line_subtotal NUMERIC;
 BEGIN
   -- ── P0-3: Verify caller identity ────────────────────────────────────────
-  IF p_buyer_id IS NULL OR p_buyer_id != auth.uid() THEN
+  IF p_buyer_id IS NULL OR p_buyer_id != auth.uid()::TEXT THEN
     RAISE EXCEPTION 'Unauthorized: buyer identity mismatch';
   END IF;
 
@@ -90,7 +90,7 @@ BEGIN
   LOOP
     SELECT oi.unit_price_pkr INTO v_line_subtotal
     FROM order_items oi
-    WHERE oi.id = (v_item->>'order_item_id')::UUID;
+    WHERE oi.id = v_item->>'order_item_id';
     v_line_subtotal := v_line_subtotal + (v_line_subtotal * (v_item->>'quantity')::INT);
   END LOOP;
 
@@ -111,7 +111,7 @@ BEGIN
     SELECT oi.*, so.store_id INTO v_order_item
     FROM order_items oi
     JOIN store_orders so ON so.id = oi.store_order_id
-    WHERE oi.id = (v_item->>'order_item_id')::UUID
+    WHERE oi.id = v_item->>'order_item_id'
       AND oi.order_id = p_order_id
     FOR UPDATE OF oi;
 
@@ -127,7 +127,7 @@ BEGIN
     -- Reject duplicate item IDs in one request
     IF EXISTS (
       SELECT 1 FROM jsonb_array_elements(v_return_items) AS existing
-      WHERE (existing->>'order_item_id')::UUID = (v_item->>'order_item_id')::UUID
+      WHERE existing->>'order_item_id' = v_item->>'order_item_id'
     ) THEN
       RAISE EXCEPTION 'Duplicate order item % in return request', v_item->>'order_item_id';
     END IF;
@@ -136,7 +136,7 @@ BEGIN
     SELECT COALESCE(SUM(ri.quantity), 0) INTO v_already_returned_qty
     FROM return_items ri
     JOIN return_requests rr ON rr.id = ri.return_request_id
-    WHERE ri.order_item_id = (v_item->>'order_item_id')::UUID
+    WHERE ri.order_item_id = v_item->>'order_item_id'
       AND rr.order_id = p_order_id
       AND rr.status NOT IN ('REJECTED', 'CANCELLED');
 
@@ -177,14 +177,15 @@ BEGIN
   END LOOP;
 
   -- Create parent return request
-  v_return_request_id := gen_random_uuid();
+  v_return_request_id := uuid_generate_v4()::TEXT;
 
   INSERT INTO return_requests (
     id, order_id, buyer_id, reason, evidence_images,
     status, refund_amount_pkr, staff_notes, created_at, updated_at
   ) VALUES (
     v_return_request_id, p_order_id, p_buyer_id, p_reason,
-    p_evidence_images, 'PENDING_COURIER_BOOKING', v_total_refund,
+    (SELECT COALESCE(array_agg(value #>> '{}'), ARRAY[]::TEXT[]) FROM jsonb_array_elements(p_evidence_images)),
+    'PENDING_COURIER_BOOKING', v_total_refund,
     CASE WHEN p_comments IS NOT NULL
       THEN 'Buyer notes: ' || p_comments || '. Pref: ' || p_refund_preference
       ELSE 'Pref: ' || p_refund_preference
@@ -196,8 +197,8 @@ BEGIN
   -- Group items by store_order_id (seller) and create per-seller return tracking
   FOR v_store_order IN
     SELECT DISTINCT
-      (elem->>'store_order_id')::UUID AS store_order_id,
-      (elem->>'store_id')::UUID AS store_id
+      elem->>'store_order_id' AS store_order_id,
+      elem->>'store_id' AS store_id
     FROM jsonb_array_elements(v_return_items) AS elem
   LOOP
     v_seller_refund := 0;
@@ -206,7 +207,7 @@ BEGIN
     -- Aggregate items for this seller using proper alias
     FOR v_item IN
       SELECT * FROM jsonb_array_elements(v_return_items) AS elem(value)
-      WHERE (elem.value->>'store_order_id')::UUID = v_store_order.store_order_id
+      WHERE elem.value->>'store_order_id' = v_store_order.store_order_id
     LOOP
       v_seller_refund := v_seller_refund + (v_item->>'refund_amount_pkr')::NUMERIC;
       v_seller_items := v_seller_items || jsonb_build_object(
@@ -217,14 +218,15 @@ BEGIN
     END LOOP;
 
     -- Create per-seller return request child
-    v_seller_return_id := gen_random_uuid();
+    v_seller_return_id := uuid_generate_v4()::TEXT;
 
     INSERT INTO return_requests (
       id, order_id, store_order_id, parent_return_id, buyer_id, reason, evidence_images,
       status, refund_amount_pkr, staff_notes, created_at, updated_at
     ) VALUES (
       v_seller_return_id, p_order_id, v_store_order.store_order_id, v_return_request_id,
-      p_buyer_id, p_reason, p_evidence_images,
+      p_buyer_id, p_reason,
+      (SELECT COALESCE(array_agg(value #>> '{}'), ARRAY[]::TEXT[]) FROM jsonb_array_elements(p_evidence_images)),
       'PENDING_COURIER_BOOKING', v_seller_refund,
       'Seller sub-return for store ' || v_store_order.store_id || '. ' ||
       COALESCE('Buyer notes: ' || p_comments || '. Pref: ' || p_refund_preference, 'Pref: ' || p_refund_preference),
@@ -234,13 +236,13 @@ BEGIN
     -- Insert return items linked to this seller's return request using proper alias
     FOR v_item IN
       SELECT * FROM jsonb_array_elements(v_return_items) AS elem(value)
-      WHERE (elem.value->>'store_order_id')::UUID = v_store_order.store_order_id
+      WHERE elem.value->>'store_order_id' = v_store_order.store_order_id
     LOOP
       INSERT INTO return_items (
         id, return_request_id, order_item_id, quantity, created_at
       ) VALUES (
-        gen_random_uuid(), v_seller_return_id,
-        (v_item->>'order_item_id')::UUID,
+        uuid_generate_v4()::TEXT, v_seller_return_id,
+        v_item->>'order_item_id',
         (v_item->>'quantity')::INT,
         NOW()
       );
@@ -277,4 +279,4 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION create_return_request(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, TEXT, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION create_return_request(TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, TEXT, JSONB) TO authenticated;

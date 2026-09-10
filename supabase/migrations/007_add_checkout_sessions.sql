@@ -7,10 +7,10 @@
 CREATE TABLE IF NOT EXISTS checkout_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quote_token TEXT NOT NULL,
-  buyer_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  buyer_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
   buyer_phone TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'committed', 'failed')),
-  order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+  order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
   idempotency_key TEXT,
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

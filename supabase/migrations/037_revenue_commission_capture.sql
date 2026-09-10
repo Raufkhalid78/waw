@@ -46,7 +46,7 @@ ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS seller_payout_pkr NUMERIC(12,2
 -- Resolution order: FIRST_PARTY → 0% | store override → nearest ancestor
 -- category rate → platform default, minus active subscription reduction.
 CREATE OR REPLACE FUNCTION waw_commission_rate(
-  p_store_id    UUID,
+  p_store_id    TEXT,
   p_category_id TEXT
 )
 RETURNS NUMERIC(5,2)
@@ -114,7 +114,7 @@ $$;
 --    line and the payout write changed)
 -- ═══════════════════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION checkout_transaction(
-  p_buyer_id        UUID,
+  p_buyer_id        TEXT,
   p_buyer_name      TEXT,
   p_buyer_phone     TEXT,
   p_shipping_address TEXT,
@@ -133,7 +133,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_order_id        UUID;
+  v_order_id        TEXT;
   v_order_number    TEXT;
   v_total_pkr       NUMERIC := 0;
   v_subtotal_pkr    NUMERIC := 0;
@@ -144,11 +144,11 @@ DECLARE
   v_offer           RECORD;
   v_variant         RECORD;
   v_snapshot        RECORD;
-  v_store_id        UUID;
+  v_store_id        TEXT;
   v_line_total      NUMERIC;
   v_store_orders    JSONB := '[]'::JSONB;
   v_existing_order  RECORD;
-  v_variant_id      UUID;
+  v_variant_id      TEXT;
   v_item_quantity   INTEGER;
   v_sorted_items    JSONB;
   v_coupon_discount_pkr   NUMERIC := 0;
@@ -172,7 +172,7 @@ BEGIN
     RAISE EXCEPTION 'Guest checkout not available here. Use guest_checkout_transaction.';
   END IF;
 
-  IF p_buyer_id != auth.uid() THEN
+  IF p_buyer_id != auth.uid()::TEXT THEN
     RAISE EXCEPTION 'Unauthorized: buyer identity mismatch';
   END IF;
 
@@ -204,9 +204,9 @@ BEGIN
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_sorted_items)
   LOOP
     IF v_item ? 'variant_id' AND (v_item->>'variant_id') IS NOT NULL THEN
-      v_variant_id := (v_item->>'variant_id')::UUID;
+      v_variant_id := v_item->>'variant_id';
     ELSE
-      v_variant_id := (v_item->>'offer_variant_id')::UUID;
+      v_variant_id := v_item->>'offer_variant_id';
     END IF;
 
     v_item_quantity := (v_item->>'quantity')::INT;
@@ -215,22 +215,24 @@ BEGIN
       RAISE EXCEPTION 'Item quantity must be positive';
     END IF;
 
-    SELECT so.*, cp.title AS product_title
+    -- Resolve the offer THROUGH the variant (API sends offer_variants.id)
+    SELECT so.*, cp.title AS product_title, ov.price_adjustment_pkr AS variant_adjustment_pkr
     INTO v_offer
-    FROM seller_offers so
+    FROM offer_variants ov
+    JOIN seller_offers so ON so.id = ov.offer_id
     JOIN catalog_products cp ON cp.id = so.catalog_product_id
-    WHERE so.id = (v_item->>'offer_variant_id')::UUID
+    WHERE ov.id = v_item->>'offer_variant_id'
       AND so.status = 'ACTIVE';
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Offer not found or inactive: %', v_item->>'offer_variant_id';
     END IF;
 
-    PERFORM ensure_inventory_snapshot(v_variant_id::TEXT, v_offer.store_id::TEXT);
+    PERFORM ensure_inventory_snapshot(v_variant_id, v_offer.store_id);
 
     SELECT * INTO v_snapshot
     FROM inventory_snapshots
-    WHERE offer_variant_id = v_variant_id::TEXT
+    WHERE offer_variant_id = v_variant_id
     FOR UPDATE;
 
     IF v_snapshot.available < v_item_quantity THEN
@@ -242,28 +244,32 @@ BEGIN
     SET reserved   = reserved + v_item_quantity,
         version    = version + 1,
         updated_at = NOW()
-    WHERE offer_variant_id = v_variant_id::TEXT;
+    WHERE offer_variant_id = v_variant_id;
   END LOOP;
 
   -- -- 5. Compute pricing --
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_sorted_items)
   LOOP
-    SELECT so.*, cp.title AS product_title
+    -- Resolve the offer THROUGH the variant (API sends offer_variants.id)
+    SELECT so.*, cp.title AS product_title, ov.price_adjustment_pkr AS variant_adjustment_pkr
     INTO v_offer
-    FROM seller_offers so
+    FROM offer_variants ov
+    JOIN seller_offers so ON so.id = ov.offer_id
     JOIN catalog_products cp ON cp.id = so.catalog_product_id
-    WHERE so.id = (v_item->>'offer_variant_id')::UUID;
+    WHERE ov.id = v_item->>'offer_variant_id';
 
     IF v_item ? 'variant_id' AND (v_item->>'variant_id') IS NOT NULL THEN
       SELECT * INTO v_variant
       FROM offer_variants
-      WHERE id = (v_item->>'variant_id')::UUID
+      WHERE id = v_item->>'variant_id'
         AND offer_id = v_offer.id;
 
       v_line_total := (v_offer.price_pkr + COALESCE(v_variant.price_adjustment_pkr, 0))
                        * (v_item->>'quantity')::INT;
     ELSE
-      v_line_total := v_offer.price_pkr * (v_item->>'quantity')::INT;
+      -- The variant adjustment was already resolved via the offer lookup
+      v_line_total := (v_offer.price_pkr + COALESCE(v_offer.variant_adjustment_pkr, 0))
+                       * (v_item->>'quantity')::INT;
     END IF;
 
     v_subtotal_pkr := v_subtotal_pkr + v_line_total;
@@ -290,7 +296,7 @@ BEGIN
   v_total_pkr := (v_subtotal_pkr - v_total_discount_pkr) + v_shipping_pkr + v_cod_fee_pkr + v_gst_pkr;
 
   -- -- 6. Create order --
-  v_order_id     := gen_random_uuid();
+  v_order_id     := uuid_generate_v4()::TEXT;
   v_order_number := 'WAW-' || TO_CHAR(NOW(), 'YYMMDD') || '-'
                     || LPAD(FLOOR(RANDOM() * 99999)::TEXT, 5, '0');
 
@@ -313,21 +319,25 @@ BEGIN
   -- -- 7. Ledger + store_orders + order_items (commission resolved per item) --
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_sorted_items)
   LOOP
-    SELECT so.*, cp.title AS product_title, so.store_id, cp.category_id AS product_category_id
+    -- Resolve the offer THROUGH the variant (API sends offer_variants.id)
+    SELECT so.*, cp.title AS product_title, so.store_id, cp.category_id AS product_category_id,
+           ov.price_adjustment_pkr AS variant_adjustment_pkr
     INTO v_offer
-    FROM seller_offers so
+    FROM offer_variants ov
+    JOIN seller_offers so ON so.id = ov.offer_id
     JOIN catalog_products cp ON cp.id = so.catalog_product_id
-    WHERE so.id = (v_item->>'offer_variant_id')::UUID;
+    WHERE ov.id = v_item->>'offer_variant_id';
 
     IF v_item ? 'variant_id' AND (v_item->>'variant_id') IS NOT NULL THEN
       SELECT * INTO v_variant
-      FROM offer_variants WHERE id = (v_item->>'variant_id')::UUID;
+      FROM offer_variants WHERE id = v_item->>'variant_id';
       v_line_total   := (v_offer.price_pkr + COALESCE(v_variant.price_adjustment_pkr, 0))
                          * (v_item->>'quantity')::INT;
-      v_variant_id   := (v_item->>'variant_id')::UUID;
+      v_variant_id   := v_item->>'variant_id';
     ELSE
-      v_line_total   := v_offer.price_pkr * (v_item->>'quantity')::INT;
-      v_variant_id   := (v_item->>'offer_variant_id')::UUID;
+      v_line_total   := (v_offer.price_pkr + COALESCE(v_offer.variant_adjustment_pkr, 0))
+                         * (v_item->>'quantity')::INT;
+      v_variant_id   := v_item->>'offer_variant_id';
     END IF;
 
     v_item_quantity := (v_item->>'quantity')::INT;
@@ -335,12 +345,12 @@ BEGIN
     INSERT INTO inventory_ledger (
       offer_variant_id, store_id, transaction_type, quantity, reference_id, notes
     ) VALUES (
-      v_variant_id::TEXT, v_offer.store_id::TEXT, 'RESERVE', -v_item_quantity,
-      v_order_id::TEXT, 'Checkout reservation for Order ' || v_order_number
+      v_variant_id, v_offer.store_id, 'RESERVE', -v_item_quantity,
+      v_order_id, 'Checkout reservation for Order ' || v_order_number
     );
 
     IF NOT (v_store_orders @> jsonb_build_array(jsonb_build_object('store_id', v_offer.store_id))) THEN
-      DECLARE v_store_order_id UUID := gen_random_uuid();
+      DECLARE v_store_order_id TEXT := uuid_generate_v4()::TEXT;
       BEGIN
         INSERT INTO store_orders (
           id, order_id, store_id, status, subtotal_pkr, commission_pkr, created_at, updated_at
@@ -353,19 +363,21 @@ BEGIN
       END;
     END IF;
 
-    DECLARE v_so_id UUID;
+    DECLARE v_so_id TEXT;
     BEGIN
-      SELECT (elem->>'store_order_id')::UUID INTO v_so_id
+      SELECT elem->>'store_order_id' INTO v_so_id
       FROM jsonb_array_elements(v_store_orders) AS elem
-      WHERE (elem->>'store_id')::UUID = v_offer.store_id;
+      WHERE elem->>'store_id' = v_offer.store_id;
 
       INSERT INTO order_items (
         id, order_id, store_order_id, offer_variant_id, product_id,
         quantity, unit_price_pkr, total_price_pkr, created_at
       ) VALUES (
-        gen_random_uuid(), v_order_id, v_so_id,
-        (v_item->>'offer_variant_id'), v_offer.catalog_product_id,
-        v_item_quantity, v_offer.price_pkr, v_line_total, NOW()
+        uuid_generate_v4()::TEXT, v_order_id, v_so_id,
+        v_variant_id, v_offer.catalog_product_id,
+        v_item_quantity,
+        v_offer.price_pkr + COALESCE(v_offer.variant_adjustment_pkr, 0),
+        v_line_total, NOW()
       );
 
       UPDATE store_orders
@@ -385,7 +397,7 @@ BEGIN
   INSERT INTO payments (
     id, order_id, payment_method, status, amount_pkr, created_at, updated_at
   ) VALUES (
-    gen_random_uuid(), v_order_id, p_payment_method, 'PENDING', v_total_pkr, NOW(), NOW()
+    uuid_generate_v4()::TEXT, v_order_id, p_payment_method, 'PENDING', v_total_pkr, NOW(), NOW()
   );
 
   RETURN jsonb_build_object(
@@ -425,7 +437,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_order_id          UUID;
+  v_order_id          TEXT;
   v_order_number      TEXT;
   v_total_pkr         NUMERIC := 0;
   v_subtotal_pkr      NUMERIC := 0;
@@ -436,11 +448,11 @@ DECLARE
   v_offer             RECORD;
   v_variant           RECORD;
   v_snapshot          RECORD;
-  v_store_id          UUID;
+  v_store_id          TEXT;
   v_line_total        NUMERIC;
   v_store_orders      JSONB := '[]'::JSONB;
   v_existing_order    RECORD;
-  v_variant_id        UUID;
+  v_variant_id        TEXT;
   v_item_quantity     INTEGER;
   v_sorted_items      JSONB;
   v_token_payload     TEXT;
@@ -566,9 +578,9 @@ BEGIN
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_sorted_items)
   LOOP
     IF v_item ? 'variant_id' AND (v_item->>'variant_id') IS NOT NULL THEN
-      v_variant_id := (v_item->>'variant_id')::UUID;
+      v_variant_id := v_item->>'variant_id';
     ELSE
-      v_variant_id := (v_item->>'offer_variant_id')::UUID;
+      v_variant_id := v_item->>'offer_variant_id';
     END IF;
 
     v_item_quantity := (v_item->>'quantity')::INT;
@@ -577,22 +589,24 @@ BEGIN
       RAISE EXCEPTION 'Item quantity must be positive';
     END IF;
 
-    SELECT so.*, cp.title AS product_title
+    -- Resolve the offer THROUGH the variant (API sends offer_variants.id)
+    SELECT so.*, cp.title AS product_title, ov.price_adjustment_pkr AS variant_adjustment_pkr
     INTO v_offer
-    FROM seller_offers so
+    FROM offer_variants ov
+    JOIN seller_offers so ON so.id = ov.offer_id
     JOIN catalog_products cp ON cp.id = so.catalog_product_id
-    WHERE so.id = (v_item->>'offer_variant_id')::UUID
+    WHERE ov.id = v_item->>'offer_variant_id'
       AND so.status = 'ACTIVE';
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Offer not found or inactive: %', v_item->>'offer_variant_id';
     END IF;
 
-    PERFORM ensure_inventory_snapshot(v_variant_id::TEXT, v_offer.store_id::TEXT);
+    PERFORM ensure_inventory_snapshot(v_variant_id, v_offer.store_id);
 
     SELECT * INTO v_snapshot
     FROM inventory_snapshots
-    WHERE offer_variant_id = v_variant_id::TEXT
+    WHERE offer_variant_id = v_variant_id
     FOR UPDATE;
 
     IF v_snapshot.available < v_item_quantity THEN
@@ -603,21 +617,22 @@ BEGIN
     IF v_item ? 'variant_id' AND (v_item->>'variant_id') IS NOT NULL THEN
       SELECT * INTO v_variant
       FROM offer_variants
-      WHERE id = (v_item->>'variant_id')::UUID
+      WHERE id = v_item->>'variant_id'
         AND offer_id = v_offer.id;
       IF NOT FOUND THEN
         RAISE EXCEPTION 'Variant not found: %', v_item->>'variant_id';
       END IF;
       v_line_total := (v_offer.price_pkr + COALESCE(v_variant.price_adjustment_pkr, 0)) * v_item_quantity;
     ELSE
-      v_line_total := v_offer.price_pkr * v_item_quantity;
+      -- The variant adjustment was already resolved via the offer lookup
+      v_line_total := (v_offer.price_pkr + COALESCE(v_offer.variant_adjustment_pkr, 0)) * v_item_quantity;
     END IF;
 
     UPDATE inventory_snapshots
     SET reserved   = reserved + v_item_quantity,
         version    = version + 1,
         updated_at = NOW()
-    WHERE offer_variant_id = v_variant_id::TEXT;
+    WHERE offer_variant_id = v_variant_id;
 
     v_subtotal_pkr := v_subtotal_pkr + v_line_total;
     v_store_id     := v_offer.store_id;
@@ -644,7 +659,7 @@ BEGIN
   v_total_pkr := (v_subtotal_pkr - v_total_discount_pkr) + v_shipping_pkr + v_cod_fee_pkr + v_gst_pkr;
 
   -- -- 10. Create order --
-  v_order_id     := gen_random_uuid();
+  v_order_id     := uuid_generate_v4()::TEXT;
   v_order_number := 'WAW-' || TO_CHAR(NOW(), 'YYMMDD') || '-'
                     || LPAD(FLOOR(RANDOM() * 99999)::TEXT, 5, '0');
 
@@ -667,19 +682,22 @@ BEGIN
   -- -- 11. Ledger + store_orders + order_items (commission resolved per item) --
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_sorted_items)
   LOOP
-    SELECT so.*, cp.title AS product_title, so.store_id, cp.category_id AS product_category_id
+    -- Resolve the offer THROUGH the variant (API sends offer_variants.id)
+    SELECT so.*, cp.title AS product_title, so.store_id, cp.category_id AS product_category_id,
+           ov.price_adjustment_pkr AS variant_adjustment_pkr
     INTO v_offer
-    FROM seller_offers so
+    FROM offer_variants ov
+    JOIN seller_offers so ON so.id = ov.offer_id
     JOIN catalog_products cp ON cp.id = so.catalog_product_id
-    WHERE so.id = (v_item->>'offer_variant_id')::UUID;
+    WHERE ov.id = v_item->>'offer_variant_id';
 
     IF v_item ? 'variant_id' AND (v_item->>'variant_id') IS NOT NULL THEN
-      SELECT * INTO v_variant FROM offer_variants WHERE id = (v_item->>'variant_id')::UUID;
+      SELECT * INTO v_variant FROM offer_variants WHERE id = v_item->>'variant_id';
       v_line_total  := (v_offer.price_pkr + COALESCE(v_variant.price_adjustment_pkr, 0)) * (v_item->>'quantity')::INT;
-      v_variant_id  := (v_item->>'variant_id')::UUID;
+      v_variant_id  := v_item->>'variant_id';
     ELSE
-      v_line_total  := v_offer.price_pkr * (v_item->>'quantity')::INT;
-      v_variant_id  := (v_item->>'offer_variant_id')::UUID;
+      v_line_total  := (v_offer.price_pkr + COALESCE(v_offer.variant_adjustment_pkr, 0)) * (v_item->>'quantity')::INT;
+      v_variant_id  := v_item->>'offer_variant_id';
     END IF;
 
     v_item_quantity := (v_item->>'quantity')::INT;
@@ -687,12 +705,12 @@ BEGIN
     INSERT INTO inventory_ledger (
       offer_variant_id, store_id, transaction_type, quantity, reference_id, notes
     ) VALUES (
-      v_variant_id::TEXT, v_offer.store_id::TEXT, 'RESERVE', -v_item_quantity,
-      v_order_id::TEXT, 'Guest checkout reservation for Order ' || v_order_number
+      v_variant_id, v_offer.store_id, 'RESERVE', -v_item_quantity,
+      v_order_id, 'Guest checkout reservation for Order ' || v_order_number
     );
 
     IF NOT (v_store_orders @> jsonb_build_array(jsonb_build_object('store_id', v_offer.store_id))) THEN
-      DECLARE v_store_order_id UUID := gen_random_uuid();
+      DECLARE v_store_order_id TEXT := uuid_generate_v4()::TEXT;
       BEGIN
         INSERT INTO store_orders (
           id, order_id, store_id, status, subtotal_pkr, commission_pkr, created_at, updated_at
@@ -705,19 +723,21 @@ BEGIN
       END;
     END IF;
 
-    DECLARE v_so_id UUID;
+    DECLARE v_so_id TEXT;
     BEGIN
-      SELECT (elem->>'store_order_id')::UUID INTO v_so_id
+      SELECT elem->>'store_order_id' INTO v_so_id
       FROM jsonb_array_elements(v_store_orders) AS elem
-      WHERE (elem->>'store_id')::UUID = v_offer.store_id;
+      WHERE elem->>'store_id' = v_offer.store_id;
 
       INSERT INTO order_items (
         id, order_id, store_order_id, offer_variant_id, product_id,
         quantity, unit_price_pkr, total_price_pkr, created_at
       ) VALUES (
-        gen_random_uuid(), v_order_id, v_so_id,
-        (v_item->>'offer_variant_id'), v_offer.catalog_product_id,
-        v_item_quantity, v_offer.price_pkr, v_line_total, NOW()
+        uuid_generate_v4()::TEXT, v_order_id, v_so_id,
+        v_variant_id, v_offer.catalog_product_id,
+        v_item_quantity,
+        v_offer.price_pkr + COALESCE(v_offer.variant_adjustment_pkr, 0),
+        v_line_total, NOW()
       );
 
       UPDATE store_orders
@@ -736,7 +756,7 @@ BEGIN
   INSERT INTO payments (
     id, order_id, payment_method, status, amount_pkr, created_at, updated_at
   ) VALUES (
-    gen_random_uuid(), v_order_id, p_payment_method, 'PENDING', v_total_pkr, NOW(), NOW()
+    uuid_generate_v4()::TEXT, v_order_id, p_payment_method, 'PENDING', v_total_pkr, NOW(), NOW()
   );
 
   RETURN jsonb_build_object(
@@ -756,10 +776,10 @@ $$;
 -- Function identities changed (guest RPC gained 2 trailing params) —
 -- drop legacy overloads and re-grant.
 DROP FUNCTION IF EXISTS guest_checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT);
-DROP FUNCTION IF EXISTS checkout_transaction(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT);
+DROP FUNCTION IF EXISTS checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT);
 
-GRANT EXECUTE ON FUNCTION checkout_transaction(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, INTEGER) TO authenticated;
-REVOKE EXECUTE ON FUNCTION checkout_transaction(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, INTEGER) FROM anon;
+GRANT EXECUTE ON FUNCTION checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, INTEGER) TO authenticated;
+REVOKE EXECUTE ON FUNCTION checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, INTEGER) FROM anon;
 
 GRANT EXECUTE ON FUNCTION guest_checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, NUMERIC, NUMERIC) TO anon;
 GRANT EXECUTE ON FUNCTION guest_checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT, NUMERIC, NUMERIC) TO authenticated;

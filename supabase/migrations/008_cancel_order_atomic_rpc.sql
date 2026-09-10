@@ -8,7 +8,7 @@
 BEGIN;
 
 CREATE OR REPLACE FUNCTION cancel_order(
-  p_order_id UUID,
+  p_order_id TEXT,
   p_reason   TEXT DEFAULT 'Customer cancelled'
 )
 RETURNS JSONB
@@ -70,8 +70,8 @@ BEGIN
       INSERT INTO inventory_ledger (
         offer_variant_id, store_id, transaction_type, quantity, reference_id, notes
       ) VALUES (
-        v_item.offer_variant_id, v_store_order.store_id::TEXT, 'RELEASE', v_item.quantity,
-        p_order_id::TEXT, 'Order cancelled: ' || p_reason
+        v_item.offer_variant_id, v_store_order.store_id, 'RELEASE', v_item.quantity,
+        p_order_id, 'Order cancelled: ' || p_reason
       );
 
       -- Release from snapshot (authoritative balance)
@@ -109,7 +109,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION cancel_order(UUID, TEXT) TO authenticated;
-REVOKE EXECUTE ON FUNCTION cancel_order(UUID, TEXT) FROM anon;
+GRANT EXECUTE ON FUNCTION cancel_order(TEXT, TEXT) TO authenticated;
+REVOKE EXECUTE ON FUNCTION cancel_order(TEXT, TEXT) FROM anon;
 
 COMMIT;
