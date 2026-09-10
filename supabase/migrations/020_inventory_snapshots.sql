@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- P0-PHASE0-T1: Authoritative Inventory Snapshots
 -- Provides a single deterministic row per offer_variant that the checkout RPC
 -- locks with SELECT ... FOR UPDATE. Eliminates the zero-stock race window

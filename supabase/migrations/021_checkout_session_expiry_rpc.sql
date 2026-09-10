@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- P0-PHASE0-T5: Checkout Session Expiry RPC
 -- Releases inventory_snapshots.reserved for orders that have been in
 -- PENDING_PAYMENT status for more than 15 minutes without payment.

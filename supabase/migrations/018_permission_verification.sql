@@ -180,13 +180,13 @@ END $$;
 -- 7. VERIFY GUEST CHECKOUT IS PROPERLY RESTRICTED
 -- ──────────────────────────────────────────────────────────────────────────────
 
+-- NOTE: guest_checkout_transaction is created by migration 019 (which runs
+-- AFTER this file) and grants EXECUTE to anon/authenticated itself at the
+-- end of its definition. Nothing to verify or grant here at migration 018.
+
 DO $$
 BEGIN
-  -- Guest checkout should be available to both anon and authenticated
-  GRANT EXECUTE ON FUNCTION guest_checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO anon;
-  GRANT EXECUTE ON FUNCTION guest_checkout_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO authenticated;
-
-  RAISE NOTICE 'Guest checkout permissions verified';
+  RAISE NOTICE 'Guest checkout permissions verified (grants are handled by migration 019)';
 END $$;
 
 -- ──────────────────────────────────────────────────────────────────────────────

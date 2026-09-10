@@ -12,7 +12,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS \$\$
+AS $$
 DECLARE
   v_order RECORD;
   v_store_order RECORD;
@@ -73,6 +73,6 @@ BEGIN
     'total_refund_pkr', v_total_refund
   );
 END;
-\$\$;
+$$;
 
 INSERT INTO schema_migrations (version, applied_at) VALUES ('026_financial_reversals_atomic', NOW()) ON CONFLICT DO NOTHING;

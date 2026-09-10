@@ -29,7 +29,10 @@ UPDATE xpay_webhooks_log
 
 -- 3. Replace the flat unique constraint with one scoped to non-rejected
 --    events. Rejected events no longer occupy their transaction_id slot.
-DROP CONSTRAINT IF EXISTS xpay_webhooks_log_transaction_id_key;
+ALTER TABLE xpay_webhooks_log
+  DROP CONSTRAINT IF EXISTS uq_xpay_webhooks_log_transaction_id;
+ALTER TABLE xpay_webhooks_log
+  DROP CONSTRAINT IF EXISTS xpay_webhooks_log_transaction_id_key;
 ALTER TABLE xpay_webhooks_log
   DROP CONSTRAINT IF EXISTS xpay_webhooks_log_transaction_id_status_key;
 ALTER TABLE xpay_webhooks_log

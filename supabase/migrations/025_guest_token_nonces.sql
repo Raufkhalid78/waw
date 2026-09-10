@@ -8,6 +8,12 @@ CREATE TABLE IF NOT EXISTS guest_token_nonces (
   consumed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE guest_token_nonces ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access guest_token_nonces"
+  ON guest_token_nonces FOR ALL
+  USING (auth.role() = 'service_role');
+
 -- Note: We will modify 019_guest_checkout_rpc.sql separately to insert the nonce.
 
 INSERT INTO schema_migrations (version, applied_at) VALUES ('025_guest_token_nonces', NOW()) ON CONFLICT DO NOTHING;

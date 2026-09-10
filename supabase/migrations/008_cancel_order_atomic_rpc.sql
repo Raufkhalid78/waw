@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- P0-2 + P0-5 [HARDENED]: Atomic cancel order RPC with snapshot release
 -- Improvements over previous version:
 --   1. Releases inventory_snapshots.reserved on cancellation (not just ledger).
