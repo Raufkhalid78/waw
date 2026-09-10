@@ -50,9 +50,14 @@ CREATE TRIGGER trg_inv_snapshots_updated_at
 -- 4. RLS
 ALTER TABLE inventory_snapshots ENABLE ROW LEVEL SECURITY;
 
+-- 001_schema_complete.sql already creates equivalent policies; these
+-- re-creations must be guarded because Postgres has no CREATE POLICY
+-- IF NOT EXISTS.
+DROP POLICY IF EXISTS "Deny anon inventory_snapshots read" ON inventory_snapshots;
 CREATE POLICY "Deny anon inventory_snapshots read"
   ON inventory_snapshots FOR SELECT TO anon USING (false);
 
+DROP POLICY IF EXISTS "Store owners can view their inventory snapshots" ON inventory_snapshots;
 CREATE POLICY "Store owners can view their inventory snapshots"
   ON inventory_snapshots FOR SELECT TO authenticated
   USING (

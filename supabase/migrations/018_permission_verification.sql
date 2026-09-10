@@ -121,7 +121,7 @@ BEGIN
   FOR v_func IN
     SELECT p.proname, pg_get_functiondef(p.oid) as definition
     FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.procnsp
+    JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
       AND p.prosecdef = true
   LOOP
