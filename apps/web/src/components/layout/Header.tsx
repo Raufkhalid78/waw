@@ -250,14 +250,15 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
   };
 
   // Auto rotate admin announcements every 5 seconds
+  // (Guard: with zero announcements the modulo would be % 0 -> NaN index)
+  const announcementCount = config.promotionalAnnouncements.length;
   useEffect(() => {
+    if (announcementCount < 2) return;
     const timer = setInterval(() => {
-      setActivePromoIndex(
-        (prev) => (prev + 1) % config.promotionalAnnouncements.length,
-      );
+      setActivePromoIndex((prev) => (prev + 1) % announcementCount);
     }, 5000);
     return () => clearInterval(timer);
-  }, [config.promotionalAnnouncements.length]);
+  }, [announcementCount]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -329,12 +330,16 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const activePromo = config.promotionalAnnouncements[activePromoIndex];
+  const activePromo =
+    config.promotionalAnnouncements[
+      Math.min(activePromoIndex, Math.max(config.promotionalAnnouncements.length - 1, 0))
+    ];
 
   return (
     <>
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs dark:bg-slate-900 dark:border-slate-700">
         {/* ── Tier 1: Dynamic Admin Promotional & Announcement Ticker ───────── */}
+        {config.promotionalAnnouncements.length > 0 && activePromo && (
         <div className="bg-[#0B0F19] text-white text-[11px] font-medium py-1.5 px-3 sm:px-6 lg:px-10 xl:px-12 border-b border-slate-800">
           <div className="w-full flex items-center justify-between gap-4">
             {/* Rotating Live Announcement */}
@@ -372,6 +377,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
             </div>
           </div>
         </div>
+        )}
 
         {/* ── Tier 2: Premium Noon-Inspired Navigation Bar ──────────────────── */}
         <div className="bg-[#FEEB00] py-2 px-3 sm:px-6 lg:px-10 xl:px-12 border-b border-yellow-400">

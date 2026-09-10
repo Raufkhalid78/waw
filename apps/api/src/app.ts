@@ -841,7 +841,7 @@ app.get("/api/marketplace-stats", async (_req, res) => {
       avgRating: parseFloat(avgRating),
     };
 
-    await redis.setex(cacheKey, 300, JSON.stringify(stats));
+    await redis.set(cacheKey, JSON.stringify(stats), { ex: 300 });
     res.json(stats);
   } catch (err: any) {
     logger.error("Marketplace stats error", "API", err);

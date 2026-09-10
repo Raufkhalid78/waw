@@ -312,14 +312,22 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       setLanguageState(saved);
       applyLanguage(saved);
     }
-    // Try to load from DB (for logged-in users)
-    fetchUserPreferences().then((prefs) => {
-      if (prefs.language && ['en', 'ur'].includes(prefs.language)) {
-        setLanguageState(prefs.language);
-        applyLanguage(prefs.language);
-        localStorage.setItem('waw-language', prefs.language);
-      }
-    }).catch(() => {});
+    // Try to load from DB (for logged-in users only — the endpoint is
+    // auth-guarded, so calling it anonymously just produces 401 noise)
+    const hasSessionCookie =
+      typeof document !== 'undefined' &&
+      document.cookie
+        .split(';')
+        .some((c) => c.trim().startsWith('waw_session='));
+    if (hasSessionCookie) {
+      fetchUserPreferences().then((prefs) => {
+        if (prefs.language && ['en', 'ur'].includes(prefs.language)) {
+          setLanguageState(prefs.language);
+          applyLanguage(prefs.language);
+          localStorage.setItem('waw-language', prefs.language);
+        }
+      }).catch(() => {});
+    }
   }, []);
 
   const applyLanguage = (lang: Language) => {
