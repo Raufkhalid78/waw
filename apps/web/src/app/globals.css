@@ -379,6 +379,37 @@ body {
 .dark .bg-amber-400 { background-color: #fbbf24; }
 .dark .bg-amber-500 { background-color: #f59e0b; }
 
+/* ── Tier-2 Brand Nav Bar (gold #FEEB00) — keep the bar yellow, ink dark ──
+   The global .dark text overrides above would otherwise flip the nav text to
+   light, making the menu invisible on the bright gold bar. Scope a re-flip
+   to the bar's ink regions while leaving the center search (dark surface)
+   and popovers untouched. */
+.dark .brand-ink .text-slate-950,
+.dark .brand-ink .text-slate-900,
+.dark .brand-ink .text-slate-800,
+.dark .brand-ink .text-slate-700 {
+  color: #0f172a;
+}
+.dark .brand-ink .text-slate-900\/20 {
+  color: rgba(15, 23, 42, 0.35);
+}
+
+/* Popovers launched from the brand bar stay on dark surfaces */
+.dark .brand-ink .popover {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+.dark .brand-ink .popover .text-slate-100,
+.dark .brand-ink .popover .text-slate-200 { color: #e2e8f0; }
+.dark .brand-ink .popover .text-slate-300 { color: #cbd5e1; }
+.dark .brand-ink .popover .text-slate-400 { color: #94a3b8; }
+.dark .brand-ink .popover .text-slate-500 { color: #94a3b8; }
+.dark .brand-ink .popover .text-slate-600 { color: #94a3b8; }
+.dark .brand-ink .popover .text-slate-700 { color: #cbd5e1; }
+.dark .brand-ink .popover .text-slate-800 { color: #e2e8f0; }
+.dark .brand-ink .popover .text-slate-900 { color: #f1f5f9; }
+.dark .brand-ink .popover .text-slate-950 { color: #f8fafc; }
+
 /* ── Selection ───────────────────────────────────────────────────────────── */
 .dark ::selection { background-color: rgba(251, 191, 36, 0.3); color: #f8fafc; }
 

@@ -383,7 +383,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
         <div className="bg-[#FEEB00] py-2 px-3 sm:px-6 lg:px-10 xl:px-12 border-b border-yellow-400">
           <div className="w-full flex items-center justify-between gap-3 sm:gap-5">
             {/* Left: 'waw' Bold Wordmark + Clean Delivery Pill */}
-            <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 shrink-0 brand-ink">
               <Logo size="md" />
 
               {/* Delivery Location Pill */}
@@ -404,7 +404,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
                 {/* City Picker Dropdown */}
                 {showCityModal && (
-                  <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 text-slate-900 animate-fade-up dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 text-slate-900 animate-fade-up popover dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
                     <div className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
                       {t.selectCity}
                     </div>
@@ -536,7 +536,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
             </div>
 
             {/* Right: Theme, Language, User Profile, Orders, Wishlist, Cart */}
-            <div className="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm font-black text-slate-950 dark:text-slate-100">
+            <div className="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm font-black text-slate-950 dark:text-slate-950 brand-ink">
               {/* Theme Toggle */}
               <div className="hidden lg:block">
                 <ThemeToggle />
@@ -573,7 +573,7 @@ export function Header({ onMenuToggle, menuOpen: externalMenuOpen }: HeaderProps
 
                   {/* Dropdown Menu */}
                   {showUserMenu && (
-                    <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 text-slate-900 overflow-hidden animate-fade-up dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 text-slate-900 overflow-hidden animate-fade-up popover dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
                       <div className="p-3 bg-slate-50 border-b border-slate-100 dark:bg-slate-900 dark:border-slate-700">
                         <p className="text-xs font-black text-slate-900 truncate">
                           {user.name}
