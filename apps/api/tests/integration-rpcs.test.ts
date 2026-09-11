@@ -94,7 +94,9 @@ describe("P0-INT: Checkout Transaction RPC Integration", { skip: SKIP_DB_TESTS ?
     }
   });
 
-  it("should have guest checkout function available to anon role", async () => {
+  it("should NOT have guest checkout function granted to anon role", async () => {
+    // Hardened in migration 049: guests check out through the Express API
+    // (service_role), so no checkout RPC is directly executable by anon.
     const client = await pool.connect();
     try {
       const { rows } = await client.query(`
@@ -105,7 +107,7 @@ describe("P0-INT: Checkout Transaction RPC Integration", { skip: SKIP_DB_TESTS ?
           AND grantee = 'anon'
       `);
 
-      assert.ok(rows.length > 0, "guest_checkout_transaction should be granted to anon role");
+      assert.ok(rows.length === 0, "guest_checkout_transaction must NOT be granted to anon role");
     } finally {
       client.release();
     }

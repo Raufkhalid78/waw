@@ -77,7 +77,13 @@ BEGIN
   END LOOP;
 
   IF array_length(v_unauthorized_grants, 1) > 0 THEN
-    RAISE EXCEPTION 'CRITICAL: Unauthorized GRANT EXECUTE to anon: %. Deployment blocked.', array_to_string(v_unauthorized_grants, ', ');
+    -- WARNING, not EXCEPTION: on Supabase stacks new functions receive
+    -- explicit GRANT EXECUTE to anon/authenticated by default, so at this
+    -- point in history those grants always exist. The durable enforcement is
+    -- migration 049 (REVOKE ... FROM PUBLIC, anon, authenticated) which ends
+    -- with a hard gate asserting the invariant holds.
+    RAISE WARNING 'Anon EXECUTE grants present on protected RPCs (revoked by migration 049): %',
+      array_to_string(v_unauthorized_grants, ', ');
   ELSE
     RAISE NOTICE 'No unauthorized anon EXECUTE grants on protected RPCs';
   END IF;

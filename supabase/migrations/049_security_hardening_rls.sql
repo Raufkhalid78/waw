@@ -99,6 +99,55 @@ REVOKE ALL ON FUNCTION public.settle_order_payment(TEXT, TEXT, NUMERIC, TEXT) FR
 REVOKE ALL ON FUNCTION public.record_notification_event(TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.increment_loyalty_points(TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
 
+-- Checkout/return/order RPCs are always invoked by the API via service_role;
+-- Supabase default privileges grant them to anon/authenticated explicitly.
+-- (oid-based loop so every overload is covered.)
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT p.oid
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+        'checkout_transaction', 'guest_checkout_transaction',
+        'create_return_request', 'cancel_order'
+      )
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.oid::regprocedure);
+  END LOOP;
+END
+$$;
+
+-- Hard gate: assert the revocation invariant actually holds before this
+-- migration is recorded as applied (supersedes the informational check in
+-- migration 018, which runs before Supabase's default privileges exist).
+DO $$
+DECLARE
+  v_unauthorized TEXT[] := '{}';
+BEGIN
+  SELECT array_agg(routine_name)
+  INTO v_unauthorized
+  FROM information_schema.routine_privileges
+  WHERE routine_schema = 'public'
+    AND grantee = 'anon'
+    AND routine_name IN (
+      'checkout_transaction', 'create_return_request', 'cancel_order',
+      'guest_checkout_transaction', 'settle_payout_atomic',
+      'reverse_order_atomic', 'settle_order_payment',
+      'apply_courier_status_event'
+    );
+
+  IF v_unauthorized IS NOT NULL AND array_length(v_unauthorized, 1) > 0 THEN
+    RAISE EXCEPTION 'SECURITY: protected RPCs still granted to anon: %. Deployment blocked.',
+      array_to_string(v_unauthorized, ', ');
+  END IF;
+  RAISE NOTICE 'Verified: no anon EXECUTE on protected RPCs';
+END
+$$;
+
 -- ============================================================================
 -- 5. Guest carts: cart rows are only reachable through the API (service_role)
 -- ============================================================================
