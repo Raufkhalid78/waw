@@ -159,7 +159,12 @@ jobs:
         run: npx supabase db reset
       - name: Export Supabase connection env
         run: |
-          npx supabase status -o env | grep -E '^(SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' >> "$GITHUB_ENV"
+          npx supabase status -o json > supabase-status.json
+          {
+            echo "SUPABASE_URL=$(jq -r .api_url supabase-status.json)"
+            echo "SUPABASE_ANON_KEY=$(jq -r .anon_key supabase-status.json)"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(jq -r .service_role_key supabase-status.json)"
+          } >> "$GITHUB_ENV"
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
       - name: Run E2E tests
