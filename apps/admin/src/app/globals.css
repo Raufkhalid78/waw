@@ -185,6 +185,12 @@ body {
   background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
 }
 
+/* Amber fills keep dark ink (buttons, badges) */
+.dark .bg-amber-400.text-slate-950,
+.dark .bg-amber-500.text-slate-950,
+.dark .bg-amber-400.text-slate-900,
+.dark .bg-amber-500.text-slate-900 { color: #0f172a; }
+
 /* Scrollbar */
 .dark ::-webkit-scrollbar-track { background: #1e293b; }
 .dark ::-webkit-scrollbar-thumb { background: #475569; }

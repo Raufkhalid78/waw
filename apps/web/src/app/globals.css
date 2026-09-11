@@ -379,6 +379,14 @@ body {
 .dark .bg-amber-400 { background-color: #fbbf24; }
 .dark .bg-amber-500 { background-color: #f59e0b; }
 
+/* Keep dark ink wherever amber fills + dark text meet on the same element
+   (buttons, badges, pills) — otherwise the .dark text-slate-950 override
+   above turns the label light-on-amber and it becomes unreadable. */
+.dark .bg-amber-400.text-slate-950,
+.dark .bg-amber-500.text-slate-950 { color: #0f172a; }
+.dark .bg-amber-400.text-slate-900,
+.dark .bg-amber-500.text-slate-900 { color: #0f172a; }
+
 /* ── Tier-2 Brand Nav Bar (gold #FEEB00) — keep the bar yellow, ink dark ──
    The global .dark text overrides above would otherwise flip the nav text to
    light, making the menu invisible on the bright gold bar. Scope a re-flip
