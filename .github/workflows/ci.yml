@@ -82,7 +82,7 @@ jobs:
     needs: [build]
     services:
       postgres:
-        image: supabase/postgres:15.6.1.146
+        image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: waw_test
@@ -112,7 +112,7 @@ jobs:
       - run: npm ci
       - run: npx turbo run build --filter=@waw/types --filter=@waw/config
       - name: Apply Supabase Migrations
-        run: npx supabase db push --db-url "$DATABASE_URL?sslmode=disable"
+        run: npx supabase db push --include-all --db-url "$DATABASE_URL?sslmode=disable"
       - name: Load Staging Seed Data
         run: PGPASSWORD=postgres psql -h localhost -U postgres -d waw_test -f supabase/seed.sql
       - name: Run API unit tests
@@ -126,18 +126,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     services:
-      postgres:
-        image: supabase/postgres:15.6.1.146
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: waw_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
       redis:
         image: redis:7-alpine
         ports:
@@ -148,10 +136,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/waw_e2e
-      SUPABASE_URL: http://localhost:54321
-      SUPABASE_ANON_KEY: test
-      SUPABASE_SERVICE_ROLE_KEY: test
+      # Local Supabase stack defaults (see supabase/config.toml: api 54321, db 54322)
+      DATABASE_URL: postgresql://postgres:postgres@localhost:54322/postgres
       JWT_SECRET: test-secret-key
       REDIS_HOST: localhost
       REDIS_PORT: 6379
@@ -167,11 +153,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
       - run: npm ci
-      - name: Apply Supabase Migrations
-        run: npx supabase db push --db-url "$DATABASE_URL?sslmode=disable"
-      - name: Load Staging Seed Data
-        run: PGPASSWORD=postgres psql -h localhost -U postgres -d waw_e2e -f supabase/seed.sql
-      - run: npx playwright install --with-deps chromium
+      - name: Start local Supabase stack (PostgREST + GoTrue + Postgres)
+        run: npx supabase start
+      - name: Apply migrations + seed (supabase db reset)
+        run: npx supabase db reset
+      - name: Export Supabase connection env
+        run: |
+          npx supabase status -o env | grep -E '^(SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' >> "$GITHUB_ENV"
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
       - name: Run E2E tests
         run: npx playwright test --project=chromium
         env:
