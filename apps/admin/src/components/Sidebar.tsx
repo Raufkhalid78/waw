@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "./ThemeProvider";
 import {
   LayoutDashboard,
   Package,
@@ -24,6 +25,8 @@ import {
   Zap,
   Image,
   FolderTree,
+  Sun,
+  Moon,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -54,6 +57,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -70,14 +74,14 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const navContent = (
     <>
       {/* Logo */}
-      <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+      <div className="p-5 border-b border-gray-100 flex items-center justify-between dark:border-slate-700">
         <Link href="/" className="flex items-center gap-2.5" onClick={onClose}>
           <div className="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center shadow-sm">
             <span className="text-xl font-black text-slate-950 leading-none">W</span>
           </div>
           <div>
-            <span className="text-lg font-black text-slate-950 tracking-tight">waw</span>
-            <span className="block text-[10px] font-bold text-slate-400 tracking-widest uppercase -mt-0.5">
+            <span className="text-lg font-black text-slate-950 tracking-tight dark:text-slate-100">waw</span>
+            <span className="block text-[10px] font-bold text-slate-400 tracking-widest uppercase -mt-0.5 dark:text-slate-500">
               admin
             </span>
           </div>
@@ -85,7 +89,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 lg:hidden"
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 lg:hidden dark:hover:bg-slate-700"
           >
             <X className="w-5 h-5" />
           </button>
@@ -120,11 +124,18 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-100">
-        <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400">
+      <div className="p-3 border-t border-gray-100 dark:border-slate-700">
+        <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 dark:text-slate-500">
           <Shield className="w-3.5 h-3.5" />
           <span>Admin Panel v1.0</span>
         </div>
+        <button
+          onClick={toggleTheme}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-0.5 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors mt-0.5"
@@ -139,7 +150,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-60 bg-white border-r border-gray-200 flex-col h-screen shrink-0">
+      <aside className="hidden lg:flex w-60 bg-white border-r border-gray-200 flex-col h-screen shrink-0 dark:bg-slate-800 dark:border-slate-700">
         {navContent}
       </aside>
 
@@ -152,7 +163,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             style={{ animation: "overlayIn 200ms ease-out" }}
           />
           <aside
-            className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col"
+            className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col dark:bg-slate-800"
             style={{ animation: "slideInLeft 250ms ease-out" }}
           >
             {navContent}

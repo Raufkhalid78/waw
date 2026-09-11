@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@waw/config";
+import { logger } from "@/lib/logger";
 
 import { NextRequest, NextResponse } from "next/server";
 
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (err) {
-      console.error("OAuth callback error:", err);
+      logger.error("OAuth callback error", "AuthCallback", err);
     }
   }
 

@@ -32,17 +32,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Checkout',
-          style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+          style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back_ios, color: scheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -124,17 +125,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         _buildSection(
                           'Payment Method',
                           Icons.payment,
-                          Column(
-                            children: PaymentMethod.values.map((method) {
-                              return RadioListTile<PaymentMethod>(
-                                value: method,
-                                groupValue: _paymentMethod,
-                                onChanged: (v) => setState(() => _paymentMethod = v!),
-                                title: Text(method.label),
-                                activeColor: const Color(0xFFF59E0B),
-                                contentPadding: EdgeInsets.zero,
-                              );
-                            }).toList(),
+                          RadioGroup<PaymentMethod>(
+                            groupValue: _paymentMethod,
+                            onChanged: (v) => setState(() => _paymentMethod = v!),
+                            child: Column(
+                              children: PaymentMethod.values.map((method) {
+                                return RadioListTile<PaymentMethod>(
+                                  value: method,
+                                  title: Text(method.label),
+                                  contentPadding: EdgeInsets.zero,
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -159,7 +161,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: scheme.surface,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.05),
@@ -193,20 +195,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                             .toList(),
                                       );
                                 },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF59E0B),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
                           child: orderState is OrderLoading
-                              ? const SizedBox(
+                              ? SizedBox(
                                   height: 20,
                                   width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: scheme.onPrimary,
+                                  ),
                                 )
                               : Text(
                                   'Place Order - PKR ${total.round()}',
@@ -226,19 +222,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildSection(String title, IconData icon, Widget child) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: const Color(0xFFF59E0B)),
+              Icon(icon, size: 18, color: scheme.primary),
               const SizedBox(width: 8),
               Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
@@ -252,20 +249,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildValidatedField(String label, TextEditingController controller,
       {TextInputType keyboard = TextInputType.text, String? Function(String?)? validator}) {
+    final scheme = Theme.of(context).colorScheme;
     return TextFormField(
       controller: controller,
       keyboardType: keyboard,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        labelStyle: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFF59E0B)),
+          borderSide: BorderSide(color: scheme.primary),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

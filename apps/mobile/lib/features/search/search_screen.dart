@@ -34,28 +34,30 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back_ios, color: scheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: TextField(
           controller: _searchController,
           focusNode: _focusNode,
           onSubmitted: _performSearch,
+          style: TextStyle(color: scheme.onSurface),
           decoration: InputDecoration(
             hintText: 'Search products...',
-            hintStyle: TextStyle(color: Colors.grey.shade400),
+            hintStyle: TextStyle(color: scheme.onSurfaceVariant),
             border: InputBorder.none,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Color(0xFFF59E0B)),
+            icon: Icon(Icons.search, color: scheme.primary),
             onPressed: () => _performSearch(_searchController.text),
           ),
         ],
@@ -63,8 +65,8 @@ class _SearchScreenState extends State<SearchScreen> {
       body: BlocBuilder<ProductCubit, ProductState>(
         builder: (context, state) {
           if (state is ProductLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFF59E0B)),
+            return Center(
+              child: CircularProgressIndicator(color: scheme.primary),
             );
           }
 
@@ -74,7 +76,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+                    Icon(Icons.search_off, size: 64, color: scheme.outline),
                     const SizedBox(height: 16),
                     const Text(
                       'No results found',
@@ -83,7 +85,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Try different keywords',
-                      style: TextStyle(color: Colors.grey.shade500),
+                      style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -121,11 +123,11 @@ class _SearchScreenState extends State<SearchScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.search, size: 64, color: Colors.grey.shade300),
+                Icon(Icons.search, size: 64, color: scheme.outline),
                 const SizedBox(height: 16),
                 Text(
                   'Search for products',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 16, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),

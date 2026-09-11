@@ -1,20 +1,21 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubits/auth_cubit.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
 
-  @override
+@override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Account',
-          style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+          style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.bold),
         ),
       ),
       body: BlocBuilder<AuthCubit, AuthState>(
@@ -30,21 +31,21 @@ class AccountScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: scheme.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade100),
+                    border: Border.all(color: scheme.outlineVariant),
                   ),
                   child: Column(
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: const Color(0xFFFEF3C7),
+                        backgroundColor: scheme.surfaceContainerHighest,
                         child: Text(
                           (user?.fullName ?? 'U')[0].toUpperCase(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFF59E0B),
+                            color: scheme.primary,
                           ),
                         ),
                       ),
@@ -56,7 +57,7 @@ class AccountScreen extends StatelessWidget {
                       if (user?.phone != null)
                         Text(
                           user!.phone!,
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                          style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
                         ),
                     ],
                   ),
@@ -65,32 +66,32 @@ class AccountScreen extends StatelessWidget {
 
                 // Menu Items
                 _buildMenuItem(
-                  icon: Icons.receipt_long,
+                  context: context, icon: Icons.receipt_long,
                   title: 'My Orders',
                   onTap: () => Navigator.of(context).pushNamed('/orders'),
                 ),
                 _buildMenuItem(
-                  icon: Icons.favorite_outline,
+                  context: context, icon: Icons.favorite_outline,
                   title: 'Wishlist',
                   onTap: () {},
                 ),
                 _buildMenuItem(
-                  icon: Icons.location_on_outlined,
+                  context: context, icon: Icons.location_on_outlined,
                   title: 'Saved Addresses',
                   onTap: () {},
                 ),
                 _buildMenuItem(
-                  icon: Icons.help_outline,
+                  context: context, icon: Icons.help_outline,
                   title: 'Help & Support',
                   onTap: () {},
                 ),
                 _buildMenuItem(
-                  icon: Icons.settings_outlined,
+                  context: context, icon: Icons.settings_outlined,
                   title: 'Settings',
                   onTap: () => Navigator.of(context).pushNamed('/settings'),
                 ),
                 _buildMenuItem(
-                  icon: Icons.info_outline,
+                  context: context, icon: Icons.info_outline,
                   title: 'About Waw',
                   onTap: () {},
                 ),
@@ -141,8 +142,6 @@ class AccountScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () => Navigator.of(context).pushNamed('/login'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF59E0B),
-                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -160,21 +159,23 @@ class AccountScreen extends StatelessWidget {
   }
 
   Widget _buildMenuItem({
+    required BuildContext context,
     required IconData icon,
     required String title,
     VoidCallback? onTap,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFFF59E0B)),
+        leading: Icon(icon, color: scheme.primary),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        trailing: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

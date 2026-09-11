@@ -22,14 +22,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       body: CustomScrollView(
         slivers: [
           // App Bar
           SliverAppBar(
             floating: true,
-            backgroundColor: Colors.white,
+            backgroundColor: scheme.surface,
             elevation: 0,
             title: Row(
               children: [
@@ -52,25 +53,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'waw',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: scheme.onSurface,
                   ),
                 ),
               ],
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.search, color: Color(0xFF0F172A)),
+                icon: Icon(Icons.search, color: scheme.onSurface),
                 onPressed: () => Navigator.of(context).pushNamed('/search'),
               ),
               Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0F172A)),
+                    icon: Icon(Icons.shopping_bag_outlined, color: scheme.onSurface),
                     onPressed: () => Navigator.of(context).pushNamed('/cart'),
                   ),
                   BlocBuilder<CartCubit, CartState>(
@@ -172,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 width: 56,
                                 height: 56,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF3C7),
+                                  color: scheme.secondaryContainer,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: cat.imageUrl != null
@@ -181,20 +182,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                         child: Image.network(
                                           cat.imageUrl!,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(
+                                          errorBuilder: (_, __, ___) => Icon(
                                             Icons.category,
-                                            color: Color(0xFFF59E0B),
+                                            color: scheme.primary,
                                           ),
                                         ),
                                       )
-                                    : const Icon(Icons.category, color: Color(0xFFF59E0B)),
+                                    : Icon(Icons.category, color: scheme.primary),
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 cat.name,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
+                                  color: scheme.onSurface,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -212,15 +214,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           // Section Header
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Text(
                 'Featured Products',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF0F172A),
+                  color: scheme.onSurface,
                 ),
               ),
             ),
@@ -239,16 +241,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
               if (state is ProductLoaded) {
                 final products = state.products;
-                if (products.isEmpty) {
-                  return const SliverFillRemaining(
-                    child: Center(
-                      child: Text(
-                        'No products found',
-                        style: TextStyle(color: Colors.grey),
+if (products.isEmpty) {
+                    return SliverFillRemaining(
+                      child: Center(
+                        child: Text(
+                          'No products found',
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
                       ),
-                    ),
-                  );
-                }
+                    );
+                  }
 
                 return SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -307,11 +309,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                        Icon(Icons.error_outline, size: 48, color: scheme.error),
                         const SizedBox(height: 16),
                         Text(
                           state.message,
-                          style: const TextStyle(color: Colors.grey),
+                          style: TextStyle(color: scheme.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
@@ -320,8 +322,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Retry'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF59E0B),
-                            foregroundColor: Colors.white,
+                            backgroundColor: scheme.primary,
+                            foregroundColor: scheme.onPrimary,
                           ),
                         ),
                       ],

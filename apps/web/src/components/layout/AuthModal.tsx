@@ -373,7 +373,7 @@ export function AuthModal({
                   className={`w-full font-black py-3.5 rounded-2xl text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${
                     hasInput
                       ? "bg-[#2D3344] hover:bg-slate-950 text-white hover:shadow-lg hover:scale-[1.01]"
-                      : "bg-[#E2E6EE] text-[#8E9AA8] cursor-not-allowed shadow-none"
+                      : "bg-[#E2E6EE] text-[#8E9AA8] cursor-not-allowed shadow-none dark:bg-slate-700 dark:text-slate-400"
                   }`}
                 >
                   {loading ? (

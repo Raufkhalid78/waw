@@ -8,7 +8,6 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@waw/types'],
-  swcMinify: true,
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
@@ -28,6 +27,14 @@ const nextConfig = {
   experimental: {
   },
   async headers() {
+    const isProd = process.env.NODE_ENV === "production";
+    const connectSrc = isProd
+      // Production: API server + Supabase (cross-origin cookies need this).
+      // localhost is deliberately excluded so a dev origin is never allowed
+      // in production bundles.
+      ? "'self' https://*.supabase.co wss://*.supabase.co https://api.waw.com.pk https://www.waw.com.pk"
+      // Dev: also permit the local API server.
+      : "'self' https://*.supabase.co wss://*.supabase.co http://localhost:4000 https://api.waw.com.pk https://www.waw.com.pk";
     return [
       {
         source: '/(.*)',
@@ -50,8 +57,7 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:",
               "img-src 'self' data: blob: https:",
               "media-src 'self' https:",
-              // API server + Supabase (cross-origin cookies need this)
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co http://localhost:4000 https://api.waw.com.pk https://www.waw.com.pk",
+              `connect-src ${connectSrc}`,
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",

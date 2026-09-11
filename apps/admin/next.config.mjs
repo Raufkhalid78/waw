@@ -10,6 +10,10 @@ const nextConfig = {
     ],
   },
   async headers() {
+    const isProd = process.env.NODE_ENV === "production";
+    const connectSrc = isProd
+      ? "'self' https://*.supabase.co wss://*.supabase.co https://api.waw.com.pk"
+      : "'self' https://*.supabase.co wss://*.supabase.co http://localhost:4000 https://api.waw.com.pk";
     return [
       {
         source: '/(.*)',
@@ -30,7 +34,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
               "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co http://localhost:4000 https://api.waw.com.pk",
+              `connect-src ${connectSrc}`,
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",

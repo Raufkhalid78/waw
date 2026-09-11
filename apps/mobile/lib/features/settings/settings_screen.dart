@@ -113,37 +113,29 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Select Theme'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<ThemeMode>(
-              title: const Text('Light'),
-              value: ThemeMode.light,
-              groupValue: current,
-              onChanged: (v) {
-                context.read<SettingsCubit>().setThemeMode(v!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('Dark'),
-              value: ThemeMode.dark,
-              groupValue: current,
-              onChanged: (v) {
-                context.read<SettingsCubit>().setThemeMode(v!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('System'),
-              value: ThemeMode.system,
-              groupValue: current,
-              onChanged: (v) {
-                context.read<SettingsCubit>().setThemeMode(v!);
-                Navigator.pop(ctx);
-              },
-            ),
-          ],
+        content: RadioGroup<ThemeMode>(
+          groupValue: current,
+          onChanged: (v) {
+            context.read<SettingsCubit>().setThemeMode(v!);
+            Navigator.pop(ctx);
+          },
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<ThemeMode>(
+                title: Text('Light'),
+                value: ThemeMode.light,
+              ),
+              RadioListTile<ThemeMode>(
+                title: Text('Dark'),
+                value: ThemeMode.dark,
+              ),
+              RadioListTile<ThemeMode>(
+                title: Text('System'),
+                value: ThemeMode.system,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -154,28 +146,25 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Select Language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String>(
-              title: const Text('English'),
-              value: 'en',
-              groupValue: current,
-              onChanged: (v) {
-                context.read<SettingsCubit>().setLanguage(v!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('اردو'),
-              value: 'ur',
-              groupValue: current,
-              onChanged: (v) {
-                context.read<SettingsCubit>().setLanguage(v!);
-                Navigator.pop(ctx);
-              },
-            ),
-          ],
+        content: RadioGroup<String>(
+          groupValue: current,
+          onChanged: (v) {
+            context.read<SettingsCubit>().setLanguage(v!);
+            Navigator.pop(ctx);
+          },
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<String>(
+                title: Text('English'),
+                value: 'en',
+              ),
+              RadioListTile<String>(
+                title: Text('اردو'),
+                value: 'ur',
+              ),
+            ],
+          ),
         ),
       ),
     );

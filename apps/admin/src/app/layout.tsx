@@ -6,6 +6,7 @@ import { AdminProvider } from "@/components/AdminProvider";
 import { ClientAuthGuard } from "@/components/ClientAuthGuard";
 import { AdminShell } from "@/components/AdminShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,11 +24,13 @@ export default function AdminLayout({
     <html lang="en">
       <body className={inter.className}>
         <ErrorBoundary>
-          <AdminProvider>
-            <ClientAuthGuard>
-              <AdminShell>{children}</AdminShell>
-            </ClientAuthGuard>
-          </AdminProvider>
+          <ThemeProvider>
+            <AdminProvider>
+              <ClientAuthGuard>
+                <AdminShell>{children}</AdminShell>
+              </ClientAuthGuard>
+            </AdminProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

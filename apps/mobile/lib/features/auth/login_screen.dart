@@ -23,8 +23,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scheme.surface,
       body: SafeArea(
         child: BlocListener<AuthCubit, AuthState>(
           listener: (context, state) {
@@ -75,21 +76,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'waw',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: scheme.onSurface,
                   ),
                 ),
-                const Text(
+                Text(
                   'Pakistan\'s Marketplace',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF64748B),
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -105,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'We\'ll send a verification code via WhatsApp',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -113,12 +114,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: scheme.outlineVariant),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text(
+                        child: Text(
                           '+92',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: scheme.onSurface,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -126,17 +131,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: TextField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
-                          style: const TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 16, color: scheme.onSurface),
                           decoration: InputDecoration(
                             hintText: '3XXXXXXXXX',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            hintStyle: TextStyle(color: scheme.onSurfaceVariant),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(color: scheme.outlineVariant),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFF59E0B)),
+                              borderSide: BorderSide(color: scheme.primary),
                             ),
                           ),
                         ),
@@ -155,22 +160,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   context.read<AuthCubit>().sendOtp('+92$phone');
                                 }
                               },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF59E0B),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
                         child: state is AuthLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: scheme.onPrimary,
                                 ),
                               )
                             : const Text(
@@ -194,33 +190,34 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Code sent to +92${_phoneController.text}',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _otpController,
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       letterSpacing: 8,
                       fontWeight: FontWeight.bold,
+                      color: scheme.onSurface,
                     ),
                     maxLength: 6,
                     decoration: InputDecoration(
                       hintText: '------',
                       hintStyle: TextStyle(
-                        color: Colors.grey.shade300,
+                        color: scheme.outline,
                         letterSpacing: 8,
                       ),
                       counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: scheme.outlineVariant),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFF59E0B)),
+                        borderSide: BorderSide(color: scheme.primary),
                       ),
                     ),
                   ),
@@ -236,22 +233,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   context.read<AuthCubit>().verifyOtp(otp);
                                 }
                               },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF59E0B),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
                         child: state is AuthLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: scheme.onPrimary,
                                 ),
                               )
                             : const Text(
@@ -274,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   'By continuing, you agree to our Terms of Service',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),

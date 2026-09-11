@@ -31,6 +31,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final discount = comparePrice != null && comparePrice! > 0
         ? ((comparePrice! - price) / comparePrice! * 100).round()
         : 0;
@@ -39,9 +40,9 @@ class ProductCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: scheme.outlineVariant),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -67,19 +68,22 @@ class ProductCard extends StatelessWidget {
                             imageUrl: imageUrl!,
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Container(
-                              color: Colors.grey.shade100,
-                              child: const Center(
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                              color: scheme.surfaceContainerHighest,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: scheme.primary,
+                                ),
                               ),
                             ),
                             errorWidget: (_, __, ___) => Container(
-                              color: Colors.grey.shade100,
-                              child: const Icon(Icons.image_outlined, color: Colors.grey),
+                              color: scheme.surfaceContainerHighest,
+                              child: Icon(Icons.image_outlined, color: scheme.outline),
                             ),
                           )
                         : Container(
-                            color: Colors.grey.shade100,
-                            child: const Icon(Icons.image_outlined, color: Colors.grey),
+                            color: scheme.surfaceContainerHighest,
+                            child: Icon(Icons.image_outlined, color: scheme.outline),
                           ),
                   ),
                 ),
@@ -116,10 +120,11 @@ class ProductCard extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       height: 1.3,
+                      color: scheme.onSurface,
                     ),
                   ),
                   if (titleUrdu != null && titleUrdu!.isNotEmpty)
@@ -129,7 +134,7 @@ class ProductCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.grey.shade500,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   const SizedBox(height: 4),
@@ -137,10 +142,10 @@ class ProductCard extends StatelessWidget {
                     children: [
                       Text(
                         'PKR ${price.round()}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF1A1A1A),
+                          color: scheme.onSurface,
                         ),
                       ),
                       if (comparePrice != null && comparePrice! > price) ...[
@@ -149,7 +154,7 @@ class ProductCard extends StatelessWidget {
                           'PKR ${comparePrice!.round()}',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.grey.shade400,
+                            color: scheme.onSurfaceVariant,
                             decoration: TextDecoration.lineThrough,
                           ),
                         ),
@@ -163,14 +168,14 @@ class ProductCard extends StatelessWidget {
                         const SizedBox(width: 2),
                         Text(
                           '${ratingAverage?.toStringAsFixed(1) ?? "-"} ($ratingCount)',
-                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                          style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
                         ),
                       ],
                     ),
                   if (showStoreName && storeName != null)
                     Text(
                       storeName!,
-                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                      style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -188,8 +193,8 @@ class ProductCard extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: onAddToCart,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF59E0B),
-                      foregroundColor: Colors.white,
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),

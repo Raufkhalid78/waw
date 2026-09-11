@@ -100,7 +100,7 @@ class _MainShellState extends State<MainShell> {
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         indicatorColor: isDark
-            ? const Color(0xFFFEF3C7).withOpacity(0.2)
+            ? const Color(0xFFFEF3C7).withValues(alpha: 0.2)
             : const Color(0xFFFEF3C7),
         destinations: const [
           NavigationDestination(

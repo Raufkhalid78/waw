@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { fetchProducts, fetchCategories } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import HomeClient from './HomeClient';
 
 export const metadata: Metadata = {
@@ -30,7 +31,7 @@ export default async function HomePage() {
     const flat = categoriesRes.flatMap((c: any) => [c, ...(c.children || [])]);
     initialCategories = flat.map((c: any) => ({ name: c.name, slug: c.slug }));
   } catch (err) {
-    console.error('Failed to fetch initial home data:', err);
+    logger.error('Failed to fetch initial home data', 'HomePage', err);
   }
 
   return (

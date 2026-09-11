@@ -20,25 +20,26 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'My Orders',
-          style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+          style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back_ios, color: scheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: BlocBuilder<OrderCubit, OrderState>(
         builder: (context, state) {
           if (state is OrderLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFF59E0B)),
+            return Center(
+              child: CircularProgressIndicator(color: scheme.primary),
             );
           }
 
@@ -48,7 +49,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.receipt_long, size: 80, color: Colors.grey.shade300),
+                    Icon(Icons.receipt_long, size: 80, color: scheme.outline),
                     const SizedBox(height: 16),
                     const Text(
                       'No orders yet',
@@ -57,7 +58,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Your orders will appear here',
-                      style: TextStyle(color: Colors.grey.shade500),
+                      style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -88,6 +89,7 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final statusColor = _statusColor(order.orderStatus);
 
     return GestureDetector(
@@ -97,9 +99,9 @@ class _OrderCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: scheme.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,11 +111,11 @@ class _OrderCard extends StatelessWidget {
               children: [
                 Text(
                   order.orderNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'monospace',
-                    color: Color(0xFFF59E0B),
+                    color: scheme.primary,
                   ),
                 ),
                 Container(
@@ -141,12 +143,12 @@ class _OrderCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               order.shippingCity,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
             ),
             if (order.createdAt != null)
               Text(
                 _formatDate(order.createdAt!),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
               ),
           ],
         ),

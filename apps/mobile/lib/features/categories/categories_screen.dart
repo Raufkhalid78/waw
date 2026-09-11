@@ -8,15 +8,16 @@ class CategoriesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Categories',
           style: TextStyle(
-            color: Color(0xFF0F172A),
+            color: scheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -24,8 +25,8 @@ class CategoriesScreen extends StatelessWidget {
       body: BlocBuilder<CategoryCubit, CategoryState>(
         builder: (context, state) {
           if (state is CategoryLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFF59E0B)),
+            return Center(
+              child: CircularProgressIndicator(color: scheme.primary),
             );
           }
 
@@ -36,11 +37,11 @@ class CategoriesScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.category_outlined, size: 64, color: Colors.grey.shade300),
+                    Icon(Icons.category_outlined, size: 64, color: scheme.outline),
                     const SizedBox(height: 16),
                     Text(
                       'No categories available',
-                      style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
+                      style: TextStyle(fontSize: 16, color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -68,11 +69,11 @@ class CategoriesScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                  Icon(Icons.error_outline, size: 48, color: scheme.error),
                   const SizedBox(height: 16),
                   Text(
                     state.message,
-                    style: const TextStyle(color: Colors.grey),
+                    style: TextStyle(color: scheme.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -81,8 +82,8 @@ class CategoriesScreen extends StatelessWidget {
                     icon: const Icon(Icons.refresh),
                     label: const Text('Retry'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF59E0B),
-                      foregroundColor: Colors.white,
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
                     ),
                   ),
                 ],
@@ -103,6 +104,7 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () {
         Navigator.of(context).pushNamed(
@@ -115,9 +117,9 @@ class _CategoryCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade100),
+          border: Border.all(color: scheme.outlineVariant),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -133,7 +135,7 @@ class _CategoryCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
+                color: scheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: category.imageUrl != null
@@ -142,22 +144,23 @@ class _CategoryCard extends StatelessWidget {
                       child: Image.network(
                         category.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
+                        errorBuilder: (_, __, ___) => Icon(
                           Icons.category,
-                          color: Color(0xFFF59E0B),
+                          color: scheme.primary,
                         ),
                       ),
                     )
-                  : const Icon(Icons.category, color: Color(0xFFF59E0B)),
+                  : Icon(Icons.category, color: scheme.primary),
             ),
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
                 category.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -171,7 +174,7 @@ class _CategoryCard extends StatelessWidget {
                   category.nameUrdu!,
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey.shade500,
+                    color: scheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),

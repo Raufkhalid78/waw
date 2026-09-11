@@ -21,17 +21,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Order Details',
-          style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+          style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back_ios, color: scheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -202,12 +203,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildSection(String title, Widget child) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,6 +223,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildOrderItem(OrderItem item) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -232,7 +235,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 Text(item.productTitle, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 Text(
                   '${item.quantity} x PKR ${item.unitPricePkr.round()}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -260,6 +263,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   List<Widget> _buildTimeline(OrderStatus status) {
+    final scheme = Theme.of(context).colorScheme;
     final steps = [
       ('Order Placed', Icons.check_circle, true),
       ('Confirmed', Icons.check_circle, status.index >= OrderStatus.confirmed.index),
@@ -274,7 +278,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Icon(
             step.$2,
             size: 20,
-            color: step.$3 ? const Color(0xFF10B981) : Colors.grey.shade300,
+            color: step.$3 ? const Color(0xFF10B981) : scheme.outline,
           ),
           const SizedBox(width: 12),
           Text(
@@ -282,7 +286,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: step.$3 ? FontWeight.w600 : FontWeight.normal,
-              color: step.$3 ? const Color(0xFF0F172A) : Colors.grey.shade400,
+              color: step.$3 ? scheme.onSurface : scheme.onSurfaceVariant,
             ),
           ),
         ],

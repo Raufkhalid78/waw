@@ -1,17 +1,19 @@
 "use client";
 
-import { Menu, Bell } from "lucide-react";
+import { Menu, Bell, Sun, Moon } from "lucide-react";
+import { useTheme } from "./ThemeProvider";
 
 interface TopBarProps {
   onMenuToggle: () => void;
 }
 
 export function TopBar({ onMenuToggle }: TopBarProps) {
+  const { theme, toggleTheme } = useTheme();
   return (
-    <header className="sticky top-0 z-30 h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 lg:hidden">
+    <header className="sticky top-0 z-30 h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 lg:hidden dark:bg-slate-800 dark:border-slate-700">
       <button
         onClick={onMenuToggle}
-        className="p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+        className="p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors dark:hover:bg-slate-700"
       >
         <Menu className="w-5 h-5" />
       </button>
@@ -19,10 +21,17 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
         <div className="w-7 h-7 rounded-lg bg-amber-400 flex items-center justify-center">
           <span className="text-sm font-black text-slate-950 leading-none">W</span>
         </div>
-        <span className="text-sm font-bold text-gray-900">waw admin</span>
+        <span className="text-sm font-bold text-gray-900 dark:text-slate-100">waw admin</span>
       </div>
       <div className="ml-auto flex items-center gap-2">
-        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative">
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors dark:hover:bg-slate-700"
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative dark:hover:bg-slate-700">
           <Bell className="w-4 h-4" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
         </button>

@@ -510,7 +510,7 @@ export function Footer() {
       </div>
 
       {/* ── 3. App Download & Social Media Strip ───────────────────────────── */}
-      <div className="border-t border-b border-slate-200 py-6 px-3 sm:px-6 lg:px-10 xl:px-12 bg-[#FBFBFC]">
+      <div className="border-t border-b border-slate-200 py-6 px-3 sm:px-6 lg:px-10 xl:px-12 bg-[#FBFBFC] dark:bg-slate-800 dark:border-slate-700">
         <div className="w-full flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Left: App Download Badges */}
           <div className="flex flex-col sm:flex-row items-center gap-3.5 text-center sm:text-left">
@@ -649,7 +649,7 @@ export function Footer() {
       </div>
 
       {/* ── 4. Bottom Legal, Payment Badges & Policy Links (Fixed-Dimension Cards) ───── */}
-      <div className="bg-[#F7F7FA] py-6 px-3 sm:px-6 lg:px-10 xl:px-12">
+      <div className="bg-[#F7F7FA] py-6 px-3 sm:px-6 lg:px-10 xl:px-12 dark:bg-slate-800">
         <div className="w-full space-y-4">
           {/* Row 1: Copyright + Official Payment Partner Cards + Policy Links */}
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 text-[11px] text-slate-600">

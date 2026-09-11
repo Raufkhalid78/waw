@@ -50,20 +50,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
         title: Text(
           widget.categoryName ?? widget.searchQuery ?? 'Products',
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
+          style: TextStyle(
+            color: scheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back_ios, color: scheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -72,12 +73,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
           // Sort Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.white,
+            color: scheme.surface,
             child: Row(
               children: [
-                const Icon(Icons.sort, size: 18, color: Color(0xFF64748B)),
+                Icon(Icons.sort, size: 18, color: scheme.onSurfaceVariant),
                 const SizedBox(width: 4),
-                const Text('Sort:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                Text('Sort:', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: SingleChildScrollView(
@@ -96,15 +97,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: scheme.outlineVariant),
 
           // Products
           Expanded(
             child: BlocBuilder<ProductCubit, ProductState>(
               builder: (context, state) {
                 if (state is ProductLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFF59E0B)),
+                  return Center(
+                    child: CircularProgressIndicator(color: scheme.primary),
                   );
                 }
 
@@ -115,7 +116,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey.shade300),
+                          Icon(Icons.shopping_bag_outlined, size: 64, color: scheme.outline),
                           const SizedBox(height: 16),
                           const Text(
                             'No products found',
@@ -124,7 +125,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           const SizedBox(height: 8),
                           Text(
                             'Try adjusting your filters',
-                            style: TextStyle(color: Colors.grey.shade500),
+                            style: TextStyle(color: scheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -139,13 +140,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           children: [
                             Text(
                               '${products.length} products',
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                             ),
                             if (state.hasMore) ...[
                               const SizedBox(width: 8),
                               Text(
                                 'Scroll for more',
-                                style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                               ),
                             ],
                           ],
@@ -164,11 +165,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           itemCount: products.length + (state.hasMore ? 1 : 0),
                           itemBuilder: (context, index) {
                             if (index == products.length) {
-                              return const Center(
+                              return Center(
                                 child: Padding(
-                                  padding: EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(16),
                                   child: CircularProgressIndicator(
-                                    color: Color(0xFFF59E0B),
+                                    color: scheme.primary,
                                     strokeWidth: 2,
                                   ),
                                 ),
@@ -200,11 +201,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                        Icon(Icons.error_outline, size: 48, color: scheme.error),
                         const SizedBox(height: 16),
                         Text(
                           state.message,
-                          style: const TextStyle(color: Colors.grey),
+                          style: TextStyle(color: scheme.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
@@ -219,8 +220,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Retry'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF59E0B),
-                            foregroundColor: Colors.white,
+                            backgroundColor: scheme.primary,
+                            foregroundColor: scheme.onPrimary,
                           ),
                         ),
                       ],
@@ -238,6 +239,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Widget _buildSortChip(String value, String label) {
+    final scheme = Theme.of(context).colorScheme;
     final isSelected = _sortBy == value;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
@@ -253,7 +255,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFF59E0B) : Colors.grey.shade100,
+            color: isSelected ? scheme.primary : scheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
@@ -261,7 +263,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+              color: isSelected ? scheme.onPrimary : scheme.onSurfaceVariant,
             ),
           ),
         ),

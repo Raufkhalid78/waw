@@ -9,25 +9,26 @@ class CartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: scheme.surfaceContainerLow,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'My Cart',
-          style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+          style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back_ios, color: scheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: BlocBuilder<CartCubit, CartState>(
         builder: (context, state) {
           if (state is CartLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFF59E0B)),
+            return Center(
+              child: CircularProgressIndicator(color: scheme.primary),
             );
           }
 
@@ -38,7 +39,7 @@ class CartScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey.shade300),
+                    Icon(Icons.shopping_bag_outlined, size: 80, color: scheme.outline),
                     const SizedBox(height: 16),
                     const Text(
                       'Your cart is empty',
@@ -47,19 +48,11 @@ class CartScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       'Add items to get started',
-                      style: TextStyle(color: Colors.grey.shade500),
+                      style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF59E0B),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                       child: const Text('Continue Shopping'),
                     ),
                   ],
@@ -74,7 +67,7 @@ class CartScreen extends StatelessWidget {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: cart.items.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, __) => Divider(color: scheme.outlineVariant),
                     itemBuilder: (context, index) {
                       final item = cart.items[index];
                       return _CartItemTile(item: item);
@@ -86,7 +79,7 @@ class CartScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: scheme.surface,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.05),
@@ -102,13 +95,14 @@ class CartScreen extends StatelessWidget {
                         children: [
                           Text(
                             '${cart.itemCount} items',
-                            style: TextStyle(color: Colors.grey.shade600),
+                            style: TextStyle(color: scheme.onSurfaceVariant),
                           ),
                           Text(
                             'PKR ${cart.subtotalPkr.round()}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
+                              color: scheme.onSurface,
                             ),
                           ),
                         ],
@@ -122,7 +116,7 @@ class CartScreen extends StatelessWidget {
                           fontSize: 12,
                           color: cart.subtotalPkr >= 5000
                               ? const Color(0xFF10B981)
-                              : Colors.grey.shade500,
+                              : scheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -132,15 +126,6 @@ class CartScreen extends StatelessWidget {
                           onPressed: () {
                             Navigator.of(context).pushNamed('/checkout');
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF59E0B),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
                           child: const Text(
                             'Proceed to Checkout',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -167,6 +152,7 @@ class _CartItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -182,13 +168,13 @@ class _CartItemTile extends StatelessWidget {
                       imageUrl: item.productImage!,
                       fit: BoxFit.cover,
                       errorWidget: (_, __, ___) => Container(
-                        color: Colors.grey.shade100,
-                        child: const Icon(Icons.image, color: Colors.grey),
+                        color: scheme.surfaceContainerHighest,
+                        child: Icon(Icons.image, color: scheme.outline),
                       ),
                     )
                   : Container(
-                      color: Colors.grey.shade100,
-                      child: const Icon(Icons.image, color: Colors.grey),
+                      color: scheme.surfaceContainerHighest,
+                      child: Icon(Icons.image, color: scheme.outline),
                     ),
             ),
           ),
@@ -208,15 +194,15 @@ class _CartItemTile extends StatelessWidget {
                 if (item.variantTitle != null)
                   Text(
                     item.variantTitle!,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                   ),
                 const SizedBox(height: 4),
                 Text(
                   'PKR ${item.unitPricePkr.round()}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: scheme.onSurface,
                   ),
                 ),
               ],
@@ -226,13 +212,14 @@ class _CartItemTile extends StatelessWidget {
           // Quantity Controls
           Container(
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: scheme.outlineVariant),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _quantityButton(
+                  context: context,
                   icon: Icons.remove,
                   onTap: item.quantity > 1
                       ? () => context.read<CartCubit>().updateItemQuantity(
@@ -250,6 +237,7 @@ class _CartItemTile extends StatelessWidget {
                   ),
                 ),
                 _quantityButton(
+                  context: context,
                   icon: Icons.add,
                   onTap: () => context.read<CartCubit>().updateItemQuantity(
                         productId: item.productId,
@@ -265,12 +253,17 @@ class _CartItemTile extends StatelessWidget {
     );
   }
 
-  Widget _quantityButton({required IconData icon, VoidCallback? onTap}) {
+  Widget _quantityButton({required BuildContext context, required IconData icon, VoidCallback? onTap}) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(6),
-        child: Icon(icon, size: 16, color: onTap != null ? Colors.black : Colors.grey),
+        child: Icon(
+          icon,
+          size: 16,
+          color: onTap != null ? scheme.onSurface : scheme.onSurfaceVariant,
+        ),
       ),
     );
   }

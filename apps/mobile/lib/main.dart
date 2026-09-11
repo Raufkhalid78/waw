@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/network/api_client.dart';
@@ -72,6 +72,145 @@ void main() async {
   );
 }
 
+const _brandAmber = Color(0xFFF59E0B);
+const _lightPrimary = Color(0xFFD97706); // amber-600
+const _darkPrimary = Color(0xFFFBBF24); // amber-400
+const _darkOnPrimary = Color(0xFF402D00);
+
+ColorScheme _lightScheme() => ColorScheme.fromSeed(
+      seedColor: _brandAmber,
+      brightness: Brightness.light,
+    ).copyWith(
+      primary: _lightPrimary,
+      onPrimary: Colors.white,
+      surface: Colors.white,
+      surfaceContainerLowest: const Color(0xFFFAFAFA),
+      surfaceContainerLow: const Color(0xFFF8FAFC),
+      surfaceContainer: const Color(0xFFF1F5F9),
+      surfaceContainerHigh: const Color(0xFFE2E8F0),
+      surfaceContainerHighest: const Color(0xFFCBD5E1),
+      onSurface: const Color(0xFF0F172A),
+      onSurfaceVariant: const Color(0xFF475569),
+      outline: const Color(0xFF94A3B8),
+      outlineVariant: const Color(0xFFE2E8F0),
+    );
+
+ColorScheme _darkScheme() => ColorScheme.fromSeed(
+      seedColor: _brandAmber,
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: _darkPrimary,
+      onPrimary: _darkOnPrimary,
+      surface: const Color(0xFF1E293B),
+      surfaceContainerLowest: const Color(0xFF0B1120),
+      surfaceContainerLow: const Color(0xFF0F172A),
+      surfaceContainer: const Color(0xFF1E293B),
+      surfaceContainerHigh: const Color(0xFF273449),
+      surfaceContainerHighest: const Color(0xFF334155),
+      onSurface: const Color(0xFFF1F5F9),
+      onSurfaceVariant: const Color(0xFF94A3B8),
+      outline: const Color(0xFF64748B),
+      outlineVariant: const Color(0xFF334155),
+    );
+
+ThemeData _buildTheme(ColorScheme scheme, {required Brightness brightness}) {
+  final isDark = brightness == Brightness.dark;
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    brightness: brightness,
+    scaffoldBackgroundColor: scheme.surfaceContainerLow,
+    appBarTheme: AppBarTheme(
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      indicatorColor: isDark
+          ? scheme.secondaryContainer
+          : const Color(0xFFFEF3C7),
+      surfaceTintColor: Colors.transparent,
+      backgroundColor: isDark ? scheme.surface : Colors.transparent,
+    ),
+    cardTheme: CardThemeData(
+      color: scheme.surface,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+    ),
+    dividerColor: isDark ? scheme.outlineVariant : Colors.transparent,
+    radioTheme: RadioThemeData(
+      fillColor: WidgetStatePropertyAll(scheme.primary),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStatePropertyAll(scheme.primary),
+      side: BorderSide(color: scheme.outline),
+      checkColor: WidgetStatePropertyAll(scheme.onPrimary),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStatePropertyAll(scheme.onPrimary),
+      trackColor: WidgetStatePropertyAll(scheme.primary.withValues(alpha: 0.5)),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: scheme.surfaceContainerLow,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: scheme.primary, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: scheme.error),
+      ),
+      labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+      hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.7)),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 0,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: scheme.primary,
+        side: BorderSide(color: scheme.primary),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: scheme.primary,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: scheme.inverseSurface,
+      contentTextStyle: TextStyle(color: scheme.onInverseSurface),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
+
 class WawApp extends StatelessWidget {
   const WawApp({super.key});
 
@@ -79,60 +218,14 @@ class WawApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, settings) {
+        final light = _buildTheme(_lightScheme(), brightness: Brightness.light);
+        final dark = _buildTheme(_darkScheme(), brightness: Brightness.dark);
         return MaterialApp(
-          title: 'Waw — Premium Marketplace Pakistan',
+          title: 'Waw â€” Premium Marketplace Pakistan',
           debugShowCheckedModeBanner: false,
           themeMode: settings.themeMode,
-          theme: ThemeData(
-            colorSchemeSeed: const Color(0xFFF59E0B),
-            useMaterial3: true,
-            brightness: Brightness.light,
-            scaffoldBackgroundColor: Colors.white,
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Colors.white,
-              foregroundColor: Color(0xFF0F172A),
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-            ),
-            navigationBarTheme: NavigationBarThemeData(
-              indicatorColor: const Color(0xFFFEF3C7),
-              surfaceTintColor: Colors.transparent,
-            ),
-            cardTheme: CardThemeData(
-              color: Colors.white,
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
-              ),
-            ),
-          ),
-          darkTheme: ThemeData(
-            colorSchemeSeed: const Color(0xFFF59E0B),
-            useMaterial3: true,
-            brightness: Brightness.dark,
-            scaffoldBackgroundColor: const Color(0xFF0F172A),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF0F172A),
-              foregroundColor: Color(0xFFF1F5F9),
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-            ),
-            navigationBarTheme: NavigationBarThemeData(
-              indicatorColor: const Color(0xFFFEF3C7).withOpacity(0.2),
-              surfaceTintColor: Colors.transparent,
-              backgroundColor: const Color(0xFF1E293B),
-            ),
-            cardTheme: CardThemeData(
-              color: const Color(0xFF1E293B),
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFF334155)),
-              ),
-            ),
-            dividerColor: const Color(0xFF334155),
-          ),
+          theme: light,
+          darkTheme: dark,
           locale: settings.locale,
           supportedLocales: const [
             Locale('en'),

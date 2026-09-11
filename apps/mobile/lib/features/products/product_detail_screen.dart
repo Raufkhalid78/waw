@@ -33,13 +33,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scheme.surface,
       body: BlocBuilder<ProductCubit, ProductState>(
         builder: (context, state) {
           if (state is ProductLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFF59E0B)),
+            return Center(
+              child: CircularProgressIndicator(color: scheme.primary),
             );
           }
 
@@ -51,7 +52,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 SliverAppBar(
                   expandedHeight: 350,
                   pinned: true,
-                  backgroundColor: Colors.white,
+                  backgroundColor: scheme.surface,
                   leading: GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
@@ -74,7 +75,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             fit: BoxFit.cover,
                             width: double.infinity,
                             errorWidget: (_, __, ___) => Container(
-                              color: Colors.grey.shade100,
+                              color: scheme.surfaceContainerHighest,
                               child: const Icon(Icons.image, size: 64, color: Colors.grey),
                             ),
                           ),
@@ -95,7 +96,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   decoration: BoxDecoration(
                                     color: i == _selectedImageIndex
                                         ? const Color(0xFFF59E0B)
-                                        : Colors.grey.shade300,
+                                        : scheme.outline,
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
@@ -148,7 +149,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             product.titleUrdu!,
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.grey.shade500,
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         const SizedBox(height: 8),
@@ -170,7 +171,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 '${product.ratingAverage?.toStringAsFixed(1)} (${product.ratingCount} reviews)',
-                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                               ),
                             ],
                           ),
@@ -182,10 +183,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           children: [
                             Text(
                               'PKR ${product.pricePkr.round()}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
+                                color: scheme.onSurface,
                               ),
                             ),
                             if (product.compareAtPricePkr != null &&
@@ -195,7 +196,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 'PKR ${product.compareAtPricePkr!.round()}',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.grey.shade400,
+                                  color: scheme.onSurfaceVariant,
                                   decoration: TextDecoration.lineThrough,
                                 ),
                               ),
@@ -230,7 +231,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
+                            color: scheme.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -247,7 +248,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     ),
                                     Text(
                                       _getDeliveryEstimate(product.deliveryEstimate),
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                                     ),
                                     if (product.pricePkr >= 5000)
                                       Padding(
@@ -270,19 +271,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
+                              color: scheme.surfaceContainerLow,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               children: [
                                 CircleAvatar(
                                   radius: 20,
-                                  backgroundColor: const Color(0xFFFEF3C7),
+                                  backgroundColor: scheme.secondaryContainer,
                                   child: Text(
                                     product.store!.name[0].toUpperCase(),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFFF59E0B),
+                                      color: scheme.primary,
                                     ),
                                   ),
                                 ),
@@ -311,7 +312,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       if (product.store!.city != null)
                                         Text(
                                           product.store!.city!,
-                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                                         ),
                                     ],
                                   ),
@@ -338,7 +339,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               height: 1.6,
-                              color: Colors.grey.shade700,
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -356,17 +357,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                  Icon(Icons.error_outline, size: 48, color: scheme.error),
                   const SizedBox(height: 16),
-                  Text(state.message, style: const TextStyle(color: Colors.grey)),
+                  Text(state.message, style: TextStyle(color: scheme.onSurfaceVariant)),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () => context.read<ProductCubit>().loadProductBySlug(widget.slug),
                     icon: const Icon(Icons.refresh),
                     label: const Text('Retry'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF59E0B),
-                      foregroundColor: Colors.white,
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
                     ),
                   ),
                 ],
@@ -385,7 +386,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           return Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: scheme.surface,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.05),
@@ -399,7 +400,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 // Quantity
                 Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(color: scheme.outlineVariant),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -447,15 +448,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             );
                           }
                         : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF59E0B),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
                     child: Text(
                       product.inStock
                           ? 'Add to Cart - PKR ${(product.pricePkr * _quantity).round()}'
