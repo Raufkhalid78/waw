@@ -117,9 +117,84 @@ export class ApiError extends Error {
 }
 
 /**
+ * In-flight GET deduplication + short TTL cache.
+ *
+ * The homepage mounts many sections that each fetch the same endpoints
+ * (categories, stores, stats, products) on mount, with cache:"no-store".
+ * Without dedup every one fires a parallel network call — the logs showed
+ * /api/categories hit ~10x and /api/marketplace-stats ~3x simultaneously,
+ * which floods the API and amplifies upstream 503s. Collapse identical
+ * concurrent GETs into a single request and reuse the result briefly.
+ */
+const inflightGets = new Map<string, Promise<any>>();
+const getCache = new Map<string, { value: any; expiresAt: number }>();
+const GET_TTL_MS = 15_000; // hero/categories/stores/stats are static-ish for 15s
+
+// Only these public, static-ish endpoints are short-TTL cached. Deep-linking
+// calls (orders, wishlist, addresses, product detail) must always revalidate
+// to reflect user state, so they rely on in-flight dedup alone.
+const CACHEABLE_PREFIXES = [
+  "/api/categories",
+  "/api/stores",
+  "/api/marketplace-stats",
+  "/api/marketplace-config",
+  "/api/config/",
+  "/api/products/best-sellers",
+  "/api/products?",
+];
+
+function isCacheable(url: string): boolean {
+  return CACHEABLE_PREFIXES.some((p) => url.includes(p));
+}
+
+function withGetDedup<T>(
+  url: string,
+  run: () => Promise<{ ok: boolean; status: number; data?: T; error?: ApiError }>
+): Promise<{ ok: boolean; status: number; data?: T; error?: ApiError }> {
+  const now = Date.now();
+  if (isCacheable(url)) {
+    const hit = getCache.get(url);
+    if (hit && hit.expiresAt > now) {
+      return Promise.resolve(hit.value);
+    }
+  }
+
+  const inflight = inflightGets.get(url);
+  if (inflight) return inflight;
+
+  const p = run().then((result) => {
+    // Cache successful + 4xx (stable) responses; retryable 5xx are re-fetched.
+    if (isCacheable(url) && (result.ok || (result.status >= 400 && result.status < 500))) {
+      getCache.set(url, { value: result, expiresAt: now + GET_TTL_MS });
+    }
+    inflightGets.delete(url);
+    return result;
+  }).catch((err) => {
+    inflightGets.delete(url);
+    throw err;
+  });
+
+  inflightGets.set(url, p);
+  return p;
+}
+
+/**
  * Safe, abortable fetch with bounded exponential retries and correlation tracking.
  */
 export async function safeFetch<T>(
+  url: string,
+  options?: RequestInit & { timeoutMs?: number; retries?: number }
+): Promise<{ ok: boolean; status: number; data?: T; error?: ApiError }> {
+  const method = (options?.method || "GET").toUpperCase();
+
+  // Only dedup idempotent GETs; writes must always hit the network.
+  if (method === "GET") {
+    return withGetDedup<T>(url, () => doFetch<T>(url, options));
+  }
+  return doFetch<T>(url, options);
+}
+
+async function doFetch<T>(
   url: string,
   options?: RequestInit & { timeoutMs?: number; retries?: number }
 ): Promise<{ ok: boolean; status: number; data?: T; error?: ApiError }> {

@@ -819,15 +819,22 @@ app.get("/api/marketplace-stats", async (_req, res) => {
       return;
     }
 
-    const [sellers, orders, storeCities, reviews] = await Promise.all([
-      supabaseAdmin.from("stores").select("id", { count: "exact", head: true }).eq("status", "ACTIVE"),
-      supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("global_status", "DELIVERED"),
-      supabaseAdmin.from("stores").select("city").eq("status", "ACTIVE"),
-      supabaseAdmin.from("reviews").select("rating").limit(1000),
+    // Isolate per-query failures: one unavailable table (e.g. a not-yet-
+    // migrated `reviews`) must not 503 the whole public stats endpoint.
+    // Each query degrades to honest zeroes independently.
+    const [sellersRes, ordersRes, citiesRes, reviewsRes] = await Promise.all([
+      supabaseAdmin.from("stores").select("id", { count: "exact", head: true }).eq("status", "ACTIVE")
+        .then((r) => r, (err) => { logger.error("stats sellers query failed", "API", err); return { data: null, count: 0 }; }),
+      supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("global_status", "DELIVERED")
+        .then((r) => r, (err) => { logger.error("stats orders query failed", "API", err); return { data: null, count: 0 }; }),
+      supabaseAdmin.from("stores").select("city").eq("status", "ACTIVE")
+        .then((r) => r, (err) => { logger.error("stats cities query failed", "API", err); return { data: null }; }),
+      supabaseAdmin.from("reviews").select("rating").limit(1000)
+        .then((r) => r, (err) => { logger.error("stats reviews query failed", "API", err); return { data: null }; }),
     ]);
 
-    const uniqueCities = new Set((storeCities.data || []).map((c: any) => c.city).filter(Boolean));
-    const reviewData = reviews.data || [];
+    const uniqueCities = new Set((citiesRes.data || []).map((c: any) => c.city).filter(Boolean));
+    const reviewData = reviewsRes.data || [];
     const avgRating = reviewData.length
       ? (reviewData.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / reviewData.length).toFixed(1)
       : "0";
@@ -835,8 +842,8 @@ app.get("/api/marketplace-stats", async (_req, res) => {
     // Real numbers only — no fabricated fallbacks. Zeros are honest while
     // the marketplace grows; fake "500 sellers" is not.
     const stats = {
-      verifiedSellers: sellers.count || 0,
-      ordersDelivered: orders.count || 0,
+      verifiedSellers: sellersRes.count || 0,
+      ordersDelivered: ordersRes.count || 0,
       citiesCovered: uniqueCities.size || 0,
       avgRating: parseFloat(avgRating),
     };
