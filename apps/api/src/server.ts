@@ -9,6 +9,7 @@ import { initTypesenseCollections } from "./config/typesense.js";
 import { startReconciliationCron } from "./jobs/reconciliation.cron.js";
 import { startInventoryCleanupCron } from "./jobs/inventory-cleanup.cron.js";
 import { startSubscriptionExpiryCron } from "./jobs/subscription-expiry.cron.js";
+import { startTypesenseReconcileCron } from "./jobs/typesense-reconcile.cron.js";
 import { initSentry, captureException } from "./config/sentry.js";
 import { EmailService } from "./modules/email/email.service.js";
 import { UploadService } from "./modules/uploads/upload.service.js";
@@ -94,6 +95,7 @@ async function bootstrap() {
   startReconciliationCron();
   startInventoryCleanupCron();
   startSubscriptionExpiryCron();
+  startTypesenseReconcileCron();
 
   // Initialize email service
   EmailService.init();

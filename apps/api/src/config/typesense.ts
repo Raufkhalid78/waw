@@ -11,8 +11,11 @@ export const typesenseClient = new Typesense.Client({
     },
   ],
   apiKey: ENV.TYPESENSE_API_KEY,
-  connectionTimeoutSeconds: 2,
-  numRetries: 0, // Fail fast — do not retry on startup; Typesense is optional at boot
+  connectionTimeoutSeconds: 3,
+  // One bounded retry for transient blips; search still falls back to
+  // Postgres when Typesense is genuinely unavailable.
+  numRetries: 1,
+  retryIntervalSeconds: 0.2,
 });
 
 export const PRODUCT_SCHEMA = {

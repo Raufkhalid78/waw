@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../../config/supabase.js";
 import { typesenseClient } from "../../config/typesense.js";
 import { redis } from "../../config/redis.js";
+import { logger } from "../../config/logger.js";
 import { CategoryService } from "../categories/category.service.js";
 import { ConfigService } from "../admin/config.service.js";
 
@@ -425,6 +426,37 @@ export class ProductService {
         quantity: defaultStock,
         notes: 'Initial listing stock'
       });
+    }
+
+    // Enqueue Typesense search sync so the new listing is discoverable
+    // immediately (reconcile cron also backfills hourly for resilience).
+    try {
+      const { JobQueueManager } = await import("../../jobs/queue.service.js");
+      const storeRow = await supabaseAdmin
+        .from("stores")
+        .select("id, seller_type")
+        .eq("id", data.storeId)
+        .maybeSingle();
+      await JobQueueManager.addJob("TYPESENSE_SYNC", {
+        product: {
+          id: catalogProduct.id,
+          title: catalogProduct.title,
+          titleUrdu: catalogProduct.title_urdu,
+          description: catalogProduct.description,
+          slug: catalogProduct.slug,
+          categoryId: catalogProduct.category_id,
+          storeId: data.storeId,
+          isFirstParty: storeRow?.data?.seller_type === "FIRST_PARTY",
+          isFeatured: false,
+          isSponsored: false,
+          pricePkr: data.pricePkr || 0,
+          ratingAverage: 0,
+          soldCount: 0,
+          createdAt: catalogProduct.created_at,
+        },
+      });
+    } catch (err: any) {
+      logger.warn("⚠️ Typesense sync enqueue skipped:", err?.message);
     }
 
     return offer;

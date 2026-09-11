@@ -527,4 +527,20 @@ export class AdminController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  /**
+   * POST /api/admin/search/reindex — rebuild the Typesense products index
+   * from Postgres on demand (admin-triggered backfill/reconcile).
+   */
+  static async reindexSearch(req: Request, res: Response): Promise<void> {
+    try {
+      const { reconcileTypesenseIndex } = await import(
+        "../search/typesense-sync.service.js"
+      );
+      const report = await reconcileTypesenseIndex();
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
 }

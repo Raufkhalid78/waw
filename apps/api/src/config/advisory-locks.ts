@@ -24,6 +24,9 @@ export const ADVISORY_LOCKS = {
 
   // Subscriptions
   SUBSCRIPTION_EXPIRY:       50001,
+
+  // Search index
+  TYPESENSE_RECONCILE:       51001,
 } as const satisfies Record<string, number>;
 
 export type AdvisoryLockName = keyof typeof ADVISORY_LOCKS;

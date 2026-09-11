@@ -105,20 +105,31 @@ try {
           case "TYPESENSE_SYNC":
             if (payload.product) {
               try {
+                // Full-document upsert via the shared mapper so the indexed
+                // shape always matches PRODUCT_SCHEMA (ratings, dates, flags).
+                const { buildProductDocument } = await import(
+                  "../modules/search/typesense-sync.service.js"
+                );
+                const doc = buildProductDocument({
+                  id: payload.product.id,
+                  title: payload.product.title,
+                  titleUrdu: payload.product.titleUrdu,
+                  description: payload.product.description,
+                  slug: payload.product.slug,
+                  categoryId: payload.product.categoryId,
+                  storeId: payload.product.storeId,
+                  isFirstParty: payload.product.isFirstParty,
+                  isFeatured: payload.product.isFeatured,
+                  isSponsored: payload.product.isSponsored,
+                  basePricePkr: payload.product.pricePkr,
+                  ratingAverage: payload.product.ratingAverage,
+                  soldCount: payload.product.soldCount,
+                  createdAt: payload.product.createdAt,
+                });
                 await typesenseClient
                   .collections("products")
                   .documents()
-                  .upsert({
-                    id: payload.product.id,
-                    title: payload.product.title,
-                    titleUrdu: payload.product.titleUrdu || "",
-                    description: payload.product.description,
-                    basePricePkr: payload.product.pricePkr,
-                    categoryId: payload.product.categoryId,
-                    storeId: payload.product.storeId || "waw-1p",
-                    isSponsored: payload.product.isSponsored || false,
-                    soldCount: payload.product.soldCount || 0,
-                  });
+                  .upsert(doc);
               } catch (err: any) {
                 logger.warn("⚠️ Typesense sync skipped:", err.message);
               }

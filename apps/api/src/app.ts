@@ -1083,6 +1083,9 @@ app.delete("/api/admin/categories/:id", requireAuth, requireRole(UserRole.ADMIN)
 // -- Cart Abandonment Recovery (Cron) --------------------------------------
 app.post("/api/admin/cron/abandoned-carts", requireAuth, requireRole(UserRole.ADMIN), AdminController.processAbandonedCarts);
 
+// -- Search Index Rebuild (Admin) -----------------------------------------
+app.post("/api/admin/search/reindex", requireAuth, requireRole(UserRole.ADMIN), AdminController.reindexSearch);
+
 // -- File Upload Routes (Supabase Storage) ---------------------------------
 app.post(
   "/api/uploads/:bucket",
