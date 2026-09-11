@@ -55,7 +55,7 @@ describe("P0-INT: Checkout Transaction RPC Integration", { skip: SKIP_DB_TESTS ?
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'checkout_transaction'
       `);
@@ -77,7 +77,7 @@ describe("P0-INT: Checkout Transaction RPC Integration", { skip: SKIP_DB_TESTS ?
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'checkout_transaction'
       `);
@@ -117,7 +117,7 @@ describe("P0-INT: Checkout Transaction RPC Integration", { skip: SKIP_DB_TESTS ?
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'guest_checkout_transaction'
       `);
@@ -152,7 +152,7 @@ describe("P0-INT: Return Request RPC Integration", { skip: SKIP_DB_TESTS ? "DATA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'create_return_request'
       `);
@@ -174,7 +174,7 @@ describe("P0-INT: Return Request RPC Integration", { skip: SKIP_DB_TESTS ? "DATA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'create_return_request'
       `);
@@ -197,7 +197,7 @@ describe("P0-INT: Return Request RPC Integration", { skip: SKIP_DB_TESTS ? "DATA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'create_return_request'
       `);
@@ -219,7 +219,7 @@ describe("P0-INT: Return Request RPC Integration", { skip: SKIP_DB_TESTS ? "DATA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'create_return_request'
       `);
@@ -241,7 +241,7 @@ describe("P0-INT: Return Request RPC Integration", { skip: SKIP_DB_TESTS ? "DATA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'create_return_request'
       `);
@@ -276,7 +276,7 @@ describe("P0-INT: Cancel Order RPC Integration", { skip: SKIP_DB_TESTS ? "DATABA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'cancel_order'
       `);
@@ -298,7 +298,7 @@ describe("P0-INT: Cancel Order RPC Integration", { skip: SKIP_DB_TESTS ? "DATABA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'cancel_order'
       `);
@@ -320,7 +320,7 @@ describe("P0-INT: Cancel Order RPC Integration", { skip: SKIP_DB_TESTS ? "DATABA
       const { rows } = await client.query(`
         SELECT pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.proname = 'cancel_order'
       `);
@@ -413,7 +413,7 @@ describe("P0-INT: Permission Verification", { skip: SKIP_DB_TESTS ? "DATABASE_UR
       const { rows } = await client.query(`
         SELECT p.proname, pg_get_functiondef(p.oid) as definition
         FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.procnsp
+        JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
           AND p.prosecdef = true
       `);
