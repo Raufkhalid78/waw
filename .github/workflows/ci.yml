@@ -159,11 +159,16 @@ jobs:
         run: npx supabase db reset
       - name: Export Supabase connection env
         run: |
-          npx supabase status -o json > supabase-status.json
+          npx supabase status -o json | tee supabase-status.json
+          # Key names differ across CLI versions (legacy anon_key/service_role_key
+          # vs new publishable_key/secret_key) — try each in order.
+          SUPA_URL=$(jq -r '.api_url // .API_URL // .apiUrl // empty' supabase-status.json)
+          SUPA_ANON=$(jq -r '.anon_key // .ANON_KEY // .publishable_key // empty' supabase-status.json)
+          SUPA_SERVICE=$(jq -r '.service_role_key // .SERVICE_ROLE_KEY // .secret_key // empty' supabase-status.json)
           {
-            echo "SUPABASE_URL=$(jq -r .api_url supabase-status.json)"
-            echo "SUPABASE_ANON_KEY=$(jq -r .anon_key supabase-status.json)"
-            echo "SUPABASE_SERVICE_ROLE_KEY=$(jq -r .service_role_key supabase-status.json)"
+            echo "SUPABASE_URL=$SUPA_URL"
+            echo "SUPABASE_ANON_KEY=$SUPA_ANON"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPA_SERVICE"
           } >> "$GITHUB_ENV"
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
