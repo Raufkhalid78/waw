@@ -65,6 +65,35 @@ export const CreateOrderSchema = z.object({
     .min(1, "Cart must contain at least 1 item"),
 });
 
+// Guest checkout — same shape as CreateOrderSchema, but items OR quoteToken
+// (quote-first flow), and no authenticated buyer fields.
+export const GuestCreateOrderSchema = z
+  .object({
+    buyerName: z.string().min(2, "Buyer name is required"),
+    buyerPhone: z.string().min(10, "Valid phone number is required"),
+    shippingAddress: z.string().min(5, "Delivery address is required"),
+    shippingCity: z.string().min(2, "City is required"),
+    shippingProvince: z.string().min(2, "Province is required").optional(),
+    paymentMethod: z.enum(["COD", "XPAY_CARD", "XPAY_WALLET", "RAAST_P2M_QR"], {
+      errorMap: () => ({ message: "Invalid payment method" }),
+    }),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().min(1),
+          variantId: z.string().optional(),
+          quantity: z.number().int().positive().max(100, "Maximum 100 items per product"),
+        }),
+      )
+      .optional(),
+    quoteToken: z.string().min(10).optional(),
+    notes: z.string().max(1000).optional(),
+  })
+  .refine((d) => Boolean(d.quoteToken) || (Array.isArray(d.items) && d.items.length > 0), {
+    message: "Order must contain a valid quoteToken or items list",
+    path: ["items"],
+  });
+
 export const UpdateOrderStatusSchema = z.object({
   status: z.enum([
     "PENDING", "CONFIRMED", "PROCESSING", "SHIPPED",

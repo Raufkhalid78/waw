@@ -4,6 +4,30 @@ class ApiConstants {
     defaultValue: 'http://localhost:4000',
   );
 
+  /// True when this binary was compiled in release mode.
+  static const bool _isRelease = bool.fromEnvironment('dart.vm.product');
+
+  /// Release builds MUST be compiled with an explicit HTTPS API URL:
+  /// `flutter build apk --dart-define=API_BASE_URL=https://api.waw.com.pk`.
+  /// A localhost default in a shipped binary means every API call fails.
+  static void assertConfiguredForRelease() {
+    if (!_isRelease) return;
+    final isLocalhost = RegExp(
+      r'//(localhost|127\.0\.0\.1|10\.0\.2\.2|0\.0\.0\.0|::1)',
+    ).hasMatch(baseUrl);
+    if (isLocalhost || baseUrl.isEmpty) {
+      throw StateError(
+        'API_BASE_URL is not configured for this release build. '
+        'Rebuild with --dart-define=API_BASE_URL=https://<your-api-domain>',
+      );
+    }
+    if (!baseUrl.startsWith('https://')) {
+      throw StateError(
+        'API_BASE_URL must use HTTPS in release builds. Got: $baseUrl',
+      );
+    }
+  }
+
   // Auth
   static const String sendOtp = '/api/auth/whatsapp-otp/send';
   static const String verifyOtp = '/api/auth/whatsapp-otp/verify';

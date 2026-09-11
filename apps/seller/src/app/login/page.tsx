@@ -33,29 +33,6 @@ export default function SellerLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createSession = async (
-    userId: string,
-    authToken: string,
-    userRole: string,
-    userPhone?: string,
-    userEmail?: string,
-    storeId?: string,
-  ) => {
-    if (!authToken) {
-      throw new Error("Login succeeded but no auth token was returned. Cannot create session.");
-    }
-    const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ userId, authToken, userRole, userPhone, userEmail, storeId }),
-    });
-    if (!sessionRes.ok) {
-      const err = await sessionRes.json().catch(() => ({ error: "Session creation failed" }));
-      throw new Error(err.error || "Failed to create session");
-    }
-  };
-
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -82,23 +59,15 @@ export default function SellerLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
+      // Same-origin server proxy — the API's SameSite=Strict session cookies
+      // can never be set via a cross-origin fetch.
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ phone, otp, role: "SELLER", storeName, city }),
+        body: JSON.stringify({ phone, otp, storeName, city }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Invalid OTP");
-
-      await createSession(
-        data.user.id,
-        data.token,
-        data.user.role,
-        data.user.phone,
-        data.user.email,
-        data.user.store_id,
-      );
       router.push("/");
     } catch (err: any) {
       setError(err.message || "OTP verification failed");
@@ -112,23 +81,15 @@ export default function SellerLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      // Same-origin server proxy — exchange happens server-side so the
+      // SameSite=Strict session cookies land on this origin.
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
-
-      await createSession(
-        data.user.id,
-        data.token,
-        data.user.role,
-        data.user.phone,
-        data.user.email,
-        data.user.store_id,
-      );
       router.push("/");
     } catch (err: any) {
       setError(err.message || "Login failed");

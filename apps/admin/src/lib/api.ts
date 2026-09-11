@@ -571,9 +571,15 @@ export const uploadApi = {
   upload: async (file: File, bucket: string): Promise<{ url: string; path: string }> => {
     const formData = new FormData();
     formData.append("file", file);
+    // CSRF: the API enforces the double-submit token on every POST — raw
+    // fetch must include it just like adminFetch does.
+    const headers: Record<string, string> = {};
+    const csrf = getCsrfToken();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
     const res = await fetch(`${API_BASE}/api/uploads/${bucket}`, {
       method: "POST",
       credentials: "include",
+      headers,
       body: formData,
     });
     if (!res.ok) throw new Error("Upload failed");

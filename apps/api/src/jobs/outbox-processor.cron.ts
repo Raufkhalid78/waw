@@ -3,6 +3,10 @@ import { logger } from "../config/logger.js";
 import { WhatsAppService } from "../modules/notifications/whatsapp.service.js";
 import { OutboxService, OutboxEventType } from "../modules/outbox/outbox.service.js";
 import { ADVISORY_LOCKS } from "../config/advisory-locks.js";
+import {
+  handleBookCourier,
+  handleNotifyOrderConfirmed,
+} from "./outbox-event-handlers.js";
 
 /**
  * Advisory lock key for distributed outbox processor safety.
@@ -41,6 +45,14 @@ async function processOutboxEvent(event: {
 }): Promise<boolean> {
   try {
     switch (event.eventType as OutboxEventType) {
+      case "BOOK_COURIER":
+        await handleBookCourier(event.payload);
+        break;
+
+      case "NOTIFY_ORDER_CONFIRMED":
+        await handleNotifyOrderConfirmed(event.payload);
+        break;
+
       case "ORDER_CONFIRMED":
         if (event.payload.buyerPhone && event.payload.orderNumber) {
           await WhatsAppService.sendOrderConfirmed(

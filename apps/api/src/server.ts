@@ -10,6 +10,7 @@ import { startReconciliationCron } from "./jobs/reconciliation.cron.js";
 import { startInventoryCleanupCron } from "./jobs/inventory-cleanup.cron.js";
 import { startSubscriptionExpiryCron } from "./jobs/subscription-expiry.cron.js";
 import { startTypesenseReconcileCron } from "./jobs/typesense-reconcile.cron.js";
+import { startOutboxProcessorCron } from "./jobs/outbox-processor.cron.js";
 import { initSentry, captureException } from "./config/sentry.js";
 import { EmailService } from "./modules/email/email.service.js";
 import { UploadService } from "./modules/uploads/upload.service.js";
@@ -96,6 +97,9 @@ async function bootstrap() {
   startInventoryCleanupCron();
   startSubscriptionExpiryCron();
   startTypesenseReconcileCron();
+  // Durable outbox dispatcher — books couriers + sends confirmations for
+  // settled payments. Without this, paid orders never ship.
+  startOutboxProcessorCron();
 
   // Initialize email service
   EmailService.init();

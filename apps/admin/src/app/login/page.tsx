@@ -1,15 +1,10 @@
 "use client";
 
 
-import { API_BASE_URL } from "@waw/config";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, Mail, Smartphone } from "lucide-react";
 import { ScaleIn } from "@/components/Motion";
-
-const API_BASE = (
-  API_BASE_URL
-).replace(/\/+$/, "");
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,56 +14,36 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const createSession = async (
-    userId: string,
-    authToken: string,
-    userRole: string,
-    userPhone?: string,
-    userEmail?: string,
-  ) => {
-    if (!authToken) {
-      throw new Error("Login succeeded but no auth token was returned. Cannot create session.");
-    }
-    const sessionRes = await fetch(`${API_BASE}/api/auth/session/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ userId, authToken, userRole, userPhone, userEmail }),
-    });
-    if (!sessionRes.ok) {
-      const err = await sessionRes.json().catch(() => ({ error: "Session creation failed" }));
-      throw new Error(err.error || "Failed to create session");
-    }
-  };
-
+  // All auth goes through same-origin server proxy routes: the API's session
+  // cookies are SameSite=Strict and can never be set via cross-origin fetch.
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, mfaCode: mfaCode || undefined }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.code === "MFA_REQUIRED") {
+          setMfaRequired(true);
+          throw new Error("Enter your authenticator code to continue");
+        }
         throw new Error(data.error || "Login failed");
       }
 
-      if (data.user?.role !== "ADMIN") {
-        throw new Error("Access denied. Admin only.");
-      }
-
-      await createSession(data.user.id, data.token, data.user.role, data.user.phone, data.user.email);
       router.push("/");
     } catch (err: any) {
       setError(err.message);
@@ -83,11 +58,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile }),
-      });
+      // OTP delivery has no cookie dependency — call the API directly.
+      // Only the session/verify step must go through the same-origin proxy.
+      const res = await fetch(
+        `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "")}/api/auth/whatsapp-otp/send`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: mobile }),
+        },
+      );
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send OTP");
@@ -105,21 +85,22 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/whatsapp-otp/verify`, {
+      const res = await fetch("/api/auth/otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ phone: mobile, otp, role: "ADMIN" }),
+        body: JSON.stringify({ phone: mobile, otp, mfaCode: mfaCode || undefined }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "OTP verification failed");
 
-      if (data.user?.role !== "ADMIN") {
-        throw new Error("Access denied. Admin only.");
+      if (!res.ok) {
+        if (data.code === "MFA_REQUIRED") {
+          setMfaRequired(true);
+          throw new Error("Enter your authenticator code to continue");
+        }
+        throw new Error(data.error || "OTP verification failed");
       }
 
-      await createSession(data.user.id, data.token, data.user.role, data.user.phone, data.user.email);
       router.push("/");
     } catch (err: any) {
       setError(err.message);
@@ -183,6 +164,25 @@ export default function LoginPage() {
             {error && (
               <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-700 animate-[fadeIn_200ms_ease-out] mb-4">
                 {error}
+              </div>
+            )}
+
+            {/* MFA authenticator code — shown when the API demands it */}
+            {mfaRequired && (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Authenticator Code
+                </label>
+                <input
+                  type="text"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="admin-input text-center text-lg tracking-widest font-mono"
+                  placeholder="123456"
+                />
               </div>
             )}
 

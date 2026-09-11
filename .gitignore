@@ -58,3 +58,6 @@ pnpm-debug.log*
 *-output.log
 *-out.log
 *-err.log
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo

@@ -312,6 +312,24 @@ export default function CheckoutPage() {
           window.location.href = paymentSession.checkoutUrl;
           return;
         }
+
+        // A digital order without a payment redirect must NEVER be presented
+        // as a completed purchase — the gateway initiation failed (outage or
+        // misconfiguration). Logged-in buyers go to the order page to retry
+        // payment; guests stay here with a clear error. The cart is
+        // intentionally NOT cleared either way.
+        setIsSubmitting(false);
+        if (isLoggedIn) {
+          setQuoteError(
+            "Payment could not be started. Your order is saved — open it to retry payment.",
+          );
+          router.push(`/orders/${orderId}`);
+        } else {
+          setQuoteError(
+            "Payment could not be started. Please try again or contact WhatsApp support with your details.",
+          );
+        }
+        return;
       }
 
       // COD or default success — payment state is final at creation time.

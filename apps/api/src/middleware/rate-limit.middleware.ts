@@ -4,15 +4,21 @@ import { Redis } from "ioredis";
 import { ENV } from "../config/env.js";
 import { logger } from "../config/logger.js";
 
-// Setup ioredis client using the Upstash URL + Token with authenticated TLS
-const redisPassword = ENV.UPSTASH_REDIS_REST_TOKEN || ENV.REDIS_PASSWORD;
+// Setup ioredis client using dedicated TCP Redis credentials.
+// NOTE: Upstash REST tokens are NOT Redis passwords — the rate limiter (like
+// BullMQ) needs a real TCP endpoint (REDIS_HOST/PORT/PASSWORD). Upstash
+// exposes one on the same dashboard ("Connect via Redis").
 const redisClient =
-  ENV.UPSTASH_REDIS_REST_URL && redisPassword
-    ? new Redis(ENV.UPSTASH_REDIS_REST_URL.replace("https://", "rediss://"), {
-        password: redisPassword,
-        tls: { rejectUnauthorized: true },
+  ENV.REDIS_HOST && ENV.REDIS_PORT
+    ? new Redis({
+        host: ENV.REDIS_HOST,
+        port: ENV.REDIS_PORT,
+        password: ENV.REDIS_PASSWORD,
+        // Upstash and most managed providers terminate TLS on 6379
+        tls: ENV.REDIS_TLS ? { rejectUnauthorized: true } : undefined,
         lazyConnect: true,
         maxRetriesPerRequest: 1,
+        enableOfflineQueue: false,
       })
     : undefined;
 
@@ -49,7 +55,7 @@ function getStore(prefix: string) {
   if (isProduction && !warnedNoRedis) {
     warnedNoRedis = true;
     logger.warn(
-      "RATE LIMITER: Redis is not configured — falling back to in-memory rate limiting (per-instance). Configure UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for shared limits across instances.",
+      "RATE LIMITER: TCP Redis is not configured — falling back to in-memory rate limiting (per-instance). Configure REDIS_HOST/REDIS_PORT/REDIS_PASSWORD (Upstash 'Connect via Redis' endpoint) for shared limits across instances.",
     );
   }
   return undefined;
@@ -64,6 +70,8 @@ export const otpRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
+  // Degrade to pass-through (not 500) if the shared Redis store errors out.
+  passOnStoreError: true,
   store: getStore("rl_otp:"),
   message: {
     error:
@@ -80,6 +88,8 @@ export const apiRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
+  // Degrade to pass-through (not 500) if the shared Redis store errors out.
+  passOnStoreError: true,
   store: getStore("rl_api:"),
   message: {
     error: "Rate limit exceeded. Please slow down requests.",
@@ -158,6 +168,8 @@ export const loginRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
+  // Degrade to pass-through (not 500) if the shared Redis store errors out.
+  passOnStoreError: true,
   store: getStore("rl_login:"),
   message: {
     error:
@@ -196,6 +208,59 @@ export const supportRateLimiter = rateLimit({
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => (req as any).user?.id || defaultKeyGenerator(req),
+  // Degrade to pass-through (not 500) if the shared Redis store errors out.
+  passOnStoreError: true,
   store: getStore("rl_support:"),
   message: { error: "Too many support tickets. Please wait before creating another." },
+});
+
+/**
+ * Payment initiation rate limiter (10 per minute per user).
+ * Each hit is a paid-provider API call — must be throttled harder than the
+ * global limiter to prevent cost-abuse.
+ */
+export const paymentRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => (req as any).user?.id || defaultKeyGenerator(req),
+  // Degrade to pass-through (not 500) if the shared Redis store errors out.
+  passOnStoreError: true,
+  store: getStore("rl_payment:"),
+  message: { error: "Too many payment attempts. Please wait before trying again." },
+});
+
+/**
+ * Order lookup limiter (10 per 10 minutes per IP). Unauthenticated endpoint —
+ * order-number probing must be expensive.
+ */
+export const lookupRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  // Degrade to pass-through (not 500) if the shared Redis store errors out.
+  passOnStoreError: true,
+  store: getStore("rl_lookup:"),
+  message: { error: "Too many lookups. Please try again later." },
+});
+
+/**
+ * MFA endpoint limiter (5 attempts per 5 minutes per user).
+ * TOTP codes are 6 digits — without this they are brute-forceable.
+ */
+export const mfaRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => (req as any).user?.id || defaultKeyGenerator(req),
+  // Degrade to pass-through (not 500) if the shared Redis store errors out.
+  passOnStoreError: true,
+  store: getStore("rl_mfa:"),
+  message: { error: "Too many MFA attempts. Please try again in a few minutes." },
 });

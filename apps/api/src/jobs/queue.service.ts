@@ -7,6 +7,10 @@ import { typesenseClient } from "../config/typesense.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { InventoryLockService } from "../modules/products/inventory-lock.service.js";
 import { OrderStatus, PaymentStatus, ReturnReason } from "../types/index.js";
+import {
+  handleBookCourier,
+  handleNotifyOrderConfirmed,
+} from "./outbox-event-handlers.js";
 
 export interface BackgroundJobPayload<T = any> {
   id?: string;
@@ -28,6 +32,7 @@ const redisConnection = {
   host: ENV.REDIS_HOST,
   port: ENV.REDIS_PORT,
   password: ENV.REDIS_PASSWORD,
+  tls: ENV.REDIS_TLS ? { rejectUnauthorized: true } : undefined,
   maxRetriesPerRequest: null,
 };
 
@@ -349,91 +354,12 @@ try {
           }
 
           case "BOOK_COURIER": {
-            logger.info(
-              `📦 [Outbox] Booking courier for order ${payload.orderNumber || payload.orderId}`,
-            );
-            // Load the order fresh — the payload is a pointer, not a snapshot.
-            const { data: bookingOrder, error: bookingOrderErr } = await supabaseAdmin
-              .from("orders")
-              .select("id, order_number, buyer_name, buyer_phone, shipping_address, shipping_city, items:order_items(*)")
-              .eq("id", payload.orderId)
-              .single();
-
-            if (bookingOrderErr || !bookingOrder) {
-              throw new Error(`BOOK_COURIER: order ${payload.orderId} not found`);
-            }
-
-            // Idempotent: skip if a tracked or pending shipment already exists.
-            const { data: existingShipment } = await supabaseAdmin
-              .from("shipments")
-              .select("id, status, tracking_number")
-              .eq("order_id", bookingOrder.id)
-              .limit(1)
-              .maybeSingle();
-
-            if (existingShipment) {
-              logger.info(
-                `📦 [Outbox] Shipment already exists for order ${bookingOrder.order_number} (${existingShipment.status}) — booking skipped`,
-              );
-              break;
-            }
-
-            await CourierService.bookCourierShipment({
-              orderId: bookingOrder.id,
-              orderNumber: bookingOrder.order_number,
-              customerName: bookingOrder.buyer_name,
-              customerPhone: bookingOrder.buyer_phone,
-              deliveryAddress: bookingOrder.shipping_address,
-              destinationCity: bookingOrder.shipping_city,
-              codAmountPkr: 0,
-              isCod: false,
-              itemsCount: bookingOrder.items?.length || 1,
-            });
+            await handleBookCourier(payload);
             break;
           }
 
           case "NOTIFY_ORDER_CONFIRMED": {
-            logger.info(
-              `🔔 [Outbox] Sending order confirmation for ${payload.orderNumber || payload.orderId}`,
-            );
-
-            // WhatsApp — never blocks the notification flow on one channel.
-            try {
-              await WhatsAppService.sendOrderConfirmed(
-                payload.buyerPhone,
-                payload.orderNumber,
-                payload.totalPkr || 0,
-                false,
-              );
-            } catch (waErr: any) {
-              logger.warn("WhatsApp confirmation dispatch notice:", waErr?.message);
-            }
-
-            // Push (FCM) — idempotent per order: a replayed outbox event can
-            // never send the same confirmation twice.
-            try {
-              const { PushService } = await import("../modules/notifications/push.service.js");
-              const { data: pushResult } = await supabaseAdmin.rpc(
-                "record_notification_event",
-                {
-                  p_idempotency_key: `order_confirmed:${payload.orderId}`,
-                  p_user_id: payload.buyerId || null,
-                  p_channel: "push",
-                },
-              );
-              if (pushResult === true) {
-                const { PushService } = await import("../modules/notifications/push.service.js");
-                await PushService.sendToUser(payload.buyerId, {
-                  title: "Order Confirmed ✓",
-                  body: `Order ${payload.orderNumber} is confirmed — PKR ${(payload.totalPkr || 0).toLocaleString()} paid.`,
-                  data: { orderId: payload.orderId, orderNumber: payload.orderNumber, type: "ORDER_CONFIRMED" },
-                });
-              } else {
-                logger.info(`Push for order ${payload.orderNumber} already sent (idempotency guard)`);
-              }
-            } catch (pushErr: any) {
-              logger.warn("Push notification dispatch notice:", pushErr?.message);
-            }
+            await handleNotifyOrderConfirmed(payload);
             break;
           }
 
@@ -515,9 +441,24 @@ export class JobQueueManager {
             removeOnFail: 5000,
           },
         );
-        logger.info(`📥 [BullMQ] Enqueued Job #${jobId} [${type}]`);
+        logger.info(`📦 [BullMQ] Enqueued Job #${jobId} [${type}]`);
         return jobId;
-      } catch {
+      } catch (err: any) {
+        // Loud failure — a silently dropped job means a buyer never gets
+        // notified or a return never books its reverse pickup.
+        logger.error(
+          `❌ [BullMQ] FAILED to enqueue Job [${type}] — side effect will be delayed or lost:`,
+          err.message,
+        );
+        try {
+          const { captureException } = await import("../config/sentry.js");
+          captureException(err, { source: "queue.enqueue", jobType: type });
+        } catch {
+          // Sentry import is best-effort
+        }
+        if (ENV.NODE_ENV === "production") {
+          throw err;
+        }
         // Dev fallback if Redis connection times out
       }
     }

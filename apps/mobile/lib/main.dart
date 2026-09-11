@@ -2,6 +2,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/network/api_client.dart';
+import 'core/constants/api_constants.dart';
 import 'core/storage/secure_token_storage.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/product_repository.dart';
@@ -18,6 +19,9 @@ import 'router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Fail fast in release binaries built without a real API URL — a shipped
+  // app pointing at localhost is a brick with no way to recover.
+  ApiConstants.assertConfiguredForRelease();
   final prefs = await SharedPreferences.getInstance();
 
   final apiClient = ApiClient();
@@ -221,7 +225,7 @@ class WawApp extends StatelessWidget {
         final light = _buildTheme(_lightScheme(), brightness: Brightness.light);
         final dark = _buildTheme(_darkScheme(), brightness: Brightness.dark);
         return MaterialApp(
-          title: 'Waw â€” Premium Marketplace Pakistan',
+          title: 'Waw — Premium Marketplace Pakistan',
           debugShowCheckedModeBanner: false,
           themeMode: settings.themeMode,
           theme: light,

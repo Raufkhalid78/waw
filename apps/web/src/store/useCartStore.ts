@@ -164,10 +164,19 @@ export const useCartStore = create<CartStore>((set, get) => ({
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ guestToken }),
-      }).catch((err) => logger.error("Failed to merge guest cart on logout", "CartStore", err));
+      }).catch((err) => logger.error("Failed to merge guest cart on login", "CartStore", err));
     }
   },
-  logout: () => set({ user: null }),
+  logout: () => {
+    set({ user: null });
+    // Destroy the server session too — clearing client state alone leaves the
+    // httpOnly session cookie valid and the buyer fully logged in server-side.
+    fetchWithCsrf(`${API_BASE_URL}/api/auth/session/revoke`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    }).catch((err) => logger.error("Failed to revoke session on logout", "CartStore", err));
+  },
 
   setSelectedCity: (selectedCity) => set({ selectedCity }),
   setLanguage: (language) => set({ language }),

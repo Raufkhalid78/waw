@@ -6,6 +6,7 @@ import { CourierService } from "../logistics/courier.service.js";
 import { QuoteService } from "./quote.service.js";
 import { InventoryService } from "../products/inventory.service.js";
 import { JobQueueManager } from "../../jobs/queue.service.js";
+import { OutboxService } from "../outbox/outbox.service.js";
 import { AuthorizationService } from "../auth/authorization.service.js";
 import { CheckoutSessionService } from "../checkout/checkout-session.service.js";
 import { GuestTokenService } from "./guest-token.service.js";
@@ -229,13 +230,37 @@ export class OrderService {
       }
     }
 
-    // WhatsApp Order Confirmation via BullMQ queue (async, retried)
-    JobQueueManager.addJob("WHATSAPP_NOTIFICATION", {
-      phone: input.buyerPhone,
-      orderNumber: result.order_number,
-      totalPkr: result.total_amount_pkr || quote.totalPkr,
-      isCod: input.paymentMethod === PaymentMethod.COD,
-    }).catch((err) => logger.error("Failed to enqueue WhatsApp notification:", err));
+    // COD fulfilment: book the courier + send confirmations via the durable
+    // outbox (survives crashes; dispatched by the outbox-processor cron).
+    // Digital (XPay) orders get the same events from the payment settlement
+    // path instead — publishing here would double-book the courier.
+    if (input.paymentMethod === PaymentMethod.COD) {
+      OutboxService.publish("BOOK_COURIER", {
+        orderId: result.order_id,
+        orderNumber: result.order_number,
+        isCod: true,
+        codAmountPkr: result.total_amount_pkr || quote.totalPkr,
+      }).catch((err) =>
+        logger.error("Failed to publish BOOK_COURIER for COD order:", {
+          orderId: result.order_id,
+          error: (err as Error).message,
+        }),
+      );
+
+      OutboxService.publish("NOTIFY_ORDER_CONFIRMED", {
+        orderId: result.order_id,
+        orderNumber: result.order_number,
+        buyerPhone: input.buyerPhone,
+        buyerId: buyerId,
+        totalPkr: result.total_amount_pkr || quote.totalPkr,
+        isCod: true,
+      }).catch((err) =>
+        logger.error("Failed to publish NOTIFY_ORDER_CONFIRMED for COD order:", {
+          orderId: result.order_id,
+          error: (err as Error).message,
+        }),
+      );
+    }
 
     return response;
   }

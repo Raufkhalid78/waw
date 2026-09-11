@@ -32,7 +32,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (loginData.user?.role !== "ADMIN") {
+    // ADMIN-CLASS roles allowed into the admin control center. SUPER_ADMIN
+    // has implicit access to every admin API route, so rejecting it here
+    // locked the super-admin out of their own portal.
+    const ADMIN_ROLES = ["ADMIN", "SUPER_ADMIN", "FINANCE", "OPS_AGENT", "MODERATOR"];
+    if (!ADMIN_ROLES.includes(loginData.user?.role)) {
       return NextResponse.json(
         { error: "Access denied. Admin only." },
         { status: 403 }
@@ -48,13 +52,18 @@ export async function POST(request: NextRequest) {
         authToken: loginData.token,
         userRole: loginData.user.role,
         userEmail: loginData.user.email,
+        mfaCode: body.mfaCode,
       }),
     });
 
     if (!sessionRes.ok) {
+      const sessionErr = await sessionRes.json().catch(() => ({}));
       return NextResponse.json(
-        { error: "Session creation failed" },
-        { status: 500 }
+        {
+          error: sessionErr.error || "Session creation failed",
+          code: sessionErr.code,
+        },
+        { status: sessionRes.status }
       );
     }
 

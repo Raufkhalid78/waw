@@ -9,6 +9,12 @@ export interface WhatsAppMessagePayload {
   parameters: string[];
 }
 
+/** Masks all but the last 3 digits of a phone number for safe logging. */
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length > 3 ? `***${digits.slice(-3)}` : "***";
+}
+
 export class WhatsAppService {
   private static readonly META_API_VERSION = "v21.0";
   private static readonly META_BASE_URL = "https://graph.facebook.com";
@@ -52,8 +58,8 @@ export class WhatsAppService {
         "WhatsApp Meta API error:",
         err.response?.data || err.message,
       );
-      // Still log for dev visibility
-      logger.info(`📱 [WhatsApp FALLBACK] To ${phone}: ${messageBody}`);
+      // Never log the message body — OTP flows embed live verification codes.
+      logger.info(`📱 [WhatsApp FALLBACK] Sent message to ${maskPhone(phone)} (${messageBody.length} chars)`);
       return false;
     }
   }
@@ -63,7 +69,9 @@ export class WhatsAppService {
    * Uses Twilio Verify if configured, otherwise falls back to Meta Cloud API.
    */
   static async sendOtp(phone: string, otpCode: string): Promise<boolean> {
-    logger.info(`📱 [WhatsApp Service] Sending OTP ${otpCode} to ${phone}`);
+    // SECURITY: never log the OTP code itself — logs persist and are commonly
+    // aggregated; anyone with log access must not be able to intercept OTPs.
+    logger.info(`📱 [WhatsApp Service] Sending OTP to ${maskPhone(phone)}`);
 
     // If Twilio Verify is configured, use it
     if (ENV.TWILIO_ACCOUNT_SID && ENV.TWILIO_VERIFY_SERVICE_SID) {

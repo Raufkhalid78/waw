@@ -149,6 +149,36 @@ export class SessionController {
       const ip = req.ip || req.socket.remoteAddress || "unknown";
       const userAgent = req.headers["user-agent"] || "unknown";
 
+      // SECURITY: enforce TOTP for privileged roles when MFA is enrolled.
+      // Unenrolled admins are allowed through (so enrollment isn't a lock-out
+      // trap) but an enrolled admin can never log in without the code.
+      const isPrivilegedRole = ["ADMIN", "SUPER_ADMIN", "FINANCE", "OPS_AGENT"].includes(
+        authoritativeRole,
+      );
+      if (isPrivilegedRole) {
+        const { data: mfa } = await supabaseAdmin
+          .from("admin_mfa")
+          .select("secret, is_enabled")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (mfa?.is_enabled && mfa?.secret) {
+          const { mfaCode } = req.body || {};
+          if (!mfaCode || typeof mfaCode !== "string") {
+            res.status(403).json({
+              error: "MFA code required",
+              code: "MFA_REQUIRED",
+            });
+            return;
+          }
+          const { verifyTotp } = await import("../admin/totp.util.js");
+          if (!verifyTotp(mfa.secret, mfaCode)) {
+            res.status(401).json({ error: "Invalid MFA code", code: "MFA_INVALID" });
+            return;
+          }
+        }
+      }
+
       const tokens = await SessionService.createSession({
         userId,
         userRole: authoritativeRole,

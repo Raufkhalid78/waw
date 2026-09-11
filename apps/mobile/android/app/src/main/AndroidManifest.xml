@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds are built from this manifest — without INTERNET the
+         app ships with zero network access (every Dio call fails). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="waw_mobile"
+        android:label="Waw — Shop Pakistan"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

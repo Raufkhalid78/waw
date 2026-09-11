@@ -31,6 +31,9 @@ import {
   supportRateLimiter,
   loginRateLimiter,
   otpVerifyRateLimiter,
+  paymentRateLimiter,
+  lookupRateLimiter,
+  mfaRateLimiter,
 } from "./middleware/rate-limit.middleware.js";
 import { validateBody } from "./middleware/validate.middleware.js";
 import { apiVersioning } from "./middleware/api-versioning.middleware.js";
@@ -42,6 +45,7 @@ import {
   VerifyOtpSchema,
   CreateProductSchema,
   CreateOrderSchema,
+  GuestCreateOrderSchema,
   CreateReviewSchema,
   CreateDisputeSchema,
   AdminSettingsSchema,
@@ -49,6 +53,9 @@ import {
   UserAddressSchema,
   WishlistSchema,
   SellerKycSchema,
+  SellerApplySchema,
+  CreateCouponSchema,
+  CreateSupportTicketSchema,
   SupportMessageSchema,
 } from "./modules/common/schemas.js";
 
@@ -212,6 +219,20 @@ app.use(apiVersioning);
 app.use(sanitizeInput);
 app.use(csrfProtection);
 
+/**
+ * Returns a client-safe error message. Intentional business-rule errors
+ * ("Coupon expired", "Insufficient stock") pass through so buyers get
+ * actionable feedback; anything that smells like a database/provider internal
+ * is masked (the real error is already logged server-side).
+ */
+function sanitizeClientError(err: any): string {
+  const msg = String(err?.message || "Bad request");
+  const internal =
+    /supabase|postgres|pg_|pgrst|permission denied|relation .* does not exist|duplicate key|violates|column .* does not exist|syntax error|econnrefused|etimedout|fetch failed|jwt/i;
+  if (internal.test(msg)) return "Request could not be completed";
+  return msg;
+}
+
 // -- Swagger API Documentation (dev/staging only — never in production) ----
 if (ENV.NODE_ENV !== "production") {
   try {
@@ -361,7 +382,8 @@ app.get("/api/content", async (req, res) => {
     if (error) throw error;
     res.json({ content: data });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    logger.error("CMS content fetch error:", err?.message || err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -430,20 +452,20 @@ app.post("/api/checkout/quote", async (req, res) => {
     });
     res.json(quote);
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: sanitizeClientError(err) });
   }
 });
 
 // ── Order Routes ──────────────────────────────────────────────────────────
 app.post("/api/orders", requireAuth, orderRateLimiter, validateBody(CreateOrderSchema), OrderController.createOrder);
 
-app.post("/api/orders/guest", orderRateLimiter, OrderController.createGuestOrder);
+app.post("/api/orders/guest", orderRateLimiter, validateBody(GuestCreateOrderSchema), OrderController.createGuestOrder);
 
 app.get("/api/orders", requireAuth, OrderController.listUserOrders);
 
 // Guest order lookup by order number + phone — MUST be registered before the
 // :id param route so "lookup" is not captured as an id.
-app.get("/api/orders/lookup", OrderController.lookupGuestOrder);
+app.get("/api/orders/lookup", lookupRateLimiter, OrderController.lookupGuestOrder);
 
 app.get("/api/orders/:id", requireAuth, OrderController.getOrder);
 
@@ -486,12 +508,12 @@ app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
     const result = await OrderService.applyCoupon(couponCode, items);
     res.json(result);
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: sanitizeClientError(err) });
   }
 });
 
 // -- Seller Routes ----------------------------------------------------------
-app.post("/api/seller/apply", requireAuth, SellerController.apply);
+app.post("/api/seller/apply", requireAuth, validateBody(SellerApplySchema), SellerController.apply);
 
 app.post("/api/seller/kyc", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), SellerController.updateKyc);
 
@@ -507,7 +529,7 @@ app.get("/api/seller/analytics", requireAuth, requireRole(UserRole.SELLER, UserR
 
 app.get("/api/seller/payouts", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.listPayouts);
 
-app.post("/api/seller/coupons", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.createCoupon);
+app.post("/api/seller/coupons", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, validateBody(CreateCouponSchema), SellerController.createCoupon);
 
 // -- Destination Serviceability Routes -----------------------------------------
 app.get("/api/serviceability/cities", LogisticsController.listCities);
@@ -515,7 +537,7 @@ app.get("/api/serviceability/cities", LogisticsController.listCities);
 app.get("/api/serviceability/check", LogisticsController.checkDestination);
 
 // -- Customer Support & Dispute Routes ---------------------------------------
-app.post("/api/support/tickets", requireAuth, supportRateLimiter, SupportController.createTicket);
+app.post("/api/support/tickets", requireAuth, supportRateLimiter, validateBody(CreateSupportTicketSchema), SupportController.createTicket);
 
 app.get("/api/support/tickets", requireAuth, SupportController.listTickets);
 
@@ -531,6 +553,7 @@ app.post("/api/logistics/postex/webhook", LogisticsController.handlePostExWebhoo
 // the exact phone the order was placed with (validated in the controller).
 app.post(
   "/api/payments/xpay/initiate",
+  paymentRateLimiter,
   attachOptionalUser,
   PaymentController.initiateXPay,
 );
@@ -601,7 +624,7 @@ app.post(
       res.json(result);
     } catch (err: any) {
       logger.error("Raast QR generation error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   },
 );
@@ -688,51 +711,26 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
         })
         .eq("id", payment.id);
 
-      // Book courier (non-COD)
-      try {
-        const { CourierService } = await import(
-          "./modules/logistics/courier.service.js"
-        );
-        const { data: orderItems } = await supabaseAdmin
-          .from("order_items")
-          .select("*")
-          .eq("order_id", order.id);
-
-        await CourierService.bookCourierShipment({
-          orderId: order.id,
-          orderNumber: order.order_number,
-          customerName: order.buyer_name,
-          customerPhone: order.buyer_phone,
-          deliveryAddress: order.shipping_address,
-          destinationCity: order.shipping_city,
-          codAmountPkr: 0,
-          isCod: false,
-          itemsCount: orderItems?.length || 1,
-        });
-      } catch (courierErr) {
-        logger.warn("PostEx booking notice:", courierErr);
-      }
-
-      // WhatsApp notification
-      try {
-        const { WhatsAppService } = await import(
-          "./modules/notifications/whatsapp.service.js"
-        );
-        await WhatsAppService.sendOrderConfirmed(
-          order.buyer_phone,
-          order.order_number,
-          order.total_amount_pkr || 0,
-          false,
-        );
-      } catch (notifErr) {
-        logger.warn("WhatsApp notice:", notifErr);
-      }
+      // Courier booking + buyer confirmations via the durable outbox —
+      // survives crashes and is idempotent (unlike inline calls here).
+      const { OutboxService } = await import("./modules/outbox/outbox.service.js");
+      await OutboxService.publish("BOOK_COURIER", {
+        orderId: order.id,
+        orderNumber: order.order_number,
+      });
+      await OutboxService.publish("NOTIFY_ORDER_CONFIRMED", {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        buyerPhone: order.buyer_phone,
+        buyerId: order.buyer_id,
+        totalPkr: order.total_amount_pkr || 0,
+      });
     }
 
     res.json({ received: true, ...result });
   } catch (err: any) {
     logger.error("Raast webhook error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -791,7 +789,7 @@ app.post("/api/admin/subscriptions/:storeId/activate", requireAuth, requireRole(
     const result = await SubscriptionService.adminActivateSubscription(storeId, months);
     res.json({ success: true, ...result });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: sanitizeClientError(err) });
   }
 });
 
@@ -802,7 +800,7 @@ app.post("/api/admin/subscriptions/:storeId/revoke", requireAuth, requireRole(Us
     await SubscriptionService.cancel(storeId);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: sanitizeClientError(err) });
   }
 });
 
@@ -953,7 +951,8 @@ app.post(
       const report = await executeReconciliationJob();
       res.json({ success: true, ...report });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      logger.error("Reconciliation job error:", err?.message || err);
+      res.status(500).json({ error: "Internal server error" });
     }
   },
 );
@@ -1143,7 +1142,7 @@ app.get(
       res.json({ settings, metadata: data });
     } catch (err: any) {
       logger.error("Admin settings fetch error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   },
 );
@@ -1182,13 +1181,15 @@ app.patch(
       ConfigService.invalidateCache();
     } catch (err: any) {
       logger.error("Admin settings update error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   },
 );
 
 // -- Admin MFA (TOTP) Routes ---------------------------------------------
-app.use("/api/admin/mfa", mfaRoutes);
+// Brute-force protection: TOTP codes are 6 digits, so verify/disable MUST
+// be rate-limited independently of the global limiter.
+app.use("/api/admin/mfa", requireAuth, mfaRateLimiter, mfaRoutes);
 
 // -- Product Q&A Routes -------------------------------------------------
 app.use("/api/questions", questionsRouter);
@@ -1278,7 +1279,7 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
 
     res.status(201).json(review);
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: sanitizeClientError(err) });
   }
 });
 

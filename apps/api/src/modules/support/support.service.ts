@@ -48,6 +48,11 @@ export class SupportService {
         .eq("id", input.orderId)
         .maybeSingle();
 
+      // SECURITY: buyers may only file tickets against their own orders.
+      if (order && order.buyer_id !== buyerId) {
+        throw new Error("You can only open tickets for your own orders");
+      }
+
       if (order) {
         orderData = order;
         const storeOrder = order.store_orders?.[0];
@@ -226,6 +231,28 @@ export class SupportService {
   ) {
     if (!message || !message.trim()) {
       throw new Error("Message content cannot be empty");
+    }
+
+    // SECURITY: verify the sender is a party to this ticket — the buyer who
+    // opened it, the owner of the linked store, or staff (ADMIN/SUPPORT).
+    const { data: ticket } = await supabaseAdmin
+      .from("support_tickets")
+      .select("id, buyer_id, store_id, stores(owner_id)")
+      .eq("id", ticketId)
+      .maybeSingle();
+
+    if (!ticket) {
+      throw new Error("Ticket not found");
+    }
+
+    const isStaff = ["ADMIN", "SUPER_ADMIN", "SUPPORT"].includes(senderRole);
+    if (!isStaff) {
+      const isBuyer = ticket.buyer_id === senderId;
+      const storeOwnerId = (ticket as any).stores?.owner_id;
+      const isStoreOwner = Boolean(storeOwnerId && storeOwnerId === senderId);
+      if (!isBuyer && !isStoreOwner) {
+        throw new Error("You do not have access to this ticket");
+      }
     }
 
     const { data: msgRecord, error } = await supabaseAdmin

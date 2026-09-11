@@ -28,13 +28,33 @@ const nextConfig = {
   },
   async headers() {
     const isProd = process.env.NODE_ENV === "production";
-    const connectSrc = isProd
-      // Production: API server + Supabase (cross-origin cookies need this).
-      // localhost is deliberately excluded so a dev origin is never allowed
-      // in production bundles.
-      ? "'self' https://*.supabase.co wss://*.supabase.co https://api.waw.com.pk https://www.waw.com.pk"
-      // Dev: also permit the local API server.
-      : "'self' https://*.supabase.co wss://*.supabase.co http://localhost:4000 https://api.waw.com.pk https://www.waw.com.pk";
+    // Production builds must never target localhost — fail loudly here too
+    // (config/src/api-base.ts has the runtime equivalent).
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
+    if (isProd) {
+      if (!apiUrl) {
+        throw new Error(
+          "[web] NEXT_PUBLIC_API_URL is required in production builds.",
+        );
+      }
+      if (/\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?/i.test(apiUrl)) {
+        throw new Error(
+          "[web] NEXT_PUBLIC_API_URL points at localhost in a production build. " +
+            "A local .env.local is overriding the deployment config — remove it.",
+        );
+      }
+    }
+    const apiOrigin = apiUrl || "https://api.waw.com.pk";
+    // Strip the scheme for CSP source form (api.example.com)
+    const apiHost = apiOrigin.replace(/^https?:\/\//, "");
+    const connectSrc =
+      isProd
+        // Production: API server + Supabase (cross-origin cookies need this).
+        // localhost is deliberately excluded so a dev origin is never allowed
+        // in production bundles.
+        ? `'self' https://*.supabase.co wss://*.supabase.co https://${apiHost}`
+        // Dev: also permit the local API server.
+        : `'self' https://*.supabase.co wss://*.supabase.co http://localhost:4000 https://${apiHost}`;
     return [
       {
         source: '/(.*)',

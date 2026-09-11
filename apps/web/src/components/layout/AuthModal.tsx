@@ -202,7 +202,33 @@ export function AuthModal({
 
       const redirectUrl = `${window.location.origin}/auth/callback`;
       const providerLower = provider.toLowerCase();
-      window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=${providerLower}&redirect_to=${encodeURIComponent(redirectUrl)}`;
+
+      // PKCE (S256) + state — prevents authorization-code interception and
+      // login CSRF. The verifier travels in a short-lived cookie so the
+      // server-side /auth/callback route can complete the exchange.
+      const randomBytes = (n: number) => {
+        const buf = new Uint8Array(n);
+        crypto.getRandomValues(buf);
+        return buf;
+      };
+      const toBase64Url = (buf: Uint8Array | ArrayBuffer) => {
+        const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+        let bin = "";
+        for (const b of bytes) bin += String.fromCharCode(b);
+        return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      };
+
+      const verifier = toBase64Url(randomBytes(32));
+      const state = toBase64Url(randomBytes(16));
+      const challenge = toBase64Url(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
+      );
+
+      // SameSite=Lax is required: the provider redirect navigates top-level.
+      document.cookie = `waw_pkce_verifier=${verifier}; Path=/; Max-Age=600; SameSite=Lax; Secure`;
+      document.cookie = `waw_oauth_state=${state}; Path=/; Max-Age=600; SameSite=Lax; Secure`;
+
+      window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=${providerLower}&redirect_to=${encodeURIComponent(redirectUrl)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
     } catch {
       setError("Could not start social sign-in. Please try again.");
       setLoading(false);

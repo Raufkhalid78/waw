@@ -99,7 +99,7 @@ export class OrderController {
         },
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   }
 
@@ -111,7 +111,7 @@ export class OrderController {
       const result = await OrderService.getUserOrders(user.id, page, limit);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   }
 
@@ -125,7 +125,7 @@ export class OrderController {
       }
       res.json(order);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   }
 
@@ -156,7 +156,7 @@ export class OrderController {
       }
       res.json(returnData);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   }
 
@@ -200,12 +200,33 @@ export class OrderController {
           return;
         }
 
-        await supabaseAdmin
+        // SECURITY: sellers may only advance their own store_order. The
+        // parent order's global_status is a cross-seller aggregate driven by
+        // courier webhooks / admin — a seller must never write it directly.
+        const { data: updatedStoreOrder, error: storeOrderErr } = await supabaseAdmin
           .from("store_orders")
           .update({ status: status, updated_at: new Date().toISOString() })
-          .eq("id", storeOrder.id);
+          .eq("id", storeOrder.id)
+          .select()
+          .single();
+
+        if (storeOrderErr) throw storeOrderErr;
+
+        await AuditService.logAction({
+          actorId: user.id || "SYSTEM",
+          actorRole: "SELLER",
+          action: "STORE_ORDER_STATUS_CHANGED",
+          targetResourceType: "store_order",
+          targetResourceId: storeOrder.id,
+          newState: updatedStoreOrder,
+          reason: `Status changed to ${status}`,
+        });
+
+        res.json(updatedStoreOrder);
+        return;
       }
 
+      // Only staff (ADMIN/SUPER_ADMIN) reaches the parent-order update below.
       const { data, error } = await supabaseAdmin
         .from("orders")
         .update({
@@ -355,7 +376,7 @@ export class OrderController {
       });
     } catch (err: any) {
       console.error("Invoice generation error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   }
 }
