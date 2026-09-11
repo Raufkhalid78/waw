@@ -61,3 +61,6 @@ pnpm-debug.log*
 
 # TypeScript incremental build artifacts
 *.tsbuildinfo
+
+# Local DB dumps
+backup_before_reset.sql
