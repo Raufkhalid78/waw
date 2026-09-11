@@ -6,6 +6,11 @@ COPY package*.json turbo.json ./
 COPY packages/ ./packages/
 COPY apps/admin/ ./apps/admin/
 
+# NEXT_PUBLIC_API_URL is baked in at build time (fail-fast guard in
+# @waw/config). Override with --build-arg in real deployments.
+ARG NEXT_PUBLIC_API_URL=https://api.waw.com.pk
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN npm ci --workspace=@waw/types --workspace=@waw/config --workspace=@waw/admin
 RUN npm run build --workspace=@waw/types
 RUN npm run build --workspace=@waw/config

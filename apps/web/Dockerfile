@@ -7,6 +7,13 @@ COPY package*.json turbo.json ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 
+# NEXT_PUBLIC_* vars are baked into the client bundle at build time. CI's
+# build-proof uses the default; deployments override with --build-arg (or a
+# build-time env). Without it the fail-fast guard in @waw/config aborts
+# production builds that would ship a bundle calling localhost.
+ARG NEXT_PUBLIC_API_URL=https://api.waw.com.pk
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN npm ci --workspace=@waw/types --workspace=@waw/config --workspace=@waw/ui --workspace=@waw/web
 RUN npm run build --workspace=@waw/types
 RUN npm run build --workspace=@waw/config

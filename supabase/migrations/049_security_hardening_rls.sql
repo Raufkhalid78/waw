@@ -115,32 +115,43 @@ ALTER FUNCTION public.update_product_rating() SET search_path = public;
 -- ============================================================================
 -- 7. Storage buckets (product images, returns, avatars) with explicit policies
 -- ============================================================================
-INSERT INTO storage.buckets (id, name, public)
-VALUES
-  ('product-images', 'product-images', true),
-  ('return-images', 'return-images', true),
-  ('avatars', 'avatars', true)
-ON CONFLICT (id) DO NOTHING;
+-- The `storage` schema only exists on Supabase-backed databases. Plain
+-- Postgres (CI service containers, local dev) skips this block gracefully.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'storage') THEN
+    RAISE NOTICE 'storage schema not present — skipping bucket setup (apply this migration on Supabase)';
+    RETURN;
+  END IF;
 
--- Public read for catalog buckets
-DROP POLICY IF EXISTS "Public read product images" ON storage.objects;
-CREATE POLICY "Public read product images" ON storage.objects
-  FOR SELECT USING (bucket_id IN ('product-images', 'return-images', 'avatars'));
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES
+    ('product-images', 'product-images', true),
+    ('return-images', 'return-images', true),
+    ('avatars', 'avatars', true)
+  ON CONFLICT (id) DO NOTHING;
 
--- Writes are performed by the API via service_role only — deny direct
--- client writes to prevent arbitrary file hosting.
-DROP POLICY IF EXISTS "Service write media" ON storage.objects;
-CREATE POLICY "Service write media" ON storage.objects
-  FOR INSERT WITH CHECK (
-    bucket_id IN ('product-images', 'return-images', 'avatars')
-    AND auth.role() = 'service_role'
-  );
+  -- Public read for catalog buckets
+  EXECUTE 'DROP POLICY IF EXISTS "Public read product images" ON storage.objects';
+  EXECUTE 'CREATE POLICY "Public read product images" ON storage.objects
+    FOR SELECT USING (bucket_id IN (''product-images'', ''return-images'', ''avatars''))';
 
-DROP POLICY IF EXISTS "Service delete media" ON storage.objects;
-CREATE POLICY "Service delete media" ON storage.objects
-  FOR DELETE USING (
-    bucket_id IN ('product-images', 'return-images', 'avatars')
-    AND auth.role() = 'service_role'
-  );
+  -- Writes are performed by the API via service_role only — deny direct
+  -- client writes to prevent arbitrary file hosting.
+  EXECUTE 'DROP POLICY IF EXISTS "Service write media" ON storage.objects';
+  EXECUTE 'CREATE POLICY "Service write media" ON storage.objects
+    FOR INSERT WITH CHECK (
+      bucket_id IN (''product-images'', ''return-images'', ''avatars'')
+      AND auth.role() = ''service_role''
+    )';
+
+  EXECUTE 'DROP POLICY IF EXISTS "Service delete media" ON storage.objects';
+  EXECUTE 'CREATE POLICY "Service delete media" ON storage.objects
+    FOR DELETE USING (
+      bucket_id IN (''product-images'', ''return-images'', ''avatars'')
+      AND auth.role() = ''service_role''
+    )';
+END
+$$;
 
 INSERT INTO schema_migrations (version, applied_at) VALUES ('049_security_hardening_rls', NOW()) ON CONFLICT DO NOTHING;
