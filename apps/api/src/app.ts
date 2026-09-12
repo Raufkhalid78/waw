@@ -1276,11 +1276,13 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
       .insert({
         id: `rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         product_id: productId,
-        user_id: user.id,
+        // Schema column is buyer_id (001 + RLS policy + 004 index all use it)
+        buyer_id: user.id,
         rating: Math.round(rating),
         comment: comment || "",
         is_verified_purchase: isVerifiedPurchase,
         status: "APPROVED", // Auto-approved unless flagged
+        is_approved: true, // Public RLS policy only exposes is_approved=true
         created_at: new Date().toISOString(),
       })
       .select()
