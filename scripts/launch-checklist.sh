@@ -188,7 +188,7 @@ echo ""
 echo "10. Payment & Logistics"
 echo "-----------------------"
 
-warn "XPay service exists" "[ -f apps/api/src/modules/payments/xpay.service.ts ]"
+warn "APG service exists" "[ -f apps/api/src/modules/payments/apg.service.ts ]"
 warn "Raast service exists" "[ -f apps/api/src/modules/payments/raast.service.ts ]"
 warn "Courier service exists" "[ -f apps/api/src/modules/logistics/courier.service.ts ]"
 warn "Inventory lock service exists" "[ -f apps/api/src/modules/products/inventory-lock.service.ts ]"

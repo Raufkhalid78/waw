@@ -195,7 +195,7 @@ export default function CartPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod(PaymentMethod.XPAY_CARD)}
+                    onClick={() => setPaymentMethod(PaymentMethod.ALFA_WALLET)}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
                       paymentMethod !== PaymentMethod.COD
                         ? "border-amber-500 bg-amber-50"
@@ -204,7 +204,7 @@ export default function CartPage() {
                   >
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-4 h-4 text-gray-700" />
-                      <span className="text-xs font-semibold text-gray-900">Online Pay</span>
+                      <span className="text-xs font-semibold text-gray-900">Pay Online</span>
                     </div>
                     <div className="text-[11px] text-green-700 font-medium mt-1">Save PKR 100</div>
                   </button>

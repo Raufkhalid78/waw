@@ -30,7 +30,7 @@ export class ApgPaymentController {
         return;
       }
 
-      // Ownership check (same policy as XPay initiate)
+      // Ownership check (same policy as the APG card checkout)
       const { data: order, error } = await supabaseAdmin
         .from("orders")
         .select("id, buyer_id, buyer_phone")

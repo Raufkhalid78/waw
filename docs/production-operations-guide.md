@@ -47,9 +47,15 @@ REDIS_PASSWORD=your-redis-password
 # JWT
 JWT_SECRET=your-jwt-secret-min-32-chars
 
-# Payment (PostEx)
-POSTEX_XPAY_MERCHANT_ID=your-merchant-id
-POSTEX_XPAY_MERCHANT_PASSWORD=your-merchant-password
+# Payment (Bank Alfalah APG)
+APG_ENV=production
+APG_MERCHANT_ID=your-merchant-id
+APG_STORE_ID=your-store-id
+APG_MERCHANT_USERNAME=your-merchant-username
+APG_MERCHANT_PASSWORD=your-merchant-password
+APG_MERCHANT_HASH=your-merchant-hash
+APG_KEY1=your-16-char-aes-key
+APG_KEY2=your-16-char-aes-iv
 
 # Monitoring
 SENTRY_DSN=your-sentry-dsn

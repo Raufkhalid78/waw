@@ -23,14 +23,13 @@ const CSRF_HEADER_NAME = "x-csrf-token";
 
 /**
  * Provider webhook endpoints. These are server-to-server POSTs from
- * PostEx/XPay/Raast — they cannot carry our CSRF cookie/header and are
+ * PostEx/Raast/APG — they cannot carry our CSRF cookie/header and are
  * instead protected by per-provider HMAC signature verification in their
  * own route handlers. They MUST be exempt from CSRF checks or no
  * digital payment/delivery webhook can ever settle.
  */
 const WEBHOOK_PATHS = [
   "/api/logistics/postex/webhook",
-  "/api/payments/xpay/webhook",
   "/api/payments/raast/webhook",
   "/api/payments/apg/ipn",
 ];

@@ -3,7 +3,7 @@ info:
   title: Waw Marketplace API
   description: |
     Multi-vendor e-commerce marketplace API for Pakistan.
-    Supports product catalog, orders, payments (XPay, Raast, COD), logistics (PostEx), and seller management.
+    Supports product catalog, orders, payments (Bank Alfalah APG, Raast, COD), logistics (PostEx), and seller management.
   version: 1.0.0
   contact:
     name: Waw Support
@@ -672,7 +672,7 @@ paths:
                   type: string
                 paymentMethod:
                   type: string
-                  enum: [COD, XPAY_CARD]
+                  enum: [COD, ALFA_CARD]
                 items:
                   type: array
                   minItems: 1
@@ -862,7 +862,7 @@ components:
           type: string
         paymentMethod:
           type: string
-          enum: [COD, XPAY_CARD, XPAY_WALLET, RAAST_P2M_QR]
+          enum: [COD, RAAST_P2M_QR, ALFA_WALLET, ALFALAH_ACCOUNT, ALFA_CARD]
         items:
           type: array
           minItems: 1

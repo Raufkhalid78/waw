@@ -31,44 +31,67 @@ test_fail() {
   ((FAIL++))
 }
 
-# ─── 1. XPay Card Payment (Sandbox) ──────────────────────────────────────────
-echo "1. XPay Card Payment (Sandbox)"
-echo "------------------------------"
+# ─── 1. Bank Alfalah APG Onsite Checkout (Sandbox) ────────────────────────────
+echo "1. Bank Alfalah APG Onsite Checkout (Sandbox)"
+echo "----------------------------------------------"
 
-# Test: Initiate card payment
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/xpay/initiate" \
+# Test: Initiate onsite wallet session (auth/ownership errors prove the
+# endpoint responds; 500 means a crash)
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/apg/onsite/initiate" \
   -H "Content-Type: application/json" \
   -d '{
     "orderId": "test-order-id",
-    "paymentMethod": "XPAY_CARD",
-    "customerPhone": "+923001234567",
-    "returnUrl": "https://staging.waw.com.pk/payment/callback"
+    "method": "ALFA_WALLET",
+    "accountNumber": "034512345678"
   }')
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
+  test_pass "APG onsite payment initiation endpoint responds"
+else
+  test_fail "APG onsite payment initiation (HTTP $HTTP_CODE)"
+fi
+
+# Test: Onsite process rejects malformed sessions
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/apg/onsite/process" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "authToken": "invalid",
+    "method": "ALFA_WALLET",
+    "smsOtp": "12345678"
+  }')
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+if [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "404" ]; then
+  test_pass "APG onsite process validates sessions"
+else
+  test_fail "APG onsite process validation (HTTP $HTTP_CODE)"
+fi
+
+# Test: Card checkout responds
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/apg/card/checkout" \
+  -H "Content-Type: application/json" \
+  -d '{"orderId": "test-order-id"}')
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
+  test_pass "APG card checkout endpoint responds"
+else
+  test_fail "APG card checkout (HTTP $HTTP_CODE)"
+fi
+
+# Test: IPN listener rejects foreign URLs
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/apg/ipn" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://evil.example.com/steal"}')
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 BODY=$(echo "$RESPONSE" | head -n-1)
-
-if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "404" ]; then
-  test_pass "XPay card payment initiation endpoint responds"
+if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q '"received":false'; then
+  test_pass "APG IPN listener rejects foreign URLs"
 else
-  test_fail "XPay card payment initiation (HTTP $HTTP_CODE)"
-fi
-
-# Test: Webhook signature verification
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/xpay/webhook" \
-  -H "Content-Type: application/json" \
-  -H "X-Webhook-Signature: invalid-signature" \
-  -d '{
-    "orderId": "test-order-id",
-    "status": "SUCCESS",
-    "transactionId": "sandbox-txn-123"
-  }')
-
-HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
-  test_pass "XPay webhook rejects invalid signatures"
-else
-  test_fail "XPay webhook signature validation (HTTP $HTTP_CODE)"
+  test_fail "APG IPN listener foreign URL rejection (HTTP $HTTP_CODE)"
 fi
 
 echo ""

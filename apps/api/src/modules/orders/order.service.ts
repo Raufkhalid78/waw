@@ -232,7 +232,7 @@ export class OrderService {
 
     // COD fulfilment: book the courier + send confirmations via the durable
     // outbox (survives crashes; dispatched by the outbox-processor cron).
-    // Digital (XPay) orders get the same events from the payment settlement
+    // Digital (APG) orders get the same events from the payment settlement
     // path instead — publishing here would double-book the courier.
     if (input.paymentMethod === PaymentMethod.COD) {
       OutboxService.publish("BOOK_COURIER", {

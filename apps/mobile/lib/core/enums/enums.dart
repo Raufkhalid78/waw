@@ -14,9 +14,9 @@ enum OrderStatus {
 
 enum PaymentMethod {
   cod,
-  xpayCard,
-  xpayJazzcash,
-  xpayEasypaisa,
+  alfaWallet,
+  alfalahAccount,
+  alfaCard,
   raastQr,
 }
 
@@ -80,12 +80,12 @@ extension PaymentMethodExtension on PaymentMethod {
     switch (this) {
       case PaymentMethod.cod:
         return 'Cash on Delivery';
-      case PaymentMethod.xpayCard:
+      case PaymentMethod.alfaWallet:
+        return 'Alfa Wallet';
+      case PaymentMethod.alfalahAccount:
+        return 'Alfalah Bank Account';
+      case PaymentMethod.alfaCard:
         return 'Credit/Debit Card';
-      case PaymentMethod.xpayJazzcash:
-        return 'JazzCash';
-      case PaymentMethod.xpayEasypaisa:
-        return 'Easypaisa';
       case PaymentMethod.raastQr:
         return 'RAAST QR';
     }
@@ -95,12 +95,12 @@ extension PaymentMethodExtension on PaymentMethod {
     switch (this) {
       case PaymentMethod.cod:
         return '💵';
-      case PaymentMethod.xpayCard:
+      case PaymentMethod.alfaWallet:
+        return '📱';
+      case PaymentMethod.alfalahAccount:
+        return '🏦';
+      case PaymentMethod.alfaCard:
         return '💳';
-      case PaymentMethod.xpayJazzcash:
-        return '📱';
-      case PaymentMethod.xpayEasypaisa:
-        return '📱';
       case PaymentMethod.raastQr:
         return '📱';
     }
@@ -111,12 +111,12 @@ PaymentMethod parsePaymentMethod(String? value) {
   switch (value) {
     case 'COD':
       return PaymentMethod.cod;
-    case 'XPAY_CARD':
-      return PaymentMethod.xpayCard;
-    case 'XPAY_WALLET_JAZZCASH':
-      return PaymentMethod.xpayJazzcash;
-    case 'XPAY_WALLET_EASYPAISA':
-      return PaymentMethod.xpayEasypaisa;
+    case 'ALFA_WALLET':
+      return PaymentMethod.alfaWallet;
+    case 'ALFALAH_ACCOUNT':
+      return PaymentMethod.alfalahAccount;
+    case 'ALFA_CARD':
+      return PaymentMethod.alfaCard;
     case 'RAAST_P2M_QR':
       return PaymentMethod.raastQr;
     default:

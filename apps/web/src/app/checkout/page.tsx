@@ -377,11 +377,8 @@ export default function CheckoutPage() {
         }
       }
 
-      if (
-        paymentMethod === PaymentMethod.XPAY_CARD ||
-        paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH ||
-        paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA
-      ) {
+      // ── Raast P2M QR (SBP instant payment) ───────────────────────────
+      if (paymentMethod === PaymentMethod.RAAST_P2M_QR) {
         const paymentSession = await initiatePaymentApi({
           orderId,
           paymentMethod,
@@ -389,7 +386,7 @@ export default function CheckoutPage() {
           returnUrl: `${window.location.origin}/orders/${orderId}`,
         });
 
-        if (paymentSession.checkoutUrl) {
+        if (paymentSession.qrPayload) {
           // Do NOT clear the cart yet — payment is not confirmed. The cart is
           // cleared only after the payment result page sees the order PAID.
           // Persist the pending order so /payment/result can recover state.
@@ -405,11 +402,11 @@ export default function CheckoutPage() {
               }),
             );
           } catch {}
-          window.location.href = paymentSession.checkoutUrl;
+          window.location.href = `/payment/raast?order=${encodeURIComponent(orderResult.orderNumber || "")}&payload=${encodeURIComponent(paymentSession.qrPayload)}`;
           return;
         }
 
-        // A digital order without a payment redirect must NEVER be presented
+        // A digital order without a payment session must NEVER be presented
         // as a completed purchase — the gateway initiation failed (outage or
         // misconfiguration). Logged-in buyers go to the order page to retry
         // payment; guests stay here with a clear error. The cart is
@@ -778,10 +775,10 @@ export default function CheckoutPage() {
                 </div>
               </label>
 
-              {/* Option 2: PostEx XPay - Debit / Credit Cards */}
+              {/* Option 2: Raast P2M QR (SBP instant payment) */}
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  paymentMethod === PaymentMethod.XPAY_CARD
+                  paymentMethod === PaymentMethod.RAAST_P2M_QR
                     ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
                     : "border-slate-200 hover:bg-slate-50"
                 }`}
@@ -789,84 +786,25 @@ export default function CheckoutPage() {
                 <input
                   type="radio"
                   name="paymentMethod"
-                  checked={paymentMethod === PaymentMethod.XPAY_CARD}
-                  onChange={() => setPaymentMethod(PaymentMethod.XPAY_CARD)}
+                  checked={paymentMethod === PaymentMethod.RAAST_P2M_QR}
+                  onChange={() => setPaymentMethod(PaymentMethod.RAAST_P2M_QR)}
                   className="mt-1 accent-amber-500"
                 />
                 <div>
                   <div className="font-black text-sm text-slate-900 flex items-center gap-2">
-                    <span>
-                      Debit / Credit Cards (Visa, Mastercard & PayPak)
-                    </span>
+                    <span>Raast QR — Instant Bank Payment</span>
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                      Save PKR 100
+                      0% Fee
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Powered by PostEx XPay 256-bit encrypted checkout.
+                    Scan the Raast QR from any Pakistani banking app — instant
+                    settlement via State Bank.
                   </p>
                 </div>
               </label>
 
-              {/* Option 3: PostEx XPay - JazzCash */}
-              <label
-                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH
-                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
-                    : "border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  checked={paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH}
-                  onChange={() =>
-                    setPaymentMethod(PaymentMethod.XPAY_WALLET_JAZZCASH)
-                  }
-                  className="mt-1 accent-amber-500"
-                />
-                <div>
-                  <div className="font-black text-sm text-slate-900">
-                    JazzCash Mobile Account
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Authorize instant payment via PostEx XPay using your
-                    JazzCash MPIN.
-                  </p>
-                </div>
-              </label>
-
-              {/* Option 4: PostEx XPay - Easypaisa */}
-              <label
-                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA
-                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
-                    : "border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  checked={
-                    paymentMethod === PaymentMethod.XPAY_WALLET_EASYPAISA
-                  }
-                  onChange={() =>
-                    setPaymentMethod(PaymentMethod.XPAY_WALLET_EASYPAISA)
-                  }
-                  className="mt-1 accent-amber-500"
-                />
-                <div>
-                  <div className="font-black text-sm text-slate-900">
-                    Easypaisa Mobile Wallet
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Approve instant OTP payment via PostEx XPay in your
-                    Easypaisa app.
-                  </p>
-                </div>
-              </label>
-
-              {/* Option 5: Cash on Delivery */}
+              {/* Option 3: Cash on Delivery */}
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
                   paymentMethod === PaymentMethod.COD

@@ -62,7 +62,7 @@ export const ENV = {
   TYPESENSE_PROTOCOL: process.env.TYPESENSE_PROTOCOL || "http",
   TYPESENSE_API_KEY: optionalEnv("TYPESENSE_API_KEY"),
 
-  // PostEx Unified Logistics & XPay Fintech Engine
+  // PostEx Unified Logistics (courier)
   POSTEX_API_BASE:
     process.env.POSTEX_API_BASE ||
     "https://api.postex.pk/services/integration/api",
@@ -75,11 +75,6 @@ export const ENV = {
   FCM_PROJECT_ID: optionalEnv("FCM_PROJECT_ID"),
   FCM_CLIENT_EMAIL: optionalEnv("FCM_CLIENT_EMAIL"),
   FCM_PRIVATE_KEY: optionalEnv("FCM_PRIVATE_KEY"),
-  POSTEX_XPAY_BASE_URL:
-    process.env.POSTEX_XPAY_BASE_URL || "https://xpay.postexglobal.com/api",
-  POSTEX_XPAY_MERCHANT_ID: optionalEnv("POSTEX_XPAY_MERCHANT_ID"),
-  POSTEX_XPAY_TOKEN: optionalEnv("POSTEX_XPAY_TOKEN"),
-  POSTEX_XPAY_SECRET_KEY: optionalEnv("POSTEX_XPAY_SECRET_KEY"),
 
   // Bank Alfalah — Alfa Payment Gateway (APG)
   APG_ENV: (process.env.APG_ENV === "production" ? "production" : "sandbox"),
@@ -138,7 +133,6 @@ export const ENV = {
 // Provider feature flags — derived from whether credentials are configured
 export const FEATURES = {
   COURIER_ENABLED: Boolean(ENV.POSTEX_API_TOKEN),
-  XPAY_ENABLED: Boolean(ENV.POSTEX_XPAY_TOKEN && ENV.POSTEX_XPAY_SECRET_KEY),
   APG_ENABLED: Boolean(
     ENV.APG_MERCHANT_ID && ENV.APG_STORE_ID && ENV.APG_MERCHANT_USERNAME &&
     ENV.APG_MERCHANT_PASSWORD && ENV.APG_MERCHANT_HASH && ENV.APG_KEY1 && ENV.APG_KEY2,
@@ -194,13 +188,13 @@ if (ENV.NODE_ENV === "production") {
     warn("[SECURITY] GUEST_TOKEN_SECRET not set - guest checkout will be REJECTED at runtime.");
   }
   if (!ENV.PUBLIC_API_URL) {
-    warn("[SECURITY] PUBLIC_API_URL not set - XPay payment webhooks cannot be delivered. Digital payments will never confirm.");
+    warn("[SECURITY] PUBLIC_API_URL not set - APG payment settlement callbacks cannot be delivered. Digital payments will never confirm.");
   }
   if (!FEATURES.COURIER_ENABLED) {
     warn("[SECURITY] POSTEX_API_TOKEN not set - courier booking is DISABLED.");
   }
-  if (!FEATURES.XPAY_ENABLED) {
-    warn("[SECURITY] XPay credentials not set - card/digital payments are DISABLED.");
+  if (!FEATURES.APG_ENABLED) {
+    warn("[SECURITY] Bank Alfalah APG credentials not set - digital payments are DISABLED (COD only).");
   }
   if (!FEATURES.SEARCH_ENABLED) {
     warn("[SECURITY] TYPESENSE_API_KEY not set - search is DISABLED.");

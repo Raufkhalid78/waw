@@ -46,7 +46,7 @@ export class SubscriptionController {
 
   /**
    * POST /api/seller/subscribe — Subscribe to a plan.
-   * Paid plans return an XPay checkout session; the subscription activates
+   * Paid plans return an APG card checkout; the subscription activates
    * via the payment webhook. Free plan activates immediately.
    */
   static async subscribe(req: Request, res: Response): Promise<void> {
@@ -88,7 +88,7 @@ export class SubscriptionController {
         return;
       }
 
-      // Paid plan: create PENDING subscription + XPay checkout session
+      // Paid plan: create PENDING subscription + APG card checkout session
       const payment = await SubscriptionService.initiateSubscriptionPayment(store.id, plan);
       res.json({ paymentRequired: true, ...payment });
     } catch (err: any) {

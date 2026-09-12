@@ -807,9 +807,9 @@ export class AdminService {
         .eq("id", returnReq.order_id);
     }
 
-    // 5. Issue automated Gateway Refund (XPay/Raast) — recorded in
-    // refund_executions; gateway failures land in MANUAL_REVIEW instead of
-    // blocking the approval flow.
+    // 5. Route the Gateway Refund (APG/Raast) — recorded in
+    // refund_executions; online refunds land in MANUAL_REVIEW for
+    // out-of-band bank settlement instead of blocking the approval flow.
     if (returnReq.order?.payment_method) {
       const { RefundService } = await import("../payments/refund.service.js");
       const refundResult = await RefundService.executeRefund({

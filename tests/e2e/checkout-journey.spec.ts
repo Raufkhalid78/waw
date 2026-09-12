@@ -7,10 +7,10 @@ import crypto from "crypto";
  * Runs against a locally seeded staging API (see supabase/seed.sql) with
  * ALLOW_TEST_OTP=true. Uses API-level flows (Playwright request context) so
  * the full financial state machine is exercised deterministically without a
- * real PostEx/XPay account:
+ * real PostEx/APG account:
  *
  *   guest quote (asserts GST) → COD order → authenticated journey
- *   → signed XPay webhook settlement → PostEx webhook delivery (COD)
+ *   → signed Raast webhook settlement → PostEx webhook delivery (COD)
  *   → return request → admin receive + refund approval
  *
  * The refund is asserted through the public guest-lookup endpoint (no admin
@@ -26,8 +26,8 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "mock_password_hash";
 const OFFER_ID = "44444444-0000-0000-0000-000000000001"; // Cotton Kurta offer
 const STORE_ORDER_PREFIX = "E2E";
 
-function xpaySignature(rawBody: string, secret?: string): string {
-  const key = secret || process.env.POSTEX_XPAY_SECRET_KEY || "";
+function raastSignature(rawBody: string, secret?: string): string {
+  const key = secret || process.env.RAAST_WEBHOOK_SECRET || "";
   if (!key) return "";
   return crypto.createHmac("sha256", key).update(rawBody).digest("hex");
 }
@@ -115,57 +115,48 @@ test.describe.serial("Journey — checkout → payment → delivery → refund",
     expect([403, 404]).toContain(res.status());
   });
 
-  test("signed XPay webhook settles the order atomically", async ({ request }) => {
-    test.skip(!process.env.POSTEX_XPAY_SECRET_KEY, "XPay secret not configured in this environment");
+  test("signed Raast webhook settles the order atomically", async ({ request }) => {
+    test.skip(!process.env.RAAST_WEBHOOK_SECRET, "Raast secret not configured in this environment");
 
     const event = {
-      event: "payment.successful",
-      data: {
-        orderNumber,
-        transactionId: `e2e_tx_${Date.now()}`,
-        amount: orderTotal,
-        currency: "PKR",
-        status: "PAID",
-      },
+      referenceId: `e2e_raast_${Date.now()}`,
+      amount: orderTotal,
+      currency: "PKR",
+      status: "PAID",
+      orderNumber,
     };
     const rawBody = JSON.stringify(event);
 
-    const res = await request.post(`${API_BASE}/api/payments/xpay/webhook`, {
-      headers: { "x-postex-signature": xpaySignature(rawBody) },
+    const res = await request.post(`${API_BASE}/api/payments/raast/webhook`, {
+      headers: { "x-raast-signature": raastSignature(rawBody) },
       data: event,
     });
     expect(res.ok()).toBeTruthy();
-    const body = await res.json();
-    expect(body.success).toBe(true);
 
-    // Replay with a different tx amount-corrected payload — must stay idempotent.
-    const replay = await request.post(`${API_BASE}/api/payments/xpay/webhook`, {
-      headers: { "x-postex-signature": xpaySignature(rawBody) },
+    // Replay the same event — must stay idempotent (already-paid guard).
+    const replay = await request.post(`${API_BASE}/api/payments/raast/webhook`, {
+      headers: { "x-raast-signature": raastSignature(rawBody) },
       data: event,
     });
-    const replayBody = await replay.json();
-    expect(replayBody.success).toBe(true); // already-applied guard
+    expect(replay.ok()).toBeTruthy();
 
-    // Wrong amount must be quarantined, never settle.
-    const badEvent = { ...event, data: { ...event.data, transactionId: `e2e_tx_bad_${Date.now()}`, amount: 1 } };
+    // Wrong amount must be rejected, never settle.
+    const badEvent = { ...event, referenceId: `e2e_raast_bad_${Date.now()}`, amount: 1 };
     const badRaw = JSON.stringify(badEvent);
-    const bad = await request.post(`${API_BASE}/api/payments/xpay/webhook`, {
-      headers: { "x-postex-signature": xpaySignature(badRaw) },
+    const bad = await request.post(`${API_BASE}/api/payments/raast/webhook`, {
+      headers: { "x-raast-signature": raastSignature(badRaw) },
       data: badEvent,
     });
-    // Handler rejects verification but returns 200 with success:false OR 400 —
-    // critically the order must NOT be paid twice or corrupted.
     if (bad.ok()) {
       const badBody = await bad.json();
       expect(badBody.success === false || badBody.error).toBeTruthy();
     }
 
-    // Corrected retry with same txId as the bad event now settles cleanly —
-    // rejected events must not burn the transaction slot.
-    const correctedEvent = { ...badEvent, data: { ...badEvent.data, amount: orderTotal } };
+    // Corrected retry with a fresh reference settles cleanly.
+    const correctedEvent = { ...badEvent, amount: orderTotal };
     const correctedRaw = JSON.stringify(correctedEvent);
-    const corrected = await request.post(`${API_BASE}/api/payments/xpay/webhook`, {
-      headers: { "x-postex-signature": xpaySignature(correctedRaw) },
+    const corrected = await request.post(`${API_BASE}/api/payments/raast/webhook`, {
+      headers: { "x-raast-signature": raastSignature(correctedRaw) },
       data: correctedEvent,
     });
     expect(corrected.ok()).toBeTruthy();

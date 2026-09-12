@@ -123,7 +123,7 @@ erDiagram
 - `global_status` (`VARCHAR(30)`, DEFAULT `'PENDING'`):
   - `'PENDING'` -> `'CONFIRMED'` -> `'SHIPPED'` -> `'DELIVERED'` -> `'REFUNDED'` / `'CANCELLED'`
 - `payment_status` (`VARCHAR(30)`, DEFAULT `'UNPAID'`): `'UNPAID'` | `'PAID'` | `'REFUNDED'`.
-- `payment_method` (`VARCHAR(30)`, NOT NULL): `'COD'` | `'XPAY_CARD'` | `'XPAY_RAAST_DYNAMIC'`.
+- `payment_method` (`VARCHAR(30)`, NOT NULL): `'COD'` | `'ALFA_CARD'` | `'RAAST_P2M_QR'`.
 - `shipping_address` (`JSONB`, NOT NULL): Full name, phone, city, address.
 - `delivered_at` (`TIMESTAMPTZ`, NULLABLE).
 

@@ -674,11 +674,11 @@ export async function initiatePaymentApi(paymentInput: {
   qrPayload?: string;
 }> {
   try {
-    const res = await fetchWithCsrf(`${API_BASE_URL}/api/payments/xpay/initiate`, {
+    const res = await fetchWithCsrf(`${API_BASE_URL}/api/payments/raast/qr`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(paymentInput),
+      body: JSON.stringify({ orderId: paymentInput.orderId }),
     });
     if (!res.ok) {
       let errMsg = "Failed to initiate payment gateway session";

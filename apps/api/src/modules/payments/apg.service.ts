@@ -10,7 +10,7 @@ import {
 } from "../../types/index.js";
 import { InventoryLockService } from "../products/inventory-lock.service.js";
 import { OutboxService } from "../outbox/outbox.service.js";
-import { verifyProviderPaymentAgainstOrder } from "./xpay.service.js";
+import { verifyProviderPaymentAgainstOrder } from "./payment-verification.js";
 
 /**
  * Bank Alfalah — Alfa Payment Gateway (APG) integration.
@@ -421,7 +421,7 @@ export class AlfaPaymentGatewayService {
    * Server-to-server IPN inquiry — the ONLY trusted settlement source.
    * GET {ipnBase}/{merchantId}/{storeId}/{orderNumber}
    * Reuses the same atomic settle_order_payment RPC + event-state machine
-   * as XPay, so idempotency/concurrency guarantees are identical.
+   * as the shared settle_order_payment RPC, so idempotency/concurrency guarantees are identical.
    */
   static async verifyAndSettle(input: { orderNumber: string; transactionId?: string }): Promise<{
     settled: boolean;
@@ -472,7 +472,7 @@ export class AlfaPaymentGatewayService {
       return { settled: false, message: verification.reason || "verification failed", transactionId: txId };
     }
 
-    // ATOMIC SETTLEMENT — same RPC as XPay webhooks
+    // ATOMIC SETTLEMENT — row-locked RPC (order PAID + event applied in one transaction)
     const { data: settlement, error: settleError } = await supabaseAdmin.rpc(
       "settle_order_payment",
       {
@@ -548,6 +548,54 @@ export class AlfaPaymentGatewayService {
   private static returnUrl(orderNumber: string): string {
     const web = process.env.NEXT_PUBLIC_WEB_URL || "https://www.waw.com.pk";
     return `${web}/payment/result?order=${encodeURIComponent(orderNumber)}`;
+  }
+
+  /**
+   * Subscription card checkout — like createCardCheckout but for direct
+   * (non-order) charges: seller subscription plans. Uses the same hosted
+   * page; the paymentReference doubles as the APG TransactionReferenceNumber
+   * and is embedded in the return URL for settlement verification.
+   */
+  static async createSubscriptionCardCheckout(input: {
+    amountPkr: number;
+    paymentReference: string; // e.g. sub_<store>_<uuid>
+    description: string;
+    buyerEmail: string;
+    buyerPhone: string;
+    returnUrl: string;
+  }): Promise<{ postUrl: string; fields: Record<string, string>; redirectUrl: string }> {
+    this.requireConfig();
+
+    const hsMap =
+      `HS_ChannelId=${REDIRECTION_CHANNEL}` +
+      `&HS_IsRedirectionRequest=1` +
+      `&HS_MerchantId=${ENV.APG_MERCHANT_ID}` +
+      `&HS_StoreId=${ENV.APG_STORE_ID}` +
+      `&HS_ReturnURL=${encodeURIComponent(input.returnUrl)}` +
+      `&HS_MerchantHash=${ENV.APG_MERCHANT_HASH}` +
+      `&HS_MerchantUsername=${ENV.APG_MERCHANT_USERNAME}` +
+      `&HS_MerchantPassword=${encodeURIComponent(ENV.APG_MERCHANT_PASSWORD)}` +
+      `&HS_TransactionReferenceNumber=${encodeURIComponent(input.paymentReference)}`;
+
+    // The hosted page is step 1 of the 2-step redirect flow: it returns an
+    // AuthToken, which the buyer's browser posts back — so the seller portal
+    // auto-submits these fields and the bank handles the rest.
+    return {
+      postUrl: this.urls.cardPost,
+      fields: {
+        HS_RequestHash: this.encryptRequestHash(hsMap),
+        HS_IsRedirectionRequest: "1",
+        HS_ChannelId: REDIRECTION_CHANNEL,
+        HS_ReturnURL: input.returnUrl,
+        HS_MerchantId: ENV.APG_MERCHANT_ID,
+        HS_StoreId: ENV.APG_STORE_ID,
+        HS_MerchantHash: ENV.APG_MERCHANT_HASH,
+        HS_MerchantUsername: ENV.APG_MERCHANT_USERNAME,
+        HS_MerchantPassword: ENV.APG_MERCHANT_PASSWORD,
+        HS_TransactionReferenceNumber: input.paymentReference,
+      },
+      redirectUrl: input.returnUrl,
+    };
   }
 
   /**

@@ -144,7 +144,7 @@ jobs:
       # Journey test secrets — the E2E API dev-server signs/verifies webhooks
       # with these, and OTP is mocked so no Twilio is needed.
       ALLOW_TEST_OTP: "true"
-      POSTEX_XPAY_SECRET_KEY: e2e_xpay_secret
+      RAAST_WEBHOOK_SECRET: e2e_raast_secret
       POSTEX_API_TOKEN: e2e_courier_token
     steps:
       - uses: actions/checkout@v4

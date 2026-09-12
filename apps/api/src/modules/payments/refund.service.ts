@@ -1,8 +1,6 @@
 import crypto from "crypto";
-import { ENV } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 import { supabaseAdmin } from "../../config/supabase.js";
-import { PostExXPayService } from "./xpay.service.js";
 import { AuditService } from "../audit/audit.service.js";
 
 export interface RefundValidationResult {
@@ -63,20 +61,21 @@ export function validateRefundRequest(input: {
 
 /**
  * Maps an internal payment method to the provider that must execute the
- * refund. Online methods settle through XPay/Raast; COD refunds cannot be
- * pushed through a payment gateway and require an out-of-band bank transfer.
+ * refund. Bank Alfalah APG exposes no public refund REST API, so online
+ * refunds are executed out-of-band (bank transfer initiated by finance)
+ * and tracked to MANUAL_REVIEW — never faked as automatic gateway success.
  */
-export function resolveRefundProvider(paymentMethod: unknown): "XPAY" | "COD_OFFLINE" {
+export function resolveRefundProvider(paymentMethod: unknown): "GATEWAY" | "OFFLINE" {
   const method = String(paymentMethod || "").toUpperCase();
   const onlineMethods = [
-    "XPAY",
-    "XPAY_CARD",
-    "CARD",
+    "ALFA_WALLET",
+    "ALFALAH_ACCOUNT",
+    "ALFA_CARD",
     "RAAST",
     "JAZZCASH",
     "EASYPAISA",
   ];
-  return onlineMethods.includes(method) ? "XPAY" : "COD_OFFLINE";
+  return onlineMethods.includes(method) ? "GATEWAY" : "OFFLINE";
 }
 
 /**
@@ -189,7 +188,7 @@ export class RefundService {
     }
 
     const provider = resolveRefundProvider(order.payment_method);
-    if (provider === "COD_OFFLINE") {
+    if (provider === "OFFLINE") {
       // COD refunds are settled out-of-band (bank transfer / wallet) — flag
       // for human execution and confirmation, never fake a gateway success.
       await this.transition(refundId, "MANUAL_REVIEW", {
@@ -198,78 +197,14 @@ export class RefundService {
       return { status: "MANUAL_REVIEW", refundId };
     }
 
-    const { data: payment } = await supabaseAdmin
-      .from("payments")
-      .select("gateway_reference")
-      .eq("order_id", input.orderId)
-      .not("gateway_reference", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const gatewayReference = payment?.gateway_reference;
-    if (!gatewayReference) {
-      await this.transition(refundId, "MANUAL_REVIEW", {
-        failure_reason: "No provider gateway_reference recorded for this order",
-      });
-      return { status: "MANUAL_REVIEW", refundId };
-    }
-
-    let lastError = "";
-    for (let attempt = 1; attempt <= MAX_GATEWAY_ATTEMPTS; attempt++) {
-      try {
-        const result = await PostExXPayService.submitProviderRefund({
-          gatewayReference,
-          orderNumber: order.order_number,
-          amountPkr: Number(input.amountPkr),
-          idempotencyKey,
-        });
-
-        await supabaseAdmin
-          .from("refund_executions")
-          .update({
-            status: "COMPLETED",
-            provider_refund_id: result.refundId,
-            provider_response: result.response,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", refundId);
-
-        await this.applyRefundToOrder({
-          orderId: input.orderId,
-          orderTotalPkr: Number(order.total_amount_pkr || 0),
-          amountPkr: Number(input.amountPkr),
-          refundId,
-          orderNumber: order.order_number,
-        });
-
-        await AuditService.logAction({
-          actorId: input.executedBy || "SYSTEM",
-          actorRole: "ADMIN",
-          action: "GATEWAY_REFUND_EXECUTED",
-          targetResourceType: "refund_execution",
-          targetResourceId: refundId,
-          newState: { status: "COMPLETED", providerRefundId: result.refundId },
-          reason: input.reason || `Gateway refund for order ${order.order_number}`,
-        });
-
-        return {
-          status: "COMPLETED",
-          refundId,
-          providerRefundId: result.refundId,
-        };
-      } catch (err: any) {
-        lastError = err?.message || "unknown_gateway_error";
-        logger.warn(`Gateway refund attempt ${attempt}/${MAX_GATEWAY_ATTEMPTS} failed`, {
-          refundId,
-          orderId: input.orderId,
-          error: lastError,
-        });
-      }
-    }
-
+    // Online refunds (APG/Raast): Bank Alfalah APG has no public refund
+    // REST API, so these are executed out-of-band by finance against the
+    // bank settlement. The execution row is created PENDING with the
+    // idempotency lock and routed to MANUAL_REVIEW for a human to record
+    // the bank transfer reference — no fake gateway success ever exists.
     await this.transition(refundId, "MANUAL_REVIEW", {
-      failure_reason: `Gateway refund failed after ${MAX_GATEWAY_ATTEMPTS} attempts: ${lastError}`,
+      failure_reason:
+        "Online-method refund: execute via Bank Alfalah settlement portal and record the transfer reference",
     });
 
     await AuditService.logAction({
@@ -278,10 +213,10 @@ export class RefundService {
       action: "GATEWAY_REFUND_MANUAL_REVIEW",
       targetResourceType: "refund_execution",
       targetResourceId: refundId,
-      reason: `Gateway refund failed after ${MAX_GATEWAY_ATTEMPTS} attempts — manual review required`,
+      reason: `Refund for order ${order.order_number} queued for out-of-band bank settlement`,
     });
 
-    return { status: "MANUAL_REVIEW", refundId, reason: lastError };
+    return { status: "MANUAL_REVIEW", refundId };
   }
 
   private static async transition(
@@ -300,7 +235,7 @@ export class RefundService {
    * order flips to REFUNDED only when refunds have consumed the full total;
    * partial refunds keep the order PAID with a partial refund record.
    */
-  private static async applyRefundToOrder(input: {
+  static async applyRefundToOrder(input: {
     orderId: string;
     orderTotalPkr: number;
     amountPkr: number;
@@ -337,9 +272,73 @@ export class RefundService {
         .eq("id", input.orderId);
     }
   }
+
+  /**
+   * Finance completes an out-of-band (MANUAL_REVIEW) refund after executing
+   * the bank transfer via the Bank Alfalah settlement portal. Records the
+   * transfer reference, runs the ledger bookkeeping, and closes the row.
+   */
+  static async completeManualRefund(input: {
+    refundId: string;
+    bankReference: string;
+    executedBy?: string;
+  }): Promise<RefundExecutionResult> {
+    const { data: refund, error } = await supabaseAdmin
+      .from("refund_executions")
+      .select("id, order_id, amount_pkr, status")
+      .eq("id", input.refundId)
+      .single();
+    if (error || !refund) {
+      return { status: "FAILED", reason: "refund_not_found" };
+    }
+    if (refund.status === "COMPLETED") {
+      return { status: "COMPLETED", refundId: refund.id, alreadyProcessed: true };
+    }
+    if (refund.status !== "MANUAL_REVIEW") {
+      return { status: "FAILED", reason: `refund_status_is_${refund.status}` };
+    }
+    if (!input.bankReference || input.bankReference.trim().length < 4) {
+      return { status: "FAILED", reason: "bank_reference_required" };
+    }
+
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, total_amount_pkr")
+      .eq("id", refund.order_id)
+      .single();
+    if (!order) {
+      return { status: "FAILED", reason: "order_not_found" };
+    }
+
+    await supabaseAdmin
+      .from("refund_executions")
+      .update({
+        status: "COMPLETED",
+        provider_refund_id: input.bankReference.trim(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", refund.id);
+
+    await this.applyRefundToOrder({
+      orderId: order.id,
+      orderTotalPkr: Number(order.total_amount_pkr || 0),
+      amountPkr: Number(refund.amount_pkr || 0),
+      refundId: refund.id,
+      orderNumber: order.order_number,
+    });
+
+    await AuditService.logAction({
+      actorId: input.executedBy || "FINANCE",
+      actorRole: "ADMIN",
+      action: "MANUAL_REFUND_COMPLETED",
+      targetResourceType: "refund_execution",
+      targetResourceId: refund.id,
+      newState: { status: "COMPLETED", bankReference: input.bankReference.trim() },
+      reason: "Out-of-band bank transfer executed and confirmed",
+    });
+
+    return { status: "COMPLETED", refundId: refund.id, providerRefundId: input.bankReference.trim() };
+  }
 }
 
-export const REFUND_GATEWAY_TIMEOUT_MS = 15000;
 export const REFUND_MAX_ATTEMPTS = MAX_GATEWAY_ATTEMPTS;
-export const IS_REFUND_GATEWAY_CONFIGURED = () =>
-  Boolean(ENV.POSTEX_XPAY_TOKEN && ENV.POSTEX_XPAY_MERCHANT_ID);

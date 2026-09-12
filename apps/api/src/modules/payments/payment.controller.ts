@@ -1,90 +1,65 @@
 import { Request, Response } from "express";
-import { PostExXPayService } from "./xpay.service.js";
-import { PaymentMethod } from "../../types/index.js";
 import { supabaseAdmin } from "../../config/supabase.js";
 import { logger } from "../../config/logger.js";
+import { RefundService } from "./refund.service.js";
+import { UserRole } from "../../types/index.js";
 
 export class PaymentController {
   /**
-   * Initiates a PostEx XPay checkout intent (Cards, Raast QR, JazzCash, Easypaisa).
-   * Verifies the authenticated user owns the order before initiating payment.
+   * POST /api/payments/refunds/:refundId/complete
+   * Finance completes an out-of-band (MANUAL_REVIEW) refund after executing
+   * the bank transfer via the Bank Alfalah settlement portal. Admin-only.
    */
-  static async initiateXPay(req: Request, res: Response): Promise<void> {
+  static async completeManualRefund(req: Request, res: Response): Promise<void> {
     try {
-      const { orderId, method, customerPhone } = req.body;
       const user = (req as any).user;
-
-      if (!orderId) {
-        res.status(400).json({ error: "orderId is required" });
+      if (user?.role !== UserRole.ADMIN && user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.FINANCE) {
+        res.status(403).json({ error: "Admin or finance role required" });
         return;
       }
 
-      // Ownership check: verify the order belongs to the authenticated user (unless admin)
-      if (user?.role !== "ADMIN") {
-        const { data: order, error } = await supabaseAdmin
-          .from("orders")
-          .select("id, buyer_id, buyer_phone")
-          .eq("id", orderId)
-          .single();
-
-        if (error || !order) {
-          res.status(404).json({ error: "Order not found" });
-          return;
-        }
-
-        if (order.buyer_id) {
-          // Account order: must be the owner
-          if (!user || order.buyer_id !== user.id) {
-            res.status(403).json({ error: "Forbidden: You can only initiate payment for your own orders" });
-            return;
-          }
-        } else {
-          // Guest orders (buyer_id NULL): guest must prove ownership by
-          // supplying the exact phone the order was placed with.
-          const phone = String(customerPhone || "").replace(/[\s-]/g, "");
-          const orderPhone = String(order.buyer_phone || "").replace(/[\s-]/g, "");
-          if (!phone || phone !== orderPhone) {
-            res.status(403).json({ error: "Forbidden: Phone verification failed for this order" });
-            return;
-          }
-        }
+      const { refundId } = req.params;
+      const { bankReference } = req.body || {};
+      if (!bankReference) {
+        res.status(400).json({ error: "bankReference is required" });
+        return;
       }
 
-      const session = await PostExXPayService.createPaymentIntent(
-        orderId,
-        method || PaymentMethod.XPAY_CARD,
-      );
-      res.json(session);
+      const result = await RefundService.completeManualRefund({
+        refundId,
+        bankReference,
+        executedBy: user?.id,
+      });
+
+      if (result.status === "FAILED") {
+        res.status(400).json({ error: result.reason });
+        return;
+      }
+      res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: "Failed to initiate payment" });
+      logger.error("Manual refund completion failed", { message: err?.message });
+      res.status(500).json({ error: "Failed to complete refund" });
     }
   }
 
   /**
-   * Handles PostEx XPay real-time webhook callback.
+   * GET /api/payments/methods — active payment configuration for clients.
+   * Driven by env-backed FEATURES so storefronts render only what is live.
    */
-  static async xpayWebhook(req: any, res: Response): Promise<void> {
+  static async listMethods(_req: Request, res: Response): Promise<void> {
     try {
-      const signature =
-        req.headers["x-postex-signature"] ||
-        (req.headers["x-xpay-signature"] as string | undefined);
-      const rawBody = req.rawBody || JSON.stringify(req.body);
-
-      const isValid = PostExXPayService.verifyWebhookSignature(
-        rawBody,
-        signature as string | undefined,
-      );
-      if (!isValid) {
-        res.status(401).json({ error: "Invalid XPay webhook signature" });
-        return;
-      }
-
-      const result = await PostExXPayService.handleWebhook(req.body);
-      res.json({ received: true, ...result });
-    } catch (err: any) {
-      // Never echo provider/internal errors to the webhook caller.
-      logger.error("XPay webhook processing failed", { message: err?.message });
-      res.status(500).json({ error: "Webhook processing failed" });
+      const { FEATURES } = await import("../../config/env.js");
+      res.json({
+        methods: {
+          cod: true,
+          alfaWallet: FEATURES.APG_ENABLED,
+          alfalahAccount: FEATURES.APG_ENABLED,
+          alfaCard: FEATURES.APG_ENABLED,
+          raastQr: Boolean(process.env.RAAST_MERCHANT_ALIAS),
+        },
+      });
+    } catch {
+      res.json({ methods: { cod: true, alfaWallet: false, alfalahAccount: false, alfaCard: false, raastQr: false } });
     }
   }
 }

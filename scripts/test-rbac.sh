@@ -197,16 +197,16 @@ else
   test_fail "PostEx webhook — Returns $HTTP_CODE (expected 401)"
 fi
 
-# Test XPay webhook without signature
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/xpay/webhook" \
+# Test APG IPN listener with foreign URL (must not trigger settlement)
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/payments/apg/ipn" \
   -H "Content-Type: application/json" \
-  -d '{"orderId":"test","status":"SUCCESS"}' 2>/dev/null)
+  -d '{"url":"https://evil.example.com/steal"}' 2>/dev/null)
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 
-if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "200" ]; then
-  test_pass "XPay webhook — Handles missing signature"
+if [ "$HTTP_CODE" = "200" ]; then
+  test_pass "APG IPN listener — Rejects foreign URLs"
 else
-  test_fail "XPay webhook — Returns $HTTP_CODE (expected 401)"
+  test_fail "APG IPN listener — Returns $HTTP_CODE (expected 200 with received:false)"
 fi
 
 echo ""

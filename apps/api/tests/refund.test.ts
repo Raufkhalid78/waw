@@ -86,24 +86,24 @@ describe("Refund Execution Engine", () => {
   });
 
   describe("resolveRefundProvider — provider routing", () => {
-    it("routes all online payment methods through XPAY", () => {
+    it("routes all online payment methods through the gateway bucket", () => {
       for (const method of [
-        "XPAY",
-        "XPAY_CARD",
-        "CARD",
+        "ALFA_WALLET",
+        "ALFALAH_ACCOUNT",
+        "ALFA_CARD",
         "RAAST",
         "JAZZCASH",
         "EASYPAISA",
       ]) {
-        assert.strictEqual(resolveRefundProvider(method), "XPAY", method);
+        assert.strictEqual(resolveRefundProvider(method), "GATEWAY", method);
       }
     });
 
     it("routes COD and unknown methods to out-of-band settlement", () => {
-      assert.strictEqual(resolveRefundProvider("COD"), "COD_OFFLINE");
-      assert.strictEqual(resolveRefundProvider("cod"), "COD_OFFLINE");
-      assert.strictEqual(resolveRefundProvider(undefined), "COD_OFFLINE");
-      assert.strictEqual(resolveRefundProvider(""), "COD_OFFLINE");
+      assert.strictEqual(resolveRefundProvider("COD"), "OFFLINE");
+      assert.strictEqual(resolveRefundProvider("cod"), "OFFLINE");
+      assert.strictEqual(resolveRefundProvider(undefined), "OFFLINE");
+      assert.strictEqual(resolveRefundProvider(""), "OFFLINE");
     });
   });
 

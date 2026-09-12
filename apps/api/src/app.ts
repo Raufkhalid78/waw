@@ -47,7 +47,6 @@ import {
   CreateOrderSchema,
   GuestCreateOrderSchema,
   CheckoutQuoteSchema,
-  XPayInitiateSchema,
   CreateReviewSchema,
   CreateDisputeSchema,
   AdminSettingsSchema,
@@ -557,17 +556,18 @@ app.post("/api/support/tickets/:id/messages", requireAuth, validateBody(SupportM
 // -- Logistics Webhook (PostEx Live Milestone Updates) -------------------------
 app.post("/api/logistics/postex/webhook", LogisticsController.handlePostExWebhook);
 
-// ── Payment Routes (PostEx XPay Unified Fintech Engine) ────────────────────
+// ── Payment Routes (Bank Alfalah APG + refunds) ─────────────────────────
 // Auth is optional: logged-in users pay their own orders; guests must supply
 // the exact phone the order was placed with (validated in the controller).
+app.get("/api/payments/methods", PaymentController.listMethods);
+
+// Finance closes out-of-band refunds after the bank transfer
 app.post(
-  "/api/payments/xpay/initiate",
-  paymentRateLimiter,
-  validateBody(XPayInitiateSchema),
-  attachOptionalUser,
-  PaymentController.initiateXPay,
+  "/api/payments/refunds/:refundId/complete",
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FINANCE),
+  PaymentController.completeManualRefund,
 );
-app.post("/api/payments/xpay/webhook", PaymentController.xpayWebhook);
 
 // ── Bank Alfalah — Alfa Payment Gateway (APG) ────────────────────────────
 // Onsite checkout: buyer stays on waw.com.pk — enters wallet/account number,
@@ -712,7 +712,7 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
       return res.status(400).json(result);
     }
 
-    // Process successful Raast payment similar to XPay webhook
+    // Process successful Raast payment (same settlement machinery as APG)
     const { supabaseAdmin } = await import("./config/supabase.js");
     const { data: payment } = await supabaseAdmin
       .from("payments")

@@ -203,13 +203,14 @@ export class SubscriptionService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Payment flow: paid plans move PENDING → ACTIVE only after the XPay
-  // payment webhook confirms the subscription charge.
-  // ═══════════════════════════════════════════════════ orderId of sub = none
+  // Payment flow: paid plans move PENDING → ACTIVE only after the APG
+  // payment settlement confirms the subscription charge.
+  // ═══════════════════════════════════════════════════════════════════════
 
   /**
-   * Initiate payment for a paid plan. Returns an XPay payment session the
-   * seller completes in-browser; the webhook then activates the subscription.
+   * Initiate payment for a paid plan. Returns a Bank Alfalah APG card
+   * checkout (hosted page) the seller completes in-browser; the settlement
+   * verification then activates the subscription.
    */
   static async initiateSubscriptionPayment(storeId: string, planName: string) {
     const { data: plan } = await supabaseAdmin
@@ -225,10 +226,10 @@ export class SubscriptionService {
     // Ensure a PENDING subscription row exists to attach the payment to
     await this.subscribe(storeId, planName);
 
-    // Create a payment intent via XPay using the store's owner as payer.
-    // Subscription payments are tracked as payments rows with a synthetic
-    // order reference so the existing webhook/ledger machinery can match them.
-    const { PostExXPayService } = await import("../payments/xpay.service.js");
+    // Create an APG card-checkout intent using the store's owner as payer.
+    // Subscription payments are tracked with a synthetic order reference so
+    // the existing ledger machinery can match them.
+    const { AlfaPaymentGatewayService } = await import("../payments/apg.service.js");
     const { ENV } = await import("../../config/env.js");
     const { randomUUID } = await import("crypto");
 
@@ -240,17 +241,27 @@ export class SubscriptionService {
       .eq("id", storeId)
       .single();
 
-    const session = await PostExXPayService.createPaymentIntentDirect({
-      orderId: paymentRef,
+    // APG card checkout requires a real order row — subscription charges
+    // use a synthetic payment reference recorded as a payments row.
+    const { data: owner } = await supabaseAdmin
+      .from("stores")
+      .select("owner_id")
+      .eq("id", storeId)
+      .single();
+
+    const checkout = await AlfaPaymentGatewayService.createSubscriptionCardCheckout({
       amountPkr: plan.price_pkr,
-      customerPhone: "",
+      paymentReference: paymentRef,
       description: `Waw ${plan.display_name} subscription — ${store?.name || "Store"}`,
-      method: "XPAY_CARD",
-      returnUrl: `${ENV.SELLER_PORTAL_URL || "https://seller.waw.com.pk"}/subscription?status=verifying`,
+      buyerEmail: `store-${storeId.slice(0, 8)}@sellers.waw.com.pk`,
+      buyerPhone: "",
+      returnUrl: `${ENV.SELLER_PORTAL_URL || "https://seller.waw.com.pk"}/subscription?status=verifying&ref=${encodeURIComponent(paymentRef)}`,
     });
 
     return {
-      checkoutUrl: session.checkoutUrl || session.payment_url || session.redirect_url,
+      checkoutUrl: checkout.redirectUrl,
+      postUrl: checkout.postUrl,
+      fields: checkout.fields,
       paymentReference: paymentRef,
       planName,
       amountPkr: plan.price_pkr,

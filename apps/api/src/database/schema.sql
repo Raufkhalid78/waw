@@ -515,7 +515,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 21. Webhooks Idempotency Table
+-- 21. Webhooks Idempotency Table (historical name — used by the shared
+-- provider-webhook event-state machine; the name predates the APG switch)
 CREATE TABLE IF NOT EXISTS xpay_webhooks_log (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   transaction_id TEXT UNIQUE NOT NULL,

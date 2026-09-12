@@ -2,7 +2,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import jwt from "jsonwebtoken";
 import { RaastService } from "../src/modules/payments/raast.service.js";
-import { PostExXPayService } from "../src/modules/payments/xpay.service.js";
 import { CourierService } from "../src/modules/logistics/courier.service.js";
 import { ProductService } from "../src/modules/products/product.service.js";
 import {
@@ -82,38 +81,38 @@ describe("Waw Marketplace Core API Engine Tests", () => {
     assert.ok(synonyms2.includes("peshawari chappal"));
   });
 
-  it("should accurately verify valid PostEx XPay HMAC-SHA256 signatures and reject tampered payloads", () => {
-    const secret = "test-only-hmac-secret-not-a-real-key";
-    const payload = JSON.stringify({
-      intentId: "xpay_12345",
-      amount: 5000,
-      status: "PAID",
-    });
+  it("should produce deterministic APG AES-128-CBC request hashes that change if any field is tampered", async () => {
+    const { AlfaPaymentGatewayService } = await import("../src/modules/payments/apg.service.js");
+    // The service reads keys from ENV at encrypt time — set 16-char test keys
+    process.env.APG_KEY1 = "1234567890123456";
+    process.env.APG_KEY2 = "6543210987654321";
+    const { ENV } = await import("../src/config/env.js");
+    (ENV as any).APG_KEY1 = "1234567890123456";
+    (ENV as any).APG_KEY2 = "6543210987654321";
 
-    // Generate valid HMAC
-    const validSignature = crypto
-      .createHmac("sha256", secret)
-      .update(payload)
-      .digest("hex");
-    assert.strictEqual(
-      PostExXPayService.verifyWebhookSignature(payload, validSignature, secret),
-      true,
+    const mapA = "ChannelId=1002&MerchantId=170&Amount=5000";
+    const mapB = "ChannelId=1002&MerchantId=170&Amount=9999"; // tampered amount
+
+    const hashA = (AlfaPaymentGatewayService as any).encryptRequestHash.call(
+      AlfaPaymentGatewayService, mapA,
+    );
+    const hashA2 = (AlfaPaymentGatewayService as any).encryptRequestHash.call(
+      AlfaPaymentGatewayService, mapA,
+    );
+    const hashB = (AlfaPaymentGatewayService as any).encryptRequestHash.call(
+      AlfaPaymentGatewayService, mapB,
     );
 
-    // Tampered payload with valid signature
-    const tamperedPayload = JSON.stringify({
-      intentId: "xpay_12345",
-      amount: 9999,
-      status: "PAID",
-    });
-    assert.strictEqual(
-      PostExXPayService.verifyWebhookSignature(tamperedPayload, validSignature, secret),
-      false,
-    );
+    // Deterministic for identical input (APG requires exact reproducibility)
+    assert.strictEqual(hashA, hashA2);
+    // Any field tampering produces a different ciphertext
+    assert.notStrictEqual(hashA, hashB);
+    // Ciphertext is base64
+    assert.match(hashA, /^[A-Za-z0-9+/=]+$/);
   });
 
   it("P0-SEC: should accept a provider payment event only when amount and currency match the order", async () => {
-    const { verifyProviderPaymentAgainstOrder } = await import("../src/modules/payments/xpay.service.js");
+    const { verifyProviderPaymentAgainstOrder } = await import("../src/modules/payments/payment-verification.js");
 
     // Exact match — accepted
     assert.deepStrictEqual(

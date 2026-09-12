@@ -50,7 +50,7 @@ export const CreateOrderSchema = z.object({
   shippingAddress: z.string().min(5, "Delivery address is required"),
   shippingCity: z.string().min(2, "City is required"),
   shippingProvince: z.string().min(2, "Province is required"),
-  paymentMethod: z.enum(["COD", "XPAY_CARD", "XPAY_WALLET", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"], {
+  paymentMethod: z.enum(["COD", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"], {
     errorMap: () => ({ message: "Invalid payment method" }),
   }),
   items: z
@@ -74,7 +74,7 @@ export const GuestCreateOrderSchema = z
     shippingAddress: z.string().min(5, "Delivery address is required"),
     shippingCity: z.string().min(2, "City is required"),
     shippingProvince: z.string().min(2, "Province is required").optional(),
-    paymentMethod: z.enum(["COD", "XPAY_CARD", "XPAY_WALLET", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"], {
+    paymentMethod: z.enum(["COD", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"], {
       errorMap: () => ({ message: "Invalid payment method" }),
     }),
     items: z
@@ -106,15 +106,9 @@ export const CheckoutQuoteSchema = z.object({
     .min(1, "Cart must contain at least 1 item")
     .max(50, "Maximum 50 distinct items per quote"),
   shippingCity: z.string().min(2).max(60).optional(),
-  paymentMethod: z.enum(["COD", "XPAY_CARD", "XPAY_WALLET", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"]).optional(),
+  paymentMethod: z.enum(["COD", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"]).optional(),
   couponCode: z.string().min(2).max(40).optional(),
   useLoyaltyPoints: z.boolean().optional(),
-});
-
-export const XPayInitiateSchema = z.object({
-  orderId: z.string().min(1, "orderId is required"),
-  method: z.enum(["XPAY_CARD", "XPAY_WALLET", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"]).optional(),
-  customerPhone: z.string().min(10).max(20).optional(),
 });
 
 export const UpdateOrderStatusSchema = z.object({
