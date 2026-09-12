@@ -10,7 +10,7 @@ export const requireActiveStore = async (req: Request, res: Response, next: Next
     }
 
     // Admins bypass the active store check
-    if (user.role === 'ADMIN') {
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
       return next();
     }
 

@@ -19,10 +19,10 @@ export default function BulkUploadPage() {
   const [uploading, setUploading] = useState(false);
   const [successCount, setSuccessCount] = useState<number | null>(null);
 
-  const sampleCsv = `Title,Title_Urdu,Category,Price_PKR,Compare_Price_PKR,Stock,SKU
-Unstitched Festive Lawn 3PC,فیسٹیو لان سوٹ,Women's Lawn,8999,11999,25,LHR-LWN-001
-Pure Silk Kurta,خالص سلک کرتا,Men's Festive,7250,9500,15,LHR-SLK-002
-Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,Ready to Wear,4999,6500,40,LHR-JAC-003`;
+  const sampleCsv = `Title,Title_Urdu,Category_Slug,Price_PKR,Compare_Price_PKR,Stock,SKU,Image_URL,Description
+Unstitched Festive Lawn 3PC,فیسٹیو لان سوٹ,womens-lawn-festive,8999,11999,25,LHR-LWN-001,,Premium breathable 3-piece lawn suit
+Pure Silk Kurta,خالص سلک کرتا,mens-kurta-shalwar,7250,9500,15,LHR-SLK-002,,Pure silk festive kurta
+Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,womens-lawn-festive,4999,6500,40,LHR-JAC-003,,Digital print jacquard kurti`;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -69,7 +69,9 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,Ready to Wear,4999,6
         await createSellerProduct({
           title: row.Title || row.title,
           titleUrdu: row.Title_Urdu || row.title_urdu,
-          categoryId: row.Category_ID || row.category_id || "",
+          // Category by SLUG (stable across environments — never the
+          // database id). Resolved server-side.
+          categorySlug: row.Category_Slug || row.category_slug || "",
           basePricePkr: parseInt(row.Price_PKR || row.price_pkr || "0", 10),
           compareAtPricePkr: row.Compare_Price_PKR ? parseInt(row.Compare_Price_PKR, 10) : undefined,
           stockQuantity: parseInt(row.Stock || row.stock || "0", 10),

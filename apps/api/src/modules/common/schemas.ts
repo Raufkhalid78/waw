@@ -22,7 +22,10 @@ export const CreateProductSchema = z.object({
   pricePkr: z.number().positive().optional(),
   basePricePkr: z.number().positive().optional(),
   compareAtPricePkr: z.number().positive().optional(),
-  categoryId: z.string().min(1),
+  categoryId: z.string().min(1).optional(),
+  // Either the category id or its slug; slug is resolved server-side so
+  // portals never need to hardcode database ids.
+  categorySlug: z.string().min(2).optional(),
   images: z.array(z.string().url()).optional(),
   imageUrl: z.string().url().optional(),
   isFirstParty: z.boolean().optional(),
@@ -42,6 +45,25 @@ export const CreateProductSchema = z.object({
       }),
     )
     .optional(),
+}).refine((d) => Boolean(d.categoryId) || Boolean(d.categorySlug), {
+  message: "categoryId or categorySlug is required",
+  path: ["categoryId"],
+});
+
+export const UpdateProductSchema = z.object({
+  title: z.string().min(3).optional(),
+  titleUrdu: z.string().optional(),
+  description: z.string().min(5).optional(),
+  pricePkr: z.number().positive().optional(),
+  basePricePkr: z.number().positive().optional(),
+  compareAtPricePkr: z.number().positive().optional(),
+  categoryId: z.string().min(1).optional(),
+  categorySlug: z.string().min(2).optional(),
+  images: z.array(z.string().url()).optional(),
+  imageUrl: z.string().url().optional(),
+  stockQuantity: z.number().int().nonnegative().optional(),
+  weightKg: z.number().positive().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const CreateOrderSchema = z.object({

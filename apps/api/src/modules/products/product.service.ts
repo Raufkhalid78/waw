@@ -342,7 +342,8 @@ export class ProductService {
       description: string;
       pricePkr?: number;
       originalPricePkr?: number;
-      categoryId: string;
+      categoryId?: string;
+      categorySlug?: string;
       images?: string[];
       imageUrl?: string;
       sku?: string;
@@ -359,6 +360,20 @@ export class ProductService {
 
     if (!data.storeId) throw new Error("storeId is required");
 
+    // Resolve category: id direct, or slug -> id (portals should never
+    // hardcode database ids; slugs are stable across environments).
+    let categoryId = data.categoryId;
+    if (!categoryId && data.categorySlug) {
+      const { data: cat } = await supabaseAdmin
+        .from("categories")
+        .select("id")
+        .eq("slug", data.categorySlug)
+        .maybeSingle();
+      if (!cat) throw new Error(`Unknown category slug: ${data.categorySlug}`);
+      categoryId = cat.id;
+    }
+    if (!categoryId) throw new Error("categoryId or categorySlug is required");
+
     const rawImages = Array.isArray(data.images) && data.images.length > 0 ? data.images : data.imageUrl ? [data.imageUrl] : [];
     const generatedSlug = data.slug || `${data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}-${Date.now().toString().slice(-4)}`;
 
@@ -368,7 +383,7 @@ export class ProductService {
     const { data: catalogProduct, error: catError } = await supabaseAdmin
       .from("catalog_products")
       .insert({
-        category_id: data.categoryId,
+        category_id: categoryId,
         title: data.title,
         title_urdu: data.titleUrdu,
         slug: generatedSlug,
@@ -460,6 +475,196 @@ export class ProductService {
     }
 
     return offer;
+  }
+
+  /**
+   * Updates a seller's listing (catalog product + offer + stock).
+   * The productId is the OFFER id (seller_offers.id) — the identifier the
+   * seller portal sees in /api/seller/products. Ownership is enforced:
+   * only the owning store's seller (or an admin) may update.
+   */
+  static async updateProduct(
+    offerId: string,
+    data: {
+      title?: string;
+      titleUrdu?: string;
+      description?: string;
+      pricePkr?: number;
+      basePricePkr?: number;
+      compareAtPricePkr?: number;
+      categoryId?: string;
+      categorySlug?: string;
+      images?: string[];
+      imageUrl?: string;
+      stockQuantity?: number;
+      weightKg?: number;
+      isActive?: boolean;
+    },
+    user: { id: string; role: string },
+  ) {
+    const { data: offer } = await supabaseAdmin
+      .from("seller_offers")
+      .select("id, store_id, store:stores(owner_id), catalog_product:catalog_products(id, category_id)")
+      .eq("id", offerId)
+      .maybeSingle();
+
+    if (!offer) throw new Error("Product not found");
+
+    const isOwner = (offer.store as any)?.owner_id === user.id;
+    const isAdmin = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+    if (!isOwner && !isAdmin) throw new Error("Not authorized to update this product");
+
+    // Category change (id or slug resolved)
+    let categoryId = data.categoryId;
+    if (!categoryId && data.categorySlug) {
+      const { data: cat } = await supabaseAdmin
+        .from("categories")
+        .select("id")
+        .eq("slug", data.categorySlug)
+        .maybeSingle();
+      if (!cat) throw new Error(`Unknown category slug: ${data.categorySlug}`);
+      categoryId = cat.id;
+    }
+
+    // Catalog product fields
+    const catalogUpdate: Record<string, any> = {};
+    if (data.title) catalogUpdate.title = data.title;
+    if (data.titleUrdu !== undefined) catalogUpdate.title_urdu = data.titleUrdu;
+    if (data.description) catalogUpdate.description = data.description;
+    if (categoryId) catalogUpdate.category_id = categoryId;
+    if (data.images && data.images.length > 0) {
+      catalogUpdate.images = data.images;
+      catalogUpdate.thumbnail = data.images[0];
+    } else if (data.imageUrl) {
+      catalogUpdate.images = [data.imageUrl];
+      catalogUpdate.thumbnail = data.imageUrl;
+    }
+    if (data.isActive !== undefined) catalogUpdate.is_active = data.isActive;
+    if (Object.keys(catalogUpdate).length > 0) {
+      catalogUpdate.updated_at = new Date().toISOString();
+      const { error } = await supabaseAdmin
+        .from("catalog_products")
+        .update(catalogUpdate)
+        .eq("id", (offer.catalog_product as any).id);
+      if (error) throw new Error(`Product update failed: ${error.message}`);
+    }
+
+    // Offer fields
+    const offerUpdate: Record<string, any> = {};
+    const price = data.pricePkr ?? data.basePricePkr;
+    if (price !== undefined) offerUpdate.price_pkr = price;
+    if (data.compareAtPricePkr !== undefined) offerUpdate.original_price_pkr = data.compareAtPricePkr;
+    if (Object.keys(offerUpdate).length > 0) {
+      offerUpdate.updated_at = new Date().toISOString();
+      const { error } = await supabaseAdmin
+        .from("seller_offers")
+        .update(offerUpdate)
+        .eq("id", offerId);
+      if (error) throw new Error(`Offer update failed: ${error.message}`);
+    }
+
+    // Stock adjustment via the ledger (keeps snapshots consistent)
+    if (data.stockQuantity !== undefined) {
+      const { InventoryService } = await import("./inventory.service.js");
+      const { data: variant } = await supabaseAdmin
+        .from("offer_variants")
+        .select("id")
+        .eq("offer_id", offerId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (variant) {
+        const { data: balance } = await supabaseAdmin
+          .from("inventory_snapshots")
+          .select("on_hand, reserved")
+          .eq("offer_variant_id", variant.id)
+          .maybeSingle();
+        const current = balance?.on_hand ?? 0;
+        const delta = data.stockQuantity - current;
+        if (delta !== 0) {
+          const { error: ledgerErr } = await supabaseAdmin
+            .from("inventory_ledger")
+            .insert({
+              offer_variant_id: variant.id,
+              store_id: offer.store_id,
+              transaction_type: delta > 0 ? "RESTOCK" : "STOCK_ADJUST",
+              quantity: delta,
+              notes: "Manual stock adjustment via seller portal",
+            });
+          if (ledgerErr) throw new Error(`Stock update failed: ${ledgerErr.message}`);
+        }
+      }
+    }
+
+    // Re-sync search index
+    try {
+      const { JobQueueManager } = await import("../../jobs/queue.service.js");
+      const { data: fresh } = await supabaseAdmin
+        .from("seller_offers")
+        .select("id, store_id, price_pkr, catalog_product:catalog_products(id, title, title_urdu, description, slug, category_id, is_active)")
+        .eq("id", offerId)
+        .maybeSingle();
+      if (fresh) {
+        await JobQueueManager.addJob("TYPESENSE_SYNC", {
+          product: {
+            id: (fresh.catalog_product as any).id,
+            title: (fresh.catalog_product as any).title,
+            titleUrdu: (fresh.catalog_product as any).title_urdu,
+            description: (fresh.catalog_product as any).description,
+            slug: (fresh.catalog_product as any).slug,
+            categoryId: (fresh.catalog_product as any).category_id,
+            storeId: fresh.store_id ?? offer.store_id,
+            isFirstParty: false,
+            isFeatured: false,
+            isSponsored: false,
+            pricePkr: fresh.price_pkr,
+            ratingAverage: 0,
+            soldCount: 0,
+            createdAt: new Date().toISOString(),
+          },
+        });
+      }
+    } catch (err: any) {
+      logger.warn("Typesense sync after update skipped:", err?.message);
+    }
+
+    return { success: true, offerId };
+  }
+
+  /**
+   * Deactivates a seller's listing (soft delete: offer -> INACTIVE,
+   * catalog product -> inactive). Orders, reviews and payouts referencing
+   * the listing are preserved.
+   */
+  static async deleteProduct(
+    offerId: string,
+    user: { id: string; role: string },
+  ) {
+    const { data: offer } = await supabaseAdmin
+      .from("seller_offers")
+      .select("id, store_id, store:stores(owner_id), catalog_product:catalog_products(id)")
+      .eq("id", offerId)
+      .maybeSingle();
+
+    if (!offer) throw new Error("Product not found");
+
+    const isOwner = (offer.store as any)?.owner_id === user.id;
+    const isAdmin = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+    if (!isOwner && !isAdmin) throw new Error("Not authorized to delete this product");
+
+    const now = new Date().toISOString();
+    const { error: offerErr } = await supabaseAdmin
+      .from("seller_offers")
+      .update({ status: "INACTIVE", updated_at: now })
+      .eq("id", offerId);
+    if (offerErr) throw new Error(`Delete failed: ${offerErr.message}`);
+
+    await supabaseAdmin
+      .from("catalog_products")
+      .update({ is_active: false, updated_at: now })
+      .eq("id", (offer.catalog_product as any).id);
+
+    return { success: true, offerId };
   }
 
   // ── Badge computation ─────────────────────────────────────────────────────

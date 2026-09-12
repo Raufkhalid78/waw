@@ -227,6 +227,24 @@ export async function updateStoreOrderStatus(
   return true;
 }
 
+// ── Category taxonomy (public API — live from the database) ──────────────
+export interface SellerCategory {
+  id: string;
+  name: string;
+  nameUrdu?: string;
+  slug: string;
+  children?: SellerCategory[];
+}
+
+export async function fetchSellerCategories(): Promise<SellerCategory[]> {
+  try {
+    return await sellerFetch<SellerCategory[]>("/api/categories");
+  } catch (err) {
+    reportApiError("Failed to fetch categories", err);
+    return [];
+  }
+}
+
 export async function fetchSellerProducts(): Promise<SellerProduct[]> {
   try {
     const data = await sellerFetch<any>("/api/seller/products", { cache: "no-store" as any });
@@ -257,7 +275,8 @@ export async function fetchSellerProducts(): Promise<SellerProduct[]> {
 export async function createSellerProduct(productData: {
   title: string;
   titleUrdu?: string;
-  categoryId: string;
+  categoryId?: string;
+  categorySlug?: string;
   basePricePkr: number;
   compareAtPricePkr?: number;
   stockQuantity: number;

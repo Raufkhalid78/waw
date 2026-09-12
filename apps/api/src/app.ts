@@ -44,6 +44,7 @@ import {
   RequestOtpSchema,
   VerifyOtpSchema,
   CreateProductSchema,
+  UpdateProductSchema,
   CreateOrderSchema,
   GuestCreateOrderSchema,
   CheckoutQuoteSchema,
@@ -410,6 +411,23 @@ app.get("/api/categories/:slug", CategoryController.getBySlug);
 app.get("/api/products", ProductController.list);
 app.get("/api/products/best-sellers", ProductController.bestSellers);
 app.get("/api/products/:slug", ProductController.getBySlug);
+
+// Seller/admin listing management — PATCH/DELETE by OFFER id. Registered
+// after the public GET routes (different method, no path conflict).
+app.patch(
+  "/api/products/:id",
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  requireActiveStore,
+  validateBody(UpdateProductSchema),
+  ProductController.update,
+);
+app.delete(
+  "/api/products/:id",
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  ProductController.remove,
+);
 
 // -- Store Routes -----------------------------------------------------------
 app.get("/api/stores", StoreController.listStores);

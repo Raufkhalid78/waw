@@ -19,11 +19,13 @@ import {
 } from "lucide-react";
 import {
   fetchSellerProducts,
+  fetchSellerCategories,
   createSellerProduct,
   updateSellerProduct,
   deleteSellerProduct,
   uploadFile,
   SellerProduct,
+  SellerCategory,
 } from "../../lib/api";
 
 export default function SellerProductsPage() {
@@ -38,6 +40,21 @@ export default function SellerProductsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Live category taxonomy (parent -> subcategory) from the public API —
+  // never hardcoded: ids are database UUIDs that differ per environment.
+  const [categories, setCategories] = useState<SellerCategory[]>([]);
+  const [parentCategoryId, setParentCategoryId] = useState("");
+  const [subCategoryId, setSubCategoryId] = useState("");
+  const [editParentCategoryId, setEditParentCategoryId] = useState("");
+  const [editSubCategoryId, setEditSubCategoryId] = useState("");
+
+  const subCategories = categories.find((c) => c.id === parentCategoryId)?.children || [];
+  const editSubCategories = categories.find((c) => c.id === editParentCategoryId)?.children || [];
+
+  useEffect(() => {
+    fetchSellerCategories().then((tree) => setCategories(tree));
+  }, []);
+
   // Auto-dismiss notices after 6s
   useEffect(() => {
     if (!notice) return;
@@ -51,8 +68,6 @@ export default function SellerProductsPage() {
   // Form state
   const [title, setTitle] = useState("");
   const [titleUrdu, setTitleUrdu] = useState("");
-  const [categoryName, setCategoryName] = useState("");
-  const [categoryId, setCategoryId] = useState("");
   const [basePricePkr, setBasePricePkr] = useState("");
   const [comparePricePkr, setComparePricePkr] = useState("");
   const [stockQuantity, setStockQuantity] = useState("");
@@ -64,8 +79,6 @@ export default function SellerProductsPage() {
   // Edit form state
   const [editTitle, setEditTitle] = useState("");
   const [editTitleUrdu, setEditTitleUrdu] = useState("");
-  const [editCategoryId, setEditCategoryId] = useState("");
-  const [editCategoryName, setEditCategoryName] = useState("");
   const [editBasePricePkr, setEditBasePricePkr] = useState("");
   const [editComparePricePkr, setEditComparePricePkr] = useState("");
   const [editStockQuantity, setEditStockQuantity] = useState("");
@@ -123,10 +136,17 @@ export default function SellerProductsPage() {
       return;
     }
     try {
+      // Subcategory is required when the selected parent has children —
+      // listings belong in the leaf category for accurate filtering.
+      const selectedCategory = subCategoryId || parentCategoryId;
+      if (!selectedCategory) {
+        fail("Select a category (and subcategory)");
+        return;
+      }
       const created = await createSellerProduct({
         title,
         titleUrdu,
-        categoryId,
+        categoryId: selectedCategory,
         basePricePkr: price,
         compareAtPricePkr: compare,
         stockQuantity: parseInt(stockQuantity, 10),
@@ -153,6 +173,7 @@ export default function SellerProductsPage() {
       return;
     }
     try {
+      const editCategory = editSubCategoryId || editParentCategoryId;
       await updateSellerProduct(editingProduct.id, {
         title: editTitle,
         title_urdu: editTitleUrdu,
@@ -160,7 +181,7 @@ export default function SellerProductsPage() {
         base_price_pkr: editPrice,
         compare_at_price_pkr: editComparePricePkr ? Math.round(parseFloat(editComparePricePkr)) : undefined,
         stock_quantity: parseInt(editStockQuantity, 10),
-        category_id: editCategoryId,
+        category_id: editCategory || undefined,
         image_url: editImageUrl,
         weight_kg: parseFloat(editWeightKg) || 1.0,
       });
@@ -174,8 +195,7 @@ export default function SellerProductsPage() {
                 basePricePkr: editPrice,
                 compareAtPricePkr: editComparePricePkr ? Math.round(parseFloat(editComparePricePkr)) : undefined,
                 stockQuantity: parseInt(editStockQuantity, 10),
-                categoryName: editCategoryName || p.categoryName,
-                categoryId: editCategoryId || p.categoryId,
+                categoryId: editSubCategoryId || editParentCategoryId || p.categoryId,
                 images: editImageUrl ? [editImageUrl] : p.images,
                 weightKg: parseFloat(editWeightKg) || 1.0,
               }
@@ -205,8 +225,14 @@ export default function SellerProductsPage() {
     setEditingProduct(product);
     setEditTitle(product.title);
     setEditTitleUrdu(product.titleUrdu || "");
-    setEditCategoryId(product.categoryId || "");
-    setEditCategoryName(product.categoryName || "");
+    // Resolve the product's category into parent + subcategory for the
+    // cascader: find the parent whose (own or child's) id matches.
+    const pid = product.categoryId || "";
+    const parent = categories.find(
+      (c) => c.id === pid || c.children?.some((sc) => sc.id === pid)
+    );
+    setEditParentCategoryId(parent?.id || "");
+    setEditSubCategoryId(parent && parent.id !== pid ? pid : "");
     setEditBasePricePkr(String(product.basePricePkr));
     setEditComparePricePkr(String(product.compareAtPricePkr || ""));
     setEditStockQuantity(String(product.stockQuantity));
@@ -219,8 +245,8 @@ export default function SellerProductsPage() {
   const resetAddForm = () => {
     setTitle("");
     setTitleUrdu("");
-    setCategoryId("");
-    setCategoryName("");
+    setParentCategoryId("");
+    setSubCategoryId("");
     setBasePricePkr("");
     setComparePricePkr("");
     setStockQuantity("");
@@ -512,37 +538,45 @@ export default function SellerProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">
-                    Marketplace Category
+                    Category
                   </label>
                   <select
-                    value={categoryId}
+                    value={parentCategoryId}
                     onChange={(e) => {
-                      setCategoryId(e.target.value);
-                      const opt = e.target.selectedOptions[0]?.text;
-                      if (opt) setCategoryName(opt);
+                      setParentCategoryId(e.target.value);
+                      setSubCategoryId("");
                     }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                   >
-                    <option value="cat_lawn">Women&apos;s Lawn &amp; Festive</option>
-                    <option value="cat_leather">Leather Goods & Wallets</option>
-                    <option value="cat_footwear">Heritage Footwear & Chappals</option>
-                    <option value="cat_sports">Sialkot Sports Equipment</option>
-                    <option value="cat_tech">Audio & Mobile Tech</option>
-                    <option value="cat_artisan">Chiniot Handicrafts & Decor</option>
+                    <option value="">Select category…</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                        {cat.nameUrdu ? ` — ${cat.nameUrdu}` : ""}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">
-                    Shipping Weight (Kg)
+                    Subcategory {subCategories.length > 0 ? "" : "(none for this category)"}
                   </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={weightKg}
-                    onChange={(e) => setWeightKg(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
-                    placeholder="1.0"
-                  />
+                  <select
+                    value={subCategoryId}
+                    onChange={(e) => setSubCategoryId(e.target.value)}
+                    disabled={subCategories.length === 0}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400 disabled:opacity-50"
+                  >
+                    <option value="">
+                      {subCategories.length === 0 ? "—" : "Select subcategory…"}
+                    </option>
+                    {subCategories.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name}
+                        {sub.nameUrdu ? ` — ${sub.nameUrdu}` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -587,16 +621,30 @@ export default function SellerProductsPage() {
                 </div>
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">
-                    SKU Code (Auto if blank)
+                    Shipping Weight (Kg)
                   </label>
                   <input
-                    type="text"
-                    placeholder="e.g. LHR-LAWN-01"
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400 font-mono"
+                    type="number"
+                    step="0.1"
+                    value={weightKg}
+                    onChange={(e) => setWeightKg(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
+                    placeholder="1.0"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  SKU Code (Auto if blank)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. LHR-LAWN-01"
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400 font-mono"
+                />
               </div>
 
               <div>
@@ -674,21 +722,46 @@ export default function SellerProductsPage() {
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Category</label>
                   <select
-                    value={editCategoryId}
+                    value={editParentCategoryId}
                     onChange={(e) => {
-                      setEditCategoryId(e.target.value);
-                      setEditCategoryName(e.target.selectedOptions[0]?.text || "");
+                      setEditParentCategoryId(e.target.value);
+                      setEditSubCategoryId("");
                     }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                   >
-                    <option value="cat_lawn">Women&apos;s Lawn &amp; Festive</option>
-                    <option value="cat_leather">Leather Goods & Wallets</option>
-                    <option value="cat_footwear">Heritage Footwear & Chappals</option>
-                    <option value="cat_sports">Sialkot Sports Equipment</option>
-                    <option value="cat_tech">Audio & Mobile Tech</option>
-                    <option value="cat_artisan">Chiniot Handicrafts & Decor</option>
+                    <option value="">Select category…</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                        {cat.nameUrdu ? ` — ${cat.nameUrdu}` : ""}
+                      </option>
+                    ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Subcategory {editSubCategories.length > 0 ? "" : "(none for this category)"}
+                  </label>
+                  <select
+                    value={editSubCategoryId}
+                    onChange={(e) => setEditSubCategoryId(e.target.value)}
+                    disabled={editSubCategories.length === 0}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400 disabled:opacity-50"
+                  >
+                    <option value="">
+                      {editSubCategories.length === 0 ? "—" : "Select subcategory…"}
+                    </option>
+                    {editSubCategories.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name}
+                        {sub.nameUrdu ? ` — ${sub.nameUrdu}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Stock Units</label>
                   <input
@@ -699,9 +772,6 @@ export default function SellerProductsPage() {
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Price (PKR)</label>
                   <input
@@ -709,15 +779,6 @@ export default function SellerProductsPage() {
                     required
                     value={editBasePricePkr}
                     onChange={(e) => setEditBasePricePkr(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Compare Price (PKR)</label>
-                  <input
-                    type="number"
-                    value={editComparePricePkr}
-                    onChange={(e) => setEditComparePricePkr(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
@@ -731,6 +792,15 @@ export default function SellerProductsPage() {
                     step="0.1"
                     value={editWeightKg}
                     onChange={(e) => setEditWeightKg(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Compare Price (PKR)</label>
+                  <input
+                    type="number"
+                    value={editComparePricePkr}
+                    onChange={(e) => setEditComparePricePkr(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>

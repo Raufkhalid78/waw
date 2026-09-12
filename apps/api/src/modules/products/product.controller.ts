@@ -87,4 +87,40 @@ export class ProductController {
       res.status(400).json({ error: err.message });
     }
   }
+
+  static async update(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      if (!user?.id) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const result = await ProductService.updateProduct(req.params.id, req.body, {
+        id: user.id,
+        role: user.role,
+      });
+      res.json(result);
+    } catch (err: any) {
+      const unauthorized = /not authorized/i.test(err.message || "");
+      res.status(unauthorized ? 403 : 400).json({ error: err.message });
+    }
+  }
+
+  static async remove(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      if (!user?.id) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const result = await ProductService.deleteProduct(req.params.id, {
+        id: user.id,
+        role: user.role,
+      });
+      res.json(result);
+    } catch (err: any) {
+      const unauthorized = /not authorized/i.test(err.message || "");
+      res.status(unauthorized ? 403 : 404).json({ error: err.message });
+    }
+  }
 }
