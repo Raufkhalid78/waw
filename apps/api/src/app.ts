@@ -546,6 +546,21 @@ app.post("/api/seller/kyc", requireAuth, requireRole(UserRole.SELLER, UserRole.A
 app.get("/api/seller/kyc/status", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), SellerController.getKycStatus);
 
 app.get("/api/seller/store", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), SellerController.getStore);
+app.patch(
+  "/api/seller/store",
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN),
+  SellerController.updateStore,
+);
+// Seller fulfillment transition — takes the STORE ORDER id, ownership-checked
+app.patch(
+  "/api/seller/orders/:storeOrderId/status",
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN),
+  requireActiveStore,
+  validateBody(UpdateOrderStatusSchema),
+  SellerController.updateStoreOrderStatus,
+);
 
 app.get("/api/seller/orders", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.listOrders);
 

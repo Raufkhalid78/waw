@@ -257,6 +257,110 @@ export class SellerController {
     }
   }
 
+  /**
+   * PATCH /api/seller/store — seller self-service profile updates.
+   * Only presentation fields are editable; status/is_verified/commission
+   * are marketplace-controlled (guard trigger in migration 049) and KYC
+   * financials go through the dedicated /api/seller/kyc flow.
+   */
+  static async updateStore(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const { name, description, logoUrl, bannerUrl, city, address } = req.body;
+
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) {
+        res.status(404).json({ error: "No store found for this seller" });
+        return;
+      }
+
+      const update: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (name && typeof name === "string") update.name = name.trim();
+      if (description !== undefined) update.description = description;
+      if (logoUrl !== undefined) update.logo_url = logoUrl;
+      if (bannerUrl !== undefined) update.banner_url = bannerUrl;
+      if (city && typeof city === "string") update.city = city.trim();
+      if (address !== undefined) update.address = address;
+
+      const { data: updated, error } = await supabaseAdmin
+        .from("stores")
+        .update(update)
+        .eq("id", store.id)
+        .select("id, name, slug, description, logo_url, banner_url, city, address, status, is_verified, rating_average, rating_count")
+        .single();
+
+      if (error) throw error;
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  /**
+   * PATCH /api/seller/orders/:storeOrderId/status — seller fulfillment
+   * transition on their own store_order. Takes the STORE ORDER id (what
+   * the seller portal lists in /api/seller/orders), validates ownership,
+   * and never touches the parent order's cross-seller global_status.
+   */
+  static async updateStoreOrderStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const { status } = req.body;
+      const { storeOrderId } = req.params;
+
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) {
+        res.status(403).json({ error: "No active seller store found" });
+        return;
+      }
+
+      const { data: storeOrder } = await supabaseAdmin
+        .from("store_orders")
+        .select("id, status, store_id")
+        .eq("id", storeOrderId)
+        .maybeSingle();
+      if (!storeOrder) {
+        res.status(404).json({ error: "Store order not found" });
+        return;
+      }
+      if (storeOrder.store_id !== store.id) {
+        res.status(403).json({ error: "You can only update orders belonging to your store" });
+        return;
+      }
+
+      const { data: updated, error } = await supabaseAdmin
+        .from("store_orders")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", storeOrderId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      await AuditService.logAction({
+        actorId: user.id || "SYSTEM",
+        actorRole: "SELLER",
+        action: "STORE_ORDER_STATUS_CHANGED",
+        targetResourceType: "store_order",
+        targetResourceId: storeOrderId,
+        previousState: { status: storeOrder.status },
+        newState: updated,
+        reason: `Status changed to ${status} via seller portal`,
+      });
+
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
   static async listOrders(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;

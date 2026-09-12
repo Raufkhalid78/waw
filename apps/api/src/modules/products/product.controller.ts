@@ -31,6 +31,7 @@ export class ProductController {
         categorySlug: categorySlug as string,
         storeId: storeId as string,
         city: city as string,
+        isFirstParty: isFirstParty === "true" ? true : isFirstParty === "false" ? false : undefined,
         inStock: inStock === "true" ? true : undefined,
         minPrice: minPrice !== undefined ? parseSafeInt(minPrice, 0, 0, 10_000_000) : undefined,
         maxPrice: maxPrice !== undefined ? parseSafeInt(maxPrice, 0, 0, 10_000_000) : undefined,

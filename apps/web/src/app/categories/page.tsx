@@ -14,22 +14,48 @@ import {
   Gem,
   Dumbbell,
   Home,
-  Palette,
   Star,
   Grid3X3,
   Package,
   Sparkles,
 } from "lucide-react";
 
+// Hand-picked branding for known slugs. Any category not listed here —
+// including ones admins create later — falls back to a deterministic style
+// rotated by slug hash, so every category always gets a distinct branded
+// look with zero code changes.
 const CATEGORY_CONFIG: Record<string, { icon: any; gradient: string; accent: string }> = {
-  "electronics-mobility": { icon: Smartphone, gradient: "from-blue-500 to-blue-600", accent: "bg-blue-50 text-blue-600 border-blue-100" },
-  "fashion-apparel": { icon: Shirt, gradient: "from-pink-500 to-rose-500", accent: "bg-pink-50 text-pink-600 border-pink-100" },
-  "leather-craft": { icon: Briefcase, gradient: "from-amber-500 to-amber-600", accent: "bg-amber-50 text-amber-700 border-amber-100" },
+  "fashion": { icon: Shirt, gradient: "from-pink-500 to-rose-500", accent: "bg-pink-50 text-pink-600 border-pink-100" },
+  "mobiles-tech": { icon: Smartphone, gradient: "from-blue-500 to-blue-600", accent: "bg-blue-50 text-blue-600 border-blue-100" },
   "beauty-fragrance": { icon: Gem, gradient: "from-purple-500 to-violet-500", accent: "bg-purple-50 text-purple-600 border-purple-100" },
-  "sports-outdoors": { icon: Dumbbell, gradient: "from-emerald-500 to-green-500", accent: "bg-emerald-50 text-emerald-600 border-emerald-100" },
   "home-living": { icon: Home, gradient: "from-orange-500 to-orange-600", accent: "bg-orange-50 text-orange-600 border-orange-100" },
-  "pakistani-heritage": { icon: Palette, gradient: "from-rose-500 to-red-500", accent: "bg-rose-50 text-rose-600 border-rose-100" },
+  "leather-craft": { icon: Briefcase, gradient: "from-amber-500 to-amber-600", accent: "bg-amber-50 text-amber-700 border-amber-100" },
+  "sialkot-sports": { icon: Dumbbell, gradient: "from-emerald-500 to-green-500", accent: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+  "groceries": { icon: Package, gradient: "from-lime-500 to-green-600", accent: "bg-lime-50 text-lime-700 border-lime-100" },
+  "kids-toys": { icon: Sparkles, gradient: "from-fuchsia-500 to-pink-500", accent: "bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100" },
 };
+
+// Deterministic fallback rotation for admin-created categories.
+const FALLBACK_STYLES = [
+  { icon: Package, gradient: "from-slate-500 to-slate-600", accent: "bg-slate-50 text-slate-600 border-slate-200" },
+  { icon: Gem, gradient: "from-teal-500 to-cyan-600", accent: "bg-teal-50 text-teal-600 border-teal-100" },
+  { icon: Star, gradient: "from-indigo-500 to-blue-600", accent: "bg-indigo-50 text-indigo-600 border-indigo-100" },
+  { icon: Home, gradient: "from-rose-500 to-pink-600", accent: "bg-rose-50 text-rose-600 border-rose-100" },
+  { icon: Grid3X3, gradient: "from-cyan-500 to-sky-600", accent: "bg-cyan-50 text-cyan-600 border-cyan-100" },
+  { icon: Sparkles, gradient: "from-violet-500 to-purple-600", accent: "bg-violet-50 text-violet-600 border-violet-100" },
+];
+
+function categoryStyle(slug: string) {
+  return (
+    CATEGORY_CONFIG[slug] ||
+    FALLBACK_STYLES[
+      // Stable hash so a category always keeps the same style across renders
+      Math.abs(
+        Array.from(slug).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7)
+      ) % FALLBACK_STYLES.length
+    ]
+  );
+}
 
 function CategoryCardSkeleton() {
   return (
@@ -144,11 +170,7 @@ export default function CategoriesPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {categories.map((cat) => {
-              const config = CATEGORY_CONFIG[cat.slug] || {
-                icon: Package,
-                gradient: "from-gray-500 to-gray-600",
-                accent: "bg-gray-50 text-gray-600 border-gray-100",
-              };
+              const config = categoryStyle(cat.slug);
               const IconComponent = config.icon;
               const subcategories = cat.children || [];
 

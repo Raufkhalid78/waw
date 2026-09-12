@@ -14,6 +14,7 @@ export class ProductService {
     categorySlug?: string;
     storeId?: string;
     city?: string;
+    isFirstParty?: boolean;
     inStock?: boolean;
     minPrice?: number;
     maxPrice?: number;
@@ -30,16 +31,21 @@ export class ProductService {
     let dbQuery = supabaseAdmin
       .from("seller_offers")
       .select(`
-        id, 
-        price_pkr, 
-        original_price_pkr, 
-        is_express, 
+        id,
+        price_pkr,
+        original_price_pkr,
+        is_express,
         catalog_product:catalog_products!inner(id, title, slug, thumbnail, images, category_id, is_active, rating_average, rating_count),
         store:stores!inner(id, name, slug, city, rating_average, seller_type),
         variants:offer_variants(id, variant_name, price_adjustment_pkr)
       `, { count: "exact" })
       .eq("status", "ACTIVE")
       .eq("catalog_product.is_active", true);
+
+    // Fulfillment model filter (1P = Waw direct retail, 3P = marketplace vendor)
+    if (query.isFirstParty !== undefined) {
+      dbQuery = dbQuery.eq("store.seller_type", query.isFirstParty ? "FIRST_PARTY" : "THIRD_PARTY");
+    }
 
     if (query.city && query.city !== "All Cities") {
       dbQuery = dbQuery.ilike("store.city", `%${query.city}%`);
