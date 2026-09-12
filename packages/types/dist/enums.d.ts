@@ -40,6 +40,8 @@ export declare enum PaymentStatus {
     ESCROW_HELD = "ESCROW_HELD",// Marketplace Escrow holding period
     COD_PENDING = "COD_PENDING",
     COD_COLLECTED = "COD_COLLECTED",
+    AWAITING_COD_REMITTANCE = "AWAITING_COD_REMITTANCE",// Delivered COD awaiting courier remittance (migration 047)
+    SETTLED = "SETTLED",// COD cash confirmed by courier remittance (migration 047)
     FAILED = "FAILED",
     REFUNDED = "REFUNDED"
 }
@@ -66,6 +68,7 @@ export declare enum PayoutStatus {
     PROCESSING = "PROCESSING",
     PAID = "PAID",
     COMPLETED = "COMPLETED",
+    SETTLED = "SETTLED",// settle_payout_atomic terminal state (migration 047)
     HELD = "HELD",
     HELD_PENDING_DELIVERY = "HELD_PENDING_DELIVERY",
     FAILED = "FAILED"
