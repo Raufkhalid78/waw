@@ -1,15 +1,19 @@
 class ApiConstants {
+  // Production API by default — a release APK/AAB built without an explicit
+  // --dart-define still talks to the live API instead of a dead localhost.
+  // Override locally with:
+  //   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:4000',
+    defaultValue: 'https://api.waw.com.pk',
   );
 
   /// True when this binary was compiled in release mode.
   static const bool _isRelease = bool.fromEnvironment('dart.vm.product');
 
-  /// Release builds MUST be compiled with an explicit HTTPS API URL:
-  /// `flutter build apk --dart-define=API_BASE_URL=https://api.waw.com.pk`.
-  /// A localhost default in a shipped binary means every API call fails.
+  /// Release builds must target an HTTPS API URL. The production default
+  /// (https://api.waw.com.pk) already satisfies this; the guard catches
+  /// explicit localhost/HTTP overrides leaking into shipped binaries.
   static void assertConfiguredForRelease() {
     if (!_isRelease) return;
     final isLocalhost = RegExp(

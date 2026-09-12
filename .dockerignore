@@ -10,3 +10,14 @@ dist
 !.env.example
 .git
 .github
+# Logs and local artifacts — never ship in a build context
+*.log
+*-output.log
+*-out.log
+*-err.log
+test-results
+coverage
+supabase/.temp
+supabase/archive
+docs
+tests

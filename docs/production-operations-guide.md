@@ -89,6 +89,26 @@ Client → CDN → Load Balancer → API Server → PostgreSQL
 
 ## Deployment
 
+### Deployment Path Decision — RAILWAY
+
+**Production runs on Railway** (api, web, admin, seller services), deployed
+automatically by `.github/workflows/ci.yml` on merges to `main` once
+`PRODUCTION_DEPLOY_ENABLED=true` is set on the `production` GitHub
+environment. Custom domains (`waw.com.pk`, `www`, `api`, `admin`, `seller`)
+and TLS certificates are managed by Railway.
+
+`nginx.conf` + `docker-compose.yml` at the repo root are **local development /
+VPS-migration references only** — they are not part of the production path.
+
+One-time Railway project setup (per environment):
+1. Four services named exactly: `api`, `web`, `admin`, `seller`
+2. On each service set `RAILWAY_CONFIG_NAME` to its matching config:
+   `api -> railway.toml`, `web -> railway.web.toml`,
+   `admin -> railway.admin.toml`, `seller -> railway.seller.toml`
+3. Attach custom domains: `waw.com.pk` + `www` -> web, `api.waw.com.pk` ->
+   api, `admin.waw.com.pk` -> admin, `seller.waw.com.pk` -> seller
+4. Required env vars are listed under "Environment Variables" below
+
 ### Pre-Deployment Checklist
 ```bash
 # 1. Run launch checklist
