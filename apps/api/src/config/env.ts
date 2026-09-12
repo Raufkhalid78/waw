@@ -80,6 +80,17 @@ export const ENV = {
   POSTEX_XPAY_MERCHANT_ID: optionalEnv("POSTEX_XPAY_MERCHANT_ID"),
   POSTEX_XPAY_TOKEN: optionalEnv("POSTEX_XPAY_TOKEN"),
   POSTEX_XPAY_SECRET_KEY: optionalEnv("POSTEX_XPAY_SECRET_KEY"),
+
+  // Bank Alfalah — Alfa Payment Gateway (APG)
+  APG_ENV: (process.env.APG_ENV === "production" ? "production" : "sandbox"),
+  APG_MERCHANT_ID: optionalEnv("APG_MERCHANT_ID"),
+  APG_STORE_ID: optionalEnv("APG_STORE_ID"),
+  APG_MERCHANT_USERNAME: optionalEnv("APG_MERCHANT_USERNAME"),
+  APG_MERCHANT_PASSWORD: optionalEnv("APG_MERCHANT_PASSWORD"),
+  APG_MERCHANT_HASH: optionalEnv("APG_MERCHANT_HASH"),
+  // AES-128-CBC pair: Key1 = 16-char encryption key, Key2 = 16-char IV
+  APG_KEY1: optionalEnv("APG_KEY1"),
+  APG_KEY2: optionalEnv("APG_KEY2"),
   // Public base URL of THIS API server, used for provider webhooks and
   // buyer-facing return URLs. Must be set in production.
   PUBLIC_API_URL: optionalEnv("PUBLIC_API_URL"),
@@ -128,6 +139,10 @@ export const ENV = {
 export const FEATURES = {
   COURIER_ENABLED: Boolean(ENV.POSTEX_API_TOKEN),
   XPAY_ENABLED: Boolean(ENV.POSTEX_XPAY_TOKEN && ENV.POSTEX_XPAY_SECRET_KEY),
+  APG_ENABLED: Boolean(
+    ENV.APG_MERCHANT_ID && ENV.APG_STORE_ID && ENV.APG_MERCHANT_USERNAME &&
+    ENV.APG_MERCHANT_PASSWORD && ENV.APG_MERCHANT_HASH && ENV.APG_KEY1 && ENV.APG_KEY2,
+  ),
   SEARCH_ENABLED: Boolean(ENV.TYPESENSE_API_KEY),
   WHATSAPP_ENABLED: Boolean(ENV.META_WHATSAPP_TOKEN),
   OTP_ENABLED: Boolean(ENV.TWILIO_ACCOUNT_SID && ENV.TWILIO_AUTH_TOKEN),

@@ -27,6 +27,9 @@ export enum PaymentMethod {
   XPAY_WALLET_EASYPAISA = "XPAY_WALLET_EASYPAISA", // Easypaisa Mobile Wallet (via PostEx XPay)
   RAAST_P2M_QR = "RAAST_P2M_QR", // Raast Person-to-Merchant QR Code Payment
   COD = "COD", // Cash on Delivery (PostEx Courier Collection)
+  ALFA_WALLET = "ALFA_WALLET", // Alfa Wallet (Bank Alfalah APG, onsite OTP)
+  ALFALAH_ACCOUNT = "ALFALAH_ACCOUNT", // Alfalah Bank Account (APG, onsite OTAC)
+  ALFA_CARD = "ALFA_CARD", // Credit/Debit Card (APG hosted page)
 }
 
 export enum PaymentStatus {

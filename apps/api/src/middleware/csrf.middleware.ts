@@ -32,6 +32,7 @@ const WEBHOOK_PATHS = [
   "/api/logistics/postex/webhook",
   "/api/payments/xpay/webhook",
   "/api/payments/raast/webhook",
+  "/api/payments/apg/ipn",
 ];
 
 export function generateCsrfToken(): string {

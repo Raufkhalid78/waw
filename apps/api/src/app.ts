@@ -74,6 +74,7 @@ import { LogisticsController } from "./modules/logistics/logistics.controller.js
 import { StoreController } from "./modules/stores/store.controller.js";
 import { OrderService } from "./modules/orders/order.service.js";
 import { PaymentController } from "./modules/payments/payment.controller.js";
+import { ApgPaymentController } from "./modules/payments/apg.controller.js";
 import { SearchController } from "./modules/search/search.service.js";
 import { AdminController } from "./modules/admin/admin.controller.js";
 import mfaRoutes from "./modules/admin/mfa.routes.js";
@@ -567,6 +568,33 @@ app.post(
   PaymentController.initiateXPay,
 );
 app.post("/api/payments/xpay/webhook", PaymentController.xpayWebhook);
+
+// ── Bank Alfalah — Alfa Payment Gateway (APG) ────────────────────────────
+// Onsite checkout: buyer stays on waw.com.pk — enters wallet/account number,
+// receives OTP, types it into OUR checkout modal. No page redirect for
+// Alfa Wallet / Alfalah Account. Cards use the bank's hosted page (PCI).
+app.post(
+  "/api/payments/apg/onsite/initiate",
+  paymentRateLimiter,
+  attachOptionalUser,
+  ApgPaymentController.initiateOnsite,
+);
+app.post(
+  "/api/payments/apg/onsite/process",
+  paymentRateLimiter,
+  attachOptionalUser,
+  ApgPaymentController.processOnsite,
+);
+app.post(
+  "/api/payments/apg/card/checkout",
+  paymentRateLimiter,
+  attachOptionalUser,
+  ApgPaymentController.cardCheckout,
+);
+// Server-to-server IPN from APG (CSRF-exempt like other provider webhooks)
+app.post("/api/payments/apg/ipn", ApgPaymentController.ipnListener);
+// Client-pollable settlement verification after redirect/return
+app.get("/api/payments/apg/verify/:orderNumber", ApgPaymentController.verifyOrder);
 
 // -- Raast P2M QR Routes ------------------------------------------------
 app.post(

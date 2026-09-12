@@ -88,6 +88,31 @@ function PaymentResultContent() {
         return;
       }
 
+      // APG orders: before reading local state, ask the server to settle
+      // via the authoritative IPN inquiry (server-to-server). Harmless if
+      // already settled or the order used another provider.
+      const orderPaymentMethod = order.payment_method || "";
+      if (
+        orderPaymentMethod === "ALFA_WALLET" ||
+        orderPaymentMethod === "ALFALAH_ACCOUNT" ||
+        orderPaymentMethod === "ALFA_CARD"
+      ) {
+        try {
+          await fetch(
+            `${API_BASE}/api/payments/apg/verify/${encodeURIComponent(order.order_number || orderParam)}`,
+            { cache: "no-store" },
+          );
+        } catch {
+          // verification endpoint outage must not break result rendering
+        }
+        // Re-read the order after the settle attempt
+        const again = await fetch(`${API_BASE}/api/orders/${encodeURIComponent(orderParam)}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (again.ok) order = await again.json();
+      }
+
       const paymentStatus = order.payment_status || "";
       setState({
         status:

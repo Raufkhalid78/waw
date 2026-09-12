@@ -45,6 +45,9 @@ export var PaymentMethod;
     PaymentMethod["XPAY_WALLET_EASYPAISA"] = "XPAY_WALLET_EASYPAISA";
     PaymentMethod["RAAST_P2M_QR"] = "RAAST_P2M_QR";
     PaymentMethod["COD"] = "COD";
+    PaymentMethod["ALFA_WALLET"] = "ALFA_WALLET";
+    PaymentMethod["ALFALAH_ACCOUNT"] = "ALFALAH_ACCOUNT";
+    PaymentMethod["ALFA_CARD"] = "ALFA_CARD";
 })(PaymentMethod || (PaymentMethod = {}));
 export var PaymentStatus;
 (function (PaymentStatus) {

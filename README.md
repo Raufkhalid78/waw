@@ -24,12 +24,15 @@ waw/
 
 ## 💳 Payment & Delivery Strategy (Pakistan)
 
-| Channel                    | Method                                 | Policy & Pricing                                              |
-| -------------------------- | -------------------------------------- | ------------------------------------------------------------- |
-| **PostEx XPay**            | Cards (Visa/Mastercard/PayPak) + Raast | Standard checkout. **Save PKR 100 on checkout**               |
-| **PostEx XPay Wallets**    | JazzCash & Easypaisa Mobile Wallets    | Aggregated wallet checkout. **Save PKR 100 on checkout**      |
-| **Cash on Delivery (COD)** | PostEx / TCS Express                   | **+PKR 100 Handling Surcharge** (offsets courier return risk) |
-| **Delivery Promotion**     | Nationwide Delivery                    | **FREE Delivery on all orders over PKR 5,000**                |
+| Channel                        | Method                                 | Policy & Pricing                                              |
+| ----------------------------- | -------------------------------------- | ------------------------------------------------------------- |
+| **Alfa Wallet (Bank Alfalah)** | REST API — **onsite checkout**, no redirect | Buyer enters wallet number + OTP on waw.com.pk                |
+| **Alfalah Bank Account**       | REST API — **onsite checkout**, no redirect | Buyer enters account number + OTAC on waw.com.pk              |
+| **Alfa Card (Visa/Mastercard)** | APG hosted page (PCI-mandated redirect) | Redirect to Bank Alfalah secure checkout, then auto-return    |
+| **PostEx XPay**               | Cards (Visa/Mastercard/PayPak) + Raast | Alternate gateway (optional)                                 |
+| **PostEx XPay Wallets**       | JazzCash & Easypaisa Mobile Wallets    | Aggregated wallet checkout                                    |
+| **Cash on Delivery (COD)**    | PostEx / TCS Express                   | **+PKR 100 Handling Surcharge** (offsets courier return risk) |
+| **Delivery Promotion**         | Nationwide Delivery                    | **FREE Delivery on all orders over PKR 5,000**               |
 
 ---
 

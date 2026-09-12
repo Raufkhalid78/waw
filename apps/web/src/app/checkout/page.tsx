@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
 import { PaymentMethod, CheckoutQuoteResponse } from "@waw/types";
+import { API_BASE_URL } from "@waw/config";
 import {
   ShieldCheck,
   Truck,
@@ -15,6 +16,7 @@ import {
 import Link from "next/link";
 import { FadeIn } from "@/components/Motion";
 import { fetchWithCsrf } from "@/lib/csrf";
+import { AlfaOnsiteModal } from "@/components/payments/AlfaOnsiteModal";
 import {
   fetchCheckoutQuote,
   createOrderApi,
@@ -41,6 +43,7 @@ export default function CheckoutPage() {
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
+    email: "",
     address: "",
     city: selectedCity || "",
     province: "",
@@ -78,6 +81,16 @@ export default function CheckoutPage() {
     totalPkr: number;
   } | null>(null);
 
+  // Onsite Bank Alfalah checkout (Alfa Wallet / Alfalah Account) — the
+  // buyer completes OTP inside this modal without ever leaving the page.
+  const [alfaModal, setAlfaModal] = useState<{
+    open: boolean;
+    orderId: string;
+    orderNumber: string;
+    amountPkr: number;
+    method: PaymentMethod.ALFA_WALLET | PaymentMethod.ALFALAH_ACCOUNT;
+  } | null>(null);
+
   // Loyalty points
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [useLoyalty, setUseLoyalty] = useState(false);
@@ -97,6 +110,7 @@ export default function CheckoutPage() {
           setFormData({
             fullName: defaultAddr.full_name,
             phone: defaultAddr.phone,
+            email: "",
             address: defaultAddr.street_address,
             city: defaultAddr.city,
             province: defaultAddr.province,
@@ -281,6 +295,88 @@ export default function CheckoutPage() {
 
       const orderId = orderResult.orderId;
 
+      // ── Bank Alfalah APG: onsite wallet/account ────────────────────────
+      // No redirect: open the embedded OTP modal instead.
+      if (
+        paymentMethod === PaymentMethod.ALFA_WALLET ||
+        paymentMethod === PaymentMethod.ALFALAH_ACCOUNT
+      ) {
+        try {
+          sessionStorage.setItem(
+            "waw-pending-payment-order",
+            JSON.stringify({
+              orderId,
+              orderNumber: orderResult.orderNumber || "",
+              totalPkr: orderResult.totalAmountPkr || 0,
+              phone: formData.phone,
+              createdAt: Date.now(),
+            }),
+          );
+        } catch {}
+        setIsSubmitting(false);
+        setAlfaModal({
+          open: true,
+          orderId,
+          orderNumber: orderResult.orderNumber || "",
+          amountPkr: orderResult.totalAmountPkr || quoteData?.totalPkr || 0,
+          method: paymentMethod,
+        });
+        return;
+      }
+
+      // ── Bank Alfalah APG: card (hosted page, PCI-mandated redirect) ──
+      if (paymentMethod === PaymentMethod.ALFA_CARD) {
+        try {
+          const res = await fetchWithCsrf(
+            `${API_BASE_URL}/api/payments/apg/card/checkout`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                orderId,
+                customerPhone: formData.phone,
+                customerEmail: formData.email || undefined,
+              }),
+            },
+          );
+          const card = await res.json().catch(() => ({}));
+          if (!res.ok || !card.postUrl) {
+            throw new Error(card.error || "Card checkout could not be started");
+          }
+          // Auto-submit the bank's hosted-page form
+          const form = document.createElement("form");
+          form.method = "POST";
+          form.action = card.postUrl;
+          for (const [name, value] of Object.entries(card.fields || {})) {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = name;
+            input.value = String(value);
+            form.appendChild(input);
+          }
+          try {
+            sessionStorage.setItem(
+              "waw-pending-payment-order",
+              JSON.stringify({
+                orderId,
+                orderNumber: orderResult.orderNumber || "",
+                totalPkr: orderResult.totalAmountPkr || 0,
+                phone: formData.phone,
+                createdAt: Date.now(),
+              }),
+            );
+          } catch {}
+          document.body.appendChild(form);
+          form.submit();
+          return;
+        } catch (err: any) {
+          setIsSubmitting(false);
+          setQuoteError(err.message || "Card checkout could not be started.");
+          return;
+        }
+      }
+
       if (
         paymentMethod === PaymentMethod.XPAY_CARD ||
         paymentMethod === PaymentMethod.XPAY_WALLET_JAZZCASH ||
@@ -444,6 +540,7 @@ export default function CheckoutPage() {
                         setFormData({
                           fullName: addr.full_name,
                           phone: addr.phone,
+                          email: formData.email,
                           address: addr.street_address,
                           city: addr.city,
                           province: addr.province,
@@ -489,6 +586,20 @@ export default function CheckoutPage() {
                   value={formData.phone}
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium"
+                />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs font-bold text-slate-700">
+                  Email (optional — for Bank Alfalah payment notifications)
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
                   }
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none font-medium"
                 />
@@ -577,6 +688,96 @@ export default function CheckoutPage() {
             </h2>
 
             <div className="space-y-3">
+              {/* Option 1: Bank Alfalah — Alfa Wallet (ONSITE checkout) */}
+              <label
+                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
+                  paymentMethod === PaymentMethod.ALFA_WALLET
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
+                    : "border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  checked={paymentMethod === PaymentMethod.ALFA_WALLET}
+                  onChange={() => setPaymentMethod(PaymentMethod.ALFA_WALLET)}
+                  className="mt-1 accent-amber-500"
+                />
+                <div>
+                  <div className="font-black text-sm text-slate-900 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#EC1C24] inline-block" />
+                      Alfa Wallet — Bank Alfalah
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                      Onsite · No Redirect
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Pay with your Alfa Wallet — OTP confirmation right here on this page.
+                  </p>
+                </div>
+              </label>
+
+              {/* Option 1b: Bank Alfalah — Bank Account (ONSITE checkout) */}
+              <label
+                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
+                  paymentMethod === PaymentMethod.ALFALAH_ACCOUNT
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
+                    : "border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  checked={paymentMethod === PaymentMethod.ALFALAH_ACCOUNT}
+                  onChange={() => setPaymentMethod(PaymentMethod.ALFALAH_ACCOUNT)}
+                  className="mt-1 accent-amber-500"
+                />
+                <div>
+                  <div className="font-black text-sm text-slate-900 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#EC1C24] inline-block" />
+                      Alfalah Bank Account
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                      Onsite · No Redirect
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Pay directly from your Alfalah account with an OTAC code on this page.
+                  </p>
+                </div>
+              </label>
+
+              {/* Option 1c: Bank Alfalah — Credit/Debit Card (hosted page) */}
+              <label
+                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
+                  paymentMethod === PaymentMethod.ALFA_CARD
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/20"
+                    : "border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  checked={paymentMethod === PaymentMethod.ALFA_CARD}
+                  onChange={() => setPaymentMethod(PaymentMethod.ALFA_CARD)}
+                  className="mt-1 accent-amber-500"
+                />
+                <div>
+                  <div className="font-black text-sm text-slate-900 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#EC1C24] inline-block" />
+                      Debit / Credit Card (Visa · Mastercard)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Bank Alfalah secure card checkout — you&apos;ll be taken to the bank&apos;s page, then returned here.
+                  </p>
+                </div>
+              </label>
+
               {/* Option 2: PostEx XPay - Debit / Credit Cards */}
               <label
                 className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
@@ -902,6 +1103,30 @@ export default function CheckoutPage() {
         </div>
       </div>
       </FadeIn>
+
+      {/* ── Bank Alfalah Onsite Checkout (no redirect) ──────────────────── */}
+      {alfaModal && (
+        <AlfaOnsiteModal
+          open={alfaModal.open}
+          orderId={alfaModal.orderId}
+          orderNumber={alfaModal.orderNumber}
+          amountPkr={alfaModal.amountPkr}
+          method={alfaModal.method}
+          buyerPhone={formData.phone}
+          buyerEmail={formData.email}
+          onClose={() => {
+            setAlfaModal(null);
+            // Keep the pending order — buyer can retry payment from orders page
+            router.push(`/orders/${alfaModal.orderId}`);
+          }}
+          onPaid={(orderNumber) => {
+            setAlfaModal(null);
+            try { sessionStorage.removeItem("waw-cart-coupon"); } catch {}
+            clearCart();
+            router.push(`/payment/result?order=${orderNumber}`);
+          }}
+        />
+      )}
 
       {/* ── State Bank Raast P2M Dynamic QR Modal ─────────────────────────── */}
     </div>
