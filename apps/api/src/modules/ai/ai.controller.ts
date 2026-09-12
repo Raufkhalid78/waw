@@ -19,7 +19,7 @@ export class AIController {
       const { data: store } = await supabaseAdmin
         .from("stores")
         .select("subscription_plan, subscription_active")
-        .eq("owner_user_id", user.id)
+        .eq("owner_id", user.id)
         .single();
 
       if (!store || !store.subscription_active || store.subscription_plan === "free") {

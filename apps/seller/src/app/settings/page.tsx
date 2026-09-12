@@ -11,6 +11,12 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [kycSubmitting, setKycSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
+
+  const notify = (text: string, type: "success" | "error" = "success") => {
+    setMessage(text);
+    setMessageType(type);
+  };
 
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -30,7 +36,7 @@ export default function SettingsPage() {
       const result = await uploadFile(file, "stores");
       setStoreForm({ ...storeForm, logoUrl: result.url });
     } catch {
-      alert("Upload failed. Enter a URL manually.");
+      notify("Upload failed. Enter a URL manually.", "error");
     } finally {
       setUploading(false);
     }
@@ -76,9 +82,9 @@ export default function SettingsPage() {
     setMessage("");
     try {
       await updateStoreProfile(storeForm);
-      setMessage("Store profile updated successfully");
+      notify("Store profile updated successfully");
     } catch (err: any) {
-      setMessage(err.message || "Failed to update store");
+      notify(err.message || "Failed to update store", "error");
     } finally {
       setSaving(false);
     }
@@ -86,18 +92,29 @@ export default function SettingsPage() {
 
   const handleSubmitKyc = async () => {
     if (!kycForm.cnic_number || !kycForm.bank_account_number || !kycForm.bank_name) {
-      setMessage("CNIC, bank account, and bank name are required");
+      notify("CNIC, bank account, and bank name are required", "error");
+      return;
+    }
+    // CNIC format validation: XXXXX-XXXXXXX-X (Pakistan Nadra standard)
+    const cnicDigits = kycForm.cnic_number.replace(/[-\s]/g, "");
+    if (!/^\d{13}$/.test(cnicDigits)) {
+      notify("CNIC must be 13 digits in the format XXXXX-XXXXXXX-X", "error");
+      return;
+    }
+    // Basic bank account sanity: 10-24 alphanumeric characters
+    if (!/^[\w-]{10,24}$/.test(kycForm.bank_account_number.replace(/\s/g, ""))) {
+      notify("Bank account number looks invalid (10-24 characters expected)", "error");
       return;
     }
     setKycSubmitting(true);
     setMessage("");
     try {
       await submitKyc(kycForm);
-      setMessage("KYC submitted successfully");
+      notify("KYC submitted successfully");
       const status = await fetchKycStatus();
       if (status) setKycStatus(status);
     } catch (err: any) {
-      setMessage(err.message || "Failed to submit KYC");
+      notify(err.message || "Failed to submit KYC", "error");
     } finally {
       setKycSubmitting(false);
     }
@@ -125,7 +142,7 @@ export default function SettingsPage() {
 
       {message && (
         <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
-          message.includes("success") ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
+          messageType === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
         }`}>
           {message}
         </div>
@@ -236,10 +253,18 @@ export default function SettingsPage() {
             <label className="block text-xs font-medium text-gray-500 mb-1">CNIC Number</label>
             <input
               type="text"
+              inputMode="numeric"
               value={kycForm.cnic_number}
-              onChange={(e) => setKycForm({ ...kycForm, cnic_number: e.target.value })}
+              onChange={(e) => {
+                // Auto-format as XXXXX-XXXXXXX-X while typing
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 13);
+                let formatted = digits;
+                if (digits.length > 5) formatted = `${digits.slice(0, 5)}-${digits.slice(5)}`;
+                if (digits.length > 12) formatted = `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+                setKycForm({ ...kycForm, cnic_number: formatted });
+              }}
               placeholder="XXXXX-XXXXXXX-X"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
             />
           </div>
           <div>

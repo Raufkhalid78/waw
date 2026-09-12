@@ -34,8 +34,19 @@ export default function SellerProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingEdit, setUploadingEdit] = useState(false);
+  const [notice, setNotice] = useState<{ text: string; type: "error" | "success" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-dismiss notices after 6s
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  const fail = (text: string) => setNotice({ text, type: "error" });
+  const ok = (text: string) => setNotice({ text, type: "success" });
 
   // Form state
   const [title, setTitle] = useState("");
@@ -71,11 +82,11 @@ export default function SellerProductsPage() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
+      fail("Please select an image file");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image must be under 5MB");
+      fail("Image must be under 5MB");
       return;
     }
 
@@ -90,7 +101,7 @@ export default function SellerProductsPage() {
         setImageUrl(result.url);
       }
     } catch (err: any) {
-      alert(err.message || "Failed to upload image");
+      fail(err.message || "Failed to upload image");
     } finally {
       if (isEdit) setUploadingEdit(false);
       else setUploading(false);
@@ -99,15 +110,25 @@ export default function SellerProductsPage() {
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Price is whole rupees (integer PKR); round decimals instead of
+    // silently truncating them away with parseInt.
+    const price = Math.round(parseFloat(basePricePkr));
+    if (!Number.isFinite(price) || price < 0) {
+      fail("Enter a valid price in PKR (whole rupees)");
+      return;
+    }
+    const compare = comparePricePkr ? Math.round(parseFloat(comparePricePkr)) : undefined;
+    if (compare !== undefined && (!Number.isFinite(compare) || compare < 0)) {
+      fail("Compare-at price must be a valid number");
+      return;
+    }
     try {
       const created = await createSellerProduct({
         title,
         titleUrdu,
         categoryId,
-        basePricePkr: parseInt(basePricePkr, 10),
-        compareAtPricePkr: comparePricePkr
-          ? parseInt(comparePricePkr, 10)
-          : undefined,
+        basePricePkr: price,
+        compareAtPricePkr: compare,
         stockQuantity: parseInt(stockQuantity, 10),
         sku: sku || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
         imageUrl,
@@ -117,21 +138,27 @@ export default function SellerProductsPage() {
       setProducts([created, ...products]);
       setShowAddModal(false);
       resetAddForm();
+      ok("Product created");
     } catch (err: any) {
-      alert(err.message || "Failed to create product");
+      fail(err.message || "Failed to create product");
     }
   };
 
   const handleEditProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+    const editPrice = Math.round(parseFloat(editBasePricePkr));
+    if (!Number.isFinite(editPrice) || editPrice < 0) {
+      fail("Enter a valid price in PKR (whole rupees)");
+      return;
+    }
     try {
       await updateSellerProduct(editingProduct.id, {
         title: editTitle,
         title_urdu: editTitleUrdu,
         description: editDescription,
-        base_price_pkr: parseInt(editBasePricePkr, 10),
-        compare_at_price_pkr: editComparePricePkr ? parseInt(editComparePricePkr, 10) : undefined,
+        base_price_pkr: editPrice,
+        compare_at_price_pkr: editComparePricePkr ? Math.round(parseFloat(editComparePricePkr)) : undefined,
         stock_quantity: parseInt(editStockQuantity, 10),
         category_id: editCategoryId,
         image_url: editImageUrl,
@@ -144,8 +171,8 @@ export default function SellerProductsPage() {
                 ...p,
                 title: editTitle,
                 titleUrdu: editTitleUrdu,
-                basePricePkr: parseInt(editBasePricePkr, 10),
-                compareAtPricePkr: editComparePricePkr ? parseInt(editComparePricePkr, 10) : undefined,
+                basePricePkr: editPrice,
+                compareAtPricePkr: editComparePricePkr ? Math.round(parseFloat(editComparePricePkr)) : undefined,
                 stockQuantity: parseInt(editStockQuantity, 10),
                 categoryName: editCategoryName || p.categoryName,
                 categoryId: editCategoryId || p.categoryId,
@@ -157,8 +184,9 @@ export default function SellerProductsPage() {
       );
       setShowEditModal(false);
       setEditingProduct(null);
+      ok("Product updated");
     } catch (err: any) {
-      alert(err.message || "Failed to update product");
+      fail(err.message || "Failed to update product");
     }
   };
 
@@ -167,8 +195,9 @@ export default function SellerProductsPage() {
     try {
       await deleteSellerProduct(product.id);
       setProducts((prev) => prev.filter((p) => p.id !== product.id));
+      ok("Product deleted");
     } catch (err: any) {
-      alert(err.message || "Failed to delete product");
+      fail(err.message || "Failed to delete product");
     }
   };
 
@@ -275,6 +304,15 @@ export default function SellerProductsPage() {
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+      {notice && (
+        <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
+          notice.type === "success"
+            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            : "bg-red-50 text-red-700 border border-red-200"
+        }`}>
+          {notice.text}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">

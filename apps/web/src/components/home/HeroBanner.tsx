@@ -21,7 +21,7 @@ const FALLBACK_HERO_SLIDES: HeroBannerSlide[] = [
     badge: "FESTIVE COLLECTION",
     title: "Designer Lawn & Luxury Festive Suits",
     description: "Authentic embroidered lawn from top fashion houses in Karachi & Lahore with free nationwide delivery.",
-    imageUrl: "https://images.unsplash.com/photo-1620799140188-3b2a02fd9a77?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    imageUrl: "/images/showcase/hero-fashion.svg",
     href: "/category/fashion-lawn",
   },
   {
@@ -29,7 +29,7 @@ const FALLBACK_HERO_SLIDES: HeroBannerSlide[] = [
     badge: "PREMIUM TECH",
     title: "Next-Gen Audio & Smart Devices",
     description: "Upgrade your lifestyle with our curated collection of verified electronics and premium accessories.",
-    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    imageUrl: "/images/showcase/hero-tech.svg",
     href: "/category/electronics",
   }
 ];

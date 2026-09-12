@@ -30,23 +30,11 @@ const transports: winston.transport[] = [
   }),
 ];
 
-if (ENV.NODE_ENV === "production") {
-  transports.push(
-    new winston.transports.File({
-      filename: "logs/error.log",
-      level: "error",
-      format: jsonFormat,
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 5,
-    }),
-    new winston.transports.File({
-      filename: "logs/combined.log",
-      format: jsonFormat,
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 10,
-    }),
-  );
-}
+// File transports are intentionally NOT enabled in containerized production
+// (Railway/Docker): the filesystem is ephemeral, files are lost on every
+// deploy, and the logs/ parent directory may not exist (winston does not
+// create it, causing an unhandled transport error). Production logging is
+// structured JSON on stdout, collected by the platform.
 
 export const logger = winston.createLogger({
   level: logLevel,

@@ -2,12 +2,31 @@
 
 import { useState, useEffect } from "react";
 import { kycApi, type AdminKyc } from "@/lib/api";
-import { BadgeCheck, CheckCircle, XCircle, RefreshCw, FileText } from "lucide-react";
+import { BadgeCheck, CheckCircle, XCircle, RefreshCw, Eye, EyeOff, AlertTriangle } from "lucide-react";
+
+/**
+ * PII masking: CNIC and bank account numbers are sensitive (Nadra identity
+ * + financial data). They render masked by default; an operator reveals
+ * them on demand. Never logged, never copied to clipboard automatically.
+ */
+function maskCnic(cnic: string): string {
+  if (!cnic) return "-";
+  const trimmed = cnic.replace(/[-\s]/g, "");
+  if (trimmed.length < 5) return "•••••";
+  return `•••••-•••••${trimmed.slice(-4)}`.slice(0, 17);
+}
+
+function maskAccount(acc: string): string {
+  if (!acc) return "-";
+  return `•••• •••• ${acc.slice(-4)}`;
+}
 
 export default function KycPage() {
   const [submissions, setSubmissions] = useState<AdminKyc[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState("");
 
   const loadKyc = async () => {
     setLoading(true);
@@ -25,14 +44,25 @@ export default function KycPage() {
     loadKyc();
   }, []);
 
+  const toggleReveal = (storeId: string) => {
+    setRevealed((prev) => {
+      const next = new Set(prev);
+      if (next.has(storeId)) next.delete(storeId);
+      else next.add(storeId);
+      return next;
+    });
+  };
+
   const handleAction = async (storeId: string, action: "approve" | "reject") => {
     setActionLoading(storeId);
+    setActionError("");
     try {
       if (action === "approve") await kycApi.approve(storeId);
       else await kycApi.reject(storeId);
       loadKyc();
-    } catch (err) {
-      console.error(`Failed to ${action} KYC`, err);
+    } catch (err: any) {
+      // Surface the failure — a silent 401/500 must not look like success.
+      setActionError(err?.message || `Failed to ${action} KYC submission`);
     } finally {
       setActionLoading(null);
     }
@@ -63,7 +93,15 @@ export default function KycPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {submissions.map((k) => (
+          {actionError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              {actionError}
+            </div>
+          )}
+          {submissions.map((k) => {
+            const isRevealed = revealed.has(k.store_id);
+            return (
             <div key={k.id} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
@@ -80,7 +118,9 @@ export default function KycPage() {
                     </div>
                     <div>
                       <span className="text-gray-400">CNIC:</span>{" "}
-                      <span className="text-gray-700 font-mono">{k.cnic_number || "-"}</span>
+                      <span className="text-gray-700 font-mono">
+                        {isRevealed ? k.cnic_number : maskCnic(k.cnic_number || "")}
+                      </span>
                     </div>
                     <div>
                       <span className="text-gray-400">Business Reg:</span>{" "}
@@ -92,13 +132,22 @@ export default function KycPage() {
                     </div>
                     <div>
                       <span className="text-gray-400">Account #:</span>{" "}
-                      <span className="text-gray-700 font-mono">{k.bank_account_number || "-"}</span>
+                      <span className="text-gray-700 font-mono">
+                        {isRevealed ? k.bank_account_number : maskAccount(k.bank_account_number || "")}
+                      </span>
                     </div>
                     <div>
                       <span className="text-gray-400">Submitted:</span>{" "}
                       <span className="text-gray-700">{new Date(k.submitted_at).toLocaleDateString()}</span>
                     </div>
                   </div>
+                  <button
+                    onClick={() => toggleReveal(k.store_id)}
+                    className="text-[11px] text-gray-500 hover:text-gray-800 flex items-center gap-1 mt-1"
+                  >
+                    {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {isRevealed ? "Hide sensitive data" : "Reveal sensitive data"}
+                  </button>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
@@ -120,7 +169,8 @@ export default function KycPage() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

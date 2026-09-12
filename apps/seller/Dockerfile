@@ -23,11 +23,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3003
 
+# Run as non-root (container escape hardening)
+RUN addgroup -S waw && adduser -S waw -G waw
+RUN chown -R waw:waw /app
+USER waw
+
 COPY package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/seller/.next ./apps/seller/.next
-COPY --from=builder /app/apps/seller/public ./apps/seller/public
-COPY --from=builder /app/apps/seller/package.json ./apps/seller/package.json
+COPY --from=builder --chown=waw:waw /app/node_modules ./node_modules
+COPY --from=builder --chown=waw:waw /app/apps/seller/.next ./apps/seller/.next
+COPY --from=builder --chown=waw:waw /app/apps/seller/public ./apps/seller/public
+COPY --from=builder --chown=waw:waw /app/apps/seller/package.json ./apps/seller/package.json
 
 EXPOSE 3003
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:3003/ || exit 1
 CMD ["npm", "start", "--workspace=@waw/seller"]

@@ -7,6 +7,19 @@ export declare const MARKETPLACE_CONFIG: {
     GST_RATE_PERCENTAGE: number;
     CURRENCY: string;
 };
+/**
+ * Runtime marketplace fees, typically fetched from the server's
+ * marketplace_settings (via /api/config/marketplace). When the admin
+ * changes pricing at runtime, clients can override the defaults above so
+ * cart/checkout displays match the server-authoritative quote.
+ */
+export interface MarketplacePricingOverrides {
+    freeDeliveryThresholdPkr?: number;
+    shippingFeePkr?: number;
+    codFeePkr?: number;
+    commissionPercentage?: number;
+    gstRatePercentage?: number;
+}
 export interface OrderItemPricingInput {
     productId: string;
     variantId?: string;
@@ -38,7 +51,8 @@ export interface OrderCalculationResult {
     }[];
 }
 /**
- * Calculates complete order totals, applying the Free Delivery rule (Subtotal >= 5000 PKR)
- * and the COD Handling Surcharge (+100 PKR). Supports coupon discounts.
+ * Calculates complete order totals, applying the Free Delivery rule and the
+ * COD Handling Surcharge. Supports coupon discounts and runtime fee
+ * overrides so the display matches server-side pricing.
  */
-export declare function calculateOrderSummary(items: OrderItemPricingInput[], paymentMethod: PaymentMethod, customShippingFee?: number, customCodFee?: number, couponDiscountPkr?: number, freeShipping?: boolean): OrderCalculationResult;
+export declare function calculateOrderSummary(items: OrderItemPricingInput[], paymentMethod: PaymentMethod, customShippingFee?: number, customCodFee?: number, couponDiscountPkr?: number, freeShipping?: boolean, overrides?: MarketplacePricingOverrides): OrderCalculationResult;

@@ -26,7 +26,7 @@ export class SubscriptionController {
       const { data: store } = await supabaseAdmin
         .from("stores")
         .select("id")
-        .eq("owner_user_id", user.id)
+        .eq("owner_id", user.id)
         .single();
 
       if (!store) {
@@ -62,7 +62,7 @@ export class SubscriptionController {
       const { data: store } = await supabaseAdmin
         .from("stores")
         .select("id")
-        .eq("owner_user_id", user.id)
+        .eq("owner_id", user.id)
         .single();
 
       if (!store) {
@@ -106,7 +106,7 @@ export class SubscriptionController {
       const { data: store } = await supabaseAdmin
         .from("stores")
         .select("id")
-        .eq("owner_user_id", user.id)
+        .eq("owner_id", user.id)
         .single();
 
       if (!store) {

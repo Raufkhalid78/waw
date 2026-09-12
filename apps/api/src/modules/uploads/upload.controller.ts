@@ -4,6 +4,36 @@ import { logger } from "../../config/logger.js";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const VALID_BUCKETS = ["products", "stores", "reviews", "profiles"] as const;
+
+/**
+ * Bucket-level authorization. Marketplace/branding buckets must not be
+ * writable by plain buyer accounts — only sellers (and admins) can upload
+ * product/store imagery.
+ */
+function bucketRoleGate(user: any, bucket: string): string | null {
+  const role = user?.role;
+  if (role === "ADMIN" || role === "SUPER_ADMIN") return null;
+  if ((bucket === "products" || bucket === "stores") && role !== "SELLER") {
+    return "Only sellers can upload to this bucket";
+  }
+  return null;
+}
+
+/**
+ * Reject traversal payloads: ownership is derived from the FIRST path
+ * segment being the uploader's userId, so `..` sequences (raw or
+ * percent-encoded) must never reach storage.
+ */
+function isSafeStoragePath(p: string): boolean {
+  return (
+    p.length > 0 &&
+    !p.includes("..") &&
+    !/%2e/i.test(p) &&
+    !p.startsWith("/") &&
+    !p.includes("\\")
+  );
+}
 
 export class UploadController {
   /**
@@ -13,10 +43,9 @@ export class UploadController {
   static async upload(req: Request, res: Response): Promise<void> {
     try {
       const { bucket } = req.params;
-      const validBuckets = ["products", "stores", "reviews", "profiles"] as const;
 
-      if (!validBuckets.includes(bucket as any)) {
-        res.status(400).json({ error: `Invalid bucket. Must be one of: ${validBuckets.join(", ")}` });
+      if (!VALID_BUCKETS.includes(bucket as any)) {
+        res.status(400).json({ error: `Invalid bucket. Must be one of: ${VALID_BUCKETS.join(", ")}` });
         return;
       }
 
@@ -37,6 +66,13 @@ export class UploadController {
       }
 
       const user = (req as any).user;
+
+      const gateError = bucketRoleGate(user, bucket);
+      if (gateError) {
+        res.status(403).json({ error: gateError });
+        return;
+      }
+
       const result = await UploadService.upload({
         bucket: bucket as any,
         fileName: file.originalname,
@@ -62,10 +98,9 @@ export class UploadController {
   static async uploadMultiple(req: Request, res: Response): Promise<void> {
     try {
       const { bucket } = req.params;
-      const validBuckets = ["products", "stores", "reviews", "profiles"] as const;
 
-      if (!validBuckets.includes(bucket as any)) {
-        res.status(400).json({ error: `Invalid bucket. Must be one of: ${validBuckets.join(", ")}` });
+      if (!VALID_BUCKETS.includes(bucket as any)) {
+        res.status(400).json({ error: `Invalid bucket. Must be one of: ${VALID_BUCKETS.join(", ")}` });
         return;
       }
 
@@ -80,7 +115,25 @@ export class UploadController {
         return;
       }
 
+      for (const file of files) {
+        if (!ALLOWED_TYPES.includes(file.mimetype)) {
+          res.status(400).json({ error: `Invalid file type (${file.originalname}). Allowed: ${ALLOWED_TYPES.join(", ")}` });
+          return;
+        }
+        if (file.size > MAX_SIZE) {
+          res.status(400).json({ error: `File too large (${file.originalname}). Max size: ${MAX_SIZE / 1024 / 1024}MB` });
+          return;
+        }
+      }
+
       const user = (req as any).user;
+
+      const gateError = bucketRoleGate(user, bucket);
+      if (gateError) {
+        res.status(403).json({ error: gateError });
+        return;
+      }
+
       const results = await Promise.all(
         files.map((file) =>
           UploadService.upload({
@@ -111,15 +164,22 @@ export class UploadController {
    */
   static async delete(req: Request, res: Response): Promise<void> {
     try {
-      const { bucket, path } = req.params;
-      const validBuckets = ["products", "stores", "reviews", "profiles"] as const;
+      const { bucket } = req.params;
+      // Express decodes %2F etc. once; decode again only for the traversal
+      // check, then reject unsafe shapes before any storage call.
+      const rawParam = req.params.path || "";
+      const decodedPath = decodeURIComponent(rawParam);
 
-      if (!validBuckets.includes(bucket as any)) {
+      if (!VALID_BUCKETS.includes(bucket as any)) {
         res.status(400).json({ error: "Invalid bucket" });
         return;
       }
 
-      const decodedPath = decodeURIComponent(path);
+      if (!isSafeStoragePath(decodedPath) || !isSafeStoragePath(rawParam)) {
+        res.status(400).json({ error: "Invalid file path" });
+        return;
+      }
+
       const user = (req as any).user;
 
       // Ownership check: path format is {userId}/{timestamp}-{random}.{ext}

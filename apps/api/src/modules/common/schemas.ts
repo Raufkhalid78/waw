@@ -94,6 +94,29 @@ export const GuestCreateOrderSchema = z
     path: ["items"],
   });
 
+export const CheckoutQuoteSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        variantId: z.string().optional(),
+        quantity: z.number().int().positive().max(100, "Maximum 100 items per product"),
+      }),
+    )
+    .min(1, "Cart must contain at least 1 item")
+    .max(50, "Maximum 50 distinct items per quote"),
+  shippingCity: z.string().min(2).max(60).optional(),
+  paymentMethod: z.enum(["COD", "XPAY_CARD", "XPAY_WALLET", "RAAST_P2M_QR"]).optional(),
+  couponCode: z.string().min(2).max(40).optional(),
+  useLoyaltyPoints: z.boolean().optional(),
+});
+
+export const XPayInitiateSchema = z.object({
+  orderId: z.string().min(1, "orderId is required"),
+  method: z.enum(["XPAY_CARD", "XPAY_WALLET", "RAAST_P2M_QR"]).optional(),
+  customerPhone: z.string().min(10).max(20).optional(),
+});
+
 export const UpdateOrderStatusSchema = z.object({
   status: z.enum([
     "PENDING", "CONFIRMED", "PROCESSING", "SHIPPED",

@@ -7,6 +7,21 @@ import { AuditService } from "../audit/audit.service.js";
 import { AuthorizationService } from "../auth/authorization.service.js";
 import { ConfigService } from "../admin/config.service.js";
 import { UserRole } from "../../types/index.js";
+import { logger } from "../../config/logger.js";
+
+/**
+ * Client-safe error message: intentional business-rule errors pass through
+ * ("Coupon expired", "Insufficient stock"); database/provider internals
+ * are masked (full detail goes to the server log).
+ */
+function clientError(err: any): string {
+  const msg = String(err?.message || "Bad request");
+  if (/\b(error|permission|schema|syntax|constraint|relation|column|row|violat|supabase|postgres|jwt|fetch|timeout|network)\b/i.test(msg) === false && msg.length < 200) {
+    return msg;
+  }
+  logger.error("Order API error", { message: err?.message, stack: err?.stack });
+  return "An internal error occurred. Please try again.";
+}
 
 export class OrderController {
   static async createOrder(req: Request, res: Response): Promise<void> {
@@ -18,7 +33,7 @@ export class OrderController {
       }
       res.status(201).json(result);
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: clientError(err) });
     }
   }
 
@@ -50,7 +65,7 @@ export class OrderController {
 
       res.status(201).json(result);
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: clientError(err) });
     }
   }
 
@@ -139,7 +154,7 @@ export class OrderController {
       );
       res.status(201).json(result);
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: clientError(err) });
     }
   }
 
@@ -261,7 +276,7 @@ export class OrderController {
 
       res.json(data);
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: clientError(err) });
     }
   }
 
@@ -275,7 +290,7 @@ export class OrderController {
       );
       res.json(order);
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: clientError(err) });
     }
   }
 
@@ -289,7 +304,7 @@ export class OrderController {
       );
       res.status(201).json(result);
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: clientError(err) });
     }
   }
 
@@ -369,13 +384,13 @@ export class OrderController {
 
       pdfStream.pipe(res);
       pdfStream.on("error", (err) => {
-        console.error("PDF stream error:", err);
+        logger.error("PDF stream error", { message: err?.message });
         if (!res.headersSent) {
           res.status(500).json({ error: "Failed to generate invoice" });
         }
       });
     } catch (err: any) {
-      console.error("Invoice generation error:", err);
+      logger.error("Invoice generation error", { message: err?.message });
       res.status(500).json({ error: "Internal server error" });
     }
   }

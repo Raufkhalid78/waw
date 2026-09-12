@@ -25,7 +25,9 @@ export const io = new SocketIOServer(server, {
 });
 
 io.use((socket, next) => {
-  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  // Token must come from the auth payload — never the URL query string,
+  // which leaks into proxy/access logs.
+  const token = socket.handshake.auth?.token;
   if (!token) return next(new Error("Authentication required"));
   try {
     const decoded = jwt.verify(token as string, ENV.JWT_SECRET) as any;
@@ -113,21 +115,39 @@ async function bootstrap() {
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received — starting graceful shutdown`);
 
-    // Stop accepting new connections
-    server.close(() => {
-      logger.info("HTTP server closed");
-    });
-
-    // Close Socket.IO
-    io.close(() => {
-      logger.info("WebSocket server closed");
-    });
-
-    // Give in-flight requests up to 10s to complete
-    setTimeout(() => {
+    let exited = false;
+    const forceExit = setTimeout(() => {
+      if (exited) return;
       logger.error("Forced shutdown after timeout");
       process.exit(1);
-    }, 10_000).unref();
+    }, 10_000);
+    forceExit.unref();
+
+    try {
+      // Close Socket.IO FIRST — long-lived websocket connections keep the
+      // HTTP server's connection count > 0, so server.close() would never
+      // finish until they are torn down.
+      await new Promise<void>((resolve) => io.close(() => resolve()));
+      logger.info("WebSocket server closed");
+
+      // Stop accepting new connections and wait for in-flight requests
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      logger.info("HTTP server closed");
+
+      // Close BullMQ queue + worker (releases Redis connections so the
+      // event loop can drain; otherwise the process never exits cleanly
+      // and Railway sees a crash on every deploy).
+      const { closeQueue } = await import("./jobs/queue.service.js");
+      await closeQueue();
+      logger.info("Background queues closed");
+    } catch (err: any) {
+      logger.error("Error during graceful shutdown:", err?.message || err);
+    }
+
+    exited = true;
+    clearTimeout(forceExit);
+    logger.info("Graceful shutdown complete");
+    process.exit(0);
   };
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));

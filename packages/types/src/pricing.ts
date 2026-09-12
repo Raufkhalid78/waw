@@ -9,6 +9,20 @@ export const MARKETPLACE_CONFIG = {
   CURRENCY: "PKR",
 };
 
+/**
+ * Runtime marketplace fees, typically fetched from the server's
+ * marketplace_settings (via /api/config/marketplace). When the admin
+ * changes pricing at runtime, clients can override the defaults above so
+ * cart/checkout displays match the server-authoritative quote.
+ */
+export interface MarketplacePricingOverrides {
+  freeDeliveryThresholdPkr?: number;
+  shippingFeePkr?: number;
+  codFeePkr?: number;
+  commissionPercentage?: number;
+  gstRatePercentage?: number;
+}
+
 export interface OrderItemPricingInput {
   productId: string;
   variantId?: string;
@@ -42,8 +56,9 @@ export interface OrderCalculationResult {
 }
 
 /**
- * Calculates complete order totals, applying the Free Delivery rule (Subtotal >= 5000 PKR)
- * and the COD Handling Surcharge (+100 PKR). Supports coupon discounts.
+ * Calculates complete order totals, applying the Free Delivery rule and the
+ * COD Handling Surcharge. Supports coupon discounts and runtime fee
+ * overrides so the display matches server-side pricing.
  */
 export function calculateOrderSummary(
   items: OrderItemPricingInput[],
@@ -52,20 +67,26 @@ export function calculateOrderSummary(
   customCodFee = MARKETPLACE_CONFIG.DEFAULT_COD_FEE_PKR,
   couponDiscountPkr = 0,
   freeShipping = false,
+  overrides?: MarketplacePricingOverrides,
 ): OrderCalculationResult {
+  const freeDeliveryThreshold =
+    overrides?.freeDeliveryThresholdPkr ?? MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR;
+  const gstRate =
+    overrides?.gstRatePercentage ?? MARKETPLACE_CONFIG.GST_RATE_PERCENTAGE;
+
   const subtotalPkr = items.reduce(
     (sum, item) => sum + item.unitPricePkr * item.quantity,
     0,
   );
 
   const isFreeDelivery =
-    subtotalPkr >= MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR || freeShipping
+    subtotalPkr >= freeDeliveryThreshold || freeShipping
       ? 1
       : 0;
   const shippingPkr = isFreeDelivery ? 0 : customShippingFee;
   const amountNeededForFreeDeliveryPkr = Math.max(
     0,
-    MARKETPLACE_CONFIG.FREE_DELIVERY_THRESHOLD_PKR - subtotalPkr,
+    freeDeliveryThreshold - subtotalPkr,
   );
 
   const isCod = paymentMethod === PaymentMethod.COD;
@@ -75,19 +96,21 @@ export function calculateOrderSummary(
   // Coupon discount is subtracted from subtotal (before shipping/cod)
   const effectiveSubtotal = Math.max(0, subtotalPkr - couponDiscountPkr);
   const taxableAmount = effectiveSubtotal + shippingPkr + codFeePkr;
-  
-  // Calculate 18% GST
-  const gstPkr = Math.round(taxableAmount * (MARKETPLACE_CONFIG.GST_RATE_PERCENTAGE / 100));
-  
+
+  // GST (default 18%)
+  const gstPkr = Math.round(taxableAmount * (gstRate / 100));
+
   const totalPkr = taxableAmount + gstPkr;
+
+  const defaultCommission =
+    overrides?.commissionPercentage ?? MARKETPLACE_CONFIG.DEFAULT_COMMISSION_PERCENTAGE;
 
   const itemBreakdowns = items.map((item) => {
     const grossAmountPkr = item.unitPricePkr * item.quantity;
     const commissionRatePercentage =
       item.sellerType === SellerType.FIRST_PARTY
         ? 0
-        : (item.commissionRatePercentage ??
-          MARKETPLACE_CONFIG.DEFAULT_COMMISSION_PERCENTAGE);
+        : (item.commissionRatePercentage ?? defaultCommission);
 
     const wawCommissionPkr =
       item.sellerType === SellerType.FIRST_PARTY

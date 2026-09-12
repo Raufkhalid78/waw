@@ -9,6 +9,23 @@ export var UserRole;
     UserRole["MODERATOR"] = "MODERATOR";
     UserRole["SUPPORT"] = "SUPPORT";
 })(UserRole || (UserRole = {}));
+/**
+ * Roles permitted to sign in to the Admin Control Center.
+ * Shared single source of truth — the admin login proxy AND the admin
+ * middleware MUST both use this list (a previous divergence locked
+ * FINANCE/OPS_AGENT/MODERATOR accounts in a logout loop).
+ */
+export const ADMIN_PANEL_ROLES = [
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.FINANCE,
+    UserRole.OPS_AGENT,
+    UserRole.MODERATOR,
+];
+export function isAdminPanelRole(role) {
+    return (typeof role === "string" &&
+        ADMIN_PANEL_ROLES.includes(role));
+}
 export var StoreStatus;
 (function (StoreStatus) {
     StoreStatus["PENDING_KYC"] = "PENDING_KYC";

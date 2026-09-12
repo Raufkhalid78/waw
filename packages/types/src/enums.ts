@@ -9,6 +9,27 @@ export enum UserRole {
   SUPPORT = "SUPPORT",
 }
 
+/**
+ * Roles permitted to sign in to the Admin Control Center.
+ * Shared single source of truth — the admin login proxy AND the admin
+ * middleware MUST both use this list (a previous divergence locked
+ * FINANCE/OPS_AGENT/MODERATOR accounts in a logout loop).
+ */
+export const ADMIN_PANEL_ROLES: readonly UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.SUPER_ADMIN,
+  UserRole.FINANCE,
+  UserRole.OPS_AGENT,
+  UserRole.MODERATOR,
+] as const;
+
+export function isAdminPanelRole(role: unknown): boolean {
+  return (
+    typeof role === "string" &&
+    (ADMIN_PANEL_ROLES as readonly string[]).includes(role)
+  );
+}
+
 export enum StoreStatus {
   PENDING_KYC = "PENDING_KYC",
   ACTIVE = "ACTIVE",

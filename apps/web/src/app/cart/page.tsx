@@ -15,7 +15,7 @@ import { fetchMarketplaceConfig, type MarketplaceConfig } from "@/lib/api";
 import { fetchWithCsrf } from "@/lib/csrf";
 
 export default function CartPage() {
-  const { items, paymentMethod, setPaymentMethod, updateQuantity, removeItem, getSummary } = useCartStore();
+  const { items, paymentMethod, setPaymentMethod, updateQuantity, removeItem, getSummary, setPricingOverrides } = useCartStore();
   const summary = getSummary();
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPkr: number } | null>(null);
@@ -24,8 +24,20 @@ export default function CartPage() {
   const [config, setConfig] = useState<MarketplaceConfig | null>(null);
 
   useEffect(() => {
-    fetchMarketplaceConfig().then(setConfig).catch(() => {});
-  }, []);
+    fetchMarketplaceConfig()
+      .then((cfg) => {
+        setConfig(cfg);
+        // Keep cart display math in sync with server pricing rules
+        // (checkout remains server-authoritative regardless).
+        setPricingOverrides({
+          freeDeliveryThresholdPkr: cfg.freeDeliveryThresholdPkr,
+          shippingFeePkr: cfg.defaultShippingFeePkr,
+          codFeePkr: cfg.codHandlingFeePkr,
+          gstRatePercentage: cfg.gstRatePercentage,
+        });
+      })
+      .catch(() => {});
+  }, [setPricingOverrides]);
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim().toUpperCase();

@@ -74,6 +74,9 @@ export default async function ProductDetailPage({ params }: Props) {
     } catch {}
   }
 
+  // Canonical site URL — env-driven (must match lib/seo.ts), never hardcoded
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://waw.com.pk";
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -83,7 +86,7 @@ export default async function ProductDetailPage({ params }: Props) {
     "sku": product.productId,
     "offers": {
       "@type": "Offer",
-      "url": `https://waw.com.pk/products/${product.productId}`,
+      "url": `${siteUrl}/products/${product.productId}`,
       "priceCurrency": "PKR",
       "price": product.pricePkr,
       "availability": product.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",

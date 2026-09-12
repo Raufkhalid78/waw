@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { SellerNav } from "@/components/SellerNav";
 import { ClientAuthGuard } from "@/components/ClientAuthGuard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 
 export const metadata: Metadata = {
   title: "Waw Seller Center (واو) — Pakistan Vendor Operations",
@@ -30,7 +31,10 @@ export default function RootLayout({
           <ClientAuthGuard>
             <div className="flex min-h-screen">
               <SellerNav />
-              <div className="flex-1 flex flex-col min-w-0">{children}</div>
+              <div className="flex-1 flex flex-col min-w-0">
+                <ApiErrorBanner />
+                {children}
+              </div>
             </div>
           </ClientAuthGuard>
         </ErrorBoundary>

@@ -11,11 +11,13 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "@tanstack/react-query": "^5.101.4",
+    "@types/qrcode": "^1.5.6",
     "@waw/config": "*",
     "@waw/types": "file:../../packages/types",
     "clsx": "^2.1.1",
     "lucide-react": "^0.439.0",
     "next": "15.5.25",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

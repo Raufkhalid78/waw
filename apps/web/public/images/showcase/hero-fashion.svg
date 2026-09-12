@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-label="Designer lawn festive collection">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF9E0"/>
+      <stop offset="0.55" stop-color="#FFE95C"/>
+      <stop offset="1" stop-color="#F5C518"/>
+    </linearGradient>
+    <pattern id="paisley" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M30 14 Q40 24 32 34 Q24 44 14 38 Q6 32 12 22 Q18 12 30 14" fill="none" stroke="#B45309" stroke-width="2" opacity="0.35"/>
+      <circle cx="46" cy="46" r="4" fill="#B45309" opacity="0.3"/>
+      <circle cx="8" cy="8" r="3" fill="#92400E" opacity="0.3"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="400" fill="url(#bg)"/>
+  <rect width="800" height="400" fill="url(#paisley)"/>
+  <text x="60" y="180" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" fill="#1F2937">Designer Lawn &amp;</text>
+  <text x="60" y="240" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" fill="#1F2937">Luxury Festive Suits</text>
+  <text x="62" y="286" font-family="system-ui, sans-serif" font-size="20" fill="#713F12">Free nationwide delivery on orders over PKR 5,000</text>
+  <g transform="translate(560,120)">
+    <path d="M0 60 Q10 30 40 24 Q80 16 110 40 Q140 64 120 110 Q100 150 60 150 Q20 150 6 120 Z" fill="#0F766E" stroke="#134E4A" stroke-width="4"/>
+    <path d="M40 50 Q60 30 90 44" stroke="#FDE68A" stroke-width="6" fill="none"/>
+    <circle cx="70" cy="90" r="18" fill="#FDE68A" opacity="0.9"/>
+  </g>
+</svg>

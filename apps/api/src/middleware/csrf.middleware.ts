@@ -21,6 +21,19 @@ const CSRF_HEADER_NAME = "x-csrf-token";
  * - The attacker cannot read the victim's CSRF cookie due to same-origin policy
  */
 
+/**
+ * Provider webhook endpoints. These are server-to-server POSTs from
+ * PostEx/XPay/Raast — they cannot carry our CSRF cookie/header and are
+ * instead protected by per-provider HMAC signature verification in their
+ * own route handlers. They MUST be exempt from CSRF checks or no
+ * digital payment/delivery webhook can ever settle.
+ */
+const WEBHOOK_PATHS = [
+  "/api/logistics/postex/webhook",
+  "/api/payments/xpay/webhook",
+  "/api/payments/raast/webhook",
+];
+
 export function generateCsrfToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -54,6 +67,12 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   // tokens; cookie-based clients are already protected by SameSite=strict
   // cookies, and token-based (mobile) clients have no ambient credentials
   // for CSRF to abuse.
+  // Skip CSRF for provider webhooks — they are authenticated by per-provider
+  // HMAC signature verification in their own handlers (not by cookies).
+  if (WEBHOOK_PATHS.some((p) => req.path === p)) {
+    return next();
+  }
+
   const publicAuthPaths = [
     "/api/auth/login",
     "/api/auth/whatsapp-otp/send",

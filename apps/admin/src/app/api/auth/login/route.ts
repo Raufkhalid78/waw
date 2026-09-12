@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@waw/config";
+import { isAdminPanelRole } from "@waw/types";
 
 import { NextRequest, NextResponse } from "next/server";
 
@@ -32,11 +33,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ADMIN-CLASS roles allowed into the admin control center. SUPER_ADMIN
-    // has implicit access to every admin API route, so rejecting it here
-    // locked the super-admin out of their own portal.
-    const ADMIN_ROLES = ["ADMIN", "SUPER_ADMIN", "FINANCE", "OPS_AGENT", "MODERATOR"];
-    if (!ADMIN_ROLES.includes(loginData.user?.role)) {
+    // ADMIN-CLASS roles allowed into the admin control center — single
+    // shared source of truth (@waw/types ADMIN_PANEL_ROLES) so the login
+    // proxy and middleware can never diverge again.
+    if (!isAdminPanelRole(loginData.user?.role)) {
       return NextResponse.json(
         { error: "Access denied. Admin only." },
         { status: 403 }

@@ -268,7 +268,7 @@ export function AuthModal({
               {/* iPhone 15 Pro (Large) */}
               <div className="w-[84px] h-[84px] sm:w-[90px] sm:h-[90px] rounded-3xl bg-white shadow-xl border-2 border-white/80 p-1 flex items-center justify-center transform -rotate-6 hover:scale-105 transition-transform overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=200&auto=format&fit=crop&q=80"
+                  src="/images/showcase/smartphone.svg"
                   alt="Smartphone"
                   className="w-full h-full object-cover rounded-2xl"
                 />
@@ -277,7 +277,7 @@ export function AuthModal({
               {/* Handcrafted Peshawari Chappal (Large) */}
               <div className="w-[84px] h-[84px] sm:w-[90px] sm:h-[90px] rounded-3xl bg-white shadow-xl border-2 border-white/80 p-1 flex items-center justify-center transform rotate-6 hover:scale-105 transition-transform overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=200&auto=format&fit=crop&q=80"
+                  src="/images/showcase/footwear.svg"
                   alt="Footwear"
                   className="w-full h-full object-cover rounded-2xl"
                 />
@@ -298,7 +298,7 @@ export function AuthModal({
               {/* Studio ANC Headphones (Large) */}
               <div className="w-[84px] h-[84px] sm:w-[90px] sm:h-[90px] rounded-3xl bg-white shadow-xl border-2 border-white/80 p-1 flex items-center justify-center transform rotate-6 hover:scale-105 transition-transform overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&auto=format&fit=crop&q=80"
+                  src="/images/showcase/headphones.svg"
                   alt="Headphones"
                   className="w-full h-full object-cover rounded-2xl"
                 />
@@ -307,7 +307,7 @@ export function AuthModal({
               {/* Luxury Oud & Fragrance (Large) */}
               <div className="w-[84px] h-[84px] sm:w-[90px] sm:h-[90px] rounded-3xl bg-white shadow-xl border-2 border-white/80 p-1 flex items-center justify-center transform -rotate-6 hover:scale-105 transition-transform overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=200&auto=format&fit=crop&q=80"
+                  src="/images/showcase/fragrance.svg"
                   alt="Fragrance"
                   className="w-full h-full object-cover rounded-2xl"
                 />

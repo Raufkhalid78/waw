@@ -46,7 +46,9 @@ export class PushController {
         return;
       }
 
-      const token = req.body?.token || req.query?.token;
+      // Body only — device tokens must not travel in URLs (they leak into
+      // proxy/access logs).
+      const token = req.body?.token;
       if (!token || typeof token !== "string") {
         res.status(400).json({ error: "token is required" });
         return;

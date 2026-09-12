@@ -3,6 +3,7 @@
 
 import { API_BASE_URL } from "@waw/config";
 import { useState, useEffect, useRef } from "react";
+import QRCode from "qrcode";
 import { FadeIn } from "@/components/Motion";
 import { Shield, QrCode, CheckCircle2, XCircle, AlertTriangle, Copy, Loader2 } from "lucide-react";
 
@@ -67,35 +68,14 @@ export default function MfaSettingsPage() {
 
   const drawQrCode = (text: string) => {
     if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Simple QR code rendering using the canvas
-    // For production, use a QR code library like `qrcode`
-    const size = 200;
-    canvas.width = size;
-    canvas.height = size;
-
-    // Draw placeholder with instruction
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = "#374151";
-    ctx.font = "bold 14px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("Scan this URI with", size / 2, size / 2 - 30);
-    ctx.fillText("your authenticator app", size / 2, size / 2 - 10);
-    ctx.font = "11px system-ui";
-    ctx.fillStyle = "#6b7280";
-    ctx.fillText("Google Authenticator, Authy,", size / 2, size / 2 + 15);
-    ctx.fillText("or 1Password", size / 2, size / 2 + 32);
-
-    // Draw the otpauth:// URI as text
-    ctx.font = "9px monospace";
-    ctx.fillStyle = "#9333ea";
-    const lines = text.match(/.{1,35}/g) || [];
-    lines.forEach((line, i) => {
-      ctx.fillText(line, size / 2, size / 2 + 60 + i * 14);
+    // Render a real, scannable QR code of the otpauth:// enrollment URI.
+    QRCode.toCanvas(canvasRef.current, text, {
+      width: 200,
+      margin: 2,
+      color: { dark: "#1f2937", light: "#ffffff" },
+      errorCorrectionLevel: "M",
+    }).catch((err) => {
+      setError(`Failed to render QR code: ${err?.message || err}`);
     });
   };
 
@@ -262,7 +242,7 @@ export default function MfaSettingsPage() {
                     height={200}
                   />
                   <p className="text-[10px] text-gray-400 text-center mt-1">
-                    Copy the URI above into a QR generator
+                    Scan with your authenticator app
                   </p>
                 </div>
               </div>

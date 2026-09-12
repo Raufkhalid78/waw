@@ -56,15 +56,17 @@ echo "1. Service Health Checks"
 echo "------------------------"
 
 check "PostgreSQL is running" \
-  "docker compose -f docker-compose.staging.yml exec -T db pg_isready -U waw_staging" \
+  "docker compose -f docker-compose.staging.yml exec -T db pg_isready -U ${POSTGRES_USER:-waw_staging}" \
   "accepting connections"
 
 check "Redis is running" \
-  "docker compose -f docker-compose.staging.yml exec -T redis redis-cli -a change_me_staging ping" \
+  "docker compose -f docker-compose.staging.yml exec -T redis sh -c 'redis-cli -a \"\$REDIS_PASSWORD\" ping'" \
   "PONG"
 
+# Typesense is no longer published to the host (internal-only); check inside
+# the container network.
 check "Typesense is running" \
-  "curl -sf http://localhost:8108/health" \
+  "docker compose -f docker-compose.staging.yml exec -T typesense curl -sf http://localhost:8108/health" \
   "ok"
 
 echo ""

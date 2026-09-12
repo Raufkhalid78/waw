@@ -53,6 +53,7 @@ export default function StoresPage() {
   const [commissionEditing, setCommissionEditing] = useState<string | null>(null);
   const [commissionValue, setCommissionValue] = useState("");
   const [commissionSaving, setCommissionSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const startCommissionEdit = (store: any) => {
     setCommissionEditing(store.id);
@@ -64,14 +65,24 @@ export default function StoresPage() {
   };
 
   const saveCommission = async (storeId: string) => {
+    // Validate before mutating — commission drives seller payout math.
+    if (commissionValue !== "") {
+      const num = Number(commissionValue);
+      if (!Number.isFinite(num) || num < 0 || num > 50) {
+        setActionError("Commission must be a number between 0 and 50%.");
+        return;
+      }
+    }
     setCommissionSaving(true);
+    setActionError("");
     try {
       await commissionMutation.mutateAsync({
         storeId,
         value: commissionValue === "" ? null : Number(commissionValue),
       });
-    } catch (err) {
-      console.error("Failed to update commission", err);
+    } catch (err: any) {
+      // Surface the failure — a silent 401/500 must not look like success.
+      setActionError(err?.message || "Failed to update commission");
     } finally {
       setCommissionSaving(false);
     }
@@ -87,6 +98,12 @@ export default function StoresPage() {
           {data && <span className="text-sm text-gray-500">{data.total} total</span>}
         </div>
       </FadeIn>
+
+      {actionError && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
 
       <FadeIn delay={50}>
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">

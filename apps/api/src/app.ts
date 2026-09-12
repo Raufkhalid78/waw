@@ -46,6 +46,8 @@ import {
   CreateProductSchema,
   CreateOrderSchema,
   GuestCreateOrderSchema,
+  CheckoutQuoteSchema,
+  XPayInitiateSchema,
   CreateReviewSchema,
   CreateDisputeSchema,
   AdminSettingsSchema,
@@ -144,17 +146,24 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
-const TRUSTED_ORIGINS = [
-  "https://www.waw.com.pk",
-  "https://waw.com.pk",
-  "https://admin.waw.com.pk",
-  "https://seller.waw.com.pk",
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:3002",
-  "http://localhost:3003",
-  "http://localhost:4000",
-];
+const TRUSTED_ORIGINS = ENV.NODE_ENV === "production"
+  ? [
+      "https://www.waw.com.pk",
+      "https://waw.com.pk",
+      "https://admin.waw.com.pk",
+      "https://seller.waw.com.pk",
+    ]
+  : [
+      "https://www.waw.com.pk",
+      "https://waw.com.pk",
+      "https://admin.waw.com.pk",
+      "https://seller.waw.com.pk",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "http://localhost:3003",
+      "http://localhost:4000",
+    ];
 
 // Load additional CORS origins from marketplace config
 const dynamicOriginsFromConfig: string[] = [];
@@ -170,12 +179,11 @@ const dynamicOriginsEnv = process.env.CORS_ORIGIN
 
 const allowedOriginSet = new Set([...TRUSTED_ORIGINS, ...dynamicOriginsEnv, ...dynamicOriginsFromConfig]);
 
-const WEBHOOK_PATHS = ["/api/logistics/postex/webhook", "/api/payments/xpay/webhook", "/api/payments/raast/webhook"];
-
 const isAllowedOrigin = (origin?: string): boolean => {
   if (!origin) return true; // Allow server-to-server (webhooks, health checks)
   if (allowedOriginSet.has(origin)) return true;
-  if (/^https:\/\/(www|admin|seller|api)\.waw\.com\.pk$/.test(origin)) return true;
+  // Env-configured Railway domains (any *.up.railway.app preview URL)
+  if (ENV.NODE_ENV !== "production" && /^https:\/\/[a-z0-9-]+\.up\.railway\.app$/.test(origin)) return true;
   return false;
 };
 
@@ -419,7 +427,7 @@ app.post(
 );
 
 // ── Checkout Quote Engine (Server-Authoritative Pricing) ──────────────────
-app.post("/api/checkout/quote", async (req, res) => {
+app.post("/api/checkout/quote", validateBody(CheckoutQuoteSchema), async (req, res) => {
   try {
     const { items, shippingCity, paymentMethod, couponCode, useLoyaltyPoints } = req.body;
     if (!items || items.length === 0) {
@@ -554,6 +562,7 @@ app.post("/api/logistics/postex/webhook", LogisticsController.handlePostExWebhoo
 app.post(
   "/api/payments/xpay/initiate",
   paymentRateLimiter,
+  validateBody(XPayInitiateSchema),
   attachOptionalUser,
   PaymentController.initiateXPay,
 );
@@ -769,7 +778,7 @@ app.get("/api/admin/subscriptions", requireAuth, requireRole(UserRole.ADMIN), as
       .select(`
         id, name, slug, city, status,
         subscription_plan, subscription_active, subscription_expires_at,
-        owner:owner_user_id(full_name, phone),
+        owner:owner_id(full_name, phone),
         subscription:seller_subscriptions(id, status, started_at, expires_at, payment_reference, plan:subscription_plans(display_name, price_pkr))
       `)
       .order("name", { ascending: true });

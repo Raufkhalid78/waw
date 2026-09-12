@@ -25,11 +25,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Run as non-root (container escape hardening)
+RUN addgroup -S waw && adduser -S waw -G waw
+RUN chown -R waw:waw /app
+USER waw
+
 COPY package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/web/.next ./apps/web/.next
-COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/apps/web/package.json ./apps/web/package.json
+COPY --from=builder --chown=waw:waw /app/node_modules ./node_modules
+COPY --from=builder --chown=waw:waw /app/apps/web/.next ./apps/web/.next
+COPY --from=builder --chown=waw:waw /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=waw:waw /app/apps/web/package.json ./apps/web/package.json
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

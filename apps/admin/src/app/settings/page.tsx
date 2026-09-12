@@ -25,10 +25,31 @@ const DEFAULT_SETTINGS: MarketplaceSettings = {
   new_arrival_days: 14,
 };
 
+/**
+ * Bounds for money-critical marketplace settings. These values drive
+ * server-side checkout pricing — a typo (e.g. commission 1000 or a
+ * negative fee) would corrupt every new order's math, so clamp client-side
+ * and reject anything out of range.
+ */
+const SETTING_BOUNDS: Partial<Record<keyof MarketplaceSettings, { min: number; max: number; integer: boolean }>> = {
+  default_commission_pct: { min: 0, max: 50, integer: true },
+  free_delivery_threshold_pkr: { min: 0, max: 100_000, integer: true },
+  default_shipping_fee_pkr: { min: 0, max: 10_000, integer: true },
+  cod_handling_fee_pkr: { min: 0, max: 5_000, integer: true },
+  gst_rate_percentage: { min: 0, max: 25, integer: false },
+  discount_tier_1_threshold: { min: 0, max: 100, integer: true },
+  discount_tier_2_threshold: { min: 0, max: 100, integer: true },
+  discount_tier_3_threshold: { min: 0, max: 100, integer: true },
+  best_seller_days: { min: 1, max: 365, integer: true },
+  best_seller_limit: { min: 1, max: 200, integer: true },
+  new_arrival_days: { min: 1, max: 365, integer: true },
+};
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [localSettings, setLocalSettings] = useState<MarketplaceSettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
+  const [validationError, setValidationError] = useState("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin-settings"],
@@ -47,15 +68,40 @@ export default function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
       setHasChanges(false);
+      setValidationError("");
     },
   });
 
-  const handleChange = (key: keyof MarketplaceSettings, value: any) => {
-    setLocalSettings((prev) => ({ ...prev, [key]: value }));
+  const handleChange = (key: keyof MarketplaceSettings, value: string | number) => {
+    if (typeof DEFAULT_SETTINGS[key] === "number") {
+      const bounds = SETTING_BOUNDS[key];
+      // Empty string → 0; reject non-numeric input
+      const num = typeof value === "number" ? value : value === "" ? 0 : Number(value);
+      if (!Number.isFinite(num)) return;
+      let clamped = num;
+      if (bounds) {
+        if (bounds.integer && !Number.isInteger(num)) return;
+        clamped = Math.min(Math.max(num, bounds.min), bounds.max);
+      }
+      setLocalSettings((prev) => ({ ...prev, [key]: clamped }));
+    } else {
+      setLocalSettings((prev) => ({ ...prev, [key]: value as string }));
+    }
     setHasChanges(true);
   };
 
   const handleSave = () => {
+    // Final validation gate before persisting pricing configuration
+    for (const [key, bounds] of Object.entries(SETTING_BOUNDS)) {
+      const v = localSettings[key as keyof MarketplaceSettings];
+      if (typeof v !== "number" || v < bounds.min || v > bounds.max) {
+        setValidationError(
+          `${key} must be between ${bounds.min} and ${bounds.max}${bounds.integer ? " (whole number)" : ""}.`,
+        );
+        return;
+      }
+    }
+    setValidationError("");
     mutation.mutate(localSettings);
   };
 
@@ -120,6 +166,14 @@ export default function SettingsPage() {
         <FadeIn delay={50}>
           <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-700">
             Failed to save settings. Please try again.
+          </div>
+        </FadeIn>
+      )}
+
+      {validationError && (
+        <FadeIn delay={50}>
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
+            {validationError}
           </div>
         </FadeIn>
       )}

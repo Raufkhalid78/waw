@@ -146,6 +146,8 @@ if (ENV.NODE_ENV === "production") {
   if (!ENV.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
   if (!ENV.UPSTASH_REDIS_REST_URL) missing.push("UPSTASH_REDIS_REST_URL");
   if (!ENV.UPSTASH_REDIS_REST_TOKEN) missing.push("UPSTASH_REDIS_REST_TOKEN");
+  if (!process.env.REDIS_HOST) missing.push("REDIS_HOST");
+  if (!process.env.REDIS_PORT) missing.push("REDIS_PORT");
 
   if (missing.length > 0) {
     throw new Error(
@@ -164,6 +166,14 @@ if (ENV.NODE_ENV === "production") {
 
   const log = getLogger();
   const warn = (msg: string) => log ? log.warn(msg) : console.warn(msg);
+
+  if (ENV.ALLOW_TEST_OTP) {
+    throw new Error("FATAL: ALLOW_TEST_OTP=true is forbidden in production.");
+  }
+
+  if (ENV.PUBLIC_API_URL && !/^https:\/\//.test(ENV.PUBLIC_API_URL)) {
+    throw new Error("FATAL: PUBLIC_API_URL must use https:// in production.");
+  }
 
   if (!ENV.GUEST_TOKEN_SECRET) {
     warn("[SECURITY] GUEST_TOKEN_SECRET not set - guest checkout will be REJECTED at runtime.");

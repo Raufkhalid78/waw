@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@waw/config";
+import { reportApiError } from "./api-errors";
 
 import {
   OrderStatus,
@@ -200,7 +201,7 @@ export async function fetchSellerStore(): Promise<SellerStore | null> {
       ratingCount: Number(data.rating_count) || 0,
     };
   } catch (err) {
-    console.error("Failed to fetch seller store:", err);
+    reportApiError("Failed to fetch seller store", err);
     return null;
   }
 }
@@ -210,7 +211,7 @@ export async function fetchSellerOrders(): Promise<SellerOrder[]> {
     const data = await sellerFetch<any>("/api/seller/orders", { cache: "no-store" as any });
     return Array.isArray(data) ? data : data?.orders || [];
   } catch (err) {
-    console.error("Failed to fetch seller orders:", err);
+    reportApiError("Failed to fetch seller orders", err);
     return [];
   }
 }
@@ -248,7 +249,7 @@ export async function fetchSellerProducts(): Promise<SellerProduct[]> {
       createdAt: p.created_at || p.createdAt || new Date().toISOString(),
     }));
   } catch (err) {
-    console.error("Failed to fetch seller products:", err);
+    reportApiError("Failed to fetch seller products", err);
     return [];
   }
 }
@@ -279,7 +280,7 @@ export async function fetchSellerPayouts(): Promise<SellerPayout[]> {
     const data = await sellerFetch<any>("/api/seller/payouts", { cache: "no-store" as any });
     return Array.isArray(data) ? data : data?.payouts || [];
   } catch (err) {
-    console.error("Failed to fetch seller payouts:", err);
+    reportApiError("Failed to fetch seller payouts", err);
     return [];
   }
 }
@@ -289,7 +290,7 @@ export async function fetchSellerCoupons(): Promise<SellerCoupon[]> {
     const data = await sellerFetch<any>("/api/seller/coupons", { cache: "no-store" as any });
     return Array.isArray(data) ? data : data?.coupons || [];
   } catch (err) {
-    console.error("Failed to fetch seller coupons:", err);
+    reportApiError("Failed to fetch seller coupons", err);
     return [];
   }
 }
@@ -322,7 +323,7 @@ export async function fetchSellerAnalytics(): Promise<SellerAnalytics> {
   try {
     return await sellerFetch<SellerAnalytics>("/api/seller/analytics", { cache: "no-store" as any });
   } catch (err) {
-    console.error("Failed to fetch seller analytics:", err);
+    reportApiError("Failed to fetch seller analytics", err);
     return {
       totalRevenuePkr: 0,
       pendingPayoutsPkr: 0,

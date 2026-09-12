@@ -6,6 +6,16 @@ export function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+/**
+ * Session cookies (waw_session) are HttpOnly and set by the API — they can
+ * never be written from JS. This helper only exists for non-sensitive,
+ * JS-readable cookies (e.g. UI preferences) and intentionally does NOT
+ * support auth tokens: bearer tokens in localStorage/JS-readable cookies
+ * are XSS-stealable, which is why this package's previous getToken/
+ * setToken (localStorage + SameSite=Lax cookie) API was removed. All apps
+ * authenticate via HttpOnly session cookies or Authorization headers held
+ * in memory / platform-secure storage (Flutter secure_storage).
+ */
 export function setCookie(name: string, value: string, days = 7): void {
   if (!isBrowser) return;
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
@@ -15,39 +25,4 @@ export function setCookie(name: string, value: string, days = 7): void {
 export function removeCookie(name: string): void {
   if (!isBrowser) return;
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-}
-
-export function getToken(tokenKey: string): string | null {
-  if (!isBrowser) return null;
-  return localStorage.getItem(tokenKey) || getCookie(tokenKey);
-}
-
-export function setToken(tokenKey: string, token: string): void {
-  if (!isBrowser) return;
-  localStorage.setItem(tokenKey, token);
-  setCookie(tokenKey, token);
-}
-
-export function removeToken(tokenKey: string): void {
-  if (!isBrowser) return;
-  localStorage.removeItem(tokenKey);
-  removeCookie(tokenKey);
-}
-
-export function isTokenValid(token: string | null): boolean {
-  if (!token) return false;
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.exp * 1000 > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-export function parseJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    return JSON.parse(atob(token.split(".")[1]));
-  } catch {
-    return null;
-  }
 }

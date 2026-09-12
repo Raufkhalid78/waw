@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PostExXPayService } from "./xpay.service.js";
 import { PaymentMethod } from "../../types/index.js";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { logger } from "../../config/logger.js";
 
 export class PaymentController {
   /**
@@ -81,7 +82,9 @@ export class PaymentController {
       const result = await PostExXPayService.handleWebhook(req.body);
       res.json({ received: true, ...result });
     } catch (err: any) {
-      res.status(400).json({ error: err.message });
+      // Never echo provider/internal errors to the webhook caller.
+      logger.error("XPay webhook processing failed", { message: err?.message });
+      res.status(500).json({ error: "Webhook processing failed" });
     }
   }
 }

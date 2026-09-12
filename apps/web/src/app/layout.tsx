@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/layout/AppShell";
+import { Analytics } from "@/components/Analytics";
 
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-jakarta" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -63,6 +64,7 @@ export default function RootLayout({
       <body className="flex flex-col min-h-screen bg-slate-100/70 text-slate-950 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
         <Providers>
           <AppShell>{children}</AppShell>
+          <Analytics />
         </Providers>
       </body>
     </html>

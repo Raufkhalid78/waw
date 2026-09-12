@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@waw/config";
+import { isAdminPanelRole } from "@waw/types";
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -10,16 +11,28 @@ const API_BASE = (
 /**
  * Validate session by calling the API's server-authoritative session endpoint.
  * Never parse tokens locally — always trust the API's session verification.
+ * Short-TTL in-memory cache (30s) so every page navigation doesn't cost a
+ * serialized API round-trip; keyed by cookie value.
  */
+const SESSION_CACHE_TTL_MS = 30_000;
+const sessionCache = new Map<string, { result: { valid: boolean; role?: string }; expiresAt: number }>();
+
 async function validateSession(cookieHeader: string): Promise<{ valid: boolean; role?: string }> {
+  const cached = sessionCache.get(cookieHeader);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result;
+  }
   try {
     const res = await fetch(`${API_BASE}/api/auth/session/me`, {
       headers: { Cookie: cookieHeader },
       cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) return { valid: false };
     const data = await res.json();
-    return { valid: true, role: data.user?.role };
+    const result = { valid: true, role: data.user?.role as string | undefined };
+    sessionCache.set(cookieHeader, { result, expiresAt: Date.now() + SESSION_CACHE_TTL_MS });
+    return result;
   } catch {
     return { valid: false };
   }
@@ -36,7 +49,7 @@ export async function middleware(request: NextRequest) {
   if (isLoginPage) {
     if (sessionCookie) {
       const { valid, role } = await validateSession(cookieHeader);
-      if (valid && (role === "ADMIN" || role === "SUPER_ADMIN")) {
+      if (valid && isAdminPanelRole(role)) {
         return NextResponse.redirect(new URL("/", request.url));
       }
     }
@@ -56,7 +69,7 @@ export async function middleware(request: NextRequest) {
 
   const { valid, role } = await validateSession(cookieHeader);
 
-  if (!valid || (role !== "ADMIN" && role !== "SUPER_ADMIN")) {
+  if (!valid || !isAdminPanelRole(role)) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", request.nextUrl.pathname);
     const response = NextResponse.redirect(loginUrl);

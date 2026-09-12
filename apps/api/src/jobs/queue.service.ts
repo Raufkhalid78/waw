@@ -33,7 +33,13 @@ const redisConnection = {
   port: ENV.REDIS_PORT,
   password: ENV.REDIS_PASSWORD,
   tls: ENV.REDIS_TLS ? { rejectUnauthorized: true } : undefined,
-  maxRetriesPerRequest: null,
+  maxRetriesPerRequest: null, // required by BullMQ, but bounded by retryStrategy below
+  // Bounded reconnect: never wait longer than 10s between attempts so
+  // enqueues fail fast (and surface as HTTP 503) instead of hanging forever.
+  retryStrategy: (times: number) => (times <= 10 ? Math.min(times * 500, 10_000) : null),
+  enableOfflineQueue: false,
+  connectTimeout: 10_000,
+  commandTimeout: 10_000,
 };
 
 let wawQueue: Queue | null = null;
@@ -554,6 +560,20 @@ export class JobQueueManager {
       logger.error("Failed to purge dead-letter queue:", err.message);
       return 0;
     }
+  }
+}
+
+/**
+ * Close all BullMQ queues and the worker (used by graceful shutdown so the
+ * process can exit cleanly instead of being killed by the platform).
+ */
+export async function closeQueue(): Promise<void> {
+  try {
+    if (wawWorker) await wawWorker.close();
+    if (wawQueue) await wawQueue.close();
+    if (deadLetterQueue) await deadLetterQueue.close();
+  } catch (err: any) {
+    logger.warn("Error closing BullMQ connections:", err?.message || err);
   }
 }
 

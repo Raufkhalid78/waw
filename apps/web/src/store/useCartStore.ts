@@ -6,6 +6,7 @@ import { fetchWithCsrf } from "@/lib/csrf";
 import {
   calculateOrderSummary,
   MARKETPLACE_CONFIG,
+  MarketplacePricingOverrides,
   OrderCalculationResult,
   OrderItemPricingInput,
   PaymentMethod,
@@ -124,6 +125,7 @@ interface CartStore {
   language: "EN" | "UR";
   guestToken: string;
   isSyncing: boolean;
+  pricingOverrides: MarketplacePricingOverrides | null;
   login: (user: UserProfile) => void;
   logout: () => void;
   setSelectedCity: (city: string) => void;
@@ -139,6 +141,7 @@ interface CartStore {
   toggleWishlist: (item: CartItem) => void;
   isInWishlist: (productId: string) => boolean;
   setPaymentMethod: (method: PaymentMethod) => void;
+  setPricingOverrides: (overrides: MarketplacePricingOverrides | null) => void;
   getSummary: () => OrderCalculationResult;
   initGuestCart: () => Promise<void>;
   syncCart: () => Promise<void>;
@@ -153,6 +156,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   language: "EN",
   guestToken: "",
   isSyncing: false,
+  pricingOverrides: null,
 
   login: (user) => {
     set({ user });
@@ -268,8 +272,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
 
+  // Store runtime fee config from the server (marketplace_settings) so
+  // cart-page display math matches the server-authoritative quote even
+  // after an admin changes pricing without a redeploy.
+  setPricingOverrides: (pricingOverrides) => set({ pricingOverrides }),
+
   getSummary: () => {
-    const { items, paymentMethod } = get();
+    const { items, paymentMethod, pricingOverrides } = get();
     const pricingInputs: OrderItemPricingInput[] = items.map((i) => ({
       productId: i.productId,
       variantId: i.variantId,
@@ -278,6 +287,14 @@ export const useCartStore = create<CartStore>((set, get) => ({
       unitPricePkr: i.pricePkr,
       quantity: i.quantity,
     }));
-    return calculateOrderSummary(pricingInputs, paymentMethod);
+    return calculateOrderSummary(
+      pricingInputs,
+      paymentMethod,
+      pricingOverrides?.shippingFeePkr ?? MARKETPLACE_CONFIG.DEFAULT_SHIPPING_FEE_PKR,
+      pricingOverrides?.codFeePkr ?? MARKETPLACE_CONFIG.DEFAULT_COD_FEE_PKR,
+      0,
+      false,
+      pricingOverrides ?? undefined,
+    );
   },
 }));

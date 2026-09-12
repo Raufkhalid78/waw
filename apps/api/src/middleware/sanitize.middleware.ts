@@ -12,12 +12,14 @@ const HTML_ESCAPE_MAP: Record<string, string> = {
   ">": "&gt;",
   '"': "&quot;",
   "'": "&#x27;",
-  "/": "&#x2F;",
   "`": "&#96;",
 };
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"'\/`]/g, (char) => HTML_ESCAPE_MAP[char] || char);
+  // NOTE: "/" is intentionally NOT escaped — escaping it mangles legitimate
+  // data like addresses ("Karachi/DHA") and webhook payload fields that
+  // are later persisted verbatim. "/" carries no XSS risk in text contexts.
+  return value.replace(/[&<>"'`]/g, (char) => HTML_ESCAPE_MAP[char] || char);
 }
 
 function sanitizeObject(obj: any): any {
