@@ -11,7 +11,7 @@ waw/
 ├── apps/
 │   ├── web/          ← Next.js 14 Buyer Storefront (SSR, Urdu/EN, Free Delivery tracker)
 │   ├── admin/        ← Next.js 14 Custom Admin Control Center (KYC, GMV, COD Remittance)
-│   ├── api/          ← Express.js Core Backend (Supabase, PostEx XPay, WhatsApp, Typesense)
+│   ├── api/          ← Express.js Core Backend (Supabase, Bank Alfalah APG, PostEx, WhatsApp, Typesense)
 │   └── mobile/       ← Flutter iOS & Android App (BLoC, Urdu RTL, Offline Cart)
 ├── packages/
 │   ├── types/        ← Shared TypeScript Types, Enums & Pricing Calculation Engine
@@ -29,8 +29,7 @@ waw/
 | **Alfa Wallet (Bank Alfalah)** | REST API — **onsite checkout**, no redirect | Buyer enters wallet number + OTP on waw.com.pk                |
 | **Alfalah Bank Account**       | REST API — **onsite checkout**, no redirect | Buyer enters account number + OTAC on waw.com.pk              |
 | **Alfa Card (Visa/Mastercard)** | APG hosted page (PCI-mandated redirect) | Redirect to Bank Alfalah secure checkout, then auto-return    |
-| **PostEx XPay**               | Cards (Visa/Mastercard/PayPak) + Raast | Alternate gateway (optional)                                 |
-| **PostEx XPay Wallets**       | JazzCash & Easypaisa Mobile Wallets    | Aggregated wallet checkout                                    |
+| **Raast P2M QR**              | SBP instant payment — scan & pay       | Dynamic QR generated at checkout                               |
 | **Cash on Delivery (COD)**    | PostEx / TCS Express                   | **+PKR 100 Handling Surcharge** (offsets courier return risk) |
 | **Delivery Promotion**         | Nationwide Delivery                    | **FREE Delivery on all orders over PKR 5,000**               |
 
@@ -90,6 +89,6 @@ flutter run
 
 ## 🔒 Security & SBP Compliance
 
-- **SBP PSP Regulation:** PostEx XPay handles all cardholder and wallet data securely.
+- **SBP PSP Regulation:** Bank Alfalah APG (PCI-DSS certified) handles all cardholder and wallet data securely — card data never touches Waw servers.
 - **WhatsApp Direct Receipt:** Transaction receipts and courier live tracking are dispatched via WhatsApp.
 - **Data Integrity:** Supabase PostgreSQL with Row Level Security (RLS) ensures sellers only access their respective inventory and payout ledgers.
