@@ -50,14 +50,16 @@ export async function middleware(request: NextRequest) {
     if (sessionCookie) {
       const { valid, role } = await validateSession(cookieHeader);
       if (valid && isAdminPanelRole(role)) {
+        // Already authenticated — skip login and go straight to dashboard
         return NextResponse.redirect(new URL("/", request.url));
       }
-    }
-    const response = NextResponse.next();
-    if (sessionCookie) {
+      // Session cookie exists but is invalid/expired — clear it so the
+      // browser doesn't keep sending a dead token on every request.
+      const response = NextResponse.next();
       response.cookies.delete("waw_session");
+      return response;
     }
-    return response;
+    return NextResponse.next();
   }
 
   // All non-login routes require a valid ADMIN session
