@@ -1,6 +1,5 @@
 "use client";
 
-import { API_BASE_URL } from "@waw/config";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -23,14 +22,13 @@ export function ClientAuthGuard({
     }
 
     // waw_session is httpOnly — it can never be read from document.cookie.
-    // Ask the API server whether the session is valid (server-authoritative).
+    // Ask via the same-origin proxy (which reads the cookie server-side).
+    // A direct cross-origin fetch to api.waw.com.pk would strip the
+    // SameSite=Strict cookie and always return 401.
     let cancelled = false;
     async function checkSession() {
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/api/auth/session/me`,
-          { credentials: "include" },
-        );
+        const res = await fetch("/api/auth/session/me");
         if (cancelled) return;
         if (res.ok) {
           setAuthState("authorized");

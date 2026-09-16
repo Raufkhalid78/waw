@@ -1,6 +1,5 @@
 "use client";
 
-import { API_BASE_URL } from "@waw/config";
 import {
   createContext,
   useContext,
@@ -43,9 +42,9 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/auth/session/me`, {
-          credentials: "include",
-        });
+        // Same-origin proxy — HttpOnly SameSite=Strict cookies are always
+        // forwarded correctly. The proxy also handles silent token refresh.
+        const res = await fetch("/api/auth/session/me");
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
