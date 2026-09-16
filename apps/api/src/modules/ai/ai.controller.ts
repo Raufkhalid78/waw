@@ -18,7 +18,7 @@ export class AIController {
       // Check seller subscription status via stores table
       const { data: store } = await supabaseAdmin
         .from("stores")
-        .select("subscription_plan, subscription_active")
+        .select("id, subscription_plan, subscription_active")
         .eq("owner_id", user.id)
         .single();
 
@@ -37,8 +37,25 @@ export class AIController {
         user.id,
       );
 
-      // If product_id provided, update catalog_products
+      // If product_id provided, verify ownership (the caller's store must
+      // have an offer on this catalog product) before writing — prevents
+      // cross-seller product tampering (IDOR).
       if (product_id) {
+        const { data: ownedOffer } = await supabaseAdmin
+          .from("seller_offers")
+          .select("id")
+          .eq("catalog_product_id", product_id)
+          .eq("store_id", store.id)
+          .limit(1);
+
+        if (!ownedOffer || ownedOffer.length === 0) {
+          res.status(403).json({
+            error: "Product not found or not owned by your store",
+            code: "PRODUCT_OWNERSHIP_REQUIRED",
+          });
+          return;
+        }
+
         await supabaseAdmin
           .from("catalog_products")
           .update({ description })

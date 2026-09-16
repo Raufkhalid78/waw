@@ -27,7 +27,7 @@ DO $$ BEGIN CREATE TYPE "DiscountType" AS ENUM ('PERCENTAGE','FIXED_PKR','FREE_S
 -- 2. TABLES
 -- ============================================================================
 
--- ── Auth / Users ────────────────────────────────────────────────────────────
+-- - Auth / Users -
 
 CREATE TABLE IF NOT EXISTS profiles (
   id TEXT PRIMARY KEY,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Stores / Sellers ────────────────────────────────────────────────────────
+-- - Stores / Sellers -
 
 CREATE TABLE IF NOT EXISTS stores (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS stores (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Categories ──────────────────────────────────────────────────────────────
+-- - Categories -
 
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS category_schemas (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Catalog (Master Product Listings) ───────────────────────────────────────
+-- - Catalog (Master Product Listings) -
 
 CREATE TABLE IF NOT EXISTS catalog_products (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS catalog_products (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Seller Offers (Per-Store Listings) ──────────────────────────────────────
+-- - Seller Offers (Per-Store Listings) -
 
 CREATE TABLE IF NOT EXISTS seller_offers (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS seller_offers (
   UNIQUE(store_id, sku)
 );
 
--- ── Offer Variants ──────────────────────────────────────────────────────────
+-- - Offer Variants -
 
 CREATE TABLE IF NOT EXISTS offer_variants (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS offer_variants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Inventory Ledger (Double-Entry Balance) ─────────────────────────────────
+-- - Inventory Ledger (Double-Entry Balance) -
 
 CREATE TABLE IF NOT EXISTS inventory_ledger (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS inventory_ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Inventory Snapshots (Authoritative Balance for Locking) ─────────────────
+-- - Inventory Snapshots (Authoritative Balance for Locking) -
 -- Single row per offer_variant; locked FOR UPDATE by checkout RPC.
 -- Eliminates the zero-stock race window in the old aggregate approach.
 
@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS inventory_snapshots (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Legacy Products (pre-catalog, kept for migration compat) ────────────────
+-- - Legacy Products (pre-catalog, kept for migration compat) -
 
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Orders ──────────────────────────────────────────────────────────────────
+-- - Orders -
 
 CREATE TABLE IF NOT EXISTS serviceable_cities (
   city_name TEXT PRIMARY KEY,
@@ -280,7 +280,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Payments ────────────────────────────────────────────────────────────────
+-- - Payments -
 
 CREATE TABLE IF NOT EXISTS payments (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -294,7 +294,7 @@ CREATE TABLE IF NOT EXISTS payments (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Shipments ───────────────────────────────────────────────────────────────
+-- - Shipments -
 
 CREATE TABLE IF NOT EXISTS shipments (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -315,7 +315,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Payouts ─────────────────────────────────────────────────────────────────
+-- - Payouts -
 
 CREATE TABLE IF NOT EXISTS payouts (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -334,7 +334,7 @@ CREATE TABLE IF NOT EXISTS payouts (
   CONSTRAINT uq_payouts_store_order UNIQUE (store_order_id)
 );
 
--- ── Financial Ledger ────────────────────────────────────────────────────────
+-- - Financial Ledger -
 
 CREATE TABLE IF NOT EXISTS financial_ledger (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS financial_ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Reviews ─────────────────────────────────────────────────────────────────
+-- - Reviews -
 
 CREATE TABLE IF NOT EXISTS reviews (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -363,7 +363,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Coupons ─────────────────────────────────────────────────────────────────
+-- - Coupons -
 
 CREATE TABLE IF NOT EXISTS coupons (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -381,7 +381,7 @@ CREATE TABLE IF NOT EXISTS coupons (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Flash Sales ─────────────────────────────────────────────────────────────
+-- - Flash Sales -
 
 CREATE TABLE IF NOT EXISTS flash_sales (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -404,7 +404,7 @@ CREATE TABLE IF NOT EXISTS flash_sale_items (
   UNIQUE(flash_sale_id, variant_id)
 );
 
--- ── Addresses ───────────────────────────────────────────────────────────────
+-- - Addresses -
 
 CREATE TABLE IF NOT EXISTS addresses (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -420,7 +420,7 @@ CREATE TABLE IF NOT EXISTS addresses (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Carts ───────────────────────────────────────────────────────────────────
+-- - Carts -
 
 CREATE TABLE IF NOT EXISTS carts (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -441,7 +441,7 @@ CREATE TABLE IF NOT EXISTS cart_items (
   CONSTRAINT uq_cart_items UNIQUE (cart_id, product_id, variant_id)
 );
 
--- ── Returns (RMA) ───────────────────────────────────────────────────────────
+-- - Returns (RMA) -
 
 CREATE TABLE IF NOT EXISTS return_requests (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -467,7 +467,7 @@ CREATE TABLE IF NOT EXISTS return_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Support Tickets ─────────────────────────────────────────────────────────
+-- - Support Tickets -
 
 CREATE TABLE IF NOT EXISTS support_tickets (
   id TEXT PRIMARY KEY DEFAULT ('stk_' || gen_random_uuid()::text),
@@ -496,7 +496,7 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Audit Logs ──────────────────────────────────────────────────────────────
+-- - Audit Logs -
 
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -512,7 +512,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── CMS Content ─────────────────────────────────────────────────────────────
+-- - CMS Content -
 
 CREATE TABLE IF NOT EXISTS cms_content (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -525,7 +525,7 @@ CREATE TABLE IF NOT EXISTS cms_content (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Search Suggestions ──────────────────────────────────────────────────────
+-- - Search Suggestions -
 
 CREATE TABLE IF NOT EXISTS search_suggestions (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -537,7 +537,7 @@ CREATE TABLE IF NOT EXISTS search_suggestions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Campaigns / Promos ──────────────────────────────────────────────────────
+-- - Campaigns / Promos -
 
 CREATE TABLE IF NOT EXISTS campaigns (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -556,7 +556,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Marketplace Settings ────────────────────────────────────────────────────
+-- - Marketplace Settings -
 
 CREATE TABLE IF NOT EXISTS marketplace_settings (
   key TEXT PRIMARY KEY,
@@ -566,7 +566,7 @@ CREATE TABLE IF NOT EXISTS marketplace_settings (
   updated_by TEXT REFERENCES profiles(id) ON DELETE SET NULL
 );
 
--- ── Webhook Idempotency ─────────────────────────────────────────────────────
+-- - Webhook Idempotency -
 
 CREATE TABLE IF NOT EXISTS xpay_webhooks_log (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -576,7 +576,7 @@ CREATE TABLE IF NOT EXISTS xpay_webhooks_log (
   CONSTRAINT uq_xpay_webhooks_log_transaction_id UNIQUE (transaction_id)
 );
 
--- ── Outbox Events ───────────────────────────────────────────────────────────
+-- - Outbox Events -
 
 CREATE TABLE IF NOT EXISTS outbox_events (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
@@ -588,7 +588,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
   processed_at TIMESTAMPTZ
 );
 
--- ── Schema Migrations Ledger ────────────────────────────────────────────────
+-- - Schema Migrations Ledger -
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version TEXT PRIMARY KEY,

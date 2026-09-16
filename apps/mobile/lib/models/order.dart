@@ -63,14 +63,12 @@ class Order {
       discountPkr: _toDouble(json['discount_pkr']),
       totalAmountPkr: _toDouble(json['total_amount_pkr']),
       notes: json['notes'],
-      items: (json['items'] as List<dynamic>?)
-              ?.map((i) => OrderItem.fromJson(i))
-              .toList() ??
-          [],
-      shipments: (json['shipments'] as List<dynamic>?)
-              ?.map((s) => Shipment.fromJson(s))
-              .toList() ??
-          [],
+      // API shapes: GET /api/orders returns `order_items` (flat) plus nested
+      // store_orders(each with order_items) and shipments per store_order;
+      // GET /api/orders/:id nests items under store_orders as well. Accept
+      // every legacy alias so history renders with real data.
+      items: _itemsFromJson(json),
+      shipments: _shipmentsFromJson(json),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
           : null,
@@ -78,6 +76,63 @@ class Order {
           ? DateTime.tryParse(json['updated_at'])
           : null,
     );
+  }
+
+  /// Collects order items from every shape the API emits:
+  ///  - flat `order_items` / `items` (list endpoints)
+  ///  - nested `store_orders[*].order_items` (order detail)
+  static List<OrderItem> _itemsFromJson(Map<String, dynamic> json) {
+    final flat = (json['order_items'] ?? json['items']) as List<dynamic>?;
+    final fromStoreOrders = <OrderItem>[];
+    final storeOrders = json['store_orders'] as List<dynamic>?;
+    if (storeOrders is List) {
+      for (final so in storeOrders) {
+        if (so is Map<String, dynamic>) {
+          final soItems = (so['order_items'] ?? so['items']) as List<dynamic>?;
+          if (soItems is List) {
+            for (final it in soItems) {
+              if (it is Map<String, dynamic>) {
+                fromStoreOrders.add(OrderItem.fromJson(it));
+              }
+            }
+          }
+        }
+      }
+    }
+    final items = <OrderItem>[
+      ...(flat ?? []).whereType<Map<String, dynamic>>().map(OrderItem.fromJson),
+      ...fromStoreOrders,
+    ];
+    // Dedup by id (flat + nested can overlap on the detail endpoint).
+    final seen = <String>{};
+    return items.where((i) => seen.add(i.id)).toList();
+  }
+
+  /// Collects shipments from the top level and from nested store_orders.
+  static List<Shipment> _shipmentsFromJson(Map<String, dynamic> json) {
+    final flat = json['shipments'] as List<dynamic>?;
+    final fromStoreOrders = <Shipment>[];
+    final storeOrders = json['store_orders'] as List<dynamic>?;
+    if (storeOrders is List) {
+      for (final so in storeOrders) {
+        if (so is Map<String, dynamic>) {
+          final soShipments = so['shipments'] as List<dynamic>?;
+          if (soShipments is List) {
+            for (final s in soShipments) {
+              if (s is Map<String, dynamic>) {
+                fromStoreOrders.add(Shipment.fromJson(s));
+              }
+            }
+          }
+        }
+      }
+    }
+    final all = [
+      ...(flat ?? []).whereType<Map<String, dynamic>>().map(Shipment.fromJson),
+      ...fromStoreOrders,
+    ];
+    final seen = <String>{};
+    return all.where((s) => seen.add(s.id)).toList();
   }
 
   static double _toDouble(dynamic value) {

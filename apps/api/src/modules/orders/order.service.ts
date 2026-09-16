@@ -126,6 +126,19 @@ export class OrderService {
       // Verify the quote token is valid (signature check)
       quote = QuoteService.verifyQuoteToken(input.quoteToken);
 
+      // User-binding: a quote generated under an authenticated session
+      // carries the owner's userId (loyalty/coupon discount). A different
+      // caller replaying it would inherit that discount — reject the
+      // mismatch, and guest callers may not use a user-bound token at all.
+      if (quote.userId) {
+        if (!authenticatedUser) {
+          throw new Error("This checkout session belongs to an account. Please sign in to continue.");
+        }
+        if (authenticatedUser.id !== quote.userId) {
+          throw new Error("Checkout session does not belong to this account");
+        }
+      }
+
       // Create durable session if not already created
       const { session } = await CheckoutSessionService.beginSession({
         quoteToken: input.quoteToken,
@@ -453,7 +466,7 @@ export class OrderService {
 
     if (
       authenticatedUser &&
-      authenticatedUser.role !== "ADMIN" &&
+      !["ADMIN", "SUPER_ADMIN", "OPS_AGENT"].includes(authenticatedUser.role) &&
       order.buyer_id !== authenticatedUser.id
     ) {
       throw new Error("Forbidden");
@@ -581,7 +594,11 @@ export class OrderService {
       .single();
 
     if (orderErr || !order) throw new Error("Order not found");
-    if (order.buyer_id && order.buyer_id !== buyerId) {
+    // Ownership is mandatory: buyer_id orders must match the caller, and
+    // guest orders (buyer_id NULL) can never be disputed by an unrelated
+    // authenticated user — previously the check was skipped for guest
+    // orders, letting anyone freeze a seller's escrow payout (IDOR).
+    if (!order.buyer_id || order.buyer_id !== buyerId) {
       throw new Error("Unauthorized to file a dispute for this order");
     }
 

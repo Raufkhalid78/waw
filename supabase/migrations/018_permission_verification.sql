@@ -6,9 +6,9 @@
 
 BEGIN;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 1. VERIFY RLS IS ENABLED ON ALL SENSITIVE TABLES
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 DECLARE
@@ -52,9 +52,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 2. VERIFY ANON ROLE CANNOT EXECUTE PROTECTED RPCs
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 DECLARE
@@ -89,9 +89,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 3. VERIFY NO PLAINTEXT SECRETS IN TABLES
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 DECLARE
@@ -115,9 +115,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 4. VERIFY SEARCH PATH IS SET ON SECURITY DEFINER FUNCTIONS
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 DECLARE
@@ -144,9 +144,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 5. GRANT MINIMAL PERMISSIONS TO ANON ROLE
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 BEGIN
@@ -163,9 +163,9 @@ BEGIN
   RAISE NOTICE 'Anon role permissions verified: read-only on public catalog data';
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 6. VERIFY CHECKOUT/RETURN RPC PERMISSIONS
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 BEGIN
@@ -182,9 +182,9 @@ BEGIN
   RAISE NOTICE 'Checkout/return/cancel RPCs restricted to authenticated role';
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 7. VERIFY GUEST CHECKOUT IS PROPERLY RESTRICTED
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- NOTE: guest_checkout_transaction is created by migration 019 (which runs
 -- AFTER this file) and grants EXECUTE to anon/authenticated itself at the
@@ -195,9 +195,9 @@ BEGIN
   RAISE NOTICE 'Guest checkout permissions verified (grants are handled by migration 019)';
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 8. VERIFY OUTBOX EVENTS TABLE HAS PROPER RLS
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 BEGIN
@@ -215,9 +215,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 9. VERIFY MIGRATION VERSION TRACKING
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 BEGIN

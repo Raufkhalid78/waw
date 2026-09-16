@@ -20,6 +20,12 @@ const nextConfig = {
       { protocol: 'https', hostname: 'plus.unsplash.com' },
       { protocol: 'https', hostname: '**.supabase.co' },
       { protocol: 'https', hostname: '**.postex.pk' },
+      // Cloudflare R2 media (served via the bucket's custom domain) and the
+      // R2 storage endpoint itself (signed fetches by the API only, listed
+      // for completeness). Replace cdn.waw.com.pk with your R2 public domain.
+      { protocol: 'https', hostname: 'cdn.waw.com.pk' },
+      { protocol: 'https', hostname: '**.r2.cloudflarestorage.com' },
+      { protocol: 'https', hostname: '**.r2.dev' },
     ],
   },
   poweredByHeader: false,
@@ -47,6 +53,11 @@ const nextConfig = {
     const apiOrigin = apiUrl || "https://api.waw.com.pk";
     // Strip the scheme for CSP source form (api.example.com)
     const apiHost = apiOrigin.replace(/^https?:\/\//, "");
+    // Bank Alfalah APG hosted card page (PCI-mandated redirect). The checkout
+    // auto-submits a POST form to the bank — CSP form-action must allow it
+    // or card payments are silently blocked by the browser.
+    const apgHosts =
+      "https://sandbox.bankalfalah.com https://payments.bankalfalah.com";
     const connectSrc =
       isProd
         // Production: API server + Supabase (cross-origin cookies need this).
@@ -81,7 +92,9 @@ const nextConfig = {
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",
-              "form-action 'self'",
+              // Bank Alfalah APG hosted checkout is the ONLY allowed cross-origin
+              // form target (card payments POST there; the bank then redirects back).
+              `form-action 'self' ${apgHosts}`,
               "frame-ancestors 'none'",
               "upgrade-insecure-requests",
             ].join('; '),

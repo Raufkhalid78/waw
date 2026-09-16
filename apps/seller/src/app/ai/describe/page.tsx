@@ -1,13 +1,9 @@
 "use client";
 
 
-import { API_BASE_URL } from "@waw/config";
 import { useState } from "react";
 import { Sparkles, Copy, Check, AlertCircle } from "lucide-react";
-
-const API_BASE = (
-  API_BASE_URL
-).replace(/\/+$/, "");
+import { sellerFetch } from "@/lib/api";
 
 export default function AIDescribePage() {
   const [productName, setProductName] = useState("");
@@ -39,31 +35,26 @@ export default function AIDescribePage() {
         });
       }
 
-      const res = await fetch(`${API_BASE}/api/ai/generate-description`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          product_name: productName,
-          category,
-          attributes: attrs,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.code === "SUBSCRIPTION_REQUIRED") {
+      try {
+        const data = await sellerFetch<any>("/api/ai/generate-description", {
+          method: "POST",
+          body: JSON.stringify({
+            product_name: productName,
+            category,
+            attributes: attrs,
+          }),
+        });
+        setDescription(data.description);
+      } catch (err: any) {
+        const msg = err.message || "";
+        if (msg.includes("Pro or Enterprise")) {
           setError("Product Description Generator requires an active Pro or Enterprise subscription. Upgrade your plan to use this feature.");
-        } else if (data.code === "TOKEN_LIMIT_REACHED") {
+        } else if (msg.includes("AI daily limit") || msg.includes("TOKEN_LIMIT")) {
           setError("AI daily limit reached. Please try again tomorrow.");
         } else {
-          setError(data.error || "Failed to generate description");
+          setError(msg || "Failed to generate description");
         }
-        return;
       }
-
-      setDescription(data.description);
     } catch {
       setError("Network error. Please try again.");
     } finally {

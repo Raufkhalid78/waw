@@ -31,9 +31,8 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
         >
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
-        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative dark:hover:bg-slate-700">
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors dark:hover:bg-slate-700">
+          <Bell className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
     </header>

@@ -32,14 +32,19 @@ export class SearchService {
 
     // 1. Attempt Typesense Search first if available
     try {
+      // Filter-grammar injection guard: categoryId/storeId come from query
+      // params — raw values let callers splice `&&`, `:=`, `:!=` into the
+      // filter string. Only allow plain UUID-ish tokens through.
+      const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
       const filterConditions: string[] = [];
-      if (params.categoryId)
+      if (params.categoryId && SAFE_ID.test(params.categoryId))
         filterConditions.push(`categoryId:=${params.categoryId}`);
-      if (params.storeId) filterConditions.push(`storeId:=${params.storeId}`);
-      if (params.minPrice !== undefined)
-        filterConditions.push(`basePricePkr:>=${params.minPrice}`);
-      if (params.maxPrice !== undefined)
-        filterConditions.push(`basePricePkr:<=${params.maxPrice}`);
+      if (params.storeId && SAFE_ID.test(params.storeId))
+        filterConditions.push(`storeId:=${params.storeId}`);
+      if (params.minPrice !== undefined && Number.isFinite(params.minPrice))
+        filterConditions.push(`basePricePkr:>=${Math.max(0, params.minPrice)}`);
+      if (params.maxPrice !== undefined && Number.isFinite(params.maxPrice))
+        filterConditions.push(`basePricePkr:<=${Math.max(0, params.maxPrice)}`);
 
       const typesenseQ = isWildcard ? "*" : searchTerms.join(" ");
 
@@ -67,7 +72,7 @@ export class SearchService {
             id, price_pkr, original_price_pkr, condition, is_express, status,
             catalog_product:catalog_products!inner(id, title, title_urdu, slug, description, attributes, images, thumbnail, category_id, is_active, category:categories(id, name, name_urdu, slug)),
             store:stores!inner(id, name, slug, logo_url, city, rating_average, seller_type),
-            variants:offer_variants(id, variant_name, price_adjustment_pkr)
+            variants:offer_variants(id, variant_name, price_adjustment_pkr, stock_quantity)
           `)
           .in("catalog_product.id", productIds)
           .eq("status", "ACTIVE")
@@ -109,7 +114,7 @@ export class SearchService {
           offers:seller_offers!inner(
             id, sku, price_pkr, original_price_pkr, condition, is_express, status, store_id,
             store:stores!inner(id, name, slug, logo_url, city, rating_average, seller_type),
-            variants:offer_variants(id, variant_name, price_adjustment_pkr)
+            variants:offer_variants(id, variant_name, price_adjustment_pkr, stock_quantity)
           )
         `, { count: "exact" })
         .eq("is_active", true)

@@ -37,7 +37,7 @@ export class ProductService {
         is_express,
         catalog_product:catalog_products!inner(id, title, slug, thumbnail, images, category_id, is_active, rating_average, rating_count),
         store:stores!inner(id, name, slug, city, rating_average, seller_type),
-        variants:offer_variants(id, variant_name, price_adjustment_pkr)
+        variants:offer_variants(id, variant_name, price_adjustment_pkr, stock_quantity)
       `, { count: "exact" })
       .eq("status", "ACTIVE")
       .eq("catalog_product.is_active", true);
@@ -136,6 +136,22 @@ export class ProductService {
       }
     }
 
+    // Best-seller rank (cached) powers soldCount so "Most Popular" sorts and
+    // "X+ bought" chips reflect real purchase signals instead of a
+    // hardcoded 0.
+    let soldCountMap = new Map<string, number>();
+    try {
+      const sales = await supabaseAdmin.rpc("aggregate_product_sales", {
+        since_date: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+        result_limit: 500,
+      });
+      soldCountMap = new Map(
+        ((sales.data as any[]) || []).map((s: any) => [s.product_id, Number(s.total_quantity ?? s.total_sold ?? 0)]),
+      );
+    } catch {
+      // Aggregation unavailable — soldCount stays 0 (honest default).
+    }
+
     // Map to frontend expectation (product-centric view)
     const mappedItems = items.map((offer: any) => ({
       id: offer.id,
@@ -147,8 +163,8 @@ export class ProductService {
         : offer.catalog_product.thumbnail,
       pricePkr: offer.price_pkr,
       originalPricePkr: offer.original_price_pkr,
-      discountPercent: offer.original_price_pkr 
-        ? Math.round(((offer.original_price_pkr - offer.price_pkr) / offer.original_price_pkr) * 100) 
+      discountPercent: offer.original_price_pkr
+        ? Math.round(((offer.original_price_pkr - offer.price_pkr) / offer.original_price_pkr) * 100)
         : 0,
       storeId: offer.store.id,
       storeName: offer.store.name,
@@ -156,19 +172,86 @@ export class ProductService {
       sellerType: offer.store.seller_type,
       rating: offer.catalog_product.rating_average || offer.store.rating_average,
       reviewsCount: offer.catalog_product.rating_count || 0,
-      soldCount: 0,
+      soldCount: soldCountMap.get(offer.catalog_product.id) || 0,
       isExpress: offer.is_express,
       isFeaturedStore: !query.sortBy && featuredStoreIds.has(offer.store?.id),
       createdAt: offer.catalog_product.created_at,
       variants: offer.variants
     }));
 
+    // - Facets (CU-7): real category list, seller cities and DB price
+    // range computed server-side — the web's filter panel previously got
+    // `facets: {}` (empty selects, default price bounds) every time.
+    const facets: {
+      categories: string[];
+      cities: string[];
+      minPrice: number;
+      maxPrice: number;
+      sellerTypes: string[];
+    } = {
+      categories: [],
+      cities: [],
+      minPrice: 0,
+      maxPrice: 500000,
+      sellerTypes: ["FIRST_PARTY", "THIRD_PARTY"],
+    };
+
+    try {
+      const [catRes, rangeRes] = await Promise.all([
+        supabaseAdmin
+          .from("categories")
+          .select("name")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
+          .limit(50),
+        supabaseAdmin
+          .from("seller_offers")
+          .select("price_pkr")
+          .eq("status", "ACTIVE")
+          .order("price_pkr", { ascending: true })
+          .limit(1),
+      ]);
+      // Category NAMES (the web filter panel renders a string list).
+      facets.categories = (catRes.data || []).map((c: any) => c.name).filter(Boolean);
+
+      // Price bounds: cheapest + most expensive ACTIVE offer.
+      const { data: maxRow } = await supabaseAdmin
+        .from("seller_offers")
+        .select("price_pkr")
+        .eq("status", "ACTIVE")
+        .order("price_pkr", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const minRow = (rangeRes.data || [])[0];
+      if (minRow?.price_pkr !== undefined) facets.minPrice = Number(minRow.price_pkr);
+      if (maxRow?.price_pkr !== undefined) facets.maxPrice = Number(maxRow.price_pkr);
+
+      // Distinct seller cities from ACTIVE stores.
+      const { data: cityRows } = await supabaseAdmin
+        .from("stores")
+        .select("city")
+        .eq("status", "ACTIVE")
+        .order("city", { ascending: true });
+      facets.cities = [...new Set((cityRows || []).map((r: any) => r.city).filter(Boolean))] as string[];
+    } catch (facetErr: any) {
+      logger.warn("Facet computation failed — returning page-local facets", { error: facetErr?.message });
+      // Degrade honestly: derive what we can from the current page.
+      facets.cities = [...new Set(items.map((o: any) => o.store?.city).filter(Boolean))] as string[];
+      if (items.length > 0) {
+        const prices = items.map((o: any) => Number(o.price_pkr || 0)).filter((p) => p > 0);
+        if (prices.length > 0) {
+          facets.minPrice = Math.min(...prices);
+          facets.maxPrice = Math.max(...prices);
+        }
+      }
+    }
+
     return {
       items: mappedItems,
       total: count || 0,
       page,
       totalPages: Math.ceil((count || 0) / limit),
-      facets: {}
+      facets
     };
   }
 
@@ -186,7 +269,7 @@ export class ProductService {
         offers:seller_offers(
           id, sku, price_pkr, original_price_pkr, condition, is_express, status,
           store:stores(id, name, slug, logo_url, city, rating_average, seller_type),
-          variants:offer_variants(id, variant_name, price_adjustment_pkr)
+          variants:offer_variants(id, variant_name, price_adjustment_pkr, stock_quantity)
         )
       `)
       .eq("is_active", true);
@@ -267,7 +350,7 @@ export class ProductService {
         id, sku, price_pkr, original_price_pkr, condition, is_express, status,
         catalog_product:catalog_products(id, title, title_urdu, slug, description, attributes, images, thumbnail, category:categories(id, name, name_urdu, slug)),
         store:stores(id, name, slug, logo_url, city, rating_average, seller_type),
-        variants:offer_variants(id, variant_name, price_adjustment_pkr)
+        variants:offer_variants(id, variant_name, price_adjustment_pkr, stock_quantity)
       `);
 
     if (isUUID) {
@@ -673,7 +756,7 @@ export class ProductService {
     return { success: true, offerId };
   }
 
-  // ── Badge computation ─────────────────────────────────────────────────────
+  // - Badge computation -
   // Server-side badge logic: every product list/detail response includes a
   // `badges` array so the frontend renders consistently without re-deriving.
 
@@ -833,7 +916,7 @@ export class ProductService {
         id, price_pkr, original_price_pkr, is_express, status,
         catalog_product:catalog_products!inner(id, title, title_urdu, slug, thumbnail, images, is_active, rating_average, rating_count, created_at),
         store:stores!inner(id, name, slug, city, rating_average, seller_type),
-        variants:offer_variants(id, variant_name, price_adjustment_pkr)
+        variants:offer_variants(id, variant_name, price_adjustment_pkr, stock_quantity)
       `)
       .in("catalog_product_id", productIds)
       .eq("status", "ACTIVE")

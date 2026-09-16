@@ -34,11 +34,13 @@ export default function StoresPage() {
   const approveMutation = useMutation({
     mutationFn: storesApi.approve,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-stores"] }),
+    onError: (err: any) => setActionError(err?.message || "Failed to approve store"),
   });
 
   const rejectMutation = useMutation({
     mutationFn: storesApi.reject,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-stores"] }),
+    onError: (err: any) => setActionError(err?.message || "Failed to reject store"),
   });
 
   const commissionMutation = useMutation({
@@ -88,14 +90,18 @@ export default function StoresPage() {
     }
   };
 
-  const totalPages = Math.ceil((data?.total ?? 0) / 20);
+  // The API returns { sellers, pagination } — derive the display rows/total
+  // from either shape so the page never shows a false "No stores found".
+  const storeRows = (data?.sellers ?? (data as any)?.stores ?? []) as any[];
+  const storeTotal = (data?.pagination?.total ?? (data as any)?.total ?? 0) as number;
+  const totalPages = Math.ceil(storeTotal / 20);
 
   return (
     <div className="space-y-5">
       <FadeIn>
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900">Stores</h1>
-          {data && <span className="text-sm text-gray-500">{data.total} total</span>}
+          {data && <span className="text-sm text-gray-500">{storeTotal} total</span>}
         </div>
       </FadeIn>
 
@@ -138,7 +144,7 @@ export default function StoresPage() {
                 </div>
               ))}
             </div>
-          ) : !data?.stores || data.stores.length === 0 ? (
+          ) : storeRows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
                 <Inbox className="w-6 h-6 text-gray-400" />
@@ -161,7 +167,7 @@ export default function StoresPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.stores.map((store: any, i: number) => (
+                  {storeRows.map((store: any, i: number) => (
                     <tr
                       key={store.id}
                       className="opacity-0 animate-[fadeIn_300ms_ease-out_forwards]"
@@ -239,14 +245,22 @@ export default function StoresPage() {
                           {(store.status === "PENDING" || store.status === "PENDING_KYC") && (
                             <>
                               <button
-                                onClick={() => approveMutation.mutate(store.id)}
+                                onClick={() => {
+                                  if (confirm(`Approve store "${store.name}"? This activates the seller.`)) {
+                                    approveMutation.mutate(store.id);
+                                  }
+                                }}
                                 className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors active:scale-95"
                                 title="Approve"
                               >
                                 <Check className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => rejectMutation.mutate(store.id)}
+                                onClick={() => {
+                                  if (confirm(`Reject store "${store.name}"? The seller will not be able to sell.`)) {
+                                    rejectMutation.mutate(store.id);
+                                  }
+                                }}
                                 className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors active:scale-95"
                                 title="Reject"
                               >

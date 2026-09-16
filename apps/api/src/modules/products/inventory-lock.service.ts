@@ -28,7 +28,8 @@ export class InventoryLockService {
     const productLockKeys: string[] = [];
     for (const item of items) {
       const productLockKey = `LOCK:CHECKOUT:${item.productId}:${item.variantId || "default"}`;
-      const acquired = await redis.set(productLockKey, "1", "NX", "EX", 5);
+      // Options-object form works on both Upstash REST and ioredis.
+      const acquired = await redis.set(productLockKey, "1", { nx: true, ex: 5 });
       if (!acquired) {
         logger.warn(`Could not acquire checkout lock for product ${item.productId} — concurrent checkout in progress`);
         if (productLockKeys.length > 0) {
@@ -63,8 +64,7 @@ export class InventoryLockService {
           await redis.set(
             reservationKey,
             item.quantity.toString(),
-            "EX",
-            this.LOCK_EXPIRY_SECONDS,
+            { ex: this.LOCK_EXPIRY_SECONDS },
           );
           reservationKeys.push(reservationKey);
         } catch (err) {

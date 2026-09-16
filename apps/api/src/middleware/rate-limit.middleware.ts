@@ -1,68 +1,102 @@
 import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
-import { Redis } from "ioredis";
+import { redis as sharedRedis } from "../config/redis.js";
 import { ENV } from "../config/env.js";
 import { logger } from "../config/logger.js";
 
-// Setup ioredis client using dedicated TCP Redis credentials.
-// NOTE: Upstash REST tokens are NOT Redis passwords — the rate limiter (like
-// BullMQ) needs a real TCP endpoint (REDIS_HOST/PORT/PASSWORD). Upstash
-// exposes one on the same dashboard ("Connect via Redis").
-const redisClient =
-  ENV.REDIS_HOST && ENV.REDIS_PORT
-    ? new Redis({
-        host: ENV.REDIS_HOST,
-        port: ENV.REDIS_PORT,
-        password: ENV.REDIS_PASSWORD,
-        // Upstash and most managed providers terminate TLS on 6379
-        tls: ENV.REDIS_TLS ? { rejectUnauthorized: true } : undefined,
-        lazyConnect: true,
-        maxRetriesPerRequest: 1,
-        enableOfflineQueue: false,
-      })
-    : undefined;
-
-if (redisClient) {
-  redisClient.connect().catch((err) => {
-    logger.warn(
-      "⚠️ Rate limiter Redis connection error, will use in-memory fallback:",
-      err.message,
-    );
-  });
-}
+// Rate limiting store — same backing store as sessions/OTP/idempotency.
+//
+// The shared `redis` export in config/redis.ts is either the Upstash REST
+// client (production/staging) or the in-memory fallback (dev/test). Both
+// speak the same command surface (get/set/eval/del) that rate-limit-redis
+// needs, so the limiter reuses it directly.
+//
+// NOTE: the previous implementation opened a SEPARATE ioredis TCP connection
+// using REDIS_HOST/REDIS_PORT + REDIS_PASSWORD. For Upstash deployments the
+// REST token is NOT a TCP password, so that connection could never
+// authenticate: it stayed in a failed state and made EVERY rate-limited
+// request throw "Stream isn't writeable and enableOfflineQueue options is
+// false" (HTTP 500) — the cart routes were hard-down in production because
+// of it.
+const rateLimitRedis: any = sharedRedis;
 
 const defaultKeyGenerator = (req: any) => req.ip || "unknown";
 
 const isProduction = ENV.NODE_ENV === "production";
 
 /**
- * Returns a RedisStore if Redis is configured, otherwise falls back to
- * express-rate-limit's in-memory store (per-instance limits). The in-memory
- * fallback is intentional: blocking ALL traffic because the shared store is
- * missing would take the entire API down, which is worse than per-instance
- * rate limiting. A loud warning is logged in production so the operator
- * knows limits are per-instance.
+ * Returns a RedisStore backed by the shared Upstash REST client (production/
+ * staging), or undefined to let express-rate-limit use its built-in
+ * per-instance memory store (dev/test). Blocking ALL traffic because the
+ * shared store is missing would take the entire API down, which is worse
+ * than per-instance rate limiting.
+ *
+ * rate-limit-redis v6 issues raw RESP commands:
+ *   SCRIPT LOAD <lua>          → returns the script's SHA1
+ *   EVALSHA <sha> 1 <key> ...  → run script; throws NOSCRIPT if not cached
+ * The Upstash REST client exposes these as scriptLoad()/evalsha(), so we
+ * translate command-by-command. This replaces a previous implementation
+ * that opened a SEPARATE ioredis TCP connection using the Upstash REST
+ * token as a password — it could never authenticate, stayed in a failed
+ * state, and made every rate-limited request throw "Stream isn't
+ * writeable" (HTTP 500). The cart routes were hard-down in production
+ * because of it.
  */
-let warnedNoRedis = false;
+const isUpstashRestClient = (c: any): boolean =>
+  typeof c?.scriptLoad === "function" && typeof c?.evalsha === "function";
+
+let warnedNotShared = false;
 function getStore(prefix: string) {
-  if (redisClient) {
-    return new RedisStore({
-      sendCommand: (...args: string[]) =>
-        redisClient.call(args[0], ...args.slice(1)) as any,
-      prefix,
-    });
+  if (!isUpstashRestClient(rateLimitRedis)) {
+    if (isProduction && !warnedNotShared) {
+      warnedNotShared = true;
+      logger.warn(
+        "RATE LIMITER: shared Upstash Redis not configured — falling back to per-instance in-memory rate limiting.",
+      );
+    }
+    // Dev/test memory fallback → express-rate-limit's built-in store is
+    // the same thing, but battle-tested. No emulation needed.
+    return undefined;
   }
-  if (isProduction && !warnedNoRedis) {
-    warnedNoRedis = true;
-    logger.warn(
-      "RATE LIMITER: TCP Redis is not configured — falling back to in-memory rate limiting (per-instance). Configure REDIS_HOST/REDIS_PORT/REDIS_PASSWORD (Upstash 'Connect via Redis' endpoint) for shared limits across instances.",
-    );
-  }
-  return undefined;
+
+  return new RedisStore({
+    sendCommand: (...commandParts: unknown[]) => {
+      const parts = commandParts as (string | number)[];
+      const cmd = String(parts[0]).toUpperCase();
+      const args = parts.slice(1);
+
+      switch (cmd) {
+        case "SCRIPT":
+          // ["SCRIPT", "LOAD", <lua>] → scriptLoad(lua)
+          return rateLimitRedis.scriptLoad(String(args[1]));
+        case "EVALSHA": {
+          // ["EVALSHA", sha, numkeys, key, ...rest] → evalsha(sha, [keys], [args])
+          const sha = String(args[0]);
+          const keyCount = parseInt(String(args[1]), 10) || 1;
+          const keys = args.slice(2, 2 + keyCount).map(String);
+          const evalArgs = args.slice(2 + keyCount).map(String);
+          return rateLimitRedis.evalsha(sha, keys, evalArgs);
+        }
+        case "EVAL": {
+          // ["EVAL", lua, numkeys, key, ...rest] → eval(lua, [keys], [args])
+          const lua = String(args[0]);
+          const keyCount = parseInt(String(args[1]), 10) || 1;
+          const keys = args.slice(2, 2 + keyCount).map(String);
+          const evalArgs = args.slice(2 + keyCount).map(String);
+          return rateLimitRedis.eval(lua, keys, evalArgs);
+        }
+        default:
+          return Promise.reject(
+            new Error(`rate limiter: unsupported redis command ${parts[0]}`),
+          );
+      }
+    },
+    prefix,
+  });
 }
 
 /**
- * Strict rate limiter for WhatsApp OTP requests (5 requests per 15 minutes per IP/Phone)
+ * Strict rate limiter for WhatsApp OTP requests (5 requests per 15 minutes per IP)
  */
 export const otpRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -76,6 +110,33 @@ export const otpRateLimiter = rateLimit({
   message: {
     error:
       "Too many OTP requests from this IP. Please try again after 15 minutes.",
+  },
+});
+
+/**
+ * Per-destination-phone OTP send cap (3 per hour per normalized phone).
+ * The IP-keyed otpRateLimiter above can't stop a rotating-IP attacker from
+ * SMS-bombing one victim number — each send also silently replaces the
+ * victim's in-flight OTP, locking them out of login.
+ */
+export const otpPhoneRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => {
+    let phone: string = req.body?.phone || "";
+    phone = phone.replace(/[\s-]/g, "");
+    if (/^0\d{9,12}$/.test(phone)) phone = `+92${phone.replace(/^0+/, "")}`;
+    else if (/^\d{9,12}$/.test(phone)) phone = `+92${phone}`;
+    return `phone:${phone || "none"}`;
+  },
+  passOnStoreError: true,
+  store: getStore("rl_otp_phone:"),
+  message: {
+    error:
+      "Too many OTP requests for this phone number. Please try again after an hour.",
   },
 });
 
@@ -97,7 +158,10 @@ export const apiRateLimiter = rateLimit({
 });
 
 /**
- * Cart rate limiter (30 requests per minute per guest token or user)
+ * Cart rate limiter (30 requests per minute per user or IP)
+ * NOTE: the key deliberately EXCLUDES the client-supplied guestToken — an
+ * attacker could mint a fresh random token per request to get a fresh bucket.
+ * Keying on session user or IP keeps the limit unspoofable.
  */
 export const cartRateLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -106,9 +170,8 @@ export const cartRateLimiter = rateLimit({
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => {
-    const guestToken = req.body?.guestToken || req.query?.guestToken || "";
     const userId = (req as any).user?.id || "";
-    return guestToken || userId || defaultKeyGenerator(req);
+    return userId || defaultKeyGenerator(req);
   },
   store: getStore("rl_cart:"),
   message: {
@@ -159,8 +222,11 @@ export const wishlistRateLimiter = rateLimit({
 });
 
 /**
- * Login rate limiter (10 attempts per 15 minutes per IP)
- * Prevents brute force attacks on authentication endpoints
+ * Login rate limiter (10 attempts per 15 minutes per email+IP)
+ * Prevents brute force attacks on authentication endpoints.
+ * Keyed on email+IP: behind the Next.js proxies every request arrives from
+ * the proxy's IP, so an IP-only key let one attacker lock out ALL admins
+ * (shared bucket). The composite key isolates each attacker to their own.
  */
 export const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -170,10 +236,14 @@ export const loginRateLimiter = rateLimit({
   validate: { keyGeneratorIpFallback: false },
   // Degrade to pass-through (not 500) if the shared Redis store errors out.
   passOnStoreError: true,
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    return email ? `${defaultKeyGenerator(req)}:${email}` : defaultKeyGenerator(req);
+  },
   store: getStore("rl_login:"),
   message: {
     error:
-      "Too many login attempts from this IP. Please try again after 15 minutes.",
+      "Too many login attempts. Please try again after 15 minutes.",
   },
 });
 
@@ -188,7 +258,14 @@ export const otpVerifyRateLimiter = rateLimit({
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => {
-    const phone = req.body?.phone || "";
+    // Normalize the phone exactly like auth.service.ts does before hitting
+    // Redis: +92XXXXXXXXXX. Keying on the raw body let attackers bypass the
+    // per-phone limit by alternating "0300…", "+9230…", "9230…" formats —
+    // three buckets for one OTP key.
+    let phone: string = req.body?.phone || "";
+    phone = phone.replace(/[\s-]/g, "");
+    if (/^0\d{9,12}$/.test(phone)) phone = `+92${phone.replace(/^0+/, "")}`;
+    else if (/^\d{9,12}$/.test(phone)) phone = `+92${phone}`;
     return phone || defaultKeyGenerator(req);
   },
   store: getStore("rl_otp_verify:"),

@@ -44,12 +44,12 @@ DECLARE
   v_proportional_cod_fee NUMERIC;
   v_line_subtotal NUMERIC;
 BEGIN
-  -- ── P0-3: Verify caller identity ────────────────────────────────────────
+  -- - P0-3: Verify caller identity -
   IF p_buyer_id IS NULL OR p_buyer_id != auth.uid()::TEXT THEN
     RAISE EXCEPTION 'Unauthorized: buyer identity mismatch';
   END IF;
 
-  -- ── P0-5: Lock order row to prevent concurrent status changes ───────────
+  -- - P0-5: Lock order row to prevent concurrent status changes -
   SELECT * INTO v_order
   FROM orders
   WHERE id = p_order_id
@@ -83,7 +83,7 @@ BEGIN
     RAISE EXCEPTION 'At least one item must be specified for return';
   END IF;
 
-  -- ── Calculate proportional shipping and COD fee per line ─────────────────
+  -- - Calculate proportional shipping and COD fee per line -
   -- Total line subtotal for proportional allocation
   v_line_subtotal := 0;
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
@@ -103,11 +103,11 @@ BEGIN
     v_line_subtotal := GREATEST(v_total_order_sub, 1);
   END;
 
-  -- ── P0-4: Process items with seller-level grouping ──────────────────────
+  -- - P0-4: Process items with seller-level grouping -
   -- First pass: validate all items and accumulate per-seller totals
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
-    -- ── P0-5: Lock order item row to prevent concurrent over-returns ──────
+    -- - P0-5: Lock order item row to prevent concurrent over-returns -
     SELECT oi.*, so.store_id INTO v_order_item
     FROM order_items oi
     JOIN store_orders so ON so.id = oi.store_order_id
@@ -132,7 +132,7 @@ BEGIN
       RAISE EXCEPTION 'Duplicate order item % in return request', v_item->>'order_item_id';
     END IF;
 
-    -- ── P0-4: Check not already returned ───────────────────────────────
+    -- - P0-4: Check not already returned -
     SELECT COALESCE(SUM(ri.quantity), 0) INTO v_already_returned_qty
     FROM return_items ri
     JOIN return_requests rr ON rr.id = ri.return_request_id
@@ -193,7 +193,7 @@ BEGIN
     NOW(), NOW()
   );
 
-  -- ── P0-4: Create seller-level child return requests ────────────────────
+  -- - P0-4: Create seller-level child return requests -
   -- Group items by store_order_id (seller) and create per-seller return tracking
   FOR v_store_order IN
     SELECT DISTINCT

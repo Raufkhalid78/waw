@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { LanguageProvider } from "@/components/ui/LanguageProvider";
+import { ConsentProvider } from "@/components/consent/ConsentProvider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -23,7 +24,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
-          {children}
+          <ConsentProvider>{children}</ConsentProvider>
         </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>

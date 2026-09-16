@@ -31,13 +31,28 @@ export class AdminController {
     try {
       const { id } = req.params;
       const { status, commissionRatePercentage, commission_rate_percentage } = req.body;
-      const updated = await AdminService.updateSellerStatus(
-        id,
-        status,
-        commissionRatePercentage !== undefined
-          ? commissionRatePercentage
-          : commission_rate_percentage,
-      );
+      const commission = commissionRatePercentage !== undefined
+        ? commissionRatePercentage
+        : commission_rate_percentage;
+
+      // Server-side bounds (mirrors the panel's client clamp): commission is
+      // money-critical and was previously accepted at any value (9999, -5).
+      if (commission !== undefined && commission !== null) {
+        if (typeof commission !== "number" || !Number.isFinite(commission) ||
+            commission < 0 || commission > 50) {
+          res.status(400).json({
+            error: "Commission rate must be a number between 0 and 50 percent",
+          });
+          return;
+        }
+      }
+      const validStatuses = ["ACTIVE", "SUSPENDED", "PENDING", "PENDING_KYC", "REJECTED"];
+      if (status !== undefined && !validStatuses.includes(status)) {
+        res.status(400).json({ error: `Invalid store status "${status}"` });
+        return;
+      }
+
+      const updated = await AdminService.updateSellerStatus(id, status, commission);
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -46,10 +61,11 @@ export class AdminController {
 
   static async listPayouts(req: Request, res: Response): Promise<void> {
     try {
-      const { page = "1", limit = "50" } = req.query;
+      const { page = "1", limit = "50", status } = req.query;
       const payouts = await AdminService.listPayouts(
         parseInt(page as string),
         parseInt(limit as string),
+        status as string | undefined,
       );
       res.json(payouts);
     } catch (err: any) {
@@ -61,8 +77,18 @@ export class AdminController {
     try {
       const { id } = req.params;
       const { bankReference } = req.body;
+      // Bank reference becomes the immutable gateway_reference — validate
+      // shape server-side (client prompt() accepts anything).
+      const ref = String(bankReference || "").trim();
+      if (!ref || ref.length < 3 || ref.length > 100 || !/^[\w\-.\/ ]+$/.test(ref)) {
+        res.status(400).json({
+          error: "A valid bank/transfer reference (3–100 characters, letters/digits/dashes) is required",
+        });
+        return;
+      }
       const adminId = (req as any).user?.id;
-      const settled = await AdminService.settlePayout(id, bankReference, adminId);
+      const adminRole = (req as any).user?.role || "ADMIN";
+      const settled = await AdminService.settlePayout(id, ref, adminId, adminRole);
       res.json(settled);
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -145,11 +171,12 @@ export class AdminController {
 
   static async listAllUsers(req: Request, res: Response): Promise<void> {
     try {
-      const { page, limit, role } = req.query;
+      const { page, limit, role, search } = req.query;
       const result = await AdminService.listAllUsers({
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
         role: role as string,
+        search: search as string,
       });
       res.json(result);
     } catch (err: any) {
@@ -349,7 +376,7 @@ export class AdminController {
     }
   }
 
-  // ── Flash Sales ────────────────────────────────────────────────────────
+  // - Flash Sales -
 
   static async listFlashSales(req: Request, res: Response): Promise<void> {
     try {
@@ -414,7 +441,7 @@ export class AdminController {
     }
   }
 
-  // ── Banners ────────────────────────────────────────────────────────────
+  // - Banners -
 
   static async listBanners(req: Request, res: Response): Promise<void> {
     try {
@@ -454,7 +481,7 @@ export class AdminController {
     }
   }
 
-  // ── Categories ─────────────────────────────────────────────────────────
+  // - Categories -
 
   static async listCategories(req: Request, res: Response): Promise<void> {
     try {
@@ -494,7 +521,7 @@ export class AdminController {
     }
   }
 
-  // ── Cart Abandonment Recovery ───────────────────────────────────────────
+  // - Cart Abandonment Recovery -
 
   static async processAbandonedCarts(req: Request, res: Response): Promise<void> {
     try {

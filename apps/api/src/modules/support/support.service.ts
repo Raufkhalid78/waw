@@ -336,6 +336,21 @@ export class SupportService {
     },
     adminId?: string,
   ) {
+    // Reject unknown resolution values up-front — previously a mismatched
+    // enum from the admin panel silently closed the ticket WITHOUT executing
+    // the refund or payout hold (money-path no-op).
+    const VALID_RESOLUTIONS: DisputeResolution[] = [
+      "REFUND_BUYER",
+      "RELEASE_SELLER_PAYOUT",
+      "REPLACEMENT_ISSUED",
+      "DISMISSED",
+    ];
+    if (!VALID_RESOLUTIONS.includes(input.resolution)) {
+      throw new Error(
+        `Invalid resolution "${input.resolution}". Must be one of: ${VALID_RESOLUTIONS.join(", ")}`,
+      );
+    }
+
     const { data: previousTicket } = await supabaseAdmin
       .from("support_tickets")
       .select("*, order:orders(*, store_orders(*))")

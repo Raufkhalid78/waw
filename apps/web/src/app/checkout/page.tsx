@@ -12,15 +12,24 @@ import {
   Lock,
   ArrowLeft,
   AlertCircle,
+  X,
+  UserPlus,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import { FadeIn } from "@/components/Motion";
 import { fetchWithCsrf } from "@/lib/csrf";
+import { AuthModal } from "@/components/layout/AuthModal";
 import { AlfaOnsiteModal } from "@/components/payments/AlfaOnsiteModal";
 import {
+
+
+
+
   fetchCheckoutQuote,
   createOrderApi,
   createGuestOrderApi,
+  createUserAddress,
   initiatePaymentApi,
   fetchServiceableCities,
   ServiceableCity,
@@ -100,6 +109,49 @@ export default function CheckoutPage() {
   const [addressesLoading, setAddressesLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // Guest checkout: offer sign-up (with its benefits) but never force it.
+  // The choice persists for the browser session so it doesn't nag.
+  const [authOpen, setAuthOpen] = useState(false);
+  const [guestPromptDismissed, setGuestPromptDismissed] = useState(true);
+  // Account buyers: auto-save the delivery address they type (opt-out).
+  const [saveAddressChecked, setSaveAddressChecked] = useState(true);
+
+  useEffect(() => {
+    try {
+      setGuestPromptDismissed(sessionStorage.getItem("waw-guest-checkout-prompt") === "1");
+    } catch {}
+  }, []);
+
+  const dismissGuestPrompt = () => {
+    setGuestPromptDismissed(true);
+    try { sessionStorage.setItem("waw-guest-checkout-prompt", "1"); } catch {}
+  };
+
+  // After sign-in/sign-up the saved addresses (if any) become available —
+  // prefill only when the buyer hasn't typed their details yet.
+  const handleAuthSuccess = () => {
+    setAuthOpen(false);
+    setIsLoggedIn(true);
+    setGuestPromptDismissed(true);
+    import("@/lib/api").then((api) =>
+      api.fetchUserAddresses().then((data) => {
+        setSavedAddresses(data);
+        setAddressesLoading(false);
+        const defaultAddr = data.find((a: any) => a.is_default) || data[0];
+        if (defaultAddr && !formData.fullName && !formData.address) {
+          setFormData((prev) => ({
+            ...prev,
+            fullName: defaultAddr.full_name,
+            phone: defaultAddr.phone,
+            address: defaultAddr.street_address,
+            city: defaultAddr.city,
+            province: defaultAddr.province,
+          }));
+        }
+      }),
+    );
+  };
+
   useEffect(() => {
     import('@/lib/api').then(api => {
       api.fetchUserAddresses().then(data => {
@@ -135,6 +187,11 @@ export default function CheckoutPage() {
       .then((cities) => setServiceableCities(cities))
       .catch(() => setServiceableCities([]));
   }, []);
+
+  // When the serviceability list is unavailable the city select falls back to
+  // the full city list — show an honest warning instead of silently implying
+  // every city is deliverable.
+  const serviceabilityUnknown = serviceableCities.length === 0;
 
   // Fetch cities and config from API
   useEffect(() => {
@@ -259,8 +316,10 @@ export default function CheckoutPage() {
       setFormError("Please enter the recipient's full name.");
       return;
     }
-    if (!/^[+]?[0-9]{10,13}$/.test(normalizedPhone)) {
-      setFormError("Please enter a valid mobile number (e.g. +92 300 1234567).");
+    // PK mobile only: 03XXXXXXXXX (11 digits) or +92 3XXXXXXXXX / 923XXXXXXXXX
+    const isPkMobile = /^(?:0|92|\+92)?3[0-9]{9}$/.test(normalizedPhone);
+    if (!isPkMobile) {
+      setFormError("Please enter a valid Pakistani mobile number (e.g. 03001234567 or +923001234567).");
       return;
     }
     if (!formData.address?.trim() || formData.address.trim().length < 10) {
@@ -276,7 +335,11 @@ export default function CheckoutPage() {
     setQuoteError(null);
 
     try {
-      const idempotencyKey = crypto.randomUUID();
+      // Stable idempotency key per quote: retrying a failed submit after the
+      // order WAS created (e.g. payment initiation failed) must replay the
+      // same order instead of minting a fresh one per click.
+      const idempotencyKey =
+        quoteData.quoteToken || crypto.randomUUID();
       const orderPayload = {
         quoteToken: quoteData.quoteToken,
         buyerName: formData.fullName,
@@ -295,7 +358,27 @@ export default function CheckoutPage() {
 
       const orderId = orderResult.orderId;
 
-      // ── Bank Alfalah APG: onsite wallet/account ────────────────────────
+      // Auto-save delivery details for account buyers so the next checkout
+      // pre-fills them. Fire-and-forget — must never fail the order flow.
+      if (isLoggedIn && saveAddressChecked && !savedAddresses.some((a: any) => a.street_address === formData.address)) {
+        const provinceForSave =
+          formData.province || cities.find((c) => c.name === formData.city)?.province || "Punjab";
+        createUserAddress({
+          full_name: formData.fullName,
+          phone: formData.phone,
+          street_address: formData.address,
+          city: formData.city,
+          province: provinceForSave,
+        })
+          .then(() =>
+            import("@/lib/api").then((api) =>
+              api.fetchUserAddresses().then((data) => setSavedAddresses(data)),
+            ),
+          )
+          .catch(() => {});
+      }
+
+      // - Bank Alfalah APG: onsite wallet/account -
       // No redirect: open the embedded OTP modal instead.
       if (
         paymentMethod === PaymentMethod.ALFA_WALLET ||
@@ -324,7 +407,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      // ── Bank Alfalah APG: card (hosted page, PCI-mandated redirect) ──
+      // - Bank Alfalah APG: card (hosted page, PCI-mandated redirect) -
       if (paymentMethod === PaymentMethod.ALFA_CARD) {
         try {
           const res = await fetchWithCsrf(
@@ -377,7 +460,7 @@ export default function CheckoutPage() {
         }
       }
 
-      // ── Raast P2M QR (SBP instant payment) ───────────────────────────
+      // - Raast P2M QR (SBP instant payment) -
       if (paymentMethod === PaymentMethod.RAAST_P2M_QR) {
         const paymentSession = await initiatePaymentApi({
           orderId,
@@ -408,9 +491,9 @@ export default function CheckoutPage() {
 
         // A digital order without a payment session must NEVER be presented
         // as a completed purchase — the gateway initiation failed (outage or
-        // misconfiguration). Logged-in buyers go to the order page to retry
-        // payment; guests stay here with a clear error. The cart is
-        // intentionally NOT cleared either way.
+        // misconfiguration). The order IS saved: show its number and a retry
+        // path so the buyer doesn't re-place it (duplicate orders). The cart
+        // is intentionally NOT cleared.
         setIsSubmitting(false);
         if (isLoggedIn) {
           setQuoteError(
@@ -418,8 +501,12 @@ export default function CheckoutPage() {
           );
           router.push(`/orders/${orderId}`);
         } else {
+          setGuestConfirmation({
+            orderNumber: orderResult.orderNumber || "",
+            totalPkr: orderResult.totalAmountPkr || 0,
+          });
           setQuoteError(
-            "Payment could not be started. Please try again or contact WhatsApp support with your details.",
+            `Payment could not be started, but your order ${orderResult.orderNumber || ""} is saved. Contact WhatsApp support with this order number to complete payment.`,
           );
         }
         return;
@@ -462,6 +549,24 @@ export default function CheckoutPage() {
           ) : null}{" "}
           has been confirmed. You&apos;ll receive a WhatsApp confirmation shortly.
         </p>
+
+
+        {/* Guest conversion: sign-up benefits, never blocking */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-xs text-amber-900 space-y-2 max-w-sm mx-auto text-left">
+          <div className="font-black text-sm">Want faster checkout next time?</div>
+          <p className="font-medium text-amber-800">
+            Create a free account to save your delivery details, track this and
+            future orders in one place, and earn loyalty points on everything
+            you buy.
+          </p>
+          <button
+            type="button"
+            onClick={() => setAuthOpen(true)}
+            className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+          >
+            Create free account
+          </button>
+        </div>
         <Link
           href="/"
           className="inline-block bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-3 px-8 rounded-xl text-sm transition-all cursor-pointer"
@@ -513,6 +618,61 @@ export default function CheckoutPage() {
           100% Secure Payments & PostEx Delivery
         </p>
       </div>
+
+      {/* Guest choice: sign in for a faster checkout, or continue as guest.
+          Never blocks the form — dismissible for the browser session. */}
+      {!isLoggedIn && !guestPromptDismissed && (
+        <div className="relative bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-5 sm:p-6">
+          <button
+            type="button"
+            onClick={dismissGuestPrompt}
+            aria-label="Dismiss"
+            className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-amber-100 text-amber-700"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-amber-400 flex items-center justify-center shrink-0">
+              <UserPlus className="w-5 h-5 text-slate-950" />
+            </div>
+            <div className="flex-1 pr-8">
+              <h3 className="font-black text-sm text-slate-950">
+                Sign in for a faster checkout
+              </h3>
+              <ul className="mt-2 space-y-1 text-xs text-slate-600 font-medium">
+                <li className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  Your saved addresses fill in automatically — no retyping
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  Order history, live tracking and easy returns in one place
+                </li>
+                <li className="flex items-center gap-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  Earn loyalty points and check out in one tap next time
+                </li>
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAuthOpen(true)}
+                  className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Sign in / Sign up
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissGuestPrompt}
+                  className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Continue as guest
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <FadeIn delay={100}>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -642,6 +802,11 @@ export default function CheckoutPage() {
                       : <option value="">Select a city</option>
                   }
                 </select>
+                {serviceabilityUnknown && cities.length > 0 && (
+                  <p className="text-[11px] text-amber-700 font-medium">
+                    Delivery availability could not be verified right now - we&apos;ll confirm serviceability for your city after you place the order.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -675,6 +840,21 @@ export default function CheckoutPage() {
                 </select>
               </div>
             </div>
+
+            {/* Account buyers: save the typed address for next time */}
+            {isLoggedIn && (
+              <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={saveAddressChecked}
+                  onChange={(e) => setSaveAddressChecked(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-amber-500"
+                />
+                <span className="text-xs text-slate-600 font-medium">
+                  Save this address to my account for faster checkout next time
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Payment Selection */}
@@ -1054,8 +1234,28 @@ export default function CheckoutPage() {
           buyerEmail={formData.email}
           onClose={() => {
             setAlfaModal(null);
-            // Keep the pending order — buyer can retry payment from orders page
-            router.push(`/orders/${alfaModal.orderId}`);
+            if (isLoggedIn) {
+              // Keep the pending order — buyer can retry payment from orders page
+              router.push(`/orders/${alfaModal.orderId}`);
+            } else {
+              // Guests have no order history: persist the pending order so
+              // /payment/result can resolve it via the guest phone lookup.
+              try {
+                sessionStorage.setItem(
+                  "waw-pending-payment-order",
+                  JSON.stringify({
+                    orderId: alfaModal.orderId,
+                    orderNumber: alfaModal.orderNumber || "",
+                    totalPkr: alfaModal.amountPkr || 0,
+                    phone: formData.phone,
+                    createdAt: Date.now(),
+                  }),
+                );
+              } catch {}
+              router.push(
+                `/payment/result?order=${encodeURIComponent(alfaModal.orderNumber || "")}`,
+              );
+            }
           }}
           onPaid={(orderNumber) => {
             setAlfaModal(null);
@@ -1067,6 +1267,9 @@ export default function CheckoutPage() {
       )}
 
       {/* ── State Bank Raast P2M Dynamic QR Modal ─────────────────────────── */}
+
+      {/* ── Sign in / Sign up (guest checkout option) ──────────────────── */}
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onSuccess={handleAuthSuccess} />
     </div>
   );
 }

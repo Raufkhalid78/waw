@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { FadeIn } from "@/components/Motion";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { flashSalesApi, productsApi, AdminFlashSale, AdminProduct } from "@/lib/api";
 import {
   Zap, Plus, Trash2, X, CheckCircle2,
@@ -17,11 +18,11 @@ export default function FlashSalesPage() {
   const [searchResults, setSearchResults] = useState<AdminProduct[]>([]);
   const [searching, setSearching] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [formData, setFormData] = useState({
-    name: "",
-    starts_at: "",
-    ends_at: "",
-    discount_percent: 0,
+    title: "",
+    start_time: "",
+    end_time: "",
   });
 
   useEffect(() => {
@@ -30,43 +31,58 @@ export default function FlashSalesPage() {
 
   const loadSales = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await flashSalesApi.list();
       setSales(data);
-    } catch (err) {
-      console.error("Failed to load flash sales", err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load flash sales");
     } finally {
       setLoading(false);
     }
   };
 
   const handleCreate = async () => {
+    if (!formData.title.trim()) {
+      alert("Sale name is required.");
+      return;
+    }
+    if (formData.start_time && formData.end_time && new Date(formData.end_time) <= new Date(formData.start_time)) {
+      alert("End time must be after start time.");
+      return;
+    }
     try {
-      await flashSalesApi.create(formData);
+      await flashSalesApi.create({
+        title: formData.title.trim(),
+        start_time: new Date(formData.start_time).toISOString(),
+        end_time: new Date(formData.end_time).toISOString(),
+      });
       setShowCreate(false);
-      setFormData({ name: "", starts_at: "", ends_at: "", discount_percent: 0 });
+      setFormData({ title: "", start_time: "", end_time: "" });
       loadSales();
-    } catch (err) {
-      console.error("Failed to create flash sale", err);
+    } catch (err: any) {
+      alert(err?.message || "Failed to create flash sale");
     }
   };
 
   const toggleActive = async (sale: AdminFlashSale) => {
+    setLoadError("");
     try {
       await flashSalesApi.update(sale.id, { is_active: !sale.is_active });
       loadSales();
-    } catch (err) {
-      console.error("Failed to update flash sale", err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to update flash sale");
     }
   };
 
   const deleteSale = async (id: string) => {
     if (!confirm("Delete this flash sale?")) return;
+    setLoadError("");
     try {
       await flashSalesApi.delete(id);
       loadSales();
-    } catch (err) {
-      console.error("Failed to delete flash sale", err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to delete flash sale");
     }
   };
 
@@ -91,10 +107,11 @@ export default function FlashSalesPage() {
   const handleAddItem = async (saleId: string, product: AdminProduct, promoPrice: number, stock: number) => {
     setAddError(null);
     try {
+      // The API resolves offer ids to their default variant server-side.
       await flashSalesApi.addItem(saleId, {
-        variant_id: product.id,
-        promotional_price_pkr: promoPrice,
-        allocated_stock: stock,
+        variantId: product.id,
+        salePricePkr: promoPrice,
+        stockQuantity: stock,
       });
       setShowAddItems(null);
       setProductSearch("");
@@ -107,8 +124,8 @@ export default function FlashSalesPage() {
 
   const now = new Date();
   const getStatus = (sale: AdminFlashSale) => {
-    const start = new Date(sale.starts_at);
-    const end = new Date(sale.ends_at);
+    const start = new Date(sale.start_time);
+    const end = new Date(sale.end_time);
     if (!sale.is_active) return { label: "Disabled", color: "bg-gray-100 text-gray-600" };
     if (now < start) return { label: "Scheduled", color: "bg-blue-100 text-blue-700" };
     if (now > end) return { label: "Ended", color: "bg-red-100 text-red-700" };
@@ -150,8 +167,8 @@ export default function FlashSalesPage() {
                 <label className="text-xs font-bold text-gray-700">Sale Name</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g., Independence Day Mega Sale"
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none"
                 />
@@ -161,8 +178,8 @@ export default function FlashSalesPage() {
                   <label className="text-xs font-bold text-gray-700">Starts At</label>
                   <input
                     type="datetime-local"
-                    value={formData.starts_at}
-                    onChange={(e) => setFormData({ ...formData, starts_at: e.target.value })}
+                    value={formData.start_time}
+                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none"
                   />
                 </div>
@@ -170,22 +187,11 @@ export default function FlashSalesPage() {
                   <label className="text-xs font-bold text-gray-700">Ends At</label>
                   <input
                     type="datetime-local"
-                    value={formData.ends_at}
-                    onChange={(e) => setFormData({ ...formData, ends_at: e.target.value })}
+                    value={formData.end_time}
+                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-700">Discount %</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="90"
-                  value={formData.discount_percent}
-                  onChange={(e) => setFormData({ ...formData, discount_percent: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none"
-                />
               </div>
             </div>
             <div className="flex gap-2 pt-2">
@@ -194,7 +200,7 @@ export default function FlashSalesPage() {
               </button>
               <button
                 onClick={handleCreate}
-                disabled={!formData.name || !formData.starts_at || !formData.ends_at}
+                disabled={!formData.title || !formData.start_time || !formData.end_time}
                 className="flex-1 px-4 py-2 bg-amber-400 hover:bg-amber-500 disabled:bg-gray-200 text-slate-900 font-bold rounded-xl text-sm cursor-pointer disabled:cursor-not-allowed"
               >
                 Create
@@ -217,6 +223,8 @@ export default function FlashSalesPage() {
         />
       )}
 
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadSales} />}
+
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(3)].map((_, i) => (
@@ -227,7 +235,7 @@ export default function FlashSalesPage() {
             </div>
           ))}
         </div>
-      ) : sales.length === 0 ? (
+      ) : sales.length === 0 && !loadError ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
           <Zap className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <h3 className="text-base font-bold text-gray-900 mb-1">No Flash Sales</h3>
@@ -237,18 +245,19 @@ export default function FlashSalesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {sales.map((sale) => {
             const status = getStatus(sale);
+            const itemCount = sale.items?.length ?? sale.item_count ?? 0;
             return (
               <div key={sale.id} className="bg-white border border-gray-200 rounded-2xl p-5 space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-bold text-gray-900">{sale.name}</h3>
+                    <h3 className="font-bold text-gray-900">{sale.title}</h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status.color}`}>
                         {status.label}
                       </span>
-                      {sale.item_count !== undefined && sale.item_count > 0 && (
+                      {itemCount > 0 && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                          {sale.item_count} items
+                          {itemCount} items
                         </span>
                       )}
                     </div>
@@ -280,19 +289,27 @@ export default function FlashSalesPage() {
                 <div className="flex items-center gap-4 text-xs text-gray-500">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
-                    {new Date(sale.starts_at).toLocaleDateString()}
+                    {new Date(sale.start_time).toLocaleDateString()}
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    {new Date(sale.ends_at).toLocaleDateString()}
+                    {new Date(sale.end_time).toLocaleDateString()}
                   </span>
-                  {sale.discount_percent ? (
-                    <span className="flex items-center gap-1 text-amber-600 font-bold">
-                      <Package className="w-3.5 h-3.5" />
-                      {sale.discount_percent}% off
-                    </span>
-                  ) : null}
                 </div>
+                {sale.items && sale.items.length > 0 && (
+                  <div className="border-t border-gray-100 pt-2 space-y-1">
+                    {sale.items.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between text-xs text-gray-600">
+                        <span className="truncate">
+                          {item.variant?.offer?.catalog_product?.title || item.variant?.variant_name || "Item"}
+                        </span>
+                        <span className="font-bold text-amber-600 shrink-0 ml-2">
+                          PKR {Number(item.promotional_price_pkr).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

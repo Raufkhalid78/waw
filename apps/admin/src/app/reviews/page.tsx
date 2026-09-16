@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { reviewsApi, type AdminReview } from "@/lib/api";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { Star, CheckCircle, XCircle, RefreshCw, MessageSquare } from "lucide-react";
 
 export default function ReviewsPage() {
@@ -10,15 +11,19 @@ export default function ReviewsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
 
   const loadReviews = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await reviewsApi.list({ page, limit: 20 });
-      setReviews(data.reviews || []);
-      setTotal(data.total || 0);
-    } catch (err) {
-      console.error("Failed to load reviews", err);
+      // The API returns a raw array (listPendingReviews).
+      const rows = Array.isArray(data) ? data : (data as any)?.reviews || [];
+      setReviews(rows);
+      setTotal(rows.length);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load reviews");
     } finally {
       setLoading(false);
     }
@@ -34,8 +39,8 @@ export default function ReviewsPage() {
       if (action === "approve") await reviewsApi.approve(id);
       else await reviewsApi.reject(id);
       loadReviews();
-    } catch (err) {
-      console.error(`Failed to ${action} review`, err);
+    } catch (err: any) {
+      alert(err?.message || `Failed to ${action} review`);
     } finally {
       setActionLoading(null);
     }
@@ -64,13 +69,15 @@ export default function ReviewsPage() {
         </button>
       </div>
 
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadReviews} />}
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />
           ))}
         </div>
-      ) : reviews.length === 0 ? (
+      ) : reviews.length === 0 && !loadError ? (
         <div className="text-center py-16 text-gray-400">
           <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No pending reviews</p>

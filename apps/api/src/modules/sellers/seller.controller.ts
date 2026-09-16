@@ -1,8 +1,11 @@
 import { Request, Response } from "express";
 import { supabaseAdmin } from "../../config/supabase.js";
+import { logger } from "../../config/logger.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ConfigService } from "../admin/config.service.js";
 import { UserRole } from "../../types/index.js";
+import { decideCourierStatusEvent } from "../logistics/courier.service.js";
+import { OrderStatus } from "../../types/index.js";
 
 function formatAndValidateCnic(rawCnic?: string): string {
   if (!rawCnic) throw new Error("Pakistani CNIC is required");
@@ -143,12 +146,33 @@ export class SellerController {
         return;
       }
 
-      const { cnic, accountTitle, bankTitle, bankAccount, iban, bankName, branchCity, ntnNumber, address } = req.body;
+      // Accept BOTH the documented API field names (cnic, iban, accountTitle,
+      // bankTitle, bankAccount, bankName, branchCity) AND the seller
+      // portal's names (cnic_number, bank_account_number, bank_name,
+      // account_title, bank_iban). Previously the portal's names were
+      // silently dropped and KYC submission always failed with
+      // "Pakistani CNIC is required".
+      const {
+        // canonical
+        cnic, accountTitle, bankTitle, bankAccount, iban, bankName, branchCity, ntnNumber, address,
+        // seller-portal aliases
+        cnic_number, account_title, bank_account_number, bank_iban, bank_name, branch_city, ntn_number,
+      } = req.body;
 
-      const validCnic = formatAndValidateCnic(cnic || store.cnic || store.cnic_number);
-      const validAccount = validateIbanOrAccount(iban || bankAccount || store.account_number || store.bank_account_number);
-      const resolvedTitle = accountTitle || bankTitle || store.account_title || store.name;
-      const resolvedBankName = bankName || store.bank_name || "Bank";
+      const validCnic = formatAndValidateCnic(
+        cnic || cnic_number || store.cnic || store.cnic_number,
+      );
+      const validAccount = validateIbanOrAccount(
+        iban || bank_iban || bankAccount || bank_account_number ||
+        store.account_number || store.bank_account_number,
+      );
+      const resolvedTitle =
+        accountTitle || account_title || bankTitle || store.account_title || store.name;
+      const resolvedBankName =
+        bankName || bank_name || store.bank_name || "Bank";
+      const resolvedBranchCity = branchCity || branch_city || store.city;
+      const resolvedNtn = ntnNumber || ntn_number || store.ntn_number;
+      const resolvedAddress = address || store.address;
 
       const { data: updatedStore, error: updateError } = await supabaseAdmin
         .from("stores")
@@ -160,9 +184,9 @@ export class SellerController {
           account_number: validAccount,
           bank_account_number: validAccount,
           bank_name: resolvedBankName,
-          city: branchCity || store.city,
-          address: address || store.address,
-          ntn_number: ntnNumber || store.ntn_number,
+          city: resolvedBranchCity,
+          address: resolvedAddress,
+          ntn_number: resolvedNtn,
           status: store.status === "ACTIVE" ? "ACTIVE" : "PENDING_KYC",
           updated_at: new Date().toISOString(),
         })
@@ -333,6 +357,20 @@ export class SellerController {
       }
       if (storeOrder.store_id !== store.id) {
         res.status(403).json({ error: "You can only update orders belonging to your store" });
+        return;
+      }
+
+      // Enforce monotonic lifecycle (same rank rule as courier webhooks):
+      // blocks CONFIRMED -> DELIVERED jumps (early escrow maturity) and
+      // backward transitions like DELIVERED -> CANCELLED.
+      const decision = decideCourierStatusEvent(
+        storeOrder.status as OrderStatus,
+        status as OrderStatus,
+      );
+      if (decision.action === "reject-regression") {
+        res.status(400).json({
+          error: `Invalid status transition: order is ${storeOrder.status} and cannot move to ${status}. Status may only advance forward through the fulfillment lifecycle.`,
+        });
         return;
       }
 
@@ -519,10 +557,15 @@ export class SellerController {
         discountType,
         discountValue,
         minSpendPkr,
+        minOrderPkr,
         maxDiscountPkr,
         expiresAt,
         maxUses,
       } = req.body;
+      // minSpendPkr (portal contract) takes precedence; minOrderPkr is the
+      // legacy alias. Both were previously stripped by Zod → coupons saved
+      // with min_spend_pkr = 0 and no cap.
+      const minSpend = minSpendPkr ?? minOrderPkr ?? 0;
       const { data: coupon, error } = await supabaseAdmin
         .from("coupons")
         .insert({
@@ -530,7 +573,7 @@ export class SellerController {
           store_id: store.id,
           discount_type: discountType || "PERCENTAGE",
           discount_value: discountValue,
-          min_spend_pkr: minSpendPkr || 0,
+          min_spend_pkr: minSpend,
           max_discount_pkr: maxDiscountPkr || null,
           expires_at: expiresAt || null,
           max_uses: maxUses || null,
@@ -545,6 +588,220 @@ export class SellerController {
       res.status(201).json(coupon);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * GET /api/seller/coupons — the seller portal's coupons list. The create
+   * route existed but the list route was never registered, so the portal's
+   * coupon grid always 404'd and stayed empty.
+   */
+  static async listCoupons(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) {
+        res.json([]);
+        return;
+      }
+
+      const { data: coupons, error } = await supabaseAdmin
+        .from("coupons")
+        .select("*")
+        .eq("store_id", store.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      res.json(coupons || []);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * POST /api/seller/inventory/adjust — records a restock or damage
+   * adjustment in the double-entry inventory ledger, scoped to the
+   * caller's store.
+   *
+   * Ownership chain enforced server-side: the offer (and its first variant)
+   * must belong to the authenticated seller's store. The client only supplies
+   * its own product id — cross-seller adjustments are rejected with 403.
+   */
+  static async adjustInventory(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const { product_id: productId, adjustment_type: adjustmentType, quantity, reason } = req.body;
+
+      const qty = Math.trunc(Number(quantity));
+      if (!Number.isFinite(qty) || qty === 0) {
+        res.status(400).json({ error: "A non-zero adjustment quantity is required" });
+        return;
+      }
+      if (!["restock", "damage"].includes(adjustmentType)) {
+        res.status(400).json({ error: "adjustment_type must be 'restock' or 'damage'" });
+        return;
+      }
+      if (adjustmentType === "damage" && qty > 0) {
+        res.status(400).json({ error: "Damage adjustments must carry a negative quantity" });
+        return;
+      }
+
+      // Resolve the caller's store
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) {
+        res.status(404).json({ error: "No store found for this seller" });
+        return;
+      }
+
+      // Ownership: offer must belong to this store, and we need a variant
+      const { data: offer } = await supabaseAdmin
+        .from("seller_offers")
+        .select("id, store_id")
+        .eq("id", productId)
+        .maybeSingle();
+
+      if (!offer || offer.store_id !== store.id) {
+        res.status(403).json({ error: "You can only adjust inventory for your own products" });
+        return;
+      }
+
+      const { data: variant } = await supabaseAdmin
+        .from("offer_variants")
+        .select("id")
+        .eq("offer_id", offer.id)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (!variant) {
+        res.status(400).json({ error: "Product has no inventory variant to adjust" });
+        return;
+      }
+
+      const { InventoryService } = await import("../products/inventory.service.js");
+      if (adjustmentType === "restock") {
+        await InventoryService.recordRestock({
+          storeId: store.id,
+          offerVariantId: variant.id,
+          quantity: Math.abs(qty),
+          notes: reason || "Restock via seller portal",
+          actorId: user.id,
+        });
+      } else {
+        // Refuse damage adjustments that would take stock below zero
+        const available = await InventoryService.getAvailableStock(variant.id);
+        if (available + qty < 0) {
+          res.status(400).json({
+            error: `Adjustment exceeds available stock (${available} in hand)`,
+          });
+          return;
+        }
+        await InventoryService.recordDamageAdjustment({
+          storeId: store.id,
+          offerVariantId: variant.id,
+          quantity: Math.abs(qty),
+          notes: reason || "Damage adjustment via seller portal",
+          actorId: user.id,
+        });
+      }
+
+      const { AuditService } = await import("../audit/audit.service.js");
+      await AuditService.logAction({
+        actorId: user.id,
+        actorRole: "SELLER",
+        action: "INVENTORY_ADJUSTED_PORTAL",
+        targetResourceType: "offer",
+        targetResourceId: productId,
+        reason: `${adjustmentType === "restock" ? "+" : ""}${qty} via seller portal. ${reason || ""}`.trim(),
+      });
+
+      res.json({ success: true, adjustedQuantity: qty });
+    } catch (err: any) {
+      logger.error("Seller inventory adjustment failed", { message: err.message });
+      res.status(500).json({ error: "Failed to adjust inventory" });
+    }
+  }
+
+  /**
+   * GET /api/seller/feedback — reviews on this seller's products awaiting a
+   * reply, plus unanswered product questions. Scoped to the caller's store.
+   */
+  static async listFeedback(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) {
+        res.json({ reviews: [], questions: [] });
+        return;
+      }
+
+      // This store's catalog product ids
+      const { data: offers } = await supabaseAdmin
+        .from("seller_offers")
+        .select("catalog_product_id")
+        .eq("store_id", store.id);
+      const productIds = (offers || []).map((o: any) => o.catalog_product_id).filter(Boolean);
+      if (productIds.length === 0) {
+        res.json({ reviews: [], questions: [] });
+        return;
+      }
+
+      // Approved reviews on those products that have no seller reply yet
+      const { data: reviewRows, error: reviewsErr } = await supabaseAdmin
+        .from("reviews")
+        .select("id, rating, comment, created_at, product:catalog_products(id, title, slug)")
+        .in("product_id", productIds)
+        .eq("status", "APPROVED")
+        .is("seller_reply", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (reviewsErr) throw reviewsErr;
+
+      const storeReviews = (reviewRows || []).map((r: any) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        productTitle: r.product?.title,
+        productSlug: r.product?.slug,
+        createdAt: r.created_at,
+      }));
+
+      // Unanswered questions on those products
+      const { data: questionRows, error: questionsErr } = await supabaseAdmin
+        .from("product_questions")
+        .select("id, question, created_at, product:catalog_products(id, title, slug)")
+        .in("product_id", productIds)
+        .is("answer", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (questionsErr) throw questionsErr;
+
+      const storeQuestions = (questionRows || []).map((q: any) => ({
+        id: q.id,
+        question: q.question,
+        productTitle: q.product?.title,
+        productSlug: q.product?.slug,
+        createdAt: q.created_at,
+      }));
+
+      res.json({ reviews: storeReviews, questions: storeQuestions });
+    } catch (err: any) {
+      logger.error("Seller feedback fetch failed", { message: err.message });
+      res.status(500).json({ error: "Failed to load feedback" });
     }
   }
 }

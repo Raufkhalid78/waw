@@ -1,26 +1,54 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { statsApi, type AdminStats } from "@/lib/api";
-import { BarChart3, ShoppingCart, Package, Store, DollarSign, RefreshCw } from "lucide-react";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { BarChart3, ShoppingCart, Package, Store, DollarSign, RefreshCw, Download } from "lucide-react";
 
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const data = await statsApi.get();
+      setStats(data);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load analytics");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const data = await statsApi.get();
-        setStats(data);
-      } catch (err) {
-        console.error("Failed to load stats", err);
-      } finally {
-        setLoading(false);
-      }
-    }
     load();
-  }, []);
+  }, [load]);
+
+  const exportCsv = () => {
+    if (!stats) return;
+    const rows = [
+      ["Metric", "Value"],
+      ["GMV (PKR)", String(stats.gmvPkr)],
+      ["Total Orders", String(stats.totalOrders)],
+      ["Active Sellers", String(stats.totalSellers)],
+      ["Total Products", String(stats.totalProducts)],
+      ["Platform Commissions (PKR)", String(stats.totalCommissionsPkr)],
+      ["COD Fees Collected (PKR)", String(stats.codFeesCollectedPkr)],
+      ["Net Platform Revenue (PKR)", String(stats.netPlatformRevenuePkr)],
+      ["Exported At", new Date().toISOString()],
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `waw-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
@@ -35,7 +63,18 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (!stats) return null;
+  // Distinguish "genuinely no data" from a failed load — never render a blank page.
+  if (!stats) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+        <ApiErrorBanner message={loadError} onRetry={load} />
+        <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-sm text-gray-400">
+          No analytics data available yet.
+        </div>
+      </div>
+    );
+  }
 
   const cards = [
     { label: "Gross Merchandise Value", value: `PKR ${stats.gmvPkr.toLocaleString()}`, icon: DollarSign, color: "bg-emerald-50 text-emerald-600" },
@@ -54,6 +93,13 @@ export default function AnalyticsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
           <p className="text-sm text-gray-500">Platform performance overview</p>
         </div>
+        <button
+          onClick={exportCsv}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium text-gray-700"
+        >
+          <Download className="w-4 h-4" />
+          Export CSV
+        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

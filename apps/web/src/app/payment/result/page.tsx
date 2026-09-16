@@ -211,7 +211,11 @@ function PaymentResultContent() {
 
         <div className="flex gap-3 justify-center pt-2">
           <button
-            onClick={() => router.push("/orders")}
+            onClick={() =>
+              // /orders has no list page — only /orders/[id] exists. Send
+              // buyers to their account orders tab instead.
+              router.push(pending?.orderId ? `/orders/${pending.orderId}` : "/account")
+            }
             className="px-5 py-2.5 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 hover:bg-slate-50"
           >
             View Orders

@@ -117,7 +117,7 @@ export function captureMessage(message: string, level: string = "info"): void {
   Sentry.captureMessage(message, level as any);
 }
 
-// ── Custom Metrics & Alerting ──────────────────────────────────────────────
+// - Custom Metrics & Alerting -
 
 interface MetricData {
   name: string;

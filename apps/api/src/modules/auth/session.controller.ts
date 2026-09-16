@@ -17,12 +17,16 @@ interface CookieOptions {
   maxAge: number;
 }
 
+// Express cookie maxAge is in MILLISECONDS.
+const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 const ACCESS_COOKIE_OPTS: CookieOptions = {
   httpOnly: true,
   secure: isProduction,
   sameSite: "strict",
   path: "/",
-  maxAge: 900, // 15 minutes
+  maxAge: SESSION_TTL_MS,
 };
 
 const REFRESH_COOKIE_OPTS: CookieOptions = {
@@ -30,7 +34,7 @@ const REFRESH_COOKIE_OPTS: CookieOptions = {
   secure: isProduction,
   sameSite: "strict",
   path: "/api/auth/session",
-  maxAge: 7 * 24 * 60 * 60, // 7 days
+  maxAge: REFRESH_TTL_MS,
 };
 
 /**
@@ -129,9 +133,17 @@ export class SessionController {
       // SECURITY: Never trust client-supplied role. Load authoritative role from database.
       const { data: profile } = await supabaseAdmin
         .from("profiles")
-        .select("role, phone, email")
+        .select("role, phone, email, is_banned")
         .eq("id", userId)
         .single();
+
+      // Banned users must not mint fresh sessions (previously a banned user
+      // with a login JWT kept creating valid sessions until JWT expiry).
+      if (profile?.is_banned) {
+        logger.warn("Session creation rejected — user is banned", { userId });
+        res.status(403).json({ error: "This account has been suspended" });
+        return;
+      }
 
       const authoritativeRole = profile?.role || "BUYER";
       const authoritativePhone = profile?.phone || userPhone || "";
@@ -152,7 +164,13 @@ export class SessionController {
       // SECURITY: enforce TOTP for privileged roles when MFA is enrolled.
       // Unenrolled admins are allowed through (so enrollment isn't a lock-out
       // trap) but an enrolled admin can never log in without the code.
-      const isPrivilegedRole = ["ADMIN", "SUPER_ADMIN", "FINANCE", "OPS_AGENT"].includes(
+      const isPrivilegedRole = [
+        "ADMIN",
+        "SUPER_ADMIN",
+        "FINANCE",
+        "OPS_AGENT",
+        "MODERATOR",
+      ].includes(
         authoritativeRole,
       );
       if (isPrivilegedRole) {
@@ -292,9 +310,44 @@ export class SessionController {
       // SECURITY: Always load authoritative role from database, never trust Redis-stored role
       const { data: profile } = await supabaseAdmin
         .from("profiles")
-        .select("role, phone, email")
+        .select("role, phone, email, is_banned")
         .eq("id", session.userId)
         .single();
+
+      // Banned users are logged out everywhere: /me clears cookies so the
+      // next request 401s instead of rendering the account.
+      if (profile?.is_banned) {
+        clearSessionCookies(res);
+        await SessionService.revokeAllSessions(session.userId);
+        res.status(403).json({ error: "This account has been suspended" });
+        return;
+      }
+
+      // Seller portals render store name/city/verification from the session —
+      // resolve the caller's store in the same round-trip.
+      let storeInfo: {
+        storeId: string;
+        storeName: string;
+        city: string;
+        isVerified: boolean;
+        status: string;
+      } | undefined;
+      if ((profile?.role || session.userRole) === "SELLER") {
+        const { data: store } = await supabaseAdmin
+          .from("stores")
+          .select("id, name, city, is_verified, status")
+          .eq("owner_id", session.userId)
+          .maybeSingle();
+        if (store) {
+          storeInfo = {
+            storeId: store.id,
+            storeName: store.name,
+            city: store.city || "",
+            isVerified: Boolean(store.is_verified),
+            status: store.status,
+          };
+        }
+      }
 
       res.json({
         user: {
@@ -304,6 +357,15 @@ export class SessionController {
           email: profile?.email || session.userEmail,
           storeId: session.storeId,
         },
+        ...(storeInfo ? { store: storeInfo } : {}),
+        // Flat aliases for portal consumers that read store fields at top level
+        ...(storeInfo
+          ? {
+              storeName: storeInfo.storeName,
+              city: storeInfo.city,
+              isVerified: storeInfo.isVerified,
+            }
+          : {}),
       });
     } catch (err: any) {
       logger.error("Failed to get current user", { error: err.message });

@@ -70,21 +70,21 @@ export default function CategoryPage() {
     }
     setError(null);
     try {
-      const [catData, prodData] = await Promise.all([
-        pageNum === 1 ? fetchCategoryBySlug(slug) : Promise.resolve(category),
-        fetchProducts({
-          categorySlug: slug,
-          city: selectedCity !== "All Cities" ? selectedCity : undefined,
-          sellerType: selectedSellerType,
-          maxPrice: userMaxPrice,
-          minRating: minRating > 0 ? minRating : undefined,
-          inStock: inStockOnly || undefined,
-          sortBy,
-          page: pageNum,
-          limit: 24,
-        }),
-      ]);
-      if (pageNum === 1) setCategory(catData);
+      // Products only — the category metadata is fetched once by the
+      // slug-keyed effect below. Previously `category` sat in this dep array
+      // and `setCategory(new object)` changed it every cycle, refetching in
+      // an infinite loop (continuous network flood + list state churn).
+      const prodData = await fetchProducts({
+        categorySlug: slug,
+        city: selectedCity !== "All Cities" ? selectedCity : undefined,
+        sellerType: selectedSellerType,
+        maxPrice: userMaxPrice,
+        minRating: minRating > 0 ? minRating : undefined,
+        inStock: inStockOnly || undefined,
+        sortBy,
+        page: pageNum,
+        limit: 24,
+      });
       if (prodData) {
         setProducts((prev) => append ? [...prev, ...(prodData.items || [])] : (prodData.items || []));
         if (prodData.facets) setFacets(prodData.facets);
@@ -97,7 +97,16 @@ export default function CategoryPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [slug, category, selectedCity, selectedSellerType, userMaxPrice, minRating, inStockOnly, sortBy]);
+  }, [slug, selectedCity, selectedSellerType, userMaxPrice, minRating, inStockOnly, sortBy]);
+
+  // Category metadata — keyed on the slug STRING only (stable identity).
+  useEffect(() => {
+    let alive = true;
+    fetchCategoryBySlug(slug)
+      .then((cat) => { if (alive) setCategory(cat); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [slug]);
 
   useEffect(() => {
     setPage(1);

@@ -5,7 +5,7 @@
 -- Use CLEANUP_SEED.sql to remove all demo data later.
 -- ============================================================================
 
--- ── 1. System Admin User ────────────────────────────────────────────────────
+-- - 1. System Admin User -
 -- Creates a Supabase auth user + profile for the admin panel.
 
 DO $$
@@ -15,7 +15,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = sys_user_id::uuid) THEN
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
     VALUES (sys_user_id::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-            'admin@waw.com.pk', crypt('${ADMIN_PASSWORD:-ChangeMeInProduction!}', gen_salt('bf')),
+            'admin@waw.com.pk', crypt('${ADMIN_PASSWORD:?Set ADMIN_PASSWORD to generate this seed}', gen_salt('bf')),
             NOW(), '{"provider":"email","providers":["email"]}', '{}', NOW(), NOW());
   END IF;
 
@@ -25,7 +25,7 @@ BEGIN
   END IF;
 END $$;
 
--- ── 2. Categories ───────────────────────────────────────────────────────────
+-- - 2. Categories -
 
 INSERT INTO categories (id, name, name_urdu, slug, parent_id, sort_order, is_active, image_url, description) VALUES
   ('cat_electronics', 'Electronics & Mobility', 'الیکٹرانکس اور موبائل', 'mobiles-tech', NULL, 1, true, 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&auto=format&fit=crop&q=80', 'Smartphones, ANC audio, wearables and chargers.'),
@@ -45,7 +45,7 @@ INSERT INTO categories (id, name, name_urdu, slug, parent_id, sort_order, is_act
   ('cat_attar', 'Pure Attar & Concentrated Oils', 'خالص عطر اور پرفیوم آئلز', 'attar-fragrance', 'cat_beauty', 1, true)
 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id;
 
--- ── 3. Serviceable Cities ───────────────────────────────────────────────────
+-- - 3. Serviceable Cities -
 
 INSERT INTO serviceable_cities (city_name, province, is_cod_eligible, is_active) VALUES
   -- Punjab
@@ -89,7 +89,7 @@ INSERT INTO serviceable_cities (city_name, province, is_cod_eligible, is_active)
   ('Islamabad', 'Federal', true, true)
 ON CONFLICT (city_name) DO NOTHING;
 
--- ── 4. Search Suggestions ───────────────────────────────────────────────────
+-- - 4. Search Suggestions -
 
 INSERT INTO search_suggestions (term, score, is_active) VALUES
   ('Khaadi Lawn 2026', 100, true),
@@ -101,7 +101,7 @@ INSERT INTO search_suggestions (term, score, is_active) VALUES
   ('Royal Oud Attar', 65, true)
 ON CONFLICT (term) DO UPDATE SET score = EXCLUDED.score;
 
--- ── 5. Campaigns ────────────────────────────────────────────────────────────
+-- - 5. Campaigns -
 
 INSERT INTO campaigns (tag, title, link_url, link_text, campaign_type, sort_order) VALUES
   ('⚡ MEGA DEALS', 'Azadi Celebration: Up to 50% OFF with voucher AZADI2026 at checkout!', '/category/mobiles-tech', 'Shop Deals', 'PROMO_STRIP', 1),
@@ -110,14 +110,14 @@ INSERT INTO campaigns (tag, title, link_url, link_text, campaign_type, sort_orde
   ('🏪 SELL ON WAW', '0% Listing Fees & Nationwide PostEx Pickups for verified Pakistani merchants.', '/sell', 'Register Store', 'PROMO_STRIP', 4)
 ON CONFLICT DO NOTHING;
 
--- ── 6. CMS Content ──────────────────────────────────────────────────────────
+-- - 6. CMS Content -
 
 INSERT INTO cms_content (key_slug, type, title, content_html, is_active) VALUES
   ('buyer-protection-claim', 'claim', 'Verified Pakistani Merchants',
    'Direct from verified Pakistani sellers with doorstep delivery and dedicated customer care.', true)
 ON CONFLICT (key_slug) DO UPDATE SET title = EXCLUDED.title, content_html = EXCLUDED.content_html;
 
--- ── 7. Marketplace Settings ─────────────────────────────────────────────────
+-- - 7. Marketplace Settings -
 
 INSERT INTO marketplace_settings (key, value, description) VALUES
   ('marketplace_name', '"Waw"', 'Display name of the marketplace'),
@@ -130,7 +130,7 @@ INSERT INTO marketplace_settings (key, value, description) VALUES
   ('support_email', '"support@waw.pk"', 'Support email address')
 ON CONFLICT (key) DO NOTHING;
 
--- ── 8. Demo Stores ──────────────────────────────────────────────────────────
+-- - 8. Demo Stores -
 
 DO $$
 DECLARE
@@ -155,7 +155,7 @@ BEGIN
   END IF;
 END $$;
 
--- ── 9. Demo Catalog Products ────────────────────────────────────────────────
+-- - 9. Demo Catalog Products -
 
 INSERT INTO catalog_products (id, category_id, title, title_urdu, slug, brand, description, images, is_active) VALUES
   ('cpd-airpods', 'cat_audio', 'Apple AirPods Pro 2nd Gen (USB-C)', 'ایپل ایئر پوڈز پرو 2', 'apple-airpods-pro-2', 'Apple', 'Active Noise Cancellation, Adaptive Transparency, USB-C MagSafe case.', ARRAY['https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=600'], true),
@@ -168,7 +168,7 @@ INSERT INTO catalog_products (id, category_id, title, title_urdu, slug, brand, d
   ('cpd-pottery', 'cat_heritage', 'Multani Blue Pottery Flower Vase', 'ملتانی بلیو پوٹری پھول کا گملہ', 'multani-blue-pottery-vase', 'Multan Arts', 'Hand-painted traditional Multani blue pottery, food-safe glaze.', ARRAY['https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600'], true)
 ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, images = EXCLUDED.images, is_active = true;
 
--- ── 10. Demo Seller Offers + Variants + Inventory ───────────────────────────
+-- - 10. Demo Seller Offers + Variants + Inventory -
 
 DO $$
 DECLARE
@@ -248,7 +248,7 @@ BEGIN
   END IF;
 END $$;
 
--- ── 11. Demo Coupon ─────────────────────────────────────────────────────────
+-- - 11. Demo Coupon -
 
 INSERT INTO coupons (id, code, discount_type, discount_value, min_spend_pkr, max_discount_pkr, max_uses, is_active)
 VALUES ('coupon-demo-azadi', 'AZADI2026', 'PERCENTAGE', 15, 3000, 2000, 500, true)

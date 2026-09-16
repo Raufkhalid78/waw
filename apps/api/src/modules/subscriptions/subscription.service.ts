@@ -202,10 +202,10 @@ export class SubscriptionService {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // -
   // Payment flow: paid plans move PENDING → ACTIVE only after the APG
   // payment settlement confirms the subscription charge.
-  // ═══════════════════════════════════════════════════════════════════════
+  // -
 
   /**
    * Initiate payment for a paid plan. Returns a Bank Alfalah APG card

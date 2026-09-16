@@ -55,6 +55,18 @@ class Product {
       }
     }
 
+    // Stock: sum variant stock (the API exposes per-variant stock_quantity;
+    // there is no root-level stock column). Mirrors the web mapper.
+    final variantsList = json['variants'] is List
+        ? (json['variants'] as List)
+            .map((v) => ProductVariant.fromJson(v as Map<String, dynamic>))
+            .toList()
+        : <ProductVariant>[];
+    final variantStock = variantsList.fold<int>(
+      0,
+      (sum, v) => sum + v.stockQuantity,
+    );
+
     return Product(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
@@ -71,7 +83,7 @@ class Product {
       compareAtPricePkr: json['compare_at_price_pkr'] != null
           ? _toDouble(json['compare_at_price_pkr'])
           : null,
-      stockQuantity: json['stock_quantity'] ?? 0,
+      stockQuantity: json['stock_quantity'] ?? variantStock,
       sku: json['sku'],
       weightKg: json['weight_kg'] != null
           ? _toDouble(json['weight_kg'])
@@ -82,11 +94,7 @@ class Product {
           : null,
       ratingCount: json['rating_count'],
       store: json['store'] != null ? StoreInfo.fromJson(json['store']) : null,
-      variants: json['variants'] is List
-          ? (json['variants'] as List)
-              .map((v) => ProductVariant.fromJson(v))
-              .toList()
-          : null,
+      variants: variantsList.isNotEmpty ? variantsList : null,
       attributes: json['attributes'] is Map
           ? Map<String, dynamic>.from(json['attributes'])
           : null,

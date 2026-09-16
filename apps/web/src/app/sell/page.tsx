@@ -77,10 +77,11 @@ export default function SellOnWawPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ── Format validators (Pakistani market) ────────────────────────────────
+  // - Format validators (Pakistani market) -
   const CNIC_REGEX = /^\d{5}-\d{7}-\d$/;
   const IBAN_REGEX = /^PK\d{2}[A-Z0-9]{20}$/;
-  const PHONE_REGEX = /^[+]?[0-9]{10,13}$/;
+  // PK mobile only: 03XXXXXXXXX (11 digits) or +92 3XXXXXXXXX / 923XXXXXXXXX
+  const PHONE_REGEX = /^(?:0|92|\+92)?3[0-9]{9}$/;
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const normalizePhone = (phone: string) => phone.replace(/[\s-]/g, "");
@@ -130,8 +131,10 @@ export default function SellOnWawPage() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to submit application");
-      
-      setApplicationId(`KYC-WAW-${Math.floor(10000 + Math.random() * 90000)}`);
+
+      // The server returns the real store/application reference — cite it so
+      // support can trace the application. No client-side fabricated IDs.
+      setApplicationId(data.store?.id || "");
       setSubmitted(true);
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred.");
@@ -576,7 +579,7 @@ export default function SellOnWawPage() {
           </form>
         </div>
       ) : (
-        /* ── Application Submitted State ──────────────────────────────────── */
+        /* - Application Submitted State - */
         <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto space-y-5 shadow-xs">
           <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-8 h-8" />
@@ -587,12 +590,16 @@ export default function SellOnWawPage() {
               KYC Application Submitted!
             </h2>
             <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Thank you for applying to sell on Waw Market. Your application has
-              been logged under verification ID:
+              Thank you for applying to sell on Waw Market.
+              {applicationId
+                ? " Your application has been logged under verification ID:"
+                : " Our compliance team will contact you on the number you provided."}
             </p>
-            <div className="inline-block px-4 py-2 bg-slate-100 rounded-xl font-mono font-bold text-amber-700 text-sm border border-slate-200">
-              {applicationId}
-            </div>
+            {applicationId && (
+              <div className="inline-block px-4 py-2 bg-slate-100 rounded-xl font-mono font-bold text-amber-700 text-sm border border-slate-200">
+                {applicationId}
+              </div>
+            )}
           </div>
 
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-1.5 text-slate-600">

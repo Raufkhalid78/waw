@@ -9,11 +9,28 @@ import { Shield, QrCode, CheckCircle2, XCircle, AlertTriangle, Copy, Loader2 } f
 
 const API_BASE = API_BASE_URL;
 
+// The API enforces the CSRF double-submit token on every POST — a raw
+// fetch without X-CSRF-Token gets 403 "CSRF token missing" on
+// enroll/verify/disable. Read the token from the waw_csrf cookie.
+function getCsrfToken(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|; )waw_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
 async function mfaApi(path: string, options?: RequestInit) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+  if (options?.method && !["GET", "HEAD", "OPTIONS"].includes(options.method.toUpperCase())) {
+    const csrf = getCsrfToken();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
   const res = await fetch(`${API_BASE}/api/admin/mfa${path}`, {
     ...options,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Request failed" }));

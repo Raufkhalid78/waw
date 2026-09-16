@@ -17,7 +17,7 @@
 --    and accepts coupon/loyalty discounts from the signed quote.
 -- ============================================================================
 
--- ── 1. Category commission rates ───────────────────────────────────────────
+-- - 1. Category commission rates -
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS commission_percentage NUMERIC(5,2);
 
 -- Marketplace-standard rates (top-level categories; subcategories inherit
@@ -30,7 +30,7 @@ UPDATE categories SET commission_percentage = 8.00  WHERE slug = 'sialkot-sports
 UPDATE categories SET commission_percentage = 10.00 WHERE slug = 'home-living';
 UPDATE categories SET commission_percentage = 10.00 WHERE slug = 'home-heritage';
 
--- ── 2. Store override is now opt-in (NULL = no negotiated rate) ────────────
+-- - 2. Store override is now opt-in (NULL = no negotiated rate) -
 ALTER TABLE stores ALTER COLUMN commission_rate_percentage DROP DEFAULT;
 ALTER TABLE stores ALTER COLUMN commission_rate_percentage DROP NOT NULL;
 -- Existing rows all hold the old hardcoded default; clear them so category
@@ -42,7 +42,7 @@ WHERE commission_rate_percentage = 10.00;
 -- seller_payout_pkr may not exist in every environment (FIX_MISSING_COLUMNS added it conditionally)
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS seller_payout_pkr NUMERIC(12,2) DEFAULT 0;
 
--- ── 3. Commission resolution helper ────────────────────────────────────────
+-- - 3. Commission resolution helper -
 -- Resolution order: FIRST_PARTY → 0% | store override → nearest ancestor
 -- category rate → platform default, minus active subscription reduction.
 CREATE OR REPLACE FUNCTION waw_commission_rate(
@@ -108,11 +108,11 @@ BEGIN
 END;
 $$;
 
--- ═══════════════════════════════════════════════════════════════════════════
+-- -
 -- 4. checkout_transaction — commission resolved per item + seller payout
 --    (full body carried forward from migration 035; only the commission
 --    line and the payout write changed)
--- ═══════════════════════════════════════════════════════════════════════════
+-- -
 CREATE OR REPLACE FUNCTION checkout_transaction(
   p_buyer_id        TEXT,
   p_buyer_name      TEXT,
@@ -413,12 +413,12 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- ═══════════════════════════════════════════════════════════════════════════
+-- -
 -- 5. guest_checkout_transaction — config-driven fees, quote discounts,
 --    commission resolution, seller payout (previously hardcoded 5000/200/
 --    100/0.18 and 10% commission — guests saw different pricing than
 --    logged-in buyers)
--- ═══════════════════════════════════════════════════════════════════════════
+-- -
 CREATE OR REPLACE FUNCTION guest_checkout_transaction(
   p_guest_session_token TEXT,
   p_buyer_name          TEXT,

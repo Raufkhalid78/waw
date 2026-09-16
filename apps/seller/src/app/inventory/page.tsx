@@ -60,6 +60,7 @@ export default function InventoryPage() {
     try {
       await sellerFetch("/api/seller/inventory/adjust", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           product_id: productId,
           adjustment_type: adjustType,
@@ -71,9 +72,9 @@ export default function InventoryPage() {
       setAdjustQty(1);
       setAdjustReason("");
       loadProducts();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to adjust inventory", err);
-      alert("Adjustment failed. The backend may not support this endpoint yet.");
+      alert(err?.message || "Adjustment failed — please try again.");
     }
   };
 

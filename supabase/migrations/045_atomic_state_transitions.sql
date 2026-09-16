@@ -6,9 +6,9 @@
 -- Same class of risk for payment settlement (order -> PAID + webhook row ->
 -- applied). Each RPC below runs in ONE transaction with row locks.
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 1. Courier event dedupe ledger
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE TABLE IF NOT EXISTS courier_events (
   id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   provider TEXT NOT NULL DEFAULT 'POSTEX',
@@ -23,9 +23,9 @@ CREATE TABLE IF NOT EXISTS courier_events (
 ALTER TABLE courier_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON courier_events FROM anon, authenticated;
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 2. Status rank helper (must match ORDER_STATUS_RANK in courier.service.ts)
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE OR REPLACE FUNCTION courier_status_rank(s TEXT)
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -47,9 +47,9 @@ BEGIN
 END;
 $$;
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 3. Atomic courier status transition
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE OR REPLACE FUNCTION apply_courier_status_event(
   p_tracking_number TEXT,
   p_new_status TEXT,
@@ -137,11 +137,11 @@ BEGIN
 END;
 $$;
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 4. Atomic payment settlement
 -- Locks the webhook row and the order row, verifies state + amount, then
 -- flips both in the same transaction. No partial-commit path exists.
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE OR REPLACE FUNCTION settle_order_payment(
   p_order_id TEXT,
   p_transaction_id TEXT,
@@ -201,11 +201,11 @@ BEGIN
 END;
 $$;
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 5. Retry leasing for BOOKING_PENDING sweep (FOR UPDATE SKIP LOCKED)
 -- Claims rows by leasing next_retry_at for the worker; a crashed worker's
 -- lease expires and the row becomes eligible again.
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE OR REPLACE FUNCTION claim_pending_bookings(
   p_limit INTEGER DEFAULT 20,
   p_lease_minutes INTEGER DEFAULT 15,

@@ -99,14 +99,16 @@ export default async function ProductDetailPage({ params }: Props) {
 
   return (
     <>
+      {/* Escape "<" so seller-controlled strings can't break out of the
+          script tag (stored XSS via product title/description). */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
-      <ProductDetailClient 
-        initialProduct={product} 
-        initialRelated={relatedProducts} 
-        initialStore={storeProducts} 
+      <ProductDetailClient
+        initialProduct={product}
+        initialRelated={relatedProducts}
+        initialStore={storeProducts}
       />
     </>
   );

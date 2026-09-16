@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { HelpCircle, Mail } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { useConsent } from "@/components/consent/ConsentProvider";
 import { fetchCategories, fetchStores, fetchMarketplaceConfig, type MarketplaceConfig } from "@/lib/api";
 
 export function Footer() {
+  const { reopen } = useConsent();
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonStore, setComingSoonStore] = useState("");
   const [footerCategories, setFooterCategories] = useState<{
@@ -472,6 +474,11 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/track" className="hover:text-slate-950 transition-colors">
+                  Track Your Order
+                </Link>
+              </li>
+              <li>
                 <Link href="/help" className="hover:text-slate-950 transition-colors">
                   Help & Support
                 </Link>
@@ -783,6 +790,13 @@ export function Footer() {
               >
                 Terms of Service
               </Link>
+              <button
+                type="button"
+                onClick={reopen}
+                className="hover:text-slate-950 transition-colors underline underline-offset-2"
+              >
+                Cookie Settings
+              </button>
             </div>
           </div>
 

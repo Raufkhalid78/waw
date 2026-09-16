@@ -59,7 +59,7 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// ── Type Definitions ───────────────────────────────────────────────────
+// - Type Definitions -
 
 export interface AdminProduct {
   id: string;
@@ -151,6 +151,7 @@ export interface AdminDispute {
   description?: string;
   status: string;
   resolution?: string;
+  refund_amount_pkr?: number;
   created_at: string;
 }
 
@@ -206,7 +207,7 @@ export interface AdminKyc {
   submitted_at: string;
 }
 
-// ── API Modules ────────────────────────────────────────────────────────
+// - API Modules -
 
 // Products
 export const productsApi = {
@@ -245,15 +246,30 @@ export const ordersApi = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
+  // Cancellation must go through the atomic cancel_order RPC — it releases
+  // inventory reservations, cancels payouts and reverses payments. A raw
+  // status flip leaves phantom stock and payouts behind.
+  cancel: (id: string, reason?: string) =>
+    adminFetch<any>(`/api/orders/${id}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || "Cancelled by admin" }),
+    }),
+  // Full financial reversal (inventory + payouts + gateway refund).
+  reverse: (id: string, reason?: string) =>
+    adminFetch<any>(`/api/admin/orders/${id}/reverse`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || "Admin reversal", reversalType: "REFUND" }),
+    }),
 };
 
 // Users
 export const usersApi = {
-  list: (params?: { page?: number; limit?: number; role?: string }) => {
+  list: (params?: { page?: number; limit?: number; role?: string; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set("page", String(params.page));
     if (params?.limit) query.set("limit", String(params.limit));
     if (params?.role) query.set("role", params.role);
+    if (params?.search) query.set("search", params.search);
     return adminFetch<{ users: AdminUser[]; total: number }>(
       `/api/admin/users?${query}`
     );
@@ -268,24 +284,30 @@ export const usersApi = {
     }),
 };
 
-// Stores
+// Stores — the API returns { sellers, pagination } from /api/admin/sellers
+// (listSellers in admin.service.ts). The old client read data.stores which
+// was always undefined, so the page permanently showed "No stores found".
 export const storesApi = {
   list: (params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set("page", String(params.page));
     if (params?.limit) query.set("limit", String(params.limit));
     if (params?.status) query.set("status", params.status);
-    return adminFetch<{ stores: AdminStore[]; total: number }>(
+    return adminFetch<{ sellers: AdminStore[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
       `/api/admin/sellers?${query}`
     );
   },
+  // Store approve/reject is the sellers endpoint with a status PATCH —
+  // /api/admin/stores/:id/approve|reject never existed in the API.
   approve: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/stores/${id}/approve`, {
+    adminFetch<any>(`/api/admin/sellers/${id}`, {
       method: "PATCH",
+      body: JSON.stringify({ status: "ACTIVE" }),
     }),
   reject: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/stores/${id}/reject`, {
+    adminFetch<any>(`/api/admin/sellers/${id}`, {
       method: "PATCH",
+      body: JSON.stringify({ status: "REJECTED" }),
     }),
 };
 
@@ -307,96 +329,94 @@ export const statsApi = {
   get: () => adminFetch<AdminStats>("/api/admin/stats"),
 };
 
-// Disputes
+// Disputes — the API returns a raw array (listDisputes in admin.service.ts).
 export const disputesApi = {
   list: (params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams();
-    if (params?.page) query.set("page", String(params.page));
-    if (params?.limit) query.set("limit", String(params.limit));
     if (params?.status) query.set("status", params.status);
-    return adminFetch<{ disputes: AdminDispute[]; total: number }>(
-      `/api/admin/disputes?${query}`
-    );
+    // Server returns AdminDispute[]; page/limit are sliced client-side.
+    void params?.page;
+    void params?.limit;
+    return adminFetch<AdminDispute[]>(`/api/admin/disputes?${query}`);
   },
-  resolve: (id: string, resolution: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/disputes/${id}/resolve`, {
+  // The API expects the DisputeResolution ENUM from support.service.ts:
+  // REFUND_BUYER | RELEASE_SELLER_PAYOUT | REPLACEMENT_ISSUED | DISMISSED.
+  // Any other value silently closes the ticket with NO financial action.
+  resolve: (id: string, resolution: "REFUND_BUYER" | "RELEASE_SELLER_PAYOUT" | "REPLACEMENT_ISSUED" | "DISMISSED", refundAmountPkr?: number, staffNotes?: string) =>
+    adminFetch<any>(`/api/admin/disputes/${id}/resolve`, {
       method: "PATCH",
-      body: JSON.stringify({ resolution }),
+      body: JSON.stringify({ resolution, refundAmountPkr, staffNotes }),
     }),
 };
 
-// Returns
+// Returns — the API returns a raw array (listReturns in admin.service.ts).
 export const returnsApi = {
   list: (params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams();
-    if (params?.page) query.set("page", String(params.page));
-    if (params?.limit) query.set("limit", String(params.limit));
     if (params?.status) query.set("status", params.status);
-    return adminFetch<{ returns: AdminReturn[]; total: number }>(
-      `/api/admin/returns?${query}`
-    );
+    void params?.page;
+    void params?.limit;
+    return adminFetch<AdminReturn[]>(`/api/admin/returns?${query}`);
   },
   receive: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/returns/${id}/receive`, {
+    adminFetch<any>(`/api/admin/returns/${id}/receive`, {
       method: "PATCH",
     }),
   refund: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/returns/${id}/refund`, {
+    adminFetch<any>(`/api/admin/returns/${id}/refund`, {
       method: "PATCH",
     }),
   reject: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/returns/${id}/reject`, {
+    adminFetch<any>(`/api/admin/returns/${id}/reject`, {
       method: "PATCH",
     }),
 };
 
-// Reviews
+// Reviews — the API returns a raw array (listPendingReviews).
 export const reviewsApi = {
   list: (params?: { page?: number; limit?: number }) => {
-    const query = new URLSearchParams();
-    if (params?.page) query.set("page", String(params.page));
-    if (params?.limit) query.set("limit", String(params.limit));
-    return adminFetch<{ reviews: AdminReview[]; total: number }>(
-      `/api/admin/reviews/pending?${query}`
-    );
+    void params;
+    return adminFetch<AdminReview[]>(`/api/admin/reviews/pending`);
   },
   approve: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/reviews/${id}/approve`, {
+    adminFetch<any>(`/api/admin/reviews/${id}/approve`, {
       method: "PATCH",
     }),
   reject: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/reviews/${id}/reject`, {
+    adminFetch<any>(`/api/admin/reviews/${id}/reject`, {
       method: "PATCH",
     }),
 };
 
-// Payouts
+// Payouts — the API returns { payouts, pagination } (listPayouts).
 export const payoutsApi = {
   list: (params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.set("page", String(params.page));
     if (params?.limit) query.set("limit", String(params.limit));
     if (params?.status) query.set("status", params.status);
-    return adminFetch<{ payouts: AdminPayout[]; total: number }>(
+    return adminFetch<{ payouts: AdminPayout[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
       `/api/admin/payouts?${query}`
     );
   },
-  settle: (id: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/payouts/${id}/settle`, {
-      method: "PATCH",
+  // The API registers POST /api/admin/payouts/:id/settle (not PATCH).
+  settle: (id: string, bankReference: string) =>
+    adminFetch<any>(`/api/admin/payouts/${id}/settle`, {
+      method: "POST",
+      body: JSON.stringify({ bankReference }),
     }),
 };
 
-// KYC
+// KYC — the API returns a raw array of store rows (listPendingKyc).
 export const kycApi = {
   listPending: () =>
-    adminFetch<{ submissions: AdminKyc[] }>("/api/admin/kyc/pending"),
+    adminFetch<AdminKyc[]>("/api/admin/kyc/pending"),
   approve: (storeId: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/kyc/${storeId}/approve`, {
+    adminFetch<any>(`/api/admin/kyc/${storeId}/approve`, {
       method: "PATCH",
     }),
   reject: (storeId: string) =>
-    adminFetch<{ success: boolean }>(`/api/admin/kyc/${storeId}/reject`, {
+    adminFetch<any>(`/api/admin/kyc/${storeId}/reject`, {
       method: "PATCH",
     }),
 };
@@ -447,16 +467,17 @@ export const subscriptionsApi = {
     ),
 };
 
-// Flash Sales
+// Flash Sales — field names match the API/DB contract (flash_sales table:
+// title, start_time, end_time; item counts via items relation).
 export interface AdminFlashSale {
   id: string;
-  name: string;
-  starts_at: string;
-  ends_at: string;
+  title: string;
+  start_time: string;
+  end_time: string;
   is_active: boolean;
-  discount_percent?: number;
-  item_count?: number;
   created_at: string;
+  items?: AdminFlashSaleItem[];
+  item_count?: number;
 }
 
 export interface AdminFlashSaleItem {
@@ -471,12 +492,12 @@ export interface AdminFlashSaleItem {
 
 export const flashSalesApi = {
   list: () => adminFetch<AdminFlashSale[]>("/api/admin/flash-sales"),
-  create: (data: { name: string; starts_at: string; ends_at: string; discount_percent?: number }) =>
+  create: (data: { title: string; start_time: string; end_time: string; title_urdu?: string; banner_url?: string }) =>
     adminFetch<AdminFlashSale>("/api/admin/flash-sales", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  update: (id: string, data: Partial<AdminFlashSale>) =>
+  update: (id: string, data: Partial<Pick<AdminFlashSale, "title" | "start_time" | "end_time" | "is_active">> & { title_urdu?: string; banner_url?: string }) =>
     adminFetch<{ success: boolean }>(`/api/admin/flash-sales/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
@@ -485,7 +506,7 @@ export const flashSalesApi = {
     adminFetch<{ success: boolean }>(`/api/admin/flash-sales/${id}`, {
       method: "DELETE",
     }),
-  addItem: (saleId: string, data: { variant_id: string; promotional_price_pkr: number; allocated_stock: number }) =>
+  addItem: (saleId: string, data: { variantId: string; salePricePkr: number; stockQuantity: number }) =>
     adminFetch<{ success: boolean }>(`/api/admin/flash-sales/${saleId}/items`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -584,6 +605,39 @@ export const uploadApi = {
     });
     if (!res.ok) throw new Error("Upload failed");
     return res.json();
+  },
+};
+
+// Audit Logs — GET /api/admin/audit-logs (ADMIN/SUPER_ADMIN/OPS_AGENT).
+export interface AdminAuditLog {
+  id: string;
+  actor_id: string;
+  actor_role: string;
+  action: string;
+  target_resource_type: string;
+  target_resource_id: string | null;
+  previous_state: unknown;
+  new_state: unknown;
+  reason: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export const auditLogsApi = {
+  list: (params?: {
+    limit?: number;
+    offset?: number;
+    action?: string;
+    resourceType?: string;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.offset) query.set("offset", String(params.offset));
+    if (params?.action) query.set("action", params.action);
+    if (params?.resourceType) query.set("resourceType", params.resourceType);
+    return adminFetch<{ logs: AdminAuditLog[]; total: number }>(
+      `/api/admin/audit-logs?${query}`
+    );
   },
 };
 

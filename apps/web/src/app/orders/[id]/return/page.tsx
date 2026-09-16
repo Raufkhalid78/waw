@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,7 +17,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { ReturnReason, ReturnStatus } from "@waw/types";
-import { submitOrderReturn } from "@/lib/api";
+import { fetchOrderById, submitOrderReturn } from "@/lib/api";
 
 export default function OrderReturnPage() {
   const params = useParams();
@@ -32,13 +32,79 @@ export default function OrderReturnPage() {
   const [refundPreference, setRefundPreference] = useState<
     "WALLET" | "ORIGINAL_PAYMENT"
   >("ORIGINAL_PAYMENT");
-  const [pickupCity, setPickupCity] = useState("Lahore");
-  const [pickupAddress, setPickupAddress] = useState(
-    "House 42, Block C-1, Gulberg III, Lahore",
-  );
+  const [pickupCity, setPickupCity] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Real order data — the API requires `items` (orderItemId + quantity) for
+  // every return request; the previous form never sent them so 100% of
+  // return attempts failed.
+  const [order, setOrder] = useState<any>(null);
+  const [orderLoadError, setOrderLoadError] = useState<string | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
+  const [refundTotalPkr, setRefundTotalPkr] = useState(0);
   const [returnTracking, setReturnTracking] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchOrderById(orderId)
+      .then((data) => {
+        if (!alive || !data) return;
+        setOrder(data);
+        const allItems: any[] = (data.store_orders || []).flatMap(
+          (so: any) => so.order_items || [],
+        );
+        // Preselect every item at its delivered quantity.
+        const ids = new Set<string>(allItems.map((i: any) => i.id));
+        setSelectedItemIds(ids);
+        setItemQuantities(
+          Object.fromEntries(allItems.map((i: any) => [i.id, i.quantity ?? 1])),
+        );
+        setPickupCity(data.shipping_city || "");
+        setPickupAddress(data.shipping_address || "");
+      })
+      .catch((err: any) => {
+        if (alive) setOrderLoadError(err?.message || "Failed to load the order");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [orderId]);
+
+  const allOrderItems = useMemo<any[]>(
+    () => (order?.store_orders || []).flatMap((so: any) => so.order_items || []),
+    [order],
+  );
+
+  // Refund estimate from the selected items only (server recomputes
+  // authoritatively at submission).
+  useEffect(() => {
+    const total = allOrderItems
+      .filter((i) => selectedItemIds.has(i.id))
+      .reduce(
+        (sum, i) => sum + Number(i.total_price_pkr ?? i.unit_price_pkr ?? 0) * (itemQuantities[i.id] ?? 1),
+        0,
+      );
+    setRefundTotalPkr(total);
+  }, [selectedItemIds, itemQuantities, allOrderItems]);
+
+  const toggleItem = (itemId: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const setQty = (itemId: string, qty: number, max: number) => {
+    setItemQuantities((prev) => ({
+      ...prev,
+      [itemId]: Math.max(1, Math.min(max, qty)),
+    }));
+  };
 
   const returnReasonsList = [
     {
@@ -65,8 +131,22 @@ export default function OrderReturnPage() {
 
   const handleSubmitReturn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setErrorMsg(null);
+
+    const items = allOrderItems
+      .filter((i) => selectedItemIds.has(i.id))
+      .map((i) => ({
+        orderItemId: i.id,
+        quantity: Math.max(1, Math.min(i.quantity ?? 1, itemQuantities[i.id] ?? 1)),
+      }));
+
+    if (items.length === 0) {
+      setErrorMsg("Select at least one item to return.");
+      setStep(1);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const res = await submitOrderReturn(orderId, {
@@ -75,13 +155,14 @@ export default function OrderReturnPage() {
         refundPreference,
         pickupCity,
         pickupAddress,
+        items,
       });
 
+      // Only ever show a tracking number the courier actually issued.
       const trackingCn =
         res.reverseShipment?.reverseTrackingNumber ||
         res.returnRequest?.reverse_courier_cn ||
-        `REV-PTX-${Date.now().toString().slice(-6)}`;
-
+        null;
       setReturnTracking(trackingCn);
       setStep(4);
     } catch (err: any) {
@@ -127,11 +208,11 @@ export default function OrderReturnPage() {
 
         <div className="shrink-0 bg-white/10 backdrop-blur rounded-2xl p-3 border border-white/10 text-right">
           <div className="text-[10px] text-slate-300 font-bold uppercase">
-            Return Window
+            Est. Refund (Selected Items)
           </div>
-          <div className="text-sm font-black text-amber-400 flex items-center gap-1 mt-0.5">
+          <div className="text-sm font-black text-amber-400 flex items-center gap-1 mt-0.5 justify-end">
             <Clock className="w-4 h-4" />
-            <span>5 Days Remaining</span>
+            <span>PKR {refundTotalPkr.toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -163,9 +244,93 @@ export default function OrderReturnPage() {
       {/* ── STEP 1: Select Return Reason ────────────────────────────────────── */}
       {step === 1 && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+          {orderLoadError ? (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {orderLoadError}
+            </div>
+          ) : !order ? (
+            <div className="py-10 text-center text-xs text-slate-400 font-bold">
+              Loading your order…
+            </div>
+          ) : (
+            <>
           <div>
             <h3 className="text-lg font-black text-slate-950">
-              Why are you returning this item?
+              Which items are you returning?
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Choose the items and quantities — the refund covers exactly what
+              you send back.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {allOrderItems.map((item) => {
+              const selected = selectedItemIds.has(item.id);
+              const qty = itemQuantities[item.id] ?? 1;
+              return (
+                <label
+                  key={item.id}
+                  className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                    selected
+                      ? "border-amber-400 bg-amber-50/50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => toggleItem(item.id)}
+                    className="accent-amber-500 w-4 h-4"
+                  />
+                  <Package className="w-5 h-5 text-slate-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-slate-900 truncate">
+                      {item.product_title ||
+                        item.offer_variants?.seller_offers?.catalog_products?.title ||
+                        "Item"}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      PKR {Number(item.total_price_pkr ?? item.unit_price_pkr ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  {selected && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setQty(item.id, qty - 1, item.quantity ?? 1)}
+                        className="w-7 h-7 rounded-lg border border-slate-200 font-black text-slate-600 hover:bg-slate-100"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center text-xs font-black">{qty}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQty(item.id, qty + 1, item.quantity ?? 1)}
+                        className="w-7 h-7 rounded-lg border border-slate-200 font-black text-slate-600 hover:bg-slate-100"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between rounded-2xl bg-slate-950 text-white px-5 py-4">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-300">
+              Estimated Refund
+            </span>
+            <span className="text-lg font-black text-amber-400">
+              PKR {refundTotalPkr.toLocaleString()}
+            </span>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-black text-slate-950">
+              Why are you returning {selectedItemIds.size > 1 ? "these items" : "this item"}?
             </h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
               Select the primary reason to expedite your PostEx return approval.
@@ -205,13 +370,16 @@ export default function OrderReturnPage() {
           <div className="flex justify-end pt-4 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setStep(2)}
-              className="bg-slate-950 hover:bg-slate-900 text-white font-black px-6 py-3 rounded-2xl flex items-center gap-2 cursor-pointer transition-all shadow-md text-xs"
+              onClick={() => selectedItemIds.size > 0 && setStep(2)}
+              disabled={selectedItemIds.size === 0}
+              className="bg-slate-950 hover:bg-slate-900 disabled:bg-slate-300 text-white font-black px-6 py-3 rounded-2xl flex items-center gap-2 cursor-pointer transition-all shadow-md text-xs disabled:cursor-not-allowed"
             >
               <span>Continue to Details</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+            </>
+          )}
         </div>
       )}
 
@@ -415,14 +583,16 @@ export default function OrderReturnPage() {
 
           {/* Consignment Badge */}
           <div className="bg-slate-50 rounded-2xl p-5 max-w-md mx-auto border border-slate-200 text-left space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-              <span className="text-xs font-bold text-slate-500 uppercase">
-                PostEx Reverse Tracking #
-              </span>
-              <span className="font-mono font-black text-slate-950 text-sm bg-amber-400 px-2 py-0.5 rounded-md">
-                {returnTracking}
-              </span>
-            </div>
+            {returnTracking ? (
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase">
+                  PostEx Reverse Tracking #
+                </span>
+                <span className="font-mono font-black text-slate-950 text-sm bg-amber-400 px-2 py-0.5 rounded-md">
+                  {returnTracking}
+                </span>
+              </div>
+            ) : null}
 
             <div className="text-xs space-y-1 text-slate-700">
               <div className="flex justify-between">
@@ -435,22 +605,26 @@ export default function OrderReturnPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 font-medium">
-                  Estimated Pickup:
-                </span>
-                <strong className="font-bold text-emerald-700">
-                  Tomorrow (within 24h)
-                </strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">
                   Refund Amount:
                 </span>
                 <strong className="font-black text-slate-950">
-                  PKR 3,200 (100% Escrow Protected)
+                  PKR {refundTotalPkr.toLocaleString()} (Escrow Protected)
                 </strong>
               </div>
             </div>
           </div>
+
+          {returnTracking ? (
+            <p className="text-[11px] text-slate-400 font-medium max-w-md mx-auto">
+              Reverse tracking <span className="font-mono font-bold text-slate-600">{returnTracking}</span> — live status
+              updates will appear on your order page.
+            </p>
+          ) : (
+            <p className="text-[11px] text-slate-400 font-medium max-w-md mx-auto">
+              A PostEx courier booking has been queued — your tracking number
+              will appear on the order page once the rider is assigned.
+            </p>
+          )}
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
             <Link

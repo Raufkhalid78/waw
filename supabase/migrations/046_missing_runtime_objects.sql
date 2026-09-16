@@ -4,9 +4,9 @@
 --   * outbox claim falls back to a non-atomic select (duplicate dispatches)
 --   * loyalty point awards fall back to a buggy overwriting upsert
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 1. Cart abandonment tracking
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE TABLE IF NOT EXISTS cart_abandonment (
   user_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
   cart_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -22,9 +22,9 @@ CREATE TABLE IF NOT EXISTS cart_abandonment (
 ALTER TABLE cart_abandonment ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON cart_abandonment FROM anon, authenticated;
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 2. Outbox claim (FOR UPDATE SKIP LOCKED — no duplicate dispatches)
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE OR REPLACE FUNCTION claim_outbox_events(p_batch_size INTEGER DEFAULT 50)
 RETURNS TABLE (id TEXT, event_type TEXT, payload TEXT)
 LANGUAGE sql
@@ -45,9 +45,9 @@ AS $$
   RETURNING o.id, o.event_type, o.payload::text AS payload;
 $$;
 
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 -- 3. Loyalty points (true increment, not overwrite)
--- ─────────────────────────────────────────────────────────────────────────
+-- -
 CREATE OR REPLACE FUNCTION increment_loyalty_points(
   p_user_id TEXT,
   p_points INTEGER

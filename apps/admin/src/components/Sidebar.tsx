@@ -25,29 +25,38 @@ import {
   Zap,
   Image,
   FolderTree,
+  ScrollText,
   Sun,
   Moon,
 } from "lucide-react";
 import clsx from "clsx";
+import { useAdminSession } from "./AdminSession";
 
+/**
+ * Nav items with the roles that can use each module.
+ * Mirrors the API's requireRole grants so a panel user never sees
+ * (or navigates to) a module that would 403.
+ * ADMIN/SUPER_ADMIN implicitly see everything.
+ */
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/products", label: "Products", icon: Package },
-  { href: "/orders", label: "Orders", icon: ShoppingCart },
-  { href: "/users", label: "Users", icon: Users },
-  { href: "/stores", label: "Stores", icon: Store },
-  { href: "/payouts", label: "Payouts", icon: Wallet },
-  { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
-  { href: "/disputes", label: "Disputes", icon: AlertTriangle },
-  { href: "/returns", label: "Returns", icon: RotateCcw },
-  { href: "/reviews", label: "Reviews", icon: Star },
-  { href: "/kyc", label: "KYC", icon: BadgeCheck },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/ai", label: "AI Usage", icon: Sparkles },
-  { href: "/flash-sales", label: "Flash Sales", icon: Zap },
-  { href: "/banners", label: "Banners", icon: Image },
-  { href: "/categories", label: "Categories", icon: FolderTree },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: null },
+  { href: "/products", label: "Products", icon: Package, roles: ["ADMIN", "MODERATOR"] },
+  { href: "/orders", label: "Orders", icon: ShoppingCart, roles: ["ADMIN", "OPS_AGENT"] },
+  { href: "/users", label: "Users", icon: Users, roles: ["ADMIN", "OPS_AGENT"] },
+  { href: "/audit", label: "Audit Logs", icon: ScrollText, roles: ["ADMIN"] },
+  { href: "/stores", label: "Stores", icon: Store, roles: ["ADMIN", "OPS_AGENT"] },
+  { href: "/payouts", label: "Payouts", icon: Wallet, roles: ["ADMIN", "FINANCE"] },
+  { href: "/subscriptions", label: "Subscriptions", icon: CreditCard, roles: ["ADMIN", "FINANCE", "OPS_AGENT"] },
+  { href: "/disputes", label: "Disputes", icon: AlertTriangle, roles: ["ADMIN", "FINANCE", "MODERATOR"] },
+  { href: "/returns", label: "Returns", icon: RotateCcw, roles: ["ADMIN", "FINANCE", "MODERATOR"] },
+  { href: "/reviews", label: "Reviews", icon: Star, roles: ["ADMIN", "MODERATOR"] },
+  { href: "/kyc", label: "KYC", icon: BadgeCheck, roles: ["ADMIN", "OPS_AGENT"] },
+  { href: "/analytics", label: "Analytics", icon: BarChart3, roles: null },
+  { href: "/ai", label: "AI Usage", icon: Sparkles, roles: null },
+  { href: "/flash-sales", label: "Flash Sales", icon: Zap, roles: ["ADMIN", "MODERATOR"] },
+  { href: "/banners", label: "Banners", icon: Image, roles: ["ADMIN", "MODERATOR"] },
+  { href: "/categories", label: "Categories", icon: FolderTree, roles: ["ADMIN", "MODERATOR"] },
+  { href: "/settings", label: "Settings", icon: Settings, roles: null },
 ];
 
 interface SidebarProps {
@@ -58,6 +67,18 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { role, loaded } = useAdminSession();
+
+  const canSee = (item: (typeof navItems)[number]) => {
+    // While the session resolves, show only the login-safe Dashboard item so
+    // sub-roles never glimpse restricted modules.
+    if (!loaded) return item.href === "/";
+    if (item.roles === null) return true; // null = all panel roles
+    if (role === "ADMIN" || role === "SUPER_ADMIN") return true;
+    return role !== null && item.roles.includes(role);
+  };
+
+  const visibleItems = navItems.filter(canSee);
 
   const handleLogout = async () => {
     try {
@@ -98,7 +119,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));

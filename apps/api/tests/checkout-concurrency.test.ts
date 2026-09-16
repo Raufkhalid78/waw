@@ -1,13 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 
-// ── Checkout Concurrency & Idempotency Tests ──────────────────────────────
+// - Checkout Concurrency & Idempotency Tests -
 // These tests validate the design-level guarantees of the checkout session
 // and order creation flow. They run without a database by testing the logic
 // patterns that must hold true.
 
 describe("P0-CHK: Checkout Idempotency and Concurrency", () => {
-  // ── Session State Machine ────────────────────────────────────────────────
+  // - Session State Machine -
 
   it("should enforce session state transitions: pending -> committed", () => {
     const validTransitions: Record<string, string[]> = {
@@ -51,7 +51,7 @@ describe("P0-CHK: Checkout Idempotency and Concurrency", () => {
     assert.strictEqual(isAllowed, false, "failed -> committed should be rejected");
   });
 
-  // ── Idempotency Key Handling ─────────────────────────────────────────────
+  // - Idempotency Key Handling -
 
   it("should return the same order for duplicate idempotency keys", () => {
     const processedKeys = new Map<string, string>(); // key -> orderId
@@ -86,7 +86,7 @@ describe("P0-CHK: Checkout Idempotency and Concurrency", () => {
     assert.notStrictEqual(processedKeys.get(key1), processedKeys.get(key2));
   });
 
-  // ── Inventory Reservation Atomicity ──────────────────────────────────────
+  // - Inventory Reservation Atomicity -
 
   it("should prevent oversell when concurrent requests target the same stock", () => {
     const stock = { productId: "prod-1", available: 2 };
@@ -123,7 +123,7 @@ describe("P0-CHK: Checkout Idempotency and Concurrency", () => {
     }
   });
 
-  // ── Quote Expiry ─────────────────────────────────────────────────────────
+  // - Quote Expiry -
 
   it("should reject checkout with an expired quote", () => {
     const quoteCreatedAt = Date.now() - 31 * 60 * 1000; // 31 minutes ago
@@ -141,7 +141,7 @@ describe("P0-CHK: Checkout Idempotency and Concurrency", () => {
     assert.strictEqual(isExpired, false, "Quote from 5 minutes ago should be valid");
   });
 
-  // ── Payment Callback Idempotency ─────────────────────────────────────────
+  // - Payment Callback Idempotency -
 
   it("should handle duplicate payment callbacks without double-capture", () => {
     const processedCallbacks = new Set<string>();
@@ -179,7 +179,7 @@ describe("P0-CHK: Checkout Idempotency and Concurrency", () => {
     assert.strictEqual(shouldUpdate, false, "authorized should not downgrade from captured");
   });
 
-  // ── Concurrent Checkout with Same Idempotency Key ────────────────────────
+  // - Concurrent Checkout with Same Idempotency Key -
 
   it("should produce exactly one order when 100 concurrent requests share one key", () => {
     // Simulates the optimistic lock pattern in checkout-session.service.ts

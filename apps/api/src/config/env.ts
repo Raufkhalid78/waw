@@ -126,6 +126,15 @@ export const ENV = {
   OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || "mistralai/mistral-7b-instruct",
   OPENROUTER_DAILY_REQUEST_LIMIT: parseInt(process.env.OPENROUTER_DAILY_REQUEST_LIMIT || "1000", 10),
 
+  // Cloudflare R2 Object Storage (S3-compatible) — primary media driver.
+  // When all three R2_* credentials are set, uploads are stored in R2 and
+  // served via R2_PUBLIC_BASE_URL (a Cloudflare custom domain bound to the
+  // bucket). Without them the API falls back to Supabase Storage.
+  R2_ACCOUNT_ID: optionalEnv("R2_ACCOUNT_ID"),
+  R2_ACCESS_KEY_ID: optionalEnv("R2_ACCESS_KEY_ID"),
+  R2_SECRET_ACCESS_KEY: optionalEnv("R2_SECRET_ACCESS_KEY"),
+  R2_PUBLIC_BASE_URL: optionalEnv("R2_PUBLIC_BASE_URL"),
+
   // Sentry Error Tracking
   SENTRY_DSN: optionalEnv("SENTRY_DSN"),
 };
@@ -173,11 +182,71 @@ if (ENV.NODE_ENV === "production") {
     throw new Error("FATAL: RAAST_WEBHOOK_SECRET must be at least 16 characters in production.");
   }
 
+  // The webhook secret signs payment-received events (order fulfilment
+  // triggers). Without it anyone can forge a PAID webhook — it is REQUIRED,
+  // not optional, in production.
+  if (!ENV.RAAST_WEBHOOK_SECRET) {
+    throw new Error(
+      "FATAL: RAAST_WEBHOOK_SECRET is required in production. Generate one with `openssl rand -base64 48`.",
+    );
+  }
+
+  // Blocklist well-known placeholder values: they pass naive length checks
+  // but are publicly committed in the repo — anyone could forge a signed
+  // Raast webhook (mark orders PAID, trigger fulfillment) with them.
+  const PLACEHOLDER_SECRETS: Array<[string, string]> = [
+    ["RAAST_WEBHOOK_SECRET", ENV.RAAST_WEBHOOK_SECRET || ""],
+    ["JWT_SECRET", ENV.JWT_SECRET || ""],
+    ["GUEST_TOKEN_SECRET", ENV.GUEST_TOKEN_SECRET || ""],
+    ["SUPABASE_SERVICE_ROLE_KEY", ENV.SUPABASE_SERVICE_ROLE_KEY || ""],
+    ["TYPESENSE_API_KEY", ENV.TYPESENSE_API_KEY || ""],
+  ];
+  const PLACEHOLDER_VALUES = new Set([
+    "change_me_staging",
+    "change_me",
+    "changeme",
+    "dev-only-jwt-secret-minimum-32-characters-long",
+    "dev-only-guest-token-secret-minimum-32-chars",
+    "your-secret-here",
+    "placeholder",
+  ]);
+  const isPlaceholder = (value: string): boolean => {
+    const normalized = value.trim().toLowerCase();
+    if (PLACEHOLDER_VALUES.has(normalized)) return true;
+    if (/^dev[-_]/.test(normalized)) return true;
+    // Documented placeholder templates like REPLACE_WITH_GENERATED_48_CHAR_SECRET
+    if (/^replace[_-]?with/i.test(normalized)) return true;
+    if (/^(generate|use|set)[-_]?(a[_-]?)?(real|new|strong|random|proper)[-_]?\S*(secret|key)/i.test(normalized)) return true;
+    return false;
+  };
+  for (const [name, value] of PLACEHOLDER_SECRETS) {
+    if (value && isPlaceholder(value)) {
+      throw new Error(
+        `FATAL: ${name} is set to a well-known placeholder value. Generate a real secret (e.g. \`openssl rand -base64 48\`) and set it in the deployment environment before starting in production.`,
+      );
+    }
+  }
+
+  // The browser-exposed Typesense key must NEVER be the admin/server key —
+  // a leaked NEXT_PUBLIC value with admin rights compromises the whole
+  // search cluster. Issue a scoped search-only key instead.
+  if (
+    ENV.TYPESENSE_API_KEY &&
+    process.env.NEXT_PUBLIC_TYPESENSE_API_KEY &&
+    ENV.TYPESENSE_API_KEY === process.env.NEXT_PUBLIC_TYPESENSE_API_KEY
+  ) {
+    throw new Error(
+      "FATAL: TYPESENSE_API_KEY and NEXT_PUBLIC_TYPESENSE_API_KEY are identical — the browser bundle would carry the server/admin key. Issue a scoped search-only key for the browser.",
+    );
+  }
+
   const log = getLogger();
   const warn = (msg: string) => log ? log.warn(msg) : console.warn(msg);
 
   if (ENV.ALLOW_TEST_OTP) {
-    throw new Error("FATAL: ALLOW_TEST_OTP=true is forbidden in production.");
+    throw new Error(
+      "FATAL: ALLOW_TEST_OTP=true is forbidden outside dev/test. A staging deployment reachable by real users must never accept bypass OTPs.",
+    );
   }
 
   if (ENV.PUBLIC_API_URL && !/^https:\/\//.test(ENV.PUBLIC_API_URL)) {

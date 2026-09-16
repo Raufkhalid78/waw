@@ -6,9 +6,9 @@
 
 BEGIN;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 1. ADD IDEMPOTENCY_KEY TO ORDERS (fixes checkout_transaction_rpc)
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 BEGIN
@@ -21,9 +21,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 2. ENABLE RLS ON TABLES THAT ARE MISSING IT
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_usage ENABLE ROW LEVEL SECURITY;
@@ -33,9 +33,9 @@ ALTER TABLE flash_sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flash_sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outbox_events ENABLE ROW LEVEL SECURITY;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 3. ADD RLS POLICIES TO TABLES WITH RLS ENABLED BUT NO POLICIES
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- category_schemas: admin can manage, anyone can read
 CREATE POLICY "Admin can manage category schemas"
@@ -125,9 +125,9 @@ CREATE POLICY "Admin can manage AI usage"
   ON ai_usage FOR ALL
   USING (auth.role() = 'service_role');
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 4. FIX STORES RLS: Add INSERT policy for store creation
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 BEGIN
@@ -142,9 +142,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 5. ATTACH MFA TRIGGER (currently defined but never connected)
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 DO $$
 BEGIN
@@ -159,9 +159,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 6. GRANT ANON ACCESS TO NON-SENSITIVE TABLES
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 GRANT SELECT ON subscription_plans TO anon;
 GRANT SELECT ON serviceable_cities TO anon;

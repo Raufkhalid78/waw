@@ -47,6 +47,37 @@ class MemoryCacheFallback {
     return this.store.delete(key) ? 1 : 0;
   }
 
+  /** Rate-limiting primitive: atomic counter increment (key starts at 0). */
+  async incr(key: string): Promise<number> {
+    const current = parseInt((await this.get(key)) || "0", 10) + 1;
+    const existing = this.store.get(key);
+    // Preserve any pending TTL on the key — a rate-limit window must not
+    // be reset by an increment.
+    const expiresAt = existing && existing.expiresAt > Date.now() ? existing.expiresAt : Infinity;
+    this.store.set(key, { value: String(current), expiresAt });
+    return current;
+  }
+
+  /** Rate-limiting primitive: set/extend a key's TTL in seconds. */
+  async expire(key: string, seconds: number): Promise<number> {
+    const existing = this.store.get(key);
+    if (!existing || Date.now() > existing.expiresAt) return 0;
+    this.store.set(key, { value: existing.value, expiresAt: Date.now() + seconds * 1000 });
+    return 1;
+  }
+
+  /** Rate-limiting primitive: remaining TTL in seconds (-1 if none). */
+  async ttl(key: string): Promise<number> {
+    const item = this.store.get(key);
+    if (!item) return -2;
+    if (Date.now() > item.expiresAt) {
+      this.store.delete(key);
+      return -2;
+    }
+    if (item.expiresAt === Infinity) return -1;
+    return Math.ceil((item.expiresAt - Date.now()) / 1000);
+  }
+
   async eval(
     script: string,
     numkeys: number,

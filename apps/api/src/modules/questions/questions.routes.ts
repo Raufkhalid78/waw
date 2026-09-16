@@ -5,7 +5,8 @@ import { supabaseAdmin } from '../../config/supabase.js';
 
 const router = Router();
 
-// List questions for a product (public)
+// List questions for a product (public) — author names are masked to
+// first name + initial; full names are PII and must not be exposed publicly.
 router.get('/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
@@ -16,11 +17,19 @@ router.get('/:productId', async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
+
+    const maskName = (full: string | null | undefined): string => {
+      if (!full) return 'Anonymous';
+      const parts = String(full).trim().split(/\s+/);
+      if (parts.length === 1) return parts[0];
+      return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+    };
+
     const questions = (data || []).map(q => ({
       id: q.id,
       question: q.question,
       answer: q.answer,
-      author: (q.profiles as any)?.full_name || 'Anonymous',
+      author: maskName((q.profiles as any)?.full_name),
     }));
     res.json(questions);
   } catch (error: any) {

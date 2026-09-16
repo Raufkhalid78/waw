@@ -24,6 +24,29 @@ export class CartService {
   }
 
   /**
+   * Get or create the authenticated user's cart (never a guest row).
+   * Returns null only on unrecoverable DB failure.
+   */
+  static async getOrCreateUserCart(userId: string) {
+    const { data: existing } = await supabaseAdmin
+      .from("carts")
+      .select("id, guest_token, user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existing) return existing;
+
+    const { data: created, error } = await supabaseAdmin
+      .from("carts")
+      .insert({ user_id: userId })
+      .select("id, guest_token, user_id")
+      .single();
+
+    if (error) throw error;
+    return created;
+  }
+
+  /**
    * Get cart items with product details (via offer_variants → seller_offers → catalog_products)
    */
   static async getCartItems(cartId: string) {
@@ -181,6 +204,25 @@ export class CartService {
    * Fixes race condition from clear-then-add pattern.
    */
   static async replaceCart(cartId: string, items: Array<{ productId: string; variantId?: string; quantity: number }>) {
+    // Stock gate (CU-26): the replace path previously skipped the same
+    // offer_variants.stock_quantity check addItem performs — a guest could
+    // set qty 99 on a 3-in-stock item and only discover it at checkout.
+    for (const item of items) {
+      if (!item || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) {
+        throw new Error("Each cart item needs a quantity between 1 and 99");
+      }
+      if (item.variantId) {
+        const { data: v } = await supabaseAdmin
+          .from("offer_variants")
+          .select("stock_quantity")
+          .eq("id", item.variantId)
+          .maybeSingle();
+        if (v && v.stock_quantity < item.quantity) {
+          throw new Error(`Insufficient stock. Available: ${v.stock_quantity}`);
+        }
+      }
+    }
+
     // Delete all existing items
     const { error: deleteError } = await supabaseAdmin
       .from("cart_items")

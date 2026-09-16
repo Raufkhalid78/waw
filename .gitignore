@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules/
 .pnp
 .pnp.js
@@ -38,6 +38,9 @@ android/local.properties
 .env.production
 .env.staging
 !.env.example
+# Paste-reference files (contain real secrets — never commit)
+env.railway
+env.vercel
 
 # IDE
 .idea/

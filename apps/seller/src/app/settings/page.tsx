@@ -31,12 +31,25 @@ export default function SettingsPage() {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Client-side pre-flight matching the server's allowlist — fail fast
+    // with a clear message instead of an opaque 400 after upload starts.
+    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      notify("Logo must be a JPG, PNG, WebP, or GIF image.", "error");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      notify("Logo must be under 10 MB.", "error");
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const result = await uploadFile(file, "stores");
       setStoreForm({ ...storeForm, logoUrl: result.url });
-    } catch {
-      notify("Upload failed. Enter a URL manually.", "error");
+    } catch (err: any) {
+      notify(err?.message || "Upload failed. Enter a URL manually.", "error");
     } finally {
       setUploading(false);
     }
@@ -44,10 +57,12 @@ export default function SettingsPage() {
 
   const [kycForm, setKycForm] = useState({
     cnic_number: "",
+    account_title: "",
     business_registration: "",
     bank_account_number: "",
+    bank_iban: "",
     bank_name: "",
-    bank_branch: "",
+    branch_city: "",
   });
 
   useEffect(() => {
@@ -101,9 +116,16 @@ export default function SettingsPage() {
       notify("CNIC must be 13 digits in the format XXXXX-XXXXXXX-X", "error");
       return;
     }
-    // Basic bank account sanity: 10-24 alphanumeric characters
-    if (!/^[\w-]{10,24}$/.test(kycForm.bank_account_number.replace(/\s/g, ""))) {
-      notify("Bank account number looks invalid (10-24 characters expected)", "error");
+    // Basic bank sanity: accept PK IBANs (24 chars) or 8-24 char account
+    // numbers — matches the server's validateIbanOrAccount exactly.
+    const accountDigits = kycForm.bank_iban.replace(/[\s-]/g, "") || kycForm.bank_account_number.replace(/[\s-]/g, "");
+    const isIban = /^PK/i.test(accountDigits) || /^PK/i.test(kycForm.bank_iban);
+    if (isIban && accountDigits.length !== 24) {
+      notify("Pakistani IBAN must be exactly 24 characters starting with PK", "error");
+      return;
+    }
+    if (!isIban && !/^[\w-]{8,24}$/.test(accountDigits)) {
+      notify("Bank account number looks invalid (8-24 characters, or a PK IBAN)", "error");
       return;
     }
     setKycSubmitting(true);
@@ -292,15 +314,25 @@ export default function SettingsPage() {
               type="text"
               value={kycForm.bank_account_number}
               onChange={(e) => setKycForm({ ...kycForm, bank_account_number: e.target.value })}
+              placeholder="PK36MEZN0001234567890123 or account number"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Branch (optional)</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Account Title (as on bank record)</label>
             <input
               type="text"
-              value={kycForm.bank_branch}
-              onChange={(e) => setKycForm({ ...kycForm, bank_branch: e.target.value })}
+              value={kycForm.account_title}
+              onChange={(e) => setKycForm({ ...kycForm, account_title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Branch City (optional)</label>
+            <input
+              type="text"
+              value={kycForm.branch_city}
+              onChange={(e) => setKycForm({ ...kycForm, branch_city: e.target.value })}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
             />
           </div>

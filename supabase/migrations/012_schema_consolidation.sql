@@ -10,9 +10,9 @@
 
 BEGIN;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 1. COLUMN RENAMES: Standardize order status column naming
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- The API code uses `global_status` everywhere (17+ references).
 -- The legacy schema.sql defined `order_status`. SCHEMA_COMPLETE uses `global_status`.
@@ -59,9 +59,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 2. ADD MISSING COLUMNS: Ensure all columns the API expects exist
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- Ensure orders has shipping_province (some schemas may be missing it)
 DO $$
@@ -135,10 +135,10 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 3. COLUMN TYPE SAFETY: Ensure TEXT types for status columns
 --    (Avoids enum mismatch issues between legacy and catalog)
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- Ensure global_status is TEXT, not an enum type
 DO $$
@@ -156,9 +156,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 4. FIX RECONCILIATION: store_orders uses subtotal_pkr, not total_pkr
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- Ensure store_orders has the columns the API expects
 DO $$
@@ -175,9 +175,9 @@ BEGIN
   END IF;
 END $$;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 5. CLEAN UP: Create a unified view for backward compatibility
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- Create a view that unifies catalog_products + seller_offers for any code
 -- that still expects a flat "products" shape
@@ -216,9 +216,9 @@ LEFT JOIN categories c ON c.id = cp.category_id
 LEFT JOIN seller_offers so ON so.catalog_product_id = cp.id AND so.status = 'ACTIVE'
 LEFT JOIN stores s ON s.id = so.store_id;
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 6. INDEXES: Add missing performance indexes
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- Fix: Index on correct column names (avoid phantom references)
 CREATE INDEX IF NOT EXISTS idx_store_orders_store_id ON store_orders(store_id);
@@ -229,9 +229,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_buyer_id ON orders(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_global_status ON orders(global_status);
 CREATE INDEX IF NOT EXISTS idx_shipments_store_order_id ON shipments(store_order_id);
 
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 -- 7. ARCHIVE NOTICE: Mark legacy schema.sql as deprecated
--- ──────────────────────────────────────────────────────────────────────────────
+-- -
 
 -- This is a comment-only marker. The actual file deletion should be done
 -- as a separate step after verifying this migration works.

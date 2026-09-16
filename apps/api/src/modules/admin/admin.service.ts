@@ -320,12 +320,17 @@ export class AdminService {
       .eq("id", storeId)
       .single();
 
+    // Default to the configured platform commission, not a hardcoded 10% —
+    // admins can change the marketplace default without this path drifting.
+    const { ConfigService } = await import("./config.service.js");
+    const defaultCommission = await ConfigService.getNumber("default_commission_pct", 10);
+
     const { data: updatedStore, error } = await supabaseAdmin
       .from("stores")
       .update({
         status: "ACTIVE",
         is_verified: true,
-        commission_rate_percentage: commissionRatePercentage ?? 10,
+        commission_rate_percentage: commissionRatePercentage ?? defaultCommission,
         updated_at: new Date().toISOString(),
       })
       .eq("id", storeId)
@@ -342,7 +347,7 @@ export class AdminService {
       targetResourceId: storeId,
       previousState: previousStore,
       newState: updatedStore,
-      reason: `Seller KYC verified and store activated with ${commissionRatePercentage ?? 10}% commission`,
+      reason: `Seller KYC verified and store activated with ${commissionRatePercentage ?? defaultCommission}% commission`,
     });
 
     return updatedStore;
@@ -370,6 +375,13 @@ export class AdminService {
       .single();
 
     if (error) throw error;
+
+    // A rejected store must not keep selling — pull its live offers.
+    await supabaseAdmin
+      .from("seller_offers")
+      .update({ status: "SUSPENDED_BY_MARKETPLACE", updated_at: new Date().toISOString() })
+      .eq("store_id", storeId)
+      .eq("status", "ACTIVE");
 
     await AuditService.logAction({
       actorId: adminId || "SYSTEM",
@@ -453,6 +465,26 @@ export class AdminService {
     if (error)
       throw new Error(`Failed to update store status: ${error.message}`);
 
+    // Cascade: suspension/rejection must also pull the seller's listings
+    // off the storefront — checkout keys off seller_offers.status='ACTIVE',
+    // so leaving offers ACTIVE kept selling for suspended stores. A dedicated
+    // SUSPENDED_BY_MARKETPLACE status (column is TEXT) lets re-activation
+    // revive exactly the offers the suspension hid, never the seller's own
+    // delistings.
+    if (status === StoreStatus.SUSPENDED || status === StoreStatus.REJECTED) {
+      await supabaseAdmin
+        .from("seller_offers")
+        .update({ status: "SUSPENDED_BY_MARKETPLACE", updated_at: new Date().toISOString() })
+        .eq("store_id", storeId)
+        .eq("status", "ACTIVE");
+    } else if (status === StoreStatus.ACTIVE) {
+      await supabaseAdmin
+        .from("seller_offers")
+        .update({ status: "ACTIVE", updated_at: new Date().toISOString() })
+        .eq("store_id", storeId)
+        .eq("status", "SUSPENDED_BY_MARKETPLACE");
+    }
+
     // 3. Immutably log the action
     await AuditService.logAction({
       actorId: adminId || "SYSTEM",
@@ -471,17 +503,23 @@ export class AdminService {
   }
 
   /**
-   * Lists seller payout records from Supabase.
+   * Lists seller payout records from Supabase (optionally status-filtered).
    */
-  static async listPayouts(page = 1, limit = 50) {
+  static async listPayouts(page = 1, limit = 50, status?: string) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const { data: payouts, count } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("payouts")
-      .select("*, store:stores(name, city)", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .select("*, store:stores(id, name, city)", { count: "exact" })
+      .order("created_at", { ascending: false });
+
+    // The admin panel's status filter was silently ignored before.
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data: payouts, count } = await query.range(from, to);
 
     return {
       payouts: payouts || [],
@@ -495,15 +533,45 @@ export class AdminService {
   }
 
   /**
-   * Settles pending seller escrow payout via 1Link / Raast.
+    * Settles pending seller escrow payout via 1Link / Raast.
    */
-  static async settlePayout(payoutId: string, transactionReference: string, adminId?: string) {
+  static async settlePayout(payoutId: string, transactionReference: string, adminId?: string, adminRole?: string) {
     // 1. Fetch previous state for audit log
     const { data: previousPayout } = await supabaseAdmin
       .from("payouts")
       .select("*")
       .eq("id", payoutId)
       .single();
+
+    if (!previousPayout) {
+      throw new Error("Payout not found");
+    }
+
+    // Gate: only SCHEDULED/PROCESSING payouts may be settled manually. This
+    // prevents an admin from settling a HELD (disputed) payout or re-settling
+    // an already-terminal payout (SETTLED/COMPLETED/PAID).
+    const settleableStatuses = ["SCHEDULED", "PROCESSING"];
+    if (!settleableStatuses.includes(previousPayout.status)) {
+      throw new Error(
+        `Payout cannot be settled: status is ${previousPayout.status}. Only SCHEDULED or PROCESSING payouts are eligible; disputed (HELD) payouts must be resolved first.`,
+      );
+    }
+
+    // Gate: an active dispute on the underlying order freezes the escrow —
+    // settlement must go through dispute resolution, not a manual override.
+    if (previousPayout.store_order_id) {
+      const { data: activeReturn } = await supabaseAdmin
+        .from("return_requests")
+        .select("id, status")
+        .eq("order_id", previousPayout.store_order_id)
+        .in("status", ["DISPUTE_OPENED", "REQUESTED", "APPROVED"])
+        .limit(1);
+      if (activeReturn && activeReturn.length > 0) {
+        throw new Error(
+          "Payout cannot be settled: an active dispute or return exists on the underlying order. Resolve the dispute first.",
+        );
+      }
+    }
 
     // 2. Perform update
     const { data: payout, error } = await supabaseAdmin
@@ -522,7 +590,7 @@ export class AdminService {
     // 3. Immutably log the action
     await AuditService.logAction({
       actorId: adminId || "SYSTEM",
-      actorRole: "SUPER_ADMIN",
+      actorRole: adminRole || "SUPER_ADMIN",
       action: "PAYOUT_SETTLED",
       targetResourceType: "payout",
       targetResourceId: payoutId,
@@ -590,6 +658,7 @@ export class AdminService {
     page?: number;
     limit?: number;
     role?: string;
+    search?: string;
   }) {
     const page = params?.page || 1;
     const limit = params?.limit || 20;
@@ -597,10 +666,25 @@ export class AdminService {
 
     let query = supabaseAdmin
       .from("profiles")
-      .select("*", { count: "exact" });
+      // Narrow projection: the panel only renders these fields — no more
+      // select("*") shipping full PII to OPS_AGENT.
+      .select("id, full_name, phone, email, role, is_banned, created_at", { count: "exact" });
 
     if (params?.role) {
       query = query.eq("role", params.role);
+    }
+
+    // Search by phone/name/email (normalized like the OTP normalizer).
+    if (params?.search) {
+      const term = params.search.trim();
+      if (term) {
+        let phone = term.replace(/[\s-]/g, "");
+        if (/^0\d{9,12}$/.test(phone)) phone = `+92${phone.replace(/^0+/, "")}`;
+        else if (/^\d{9,12}$/.test(phone)) phone = `+92${phone}`;
+        query = query.or(
+          `full_name.ilike.%${term.replace(/[%_,()]/g, "")}%,email.ilike.%${term.replace(/[%_,()]/g, "")}%,phone.ilike.%${phone}%`,
+        );
+      }
     }
 
     query = query
@@ -614,7 +698,8 @@ export class AdminService {
   }
 
   /**
-   * Bans a user by setting is_banned on their profile.
+   * Bans a user by setting is_banned on their profile and revoking every
+   * live session (Redis) so the ban is immediate, not "on next login".
    */
   static async banUser(userId: string, adminId?: string) {
     const { data: previousUser } = await supabaseAdmin
@@ -622,6 +707,23 @@ export class AdminService {
       .select("*")
       .eq("id", userId)
       .single();
+
+    // Peer-ban guard: admins may not ban themselves or fellow admins —
+    // only SUPER_ADMIN can touch admin accounts.
+    const actor = await supabaseAdmin
+      .from("profiles")
+      .select("id, role")
+      .eq("id", adminId || "")
+      .maybeSingle();
+    const targetIsAdmin = ["ADMIN", "SUPER_ADMIN", "FINANCE", "OPS_AGENT", "MODERATOR"].includes(
+      previousUser?.role,
+    );
+    if (targetIsAdmin && actor?.data?.role !== "SUPER_ADMIN") {
+      throw new Error("Only a SUPER_ADMIN can ban admin accounts");
+    }
+    if (adminId && adminId === userId) {
+      throw new Error("You cannot ban your own account");
+    }
 
     const { data: updatedUser, error } = await supabaseAdmin
       .from("profiles")
@@ -634,6 +736,17 @@ export class AdminService {
       .single();
 
     if (error) throw error;
+
+    // Kill every live session immediately.
+    try {
+      const { SessionService } = await import("../auth/session.service.js");
+      await SessionService.revokeAllSessions(userId);
+    } catch (err: any) {
+      logger.warn("Failed to revoke sessions during ban (ban flag still applied)", {
+        userId,
+        error: err?.message,
+      });
+    }
 
     await AuditService.logAction({
       actorId: adminId || "SYSTEM",
@@ -878,12 +991,21 @@ export class AdminService {
     return updatedReturn;
   }
 
-  // ── Flash Sales Management ──────────────────────────────────────────────
+  // - Flash Sales Management -
 
   static async listFlashSales() {
     const { data, error } = await supabaseAdmin
       .from("flash_sales")
-      .select("*")
+      .select(`
+        *,
+        items:flash_sale_items(
+          id, variant_id, promotional_price_pkr, allocated_stock, sold_count,
+          variant:offer_variants(id, variant_name, offer:seller_offers(
+            id, sku, price_pkr,
+            catalog_product:catalog_products(title, thumbnail, images)
+          ))
+        )
+      `)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -937,13 +1059,43 @@ export class AdminService {
   }
 
   static async addFlashSaleItem(flashSaleId: string, variantId: string, salePricePkr: number, stockQuantity: number) {
+    // The admin panel searches by product/offer, so callers may send a
+    // seller_offers id. flash_sale_items.variant_id is an offer_variants id
+    // (047 FK) — resolve the offer's default variant when needed.
+    let resolvedVariantId = variantId;
+    const { data: variantProbe } = await supabaseAdmin
+      .from("offer_variants")
+      .select("id")
+      .eq("id", variantId)
+      .maybeSingle();
+    if (!variantProbe) {
+      const { data: offerVariant } = await supabaseAdmin
+        .from("offer_variants")
+        .select("id")
+        .eq("offer_id", variantId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!offerVariant) {
+        throw new Error("No sellable variant found for this product");
+      }
+      resolvedVariantId = offerVariant.id;
+    }
+
+    if (!Number.isFinite(salePricePkr) || salePricePkr <= 0) {
+      throw new Error("Promotional price must be a positive amount");
+    }
+    if (!Number.isFinite(stockQuantity) || stockQuantity < 0) {
+      throw new Error("Allocated stock must be zero or more");
+    }
+
     const { data, error } = await supabaseAdmin
       .from("flash_sale_items")
       .insert({
         flash_sale_id: flashSaleId,
-        variant_id: variantId,
-        promotional_price_pkr: salePricePkr,
-        allocated_stock: stockQuantity,
+        variant_id: resolvedVariantId,
+        promotional_price_pkr: Math.round(salePricePkr),
+        allocated_stock: Math.round(stockQuantity),
       })
       .select()
       .single();
@@ -962,7 +1114,7 @@ export class AdminService {
     return { success: true };
   }
 
-  // ── Banner/Campaign Management ─────────────────────────────────────────
+  // - Banner/Campaign Management -
 
   static async listBanners() {
     const { data, error } = await supabaseAdmin
@@ -1026,7 +1178,7 @@ export class AdminService {
     return { success: true };
   }
 
-  // ── Category Management ────────────────────────────────────────────────
+  // - Category Management -
 
   static async listCategories() {
     const { data, error } = await supabaseAdmin

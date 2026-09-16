@@ -27,15 +27,24 @@ export default function SellerPayoutsPage() {
     fetchSellerStore().then(setStore);
   }, []);
 
+  // "Settled" covers BOTH terminal settlement paths: SETTLED (automated
+  // weekly job via settle_payout_atomic) and COMPLETED (manual admin path).
+  // Counting only COMPLETED under-reported every automated settlement.
   const totalDisbursed = payouts
-    .filter((p) => p.status === PayoutStatus.COMPLETED)
+    .filter(
+      (p) =>
+        p.status === PayoutStatus.COMPLETED ||
+        p.status === PayoutStatus.SETTLED ||
+        p.status === PayoutStatus.PAID,
+    )
     .reduce((s, p) => s + (p.netPayoutPkr || 0), 0);
 
   const pendingEscrow = payouts
     .filter(
       (p) =>
         p.status === PayoutStatus.SCHEDULED ||
-        p.status === PayoutStatus.PROCESSING,
+        p.status === PayoutStatus.PROCESSING ||
+        p.status === PayoutStatus.HELD_PENDING_DELIVERY,
     )
     .reduce((s, p) => s + (p.netPayoutPkr || 0), 0);
 
@@ -80,12 +89,25 @@ export default function SellerPayoutsPage() {
           <div className="text-xs font-semibold text-slate-400">
             Linked Settlement Account
           </div>
-          <div className="text-sm font-bold text-white">
-            {store?.bankName || "Meezan Bank Ltd"}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono">
-            IBAN: {store?.bankAccountNumber || "PK64MEZN0001234567890123"}
-          </div>
+          {store?.bankName && store?.bankAccountNumber ? (
+            <>
+              <div className="text-sm font-bold text-white">
+                {store.bankName}
+              </div>
+              <div className="text-[10px] text-slate-400 font-mono">
+                IBAN: {store.bankAccountNumber}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-bold text-amber-400">
+                No bank account linked
+              </div>
+              <div className="text-[10px] text-amber-400/80">
+                Add your settlement details in Settings → KYC to receive payouts.
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -147,9 +169,15 @@ export default function SellerPayoutsPage() {
                   <td className="py-3 px-4">
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        payout.status === "COMPLETED"
+                        payout.status === "COMPLETED" ||
+                        payout.status === "SETTLED" ||
+                        payout.status === "PAID"
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          : payout.status === "HELD" ||
+                              payout.status === "HELD_PENDING_DELIVERY" ||
+                              payout.status === "FAILED"
+                            ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                       }`}
                     >
                       {payout.status}

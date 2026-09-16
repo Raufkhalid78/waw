@@ -171,9 +171,9 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=$SUPA_SERVICE"
           } >> "$GITHUB_ENV"
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
       - name: Run E2E tests
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --project=firefox
         env:
           CI: true
 

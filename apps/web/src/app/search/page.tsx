@@ -29,6 +29,10 @@ function SearchContent() {
   const router = useRouter();
 
   const queryParam = searchParams.get("q") || "";
+
+
+
+
   const categoryParam =
     searchParams.get("category") || searchParams.get("cat") || "All Categories";
   const cityParam = searchParams.get("city") || "All Cities";
@@ -66,20 +70,53 @@ function SearchContent() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetchProducts({
-      q: searchQuery.trim() ? searchQuery : undefined,
-      category:
-        selectedCategory !== "All Categories" ? selectedCategory : undefined,
-      sellerType: selectedSellerType,
-    }).then((data) => {
-      if (active) {
-        setProducts(data?.items || []);
-        if (data?.facets) setFacets(data.facets);
-        setLoading(false);
+    (async () => {
+      try {
+        // Fetch in 100-item pages (server max) up to MAX_CATALOG_ITEMS so the
+        // client-side filters/facets below keep working on the full result
+        // set without loading the entire catalog unboundedly.
+        const PAGE_SIZE = 100;
+        const MAX_CATALOG_ITEMS = 500;
+        const first = await fetchProducts({
+          q: searchQuery.trim() ? searchQuery : undefined,
+          category:
+            selectedCategory !== "All Categories" ? selectedCategory : undefined,
+          sellerType: selectedSellerType,
+          limit: PAGE_SIZE,
+          page: 1,
+        });
+        if (!active) return;
+        let items: ProductDetail[] = first?.items || [];
+        const totalPages = Math.min(
+          Number(first?.totalPages) || 1,
+          Math.ceil(MAX_CATALOG_ITEMS / PAGE_SIZE),
+        );
+        if (totalPages > 1) {
+          const rest = await Promise.all(
+            Array.from({ length: totalPages - 1 }, (_, i) =>
+              fetchProducts({
+                q: searchQuery.trim() ? searchQuery : undefined,
+                category:
+                  selectedCategory !== "All Categories"
+                    ? selectedCategory
+                    : undefined,
+                sellerType: selectedSellerType,
+                limit: PAGE_SIZE,
+                page: i + 2,
+              }).catch(() => ({ items: [] as ProductDetail[] })),
+            ),
+          );
+          for (const r of rest) {
+            items = items.concat(r?.items || []);
+          }
+        }
+        if (!active) return;
+        setProducts(items);
+        if (first?.facets) setFacets(first.facets);
+      } finally {
+        if (active) setLoading(false);
       }
-    }).catch(() => {
-      if (active) setLoading(false);
-    });
+    })();
     return () => {
       active = false;
     };

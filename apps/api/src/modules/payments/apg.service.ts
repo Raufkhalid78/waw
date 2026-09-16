@@ -146,7 +146,7 @@ export class AlfaPaymentGatewayService {
     }
   }
 
-  // ── STEP 1: Handshake ─────────────────────────────────────────────────────
+  // - STEP 1: Handshake -
 
   /**
    * Creates an onsite payment session: Handshake + Initiate Transaction.
@@ -272,7 +272,14 @@ export class AlfaPaymentGatewayService {
       status: PaymentStatus.PENDING,
       gateway_reference: session.authToken,
       amount_pkr: session.amountPkr,
-      gateway_response: { success: tran.success, isOtp: session.isOtp, stage: "initiated" },
+      gateway_response: {
+        success: tran.success,
+        isOtp: session.isOtp,
+        stage: "initiated",
+        // The process step reloads the HashKey from this field — it is
+        // required by the APG Process transaction call.
+        hashKey: session.hashKey || "",
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -291,7 +298,7 @@ export class AlfaPaymentGatewayService {
     };
   }
 
-  // ── STEP 3: Process Transaction (submit OTP onsite) ───────────────────────
+  // - STEP 3: Process Transaction (submit OTP onsite) -
 
   /**
    * Submits the OTP the customer typed on OUR checkout page and completes
@@ -415,7 +422,7 @@ export class AlfaPaymentGatewayService {
     };
   }
 
-  // ── STEP 4: IPN verification + atomic settlement ──────────────────────────
+  // - STEP 4: IPN verification + atomic settlement -
 
   /**
    * Server-to-server IPN inquiry — the ONLY trusted settlement source.

@@ -2,7 +2,7 @@
 
 
 import { API_BASE_URL } from "@waw/config";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ShoppingBag,
   Truck,
@@ -16,9 +16,11 @@ import {
   Phone,
   Package,
   Download,
+  Bell,
+  X,
 } from "lucide-react";
 import {
-  fetchSellerOrders,
+  fetchSellerOrdersRaw,
   updateStoreOrderStatus,
   SellerOrder,
 } from "../../lib/api";
@@ -29,10 +31,45 @@ export default function SellerOrdersPage() {
   const [selectedTab, setSelectedTab] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<SellerOrder | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [newOrderCount, setNewOrderCount] = useState(0);
+  // Previous list's order ids — baseline for detecting newly-arrived orders.
+  const knownOrderIdsRef = useRef<Set<string> | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    let fresh: SellerOrder[];
+    try {
+      fresh = await fetchSellerOrdersRaw();
+    } catch {
+      // Transient poll failure — keep the last good snapshot on screen.
+      return;
+    }
+    const prevIds = knownOrderIdsRef.current;
+    if (prevIds) {
+      const arrived = fresh.filter((o) => !prevIds.has(o.id)).length;
+      if (arrived > 0) setNewOrderCount((c) => c + arrived);
+    }
+    knownOrderIdsRef.current = new Set(fresh.map((o) => o.id));
+    setOrders(fresh);
+    setLastUpdated(new Date());
+    // Keep the action panel in sync with the refreshed data.
+    setSelectedOrder((prev) =>
+      prev ? (fresh.find((o) => o.id === prev.id) ?? prev) : null,
+    );
+  }, []);
 
   useEffect(() => {
-    fetchSellerOrders().then(setOrders);
-  }, []);
+    loadOrders();
+  }, [loadOrders]);
+
+  // Near-real-time: poll every 30s, but only while the tab is visible.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      loadOrders();
+    }, 30000);
+    return () => clearInterval(id);
+  }, [loadOrders]);
 
   const filteredOrders = orders.filter((order) => {
     const matchesTab =
@@ -48,7 +85,12 @@ export default function SellerOrdersPage() {
     orderId: string,
     newStatus: OrderStatus,
   ) => {
-    await updateStoreOrderStatus(orderId, newStatus);
+    try {
+      await updateStoreOrderStatus(orderId, newStatus);
+    } catch (err: any) {
+      alert(err?.message || "Failed to update order status. Please try again.");
+      return;
+    }
     setOrders((prev) =>
       prev.map((o) =>
         o.id === orderId ? { ...o, orderStatus: newStatus } : o,
@@ -63,14 +105,40 @@ export default function SellerOrdersPage() {
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+      {newOrderCount > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+          <span className="font-bold flex items-center gap-1.5">
+            <Bell className="w-4 h-4 shrink-0" /> You have {newOrderCount} new
+            order{newOrderCount > 1 ? "s" : ""}
+          </span>
+          <button
+            onClick={() => setNewOrderCount(0)}
+            title="Dismiss"
+            className="text-emerald-400/70 hover:text-emerald-300"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <div>
         <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
           Store Fulfillment & Sub-Orders
         </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Pack and manifest courier shipments for items purchased from your
-          shop.
-        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-xs text-slate-400">
+            Pack and manifest courier shipments for items purchased from your
+            shop.
+          </p>
+          {lastUpdated && (
+            <span className="text-[10px] text-slate-500 whitespace-nowrap">
+              Updated{" "}
+              {lastUpdated.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Tabs & Search */}
@@ -108,6 +176,19 @@ export default function SellerOrdersPage() {
       {/* Orders List */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {filteredOrders.length === 0 && (
+            <div className="p-10 rounded-2xl bg-[#0f172a] border border-slate-800 text-center">
+              <Package className="w-8 h-8 mx-auto text-slate-600 mb-3" />
+              <p className="text-sm font-bold text-slate-300">
+                {orders.length === 0 ? "No orders yet" : "No orders match this filter"}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {orders.length === 0
+                  ? "Orders from buyers will appear here as soon as they purchase from your store."
+                  : "Try a different tab or clear the search."}
+              </p>
+            </div>
+          )}
           {filteredOrders.map((order) => (
             <div
               key={order.id}
@@ -237,7 +318,7 @@ export default function SellerOrdersPage() {
                 <button
                   onClick={() => {
                     const API = API_BASE_URL;
-                    window.open(`${API}/api/orders/${selectedOrder.id}/invoice`, "_blank");
+                    window.open(`${API}/api/seller/orders/${selectedOrder.id}/invoice`, "_blank");
                   }}
                   className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
                 >

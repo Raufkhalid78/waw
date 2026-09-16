@@ -1,6 +1,6 @@
 import { Zap } from "lucide-react";
 
-// ─── Star Rating ─────────────────────────────────────────────────
+// - Star Rating -
 export function RatingStars({
   rating,
   count,
@@ -58,7 +58,7 @@ function StarIcon({ fill }: { fill: "full" | "half" | "empty" }) {
   );
 }
 
-// ─── Waw Express Badge ────────────────────────────────────────────
+// - Waw Express Badge -
 export function WawExpressBadge({ size = "sm" }: { size?: "sm" | "md" }) {
   return (
     <span
@@ -72,7 +72,7 @@ export function WawExpressBadge({ size = "sm" }: { size?: "sm" | "md" }) {
   );
 }
 
-// ─── Discount Pill ────────────────────────────────────────────────
+// - Discount Pill -
 export function DiscountPill({ percent }: { percent: number }) {
   return (
     <span className="inline-block bg-danger text-surface-card text-[10px] font-bold px-2 py-0.5 rounded-md">
@@ -81,7 +81,7 @@ export function DiscountPill({ percent }: { percent: number }) {
   );
 }
 
-// ─── Verified Seller Badge ────────────────────────────────────────
+// - Verified Seller Badge -
 export function VerifiedBadge() {
   return (
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success">

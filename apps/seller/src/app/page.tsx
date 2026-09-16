@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ShoppingBag,
@@ -15,9 +15,11 @@ import {
   Tag,
   ExternalLink,
   Sparkles,
+  Bell,
+  X,
 } from "lucide-react";
 import {
-  fetchSellerOrders,
+  fetchSellerOrdersRaw,
   fetchSellerStore,
   fetchSellerProducts,
   fetchSellerAnalytics,
@@ -34,6 +36,19 @@ export default function SellerDashboardPage() {
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [analytics, setAnalytics] = useState<SellerAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [newOrderCount, setNewOrderCount] = useState(0);
+  // Previous list's order ids — baseline for detecting newly-arrived orders.
+  const knownOrderIdsRef = useRef<Set<string> | null>(null);
+
+  const applyOrders = useCallback((fresh: SellerOrder[]) => {
+    const prevIds = knownOrderIdsRef.current;
+    if (prevIds) {
+      const arrived = fresh.filter((o) => !prevIds.has(o.id)).length;
+      if (arrived > 0) setNewOrderCount((c) => c + arrived);
+    }
+    knownOrderIdsRef.current = new Set(fresh.map((o) => o.id));
+    setOrders(fresh);
+  }, []);
 
   useEffect(() => {
     // waw_session is httpOnly — never readable from document.cookie.
@@ -42,12 +57,12 @@ export default function SellerDashboardPage() {
       try {
         const [s, o, p, a] = await Promise.all([
           fetchSellerStore(),
-          fetchSellerOrders(),
+          fetchSellerOrdersRaw().catch(() => [] as SellerOrder[]),
           fetchSellerProducts(),
           fetchSellerAnalytics(),
         ]);
         setStore(s);
-        setOrders(o);
+        applyOrders(o);
         setProducts(p);
         setAnalytics(a);
       } catch (err) {
@@ -57,7 +72,20 @@ export default function SellerDashboardPage() {
       }
     }
     loadData();
-  }, []);
+  }, [applyOrders]);
+
+  // Near-real-time: refresh orders every 60s, but only while the tab is visible.
+  useEffect(() => {
+    const id = setInterval(async () => {
+      if (document.visibilityState === "hidden") return;
+      try {
+        applyOrders(await fetchSellerOrdersRaw());
+      } catch {
+        // Transient poll failure — keep the last good snapshot on screen.
+      }
+    }, 60000);
+    return () => clearInterval(id);
+  }, [applyOrders]);
 
   if (loading) {
     return (
@@ -168,6 +196,22 @@ export default function SellerDashboardPage() {
 
   return (
     <div className="space-y-8">
+      {newOrderCount > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+          <span className="font-bold flex items-center gap-1.5">
+            <Bell className="w-4 h-4 shrink-0" /> You have {newOrderCount} new
+            order{newOrderCount > 1 ? "s" : ""}
+          </span>
+          <button
+            onClick={() => setNewOrderCount(0)}
+            title="Dismiss"
+            className="text-emerald-400/70 hover:text-emerald-300"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* ── Welcome Banner ────────────────────────────────────────── */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -214,14 +258,24 @@ export default function SellerDashboardPage() {
             </div>
           </div>
           <span className="text-xs font-mono font-bold text-amber-400">
-            {products.length > 0 ? "4/4 Completed" : "3/4 Completed"}
+            {[
+              Boolean(store?.name && store?.city),
+              store?.isVerified,
+              Boolean(store?.bankAccountNumber),
+              products.length > 0,
+            ].filter(Boolean).length}
+            /4 Completed
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0 mt-0.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+          <div className={`p-3.5 rounded-xl bg-slate-900/80 border flex items-start gap-3 ${store?.name && store?.city ? "border-emerald-500/30" : "border-amber-500/40 bg-amber-500/5"}`}>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${store?.name && store?.city ? "bg-emerald-500 text-slate-950" : "bg-amber-400 text-slate-950 font-black text-[10px]"}`}>
+              {store?.name && store?.city ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                "1"
+              )}
             </div>
             <div>
               <div className="text-xs font-bold text-white">
@@ -233,9 +287,13 @@ export default function SellerDashboardPage() {
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0 mt-0.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+          <div className={`p-3.5 rounded-xl bg-slate-900/80 border flex items-start gap-3 ${store?.isVerified ? "border-emerald-500/30" : "border-amber-500/40 bg-amber-500/5"}`}>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${store?.isVerified ? "bg-emerald-500 text-slate-950" : "bg-amber-400 text-slate-950 font-black text-[10px]"}`}>
+              {store?.isVerified ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                "2"
+              )}
             </div>
             <div>
               <div className="text-xs font-bold text-white">
@@ -247,9 +305,13 @@ export default function SellerDashboardPage() {
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0 mt-0.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+          <div className={`p-3.5 rounded-xl bg-slate-900/80 border flex items-start gap-3 ${store?.bankAccountNumber ? "border-emerald-500/30" : "border-amber-500/40 bg-amber-500/5"}`}>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${store?.bankAccountNumber ? "bg-emerald-500 text-slate-950" : "bg-amber-400 text-slate-950 font-black text-[10px]"}`}>
+              {store?.bankAccountNumber ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                "3"
+              )}
             </div>
             <div>
               <div className="text-xs font-bold text-white">

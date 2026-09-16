@@ -9,7 +9,7 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      /* ── Brand Colours ──────────────────────────── */
+      /* - Brand Colours - */
       colors: {
         gold: {
           DEFAULT: "#F5A623",
@@ -37,7 +37,7 @@ const config: Config = {
         danger: "#DC2626",
       },
 
-      /* ── Typography ─────────────────────────────── */
+      /* - Typography - */
       fontFamily: {
         display: ['"Playfair Display"', "Georgia", "serif"],
         body: ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
@@ -65,7 +65,7 @@ const config: Config = {
         "7xl": ["72px", { lineHeight: "80px" }],
       },
 
-      /* ── Spacing (8pt grid) ─────────────────────── */
+      /* - Spacing (8pt grid) - */
       spacing: {
         "4.5": "18px",
         "5.5": "22px",
@@ -84,7 +84,7 @@ const config: Config = {
         "50": "200px",
       },
 
-      /* ── Border Radius ──────────────────────────── */
+      /* - Border Radius - */
       borderRadius: {
         none: "0",
         sm: "4px",
@@ -98,7 +98,7 @@ const config: Config = {
         pill: "9999px",
       },
 
-      /* ── Shadows ────────────────────────────────── */
+      /* - Shadows - */
       boxShadow: {
         card: "0 1px 3px rgba(15, 14, 13, 0.06), 0 1px 2px rgba(15, 14, 13, 0.04)",
         hover:
@@ -108,7 +108,7 @@ const config: Config = {
         none: "none",
       },
 
-      /* ── Transitions ────────────────────────────── */
+      /* - Transitions - */
       transitionTimingFunction: {
         smooth: "cubic-bezier(0.4, 0, 0.2, 1)",
         spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
@@ -122,7 +122,7 @@ const config: Config = {
         "500": "500ms",
       },
 
-      /* ── Keyframe Animations ────────────────────── */
+      /* - Keyframe Animations - */
       keyframes: {
         "fade-up": {
           from: { opacity: "0", transform: "translateY(12px)" },
@@ -167,13 +167,13 @@ const config: Config = {
         marquee: "marquee 28s linear infinite",
       },
 
-      /* ── Min/Max Heights ────────────────────────── */
+      /* - Min/Max Heights - */
       minHeight: {
         "hero-mobile": "56vw",
         "hero-desktop": "520px",
       },
 
-      /* ── Backdrop Blur ──────────────────────────── */
+      /* - Backdrop Blur - */
       backdropBlur: {
         xs: "2px",
         sm: "4px",

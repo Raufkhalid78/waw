@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { disputesApi, type AdminDispute } from "@/lib/api";
-import { AlertTriangle, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2 } from "lucide-react";
 
 export default function DisputesPage() {
   const [disputes, setDisputes] = useState<AdminDispute[]>([]);
@@ -10,17 +11,24 @@ export default function DisputesPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [resolving, setResolving] = useState<string | null>(null);
-  const [resolutionText, setResolutionText] = useState("");
+  const [refundTarget, setRefundTarget] = useState<AdminDispute | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundError, setRefundError] = useState("");
 
   const loadDisputes = useCallback(async () => {
     setLoading(true);
     try {
       const data = await disputesApi.list({ page, limit: 20, status: statusFilter || undefined });
-      setDisputes(data.disputes || []);
-      setTotal(data.total || 0);
-    } catch (err) {
+      // The API returns a raw array (listDisputes).
+      const rows = Array.isArray(data) ? data : (data as any)?.disputes || [];
+      setDisputes(rows);
+      setTotal(rows.length);
+      setLoadError("");
+    } catch (err: any) {
       console.error("Failed to load disputes", err);
+      setLoadError(err?.message || "Failed to load disputes");
     } finally {
       setLoading(false);
     }
@@ -30,15 +38,42 @@ export default function DisputesPage() {
     loadDisputes();
   }, [loadDisputes]);
 
-  const handleResolve = async (id: string) => {
-    if (!resolutionText.trim()) return;
+  // The API's resolveDispute expects the DisputeResolution ENUM —
+  // REFUND_BUYER | RELEASE_SELLER_PAYOUT | REPLACEMENT_ISSUED | DISMISSED.
+  // Any other value closes the ticket with NO financial action.
+  const handleResolve = async (id: string, resolution: "REFUND_BUYER" | "RELEASE_SELLER_PAYOUT" | "REPLACEMENT_ISSUED" | "DISMISSED", refundAmountPkr?: number) => {
     try {
-      await disputesApi.resolve(id, resolutionText);
+      await disputesApi.resolve(id, resolution, refundAmountPkr);
       setResolving(null);
-      setResolutionText("");
       loadDisputes();
-    } catch (err) {
-      console.error("Failed to resolve dispute", err);
+    } catch (err: any) {
+      alert(err?.message || "Failed to resolve dispute");
+    }
+  };
+
+  const openRefund = (d: AdminDispute) => {
+    setRefundTarget(d);
+    setRefundAmount(d.refund_amount_pkr != null ? String(d.refund_amount_pkr) : "");
+    setRefundError("");
+  };
+
+  const confirmRefund = async () => {
+    // Refund is a money-moving action: validate a numeric amount > 0 before
+    // hitting the API.
+    if (!refundTarget) return;
+    const parsed = Number(refundAmount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setRefundError("Enter a valid refund amount");
+      return;
+    }
+    setResolving(refundTarget.id);
+    try {
+      await disputesApi.resolve(refundTarget.id, "REFUND_BUYER", parsed);
+      setResolving(null);
+      setRefundTarget(null);
+      loadDisputes();
+    } catch (err: any) {
+      setRefundError(err?.message || "Failed to resolve dispute");
     }
   };
 
@@ -78,6 +113,8 @@ export default function DisputesPage() {
         ))}
       </div>
 
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadDisputes} />}
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -85,10 +122,12 @@ export default function DisputesPage() {
           ))}
         </div>
       ) : disputes.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>No disputes found</p>
-        </div>
+        loadError ? null : (
+          <div className="text-center py-16 text-gray-400">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>No disputes found</p>
+          </div>
+        )
       ) : (
         <div className="space-y-3">
           {disputes.map((d) => (
@@ -104,7 +143,7 @@ export default function DisputesPage() {
                   <p className="text-sm font-medium text-gray-900">{d.reason}</p>
                   {d.description && <p className="text-xs text-gray-500">{d.description}</p>}
                   <div className="text-xs text-gray-400">
-                    Buyer: {d.buyer_name || d.buyer_id} &middot; Seller: {d.seller_name || d.seller_id}
+                    Buyer: {d.buyer_name || (d as any).buyer?.full_name || d.buyer_id} &middot; Seller: {d.seller_name || d.seller_id}
                   </div>
                 </div>
                 {d.status !== "RESOLVED" && d.status !== "CLOSED" && (
@@ -117,26 +156,39 @@ export default function DisputesPage() {
                 )}
               </div>
               {resolving === d.id && (
-                <div className="flex gap-2 pt-2 border-t border-gray-100">
-                  <input
-                    type="text"
-                    value={resolutionText}
-                    onChange={(e) => setResolutionText(e.target.value)}
-                    placeholder="Enter resolution..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                  />
-                  <button
-                    onClick={() => handleResolve(d.id)}
-                    className="px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg"
-                  >
-                    Submit
-                  </button>
-                  <button
-                    onClick={() => { setResolving(null); setResolutionText(""); }}
-                    className="px-3 py-2 text-gray-500 text-xs rounded-lg hover:bg-gray-100"
-                  >
-                    Cancel
-                  </button>
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => openRefund(d)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg"
+                    >
+                      Refund Buyer
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!confirm("Mark this dispute as resolved with a replacement sent to the buyer?")) return;
+                        handleResolve(d.id, "REPLACEMENT_ISSUED");
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg"
+                    >
+                      Replacement Sent
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!confirm("Reject this claim and release the seller's held payout?")) return;
+                        handleResolve(d.id, "RELEASE_SELLER_PAYOUT");
+                      }}
+                      className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-lg"
+                    >
+                      Reject Claim
+                    </button>
+                    <button
+                      onClick={() => setResolving(null)}
+                      className="px-3 py-2 text-gray-500 text-xs rounded-lg hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

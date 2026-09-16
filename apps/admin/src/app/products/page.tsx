@@ -2,7 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productsApi } from "@/lib/api";
-import { Package, Check, X, Search, Inbox } from "lucide-react";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { Package, Check, X, Search, Inbox, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { FadeIn, Stagger } from "@/components/Motion";
 
@@ -10,21 +11,29 @@ export default function ProductsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [actionError, setActionError] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["admin-products", page, search],
     queryFn: () => productsApi.list({ page, limit: 20, search }),
+    retry: 1,
   });
 
   const approveMutation = useMutation({
     mutationFn: productsApi.approve,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
+    onError: (err: any) =>
+      setActionError(err?.message || "Failed to approve product — it remains PENDING"),
   });
 
   const rejectMutation = useMutation({
     mutationFn: productsApi.reject,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
+    onError: (err: any) =>
+      setActionError(err?.message || "Failed to reject product — it remains PENDING"),
   });
+
+  const mutationPending = approveMutation.isPending || rejectMutation.isPending;
 
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
 
@@ -38,6 +47,25 @@ export default function ProductsPage() {
           )}
         </div>
       </FadeIn>
+
+      {isError && (
+        <ApiErrorBanner
+          message={(error as any)?.message || "Failed to load products"}
+          onRetry={() => refetch()}
+        />
+      )}
+      {actionError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span className="flex-1">{actionError}</span>
+          <button
+            onClick={() => setActionError("")}
+            className="px-2 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-xs font-medium"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <FadeIn delay={50}>
         <div className="relative max-w-sm">
@@ -122,14 +150,16 @@ export default function ProductsPage() {
                             <>
                               <button
                                 onClick={() => approveMutation.mutate(product.id)}
-                                className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors active:scale-95"
+                                disabled={mutationPending}
+                                className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                                 title="Approve"
                               >
                                 <Check className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => rejectMutation.mutate(product.id)}
-                                className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors active:scale-95"
+                                disabled={mutationPending}
+                                className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                                 title="Reject"
                               >
                                 <X className="w-4 h-4" />

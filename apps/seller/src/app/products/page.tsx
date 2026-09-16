@@ -174,16 +174,19 @@ export default function SellerProductsPage() {
     }
     try {
       const editCategory = editSubCategoryId || editParentCategoryId;
+      // The API's UpdateProductSchema is camelCase and Zod strips unknown
+      // keys — the previous snake_case payload silently dropped price, stock,
+      // category, image and weight edits while the modal reported success.
       await updateSellerProduct(editingProduct.id, {
         title: editTitle,
-        title_urdu: editTitleUrdu,
+        titleUrdu: editTitleUrdu,
         description: editDescription,
-        base_price_pkr: editPrice,
-        compare_at_price_pkr: editComparePricePkr ? Math.round(parseFloat(editComparePricePkr)) : undefined,
-        stock_quantity: parseInt(editStockQuantity, 10),
-        category_id: editCategory || undefined,
-        image_url: editImageUrl,
-        weight_kg: parseFloat(editWeightKg) || 1.0,
+        basePricePkr: editPrice,
+        compareAtPricePkr: editComparePricePkr ? Math.round(parseFloat(editComparePricePkr)) : undefined,
+        stockQuantity: parseInt(editStockQuantity, 10),
+        categoryId: editCategory || undefined,
+        imageUrl: editImageUrl,
+        weightKg: parseFloat(editWeightKg) || 1.0,
       });
       setProducts((prev) =>
         prev.map((p) =>
@@ -236,7 +239,9 @@ export default function SellerProductsPage() {
     setEditBasePricePkr(String(product.basePricePkr));
     setEditComparePricePkr(String(product.compareAtPricePkr || ""));
     setEditStockQuantity(String(product.stockQuantity));
-    setEditDescription("");
+    // Seed the edit form with the CURRENT description so saving without
+    // retyping it preserves (rather than wipes) the product copy.
+    setEditDescription(product.description || "");
     setEditImageUrl(product.images?.[0] || "");
     setEditWeightKg(String(product.weightKg || 1.0));
     setShowEditModal(true);

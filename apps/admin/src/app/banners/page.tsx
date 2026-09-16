@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { FadeIn } from "@/components/Motion";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { bannersApi, uploadApi, AdminBanner } from "@/lib/api";
 import {
   ImageIcon, Plus, Trash2, X, Eye, EyeOff, Upload, GripVertical,
@@ -13,6 +14,8 @@ export default function BannersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingBanner, setEditingBanner] = useState<AdminBanner | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [formError, setFormError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     title: "",
@@ -35,11 +38,12 @@ export default function BannersPage() {
 
   const loadBanners = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await bannersApi.list();
       setBanners(data);
-    } catch (err) {
-      console.error("Failed to load banners", err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load banners");
     } finally {
       setLoading(false);
     }
@@ -67,7 +71,20 @@ export default function BannersPage() {
     }
   };
 
+  const validateForm = (): string => {
+    if (!formData.title.trim()) return "Title is required";
+    if (!formData.image_url.trim()) return "Banner image is required — upload one or paste a URL";
+    if (!formData.link_url.trim()) return "Link URL is required";
+    if (formData.starts_at && formData.ends_at && formData.ends_at < formData.starts_at) {
+      return "End date must be after the start date";
+    }
+    return "";
+  };
+
   const handleCreate = async () => {
+    const err = validateForm();
+    if (err) { setFormError(err); return; }
+    setFormError("");
     try {
       await bannersApi.create({
         ...formData,
@@ -77,13 +94,16 @@ export default function BannersPage() {
       setShowCreate(false);
       resetForm();
       loadBanners();
-    } catch (err) {
-      console.error("Failed to create banner", err);
+    } catch (err: any) {
+      setFormError(err?.message || "Failed to create banner");
     }
   };
 
   const handleUpdate = async () => {
     if (!editingBanner) return;
+    const err = validateForm();
+    if (err) { setFormError(err); return; }
+    setFormError("");
     try {
       await bannersApi.update(editingBanner.id, {
         ...formData,
@@ -93,8 +113,8 @@ export default function BannersPage() {
       setEditingBanner(null);
       resetForm();
       loadBanners();
-    } catch (err) {
-      console.error("Failed to update banner", err);
+    } catch (err: any) {
+      setFormError(err?.message || "Failed to update banner");
     }
   };
 
@@ -334,6 +354,11 @@ export default function BannersPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            {formError && (
+              <div className="px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+                {formError}
+              </div>
+            )}
             <BannerForm onSave={handleCreate} saveLabel="Create" />
           </div>
         </div>
@@ -348,10 +373,17 @@ export default function BannersPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            {formError && (
+              <div className="px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+                {formError}
+              </div>
+            )}
             <BannerForm onSave={handleUpdate} saveLabel="Update" />
           </div>
         </div>
       )}
+
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadBanners} />}
 
       {loading ? (
         <div className="space-y-3">
@@ -362,7 +394,7 @@ export default function BannersPage() {
             </div>
           ))}
         </div>
-      ) : banners.length === 0 ? (
+      ) : banners.length === 0 && !loadError ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
           <ImageIcon className="w-10 h-10 text-gray-300 mx-auto mb-3" aria-hidden="true" />
           <h3 className="text-base font-bold text-gray-900 mb-1">No Banners</h3>

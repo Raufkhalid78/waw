@@ -21,7 +21,7 @@
 
 BEGIN;
 
--- ── Helper: insert-or-get a category by slug ─────────────────────────────
+-- - Helper: insert-or-get a category by slug -
 -- Returns the id whether the row pre-existed or was just created.
 
 CREATE OR REPLACE FUNCTION waw_upsert_category(
@@ -62,98 +62,90 @@ BEGIN
 END;
 $$;
 
--- ── Top-level categories ─────────────────────────────────────────────────
+-- - Top-level categories -
 
-PERFORM waw_upsert_category('Fashion', 'فیشن', 'fashion',
-  'Clothing, fabrics and footwear for men, women and kids', 1, 15.00);
-PERFORM waw_upsert_category('Mobiles & Technology', 'موبائل اور ٹیکنالوجی', 'mobiles-tech',
-  'Phones, tablets, audio and gadgets', 2, 3.00);
-PERFORM waw_upsert_category('Beauty & Fragrance', 'بیوٹی اور پرفیوم', 'beauty-fragrance',
-  'Skincare, makeup and authentic fragrances', 3, 10.00);
-PERFORM waw_upsert_category('Home & Living', 'گھر اور زندگی', 'home-living',
-  'Furniture, decor, kitchen and bedding', 4, 10.00);
-PERFORM waw_upsert_category('Leather & Heritage Crafts', 'چمڑے کی مصنوعات', 'leather-craft',
-  'Sialkot leather goods and Pakistani heritage crafts', 5, 12.00);
-PERFORM waw_upsert_category('Sports & Outdoors', 'کھیل اور آؤٹ ڈور', 'sialkot-sports',
-  'Sialkot-manufactured sports equipment and gear', 6, 8.00);
-PERFORM waw_upsert_category('Groceries & Essentials', 'کریانہ', 'groceries',
-  'Daily-use staples and household essentials', 7, 5.00);
-PERFORM waw_upsert_category('Kids & Toys', 'بچوں کی اشیاء', 'kids-toys',
-  'Toys, games and baby products', 8, 10.00);
+SELECT waw_upsert_category('Fashion', 'فیشن', 'fashion', p_description => 'Clothing, fabrics and footwear for men, women and kids', p_sort => 1, p_commission => 15.00);
+SELECT waw_upsert_category('Mobiles & Technology', 'موبائل اور ٹیکنالوجی', 'mobiles-tech', p_description => 'Phones, tablets, audio and gadgets', p_sort => 2, p_commission => 3.00);
+SELECT waw_upsert_category('Beauty & Fragrance', 'بیوٹی اور پرفیوم', 'beauty-fragrance', p_description => 'Skincare, makeup and authentic fragrances', p_sort => 3, p_commission => 10.00);
+SELECT waw_upsert_category('Home & Living', 'گھر اور زندگی', 'home-living', p_description => 'Furniture, decor, kitchen and bedding', p_sort => 4, p_commission => 10.00);
+SELECT waw_upsert_category('Leather & Heritage Crafts', 'چمڑے کی مصنوعات', 'leather-craft', p_description => 'Sialkot leather goods and Pakistani heritage crafts', p_sort => 5, p_commission => 12.00);
+SELECT waw_upsert_category('Sports & Outdoors', 'کھیل اور آؤٹ ڈور', 'sialkot-sports', p_description => 'Sialkot-manufactured sports equipment and gear', p_sort => 6, p_commission => 8.00);
+SELECT waw_upsert_category('Groceries & Essentials', 'کریانہ', 'groceries', p_description => 'Daily-use staples and household essentials', p_sort => 7, p_commission => 5.00);
+SELECT waw_upsert_category('Kids & Toys', 'بچوں کی اشیاء', 'kids-toys', p_description => 'Toys, games and baby products', p_sort => 8, p_commission => 10.00);
 
--- ── Fashion subcategories ────────────────────────────────────────────────
-PERFORM waw_upsert_category('Women''s Lawn & Festive', 'لان اور فیسٹیو', 'womens-lawn-festive', 'fashion',
+-- - Fashion subcategories -
+SELECT waw_upsert_category('Women''s Lawn & Festive', 'لان اور فیسٹیو', 'womens-lawn-festive', 'fashion',
   'Unstitched and stitched lawn suits, festive collections', 1, 15.00);
-PERFORM waw_upsert_category('Men''s Kurtas & Shalwar Kameez', 'مردانہ کرتہ شیں', 'mens-kurta-shalwar', 'fashion',
+SELECT waw_upsert_category('Men''s Kurtas & Shalwar Kameez', 'مردانہ کرتہ شیں', 'mens-kurta-shalwar', 'fashion',
   'Traditional menswear and festive kurtas', 2, 15.00);
-PERFORM waw_upsert_category('Footwear', 'جوتے', 'footwear', 'fashion',
+SELECT waw_upsert_category('Footwear', 'جوتے', 'footwear', 'fashion',
   'Shoes, khussa, chappals and heritage footwear', 3, 15.00);
-PERFORM waw_upsert_category('Bags & Accessories', 'بیگز اور ایکسسیسریز', 'bags-accessories', 'fashion',
+SELECT waw_upsert_category('Bags & Accessories', 'بیگز اور ایکسسیسریز', 'bags-accessories', 'fashion',
   'Handbags, purses, belts and fashion accessories', 4, 15.00);
-PERFORM waw_upsert_category('Jewellery & Imitation', 'زیورات', 'jewellery', 'fashion',
+SELECT waw_upsert_category('Jewellery & Imitation', 'زیورات', 'jewellery', 'fashion',
   'Traditional and modern jewellery', 5, 15.00);
 
--- ── Mobiles & Technology subcategories ───────────────────────────────────
-PERFORM waw_upsert_category('Mobile Phones', 'موبائل فون', 'mobile-phones', 'mobiles-tech',
+-- - Mobiles & Technology subcategories -
+SELECT waw_upsert_category('Mobile Phones', 'موبائل فون', 'mobile-phones', 'mobiles-tech',
   'Smartphones and feature phones', 1, 3.00);
-PERFORM waw_upsert_category('Audio & Wearables', 'آڈیو اور ویئریبل', 'audio-wearables', 'mobiles-tech',
+SELECT waw_upsert_category('Audio & Wearables', 'آڈیو اور ویئریبل', 'audio-wearables', 'mobiles-tech',
   'Earbuds, headphones, smartwatches', 2, 3.00);
-PERFORM waw_upsert_category('Mobile Accessories', 'موبائل ایکسسیسریز', 'mobile-accessories', 'mobiles-tech',
+SELECT waw_upsert_category('Mobile Accessories', 'موبائل ایکسسیسریز', 'mobile-accessories', 'mobiles-tech',
   'Chargers, cables, cases and covers', 3, 5.00);
 
--- ── Beauty & Fragrance subcategories ─────────────────────────────────────
-PERFORM waw_upsert_category('Skincare', 'اسکن کیئر', 'skincare', 'beauty-fragrance',
+-- - Beauty & Fragrance subcategories -
+SELECT waw_upsert_category('Skincare', 'اسکن کیئر', 'skincare', 'beauty-fragrance',
   'Cleansers, serums and moisturisers', 1, 10.00);
-PERFORM waw_upsert_category('Makeup', 'میک اپ', 'makeup', 'beauty-fragrance',
+SELECT waw_upsert_category('Makeup', 'میک اپ', 'makeup', 'beauty-fragrance',
   'Lipsticks, foundations and cosmetics', 2, 10.00);
-PERFORM waw_upsert_category('Fragrances & Attars', 'پرفیوم اور عطر', 'fragrances-attars', 'beauty-fragrance',
+SELECT waw_upsert_category('Fragrances & Attars', 'پرفیوم اور عطر', 'fragrances-attars', 'beauty-fragrance',
   'Perfumes, body sprays and traditional attars', 3, 10.00);
 
--- ── Home & Living subcategories ──────────────────────────────────────────
-PERFORM waw_upsert_category('Bedsheets & Curtains', 'بید شیٹس اور پردے', 'bedsheets-curtains', 'home-living',
+-- - Home & Living subcategories -
+SELECT waw_upsert_category('Bedsheets & Curtains', 'بید شیٹس اور پردے', 'bedsheets-curtains', 'home-living',
   'King, queen and single bedding sets', 1, 10.00);
-PERFORM waw_upsert_category('Kitchen & Dining', 'باورچی خانہ', 'kitchen-dining', 'home-living',
+SELECT waw_upsert_category('Kitchen & Dining', 'باورچی خانہ', 'kitchen-dining', 'home-living',
   'Cookware, utensils and dinner sets', 2, 10.00);
-PERFORM waw_upsert_category('Decor & Lighting', 'سیج سجاوٹ', 'decor-lighting', 'home-living',
+SELECT waw_upsert_category('Decor & Lighting', 'سیج سجاوٹ', 'decor-lighting', 'home-living',
   'Wall art, lamps and home accents', 3, 10.00);
-PERFORM waw_upsert_category('Chiniot Handicrafts', 'چنیوٹ کی ہنری مصنوعات', 'chiniot-handicrafts', 'home-living',
+SELECT waw_upsert_category('Chiniot Handicrafts', 'چنیوٹ کی ہنری مصنوعات', 'chiniot-handicrafts', 'home-living',
   'Hand-carved wooden furniture and brass inlay', 4, 10.00);
 
--- ── Leather & Heritage Crafts subcategories ──────────────────────────────
-PERFORM waw_upsert_category('Leather Bags & Wallets', 'چمڑے کے بیگ اور والٹ', 'leather-bags-wallets', 'leather-craft',
+-- - Leather & Heritage Crafts subcategories -
+SELECT waw_upsert_category('Leather Bags & Wallets', 'چمڑے کے بیگ اور والٹ', 'leather-bags-wallets', 'leather-craft',
   'Sialkot leather jackets, bags and wallets', 1, 12.00);
-PERFORM waw_upsert_category('Sports Gloves & Gear', 'اسپورٹس گلوز', 'sports-gloves', 'leather-craft',
+SELECT waw_upsert_category('Sports Gloves & Gear', 'اسپورٹس گلوز', 'sports-gloves', 'leather-craft',
   'Sialkot-made sports gloves and protective gear', 2, 12.00);
-PERFORM waw_upsert_category('Heritage Textiles', 'روایتی کپڑے', 'heritage-textiles', 'leather-craft',
+SELECT waw_upsert_category('Heritage Textiles', 'روایتی کپڑے', 'heritage-textiles', 'leather-craft',
   'Handloom fabrics and regional crafts', 3, 12.00);
 
--- ── Sports & Outdoors subcategories ──────────────────────────────────────
-PERFORM waw_upsert_category('Cricket', 'کرکٹ', 'cricket', 'sialkot-sports',
+-- - Sports & Outdoors subcategories -
+SELECT waw_upsert_category('Cricket', 'کرکٹ', 'cricket', 'sialkot-sports',
   'Bats, balls, pads and cricket gear', 1, 8.00);
-PERFORM waw_upsert_category('Football & Futsal', 'فٹبال', 'football-futsal', 'sialkot-sports',
+SELECT waw_upsert_category('Football & Futsal', 'فٹبال', 'football-futsal', 'sialkot-sports',
   'Match balls, boots and gear', 2, 8.00);
-PERFORM waw_upsert_category('Fitness & Exercise', 'فٹنس', 'fitness-exercise', 'sialkot-sports',
+SELECT waw_upsert_category('Fitness & Exercise', 'فٹنس', 'fitness-exercise', 'sialkot-sports',
   'Gym equipment and activewear', 3, 8.00);
 
--- ── Groceries & Essentials subcategories ─────────────────────────────────
-PERFORM waw_upsert_category('Staples & Grains', 'غذا', 'staples-grains', 'groceries',
+-- - Groceries & Essentials subcategories -
+SELECT waw_upsert_category('Staples & Grains', 'غذا', 'staples-grains', 'groceries',
   'Rice, flour, lentils and dry goods', 1, 5.00);
-PERFORM waw_upsert_category('Tea & Beverages', 'چائے اور مشروبات', 'tea-beverages', 'groceries',
+SELECT waw_upsert_category('Tea & Beverages', 'چائے اور مشروبات', 'tea-beverages', 'groceries',
   'Tea, coffee and drinks', 2, 5.00);
-PERFORM waw_upsert_category('Household Essentials', 'گھریلو ضروریات', 'household-essentials', 'groceries',
+SELECT waw_upsert_category('Household Essentials', 'گھریلو ضروریات', 'household-essentials', 'groceries',
   'Cleaning supplies and daily essentials', 3, 5.00);
 
--- ── Kids & Toys subcategories ────────────────────────────────────────────
-PERFORM waw_upsert_category('Toys & Games', 'کھلونے', 'toys-games', 'kids-toys',
+-- - Kids & Toys subcategories -
+SELECT waw_upsert_category('Toys & Games', 'کھلونے', 'toys-games', 'kids-toys',
   'Action figures, dolls and board games', 1, 10.00);
-PERFORM waw_upsert_category('Baby Care', 'بچوں کی دیکھ بھال', 'baby-care', 'kids-toys',
+SELECT waw_upsert_category('Baby Care', 'بچوں کی دیکھ بھال', 'baby-care', 'kids-toys',
   'Diapers, feeding and nursery', 2, 10.00);
-PERFORM waw_upsert_category('Kids Clothing', 'بچوں کے کپڑے', 'kids-clothing', 'kids-toys',
+SELECT waw_upsert_category('Kids Clothing', 'بچوں کے کپڑے', 'kids-clothing', 'kids-toys',
   'Boys and girls outfits', 3, 10.00);
 
 DROP FUNCTION waw_upsert_category(TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, NUMERIC, TEXT);
 
--- ── Recursive descendant helper (public, read-only utility) ─────────────
+-- - Recursive descendant helper (public, read-only utility) -
 -- Returns the id of every category in the subtree rooted at p_slug (or p_id),
 -- inclusive of the root. Public API: buyers filter by a parent category and
 -- see all subcategory listings.

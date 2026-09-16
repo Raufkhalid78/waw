@@ -6,13 +6,18 @@ import { Inbox } from "lucide-react";
 import { useState } from "react";
 import { FadeIn } from "@/components/Motion";
 
+// Must stay in sync with UpdateOrderStatusSchema (apps/api schemas.ts) —
+// RETURN_REQUESTED is not a valid API transition and REFUNDED is set only by
+// the dispute/return money paths, so neither appears as a manual option.
 const STATUS_OPTIONS = [
   "ALL",
   "PENDING",
   "CONFIRMED",
   "PROCESSING",
   "SHIPPED",
+  "OUT_FOR_DELIVERY",
   "DELIVERED",
+  "RETURNED",
   "CANCELLED",
 ];
 
@@ -21,7 +26,10 @@ const STATUS_COLORS: Record<string, string> = {
   CONFIRMED: "badge-info",
   PROCESSING: "badge-info",
   SHIPPED: "badge-success",
+  OUT_FOR_DELIVERY: "badge-success",
   DELIVERED: "badge-success",
+  RETURN_REQUESTED: "badge-warning",
+  RETURNED: "badge-warning",
   CANCELLED: "badge-danger",
 };
 
@@ -42,8 +50,11 @@ export default function OrdersPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      ordersApi.updateStatus(id, status),
+      status === "CANCELLED"
+        ? ordersApi.cancel(id, "Cancelled from admin panel")
+        : ordersApi.updateStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
+    onError: (err: any) => alert(err?.message || "Failed to update order status"),
   });
 
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
@@ -131,7 +142,7 @@ export default function OrdersPage() {
                           {order.buyer_name || "Guest"}
                         </p>
                       </td>
-                      <td className="hidden sm:table-cell text-gray-600">{order.items_count ?? 0}</td>
+                      <td className="hidden sm:table-cell text-gray-600">{order.item_count ?? order.items_count ?? 0}</td>
                       <td className="font-medium text-gray-900 whitespace-nowrap">
                         {order.total_amount_pkr?.toLocaleString() ?? "—"}
                       </td>
@@ -141,16 +152,23 @@ export default function OrdersPage() {
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${STATUS_COLORS[order.status] || "badge-neutral"}`}>
-                          {order.status}
+                        <span className={`badge ${STATUS_COLORS[order.global_status] || "badge-neutral"}`}>
+                          {order.global_status}
                         </span>
                       </td>
                       <td>
                         <select
-                          value={order.status}
-                          onChange={(e) =>
-                            statusMutation.mutate({ id: order.id, status: e.target.value })
-                          }
+                          value={order.global_status ?? "PENDING"}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            if (
+                              next === "CANCELLED" &&
+                              !confirm(`Cancel order #${order.id.slice(0, 8)}? This releases inventory and cannot be undone from this panel.`)
+                            ) {
+                              return;
+                            }
+                            statusMutation.mutate({ id: order.id, status: next });
+                          }}
                           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 bg-white transition-all duration-150 active:scale-95"
                         >
                           {STATUS_OPTIONS.filter((s) => s !== "ALL").map((s) => (

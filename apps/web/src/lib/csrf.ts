@@ -74,3 +74,33 @@ export async function fetchWithCsrf(
 
   return res;
 }
+
+/**
+ * Session-aware fetch: on a 401 (expired 15-min access cookie) it refreshes
+ * the session via the 7-day refresh cookie and replays the request once.
+ * Without this, every authenticated storefront call 401'd after 15 minutes
+ * — order history showed "no orders" and checkout silently fell back to
+ * guest mode, de-linking orders from the buyer's account.
+ */
+export async function fetchWithSession(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  let res = await fetchWithCsrf(url, init);
+
+  if (res.status === 401) {
+    try {
+      const refreshed = await fetch(`${getApiBaseUrl()}/api/auth/session/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (refreshed.ok) {
+        res = await fetchWithCsrf(url, init);
+      }
+    } catch {
+      // Network failure during refresh — return the original 401
+    }
+  }
+
+  return res;
+}

@@ -18,7 +18,20 @@ export default function CartPage() {
   const { items, paymentMethod, setPaymentMethod, updateQuantity, removeItem, getSummary, setPricingOverrides } = useCartStore();
   const summary = getSummary();
   const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPkr: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPkr: number } | null>(() => {
+    // Restore the coupon carried over from checkout (same sessionStorage key
+    // checkout reads) so cart -> checkout -> back to cart stays consistent.
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem("waw-cart-coupon");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.code) return { code: parsed.code, discountPkr: parsed.discountPkr || 0 };
+        }
+      } catch {}
+    }
+    return null;
+  });
   const [couponError, setCouponError] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [config, setConfig] = useState<MarketplaceConfig | null>(null);

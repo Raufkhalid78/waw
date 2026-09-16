@@ -36,9 +36,9 @@
 --     catalog product ids too — retarget FK.
 -- ============================================================================
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 0. Enum additions — MUST run outside a transaction block
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'SUPER_ADMIN';
 ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'OPS_AGENT';
 ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'FINANCE';
@@ -49,9 +49,9 @@ ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'SETTLED';
 
 BEGIN;
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 1. payouts: provider columns used by settle_payout_atomic + settlement service
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS provider_transfer_id TEXT;
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS provider_payload_hash TEXT;
 ALTER TABLE payouts ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'COD';
@@ -60,16 +60,16 @@ ALTER TABLE payouts ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'COD';
 -- payouts.status is TEXT in 001 — no enum conflict, just documenting values:
 -- SCHEDULED / PROCESSING / SETTLED / COMPLETED / PAID / HELD / HELD_PENDING_DELIVERY / FAILED
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 2. stores: subscription columns used across the API (015 adds only expires_at)
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS subscription_plan TEXT NOT NULL DEFAULT 'free';
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS subscription_active BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ;
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 3. offer_variants: denormalized stock column read by cart.service.ts
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 ALTER TABLE offer_variants ADD COLUMN IF NOT EXISTS stock_quantity INTEGER NOT NULL DEFAULT 0;
 
 -- Backfill from inventory ledger so existing variants show correct stock
@@ -83,9 +83,9 @@ FROM (
 WHERE agg.offer_variant_id = ov.id
   AND ov.stock_quantity = 0;
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 4. shipments: courier_provider NOT NULL breaks BOOKING_PENDING inserts
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 ALTER TABLE shipments ALTER COLUMN courier_provider DROP NOT NULL;
 ALTER TABLE shipments ALTER COLUMN courier_provider SET DEFAULT 'POSTEX';
 -- order.controller.ts writes 'courier_name' — 001 defines the column as
@@ -109,9 +109,9 @@ CREATE TRIGGER trg_sync_shipment_courier_names
   BEFORE INSERT OR UPDATE ON shipments
   FOR EACH ROW EXECUTE FUNCTION sync_shipment_courier_names();
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 5. flash_sale_items.variant_id: API variant ids are offer_variants.id
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 DO $$
 BEGIN
   IF EXISTS (
@@ -145,15 +145,15 @@ BEGIN
   END IF;
 END $$;
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 6. UserRole / PaymentStatus enums: handled in section 0 at the top of this
 --    file (ALTER TYPE ... ADD VALUE must run outside a transaction block).
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 7. payments.payment_method: API inserts 'RAAST' / 'XPAY_WALLET' / 'JAZZCASH'
 --    values that are not in the "PaymentMethod" enum — convert to TEXT.
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 DO $$
 DECLARE col_type TEXT;
 BEGIN
@@ -167,9 +167,9 @@ BEGIN
   END IF;
 END $$;
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 -- 8. reviews / order_items / cart_items .product_id: API writes catalog ids
--- ─────────────────────────────────────────────────────────────────────────────
+-- -
 DO $$
 BEGIN
   IF EXISTS (

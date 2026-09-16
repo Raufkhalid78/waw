@@ -2,14 +2,18 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi } from "@/lib/api";
-import { Users, Ban, CheckCircle, Inbox } from "lucide-react";
-import { useState } from "react";
+import { Users, Ban, CheckCircle, Inbox, Search } from "lucide-react";
+import { useState, useEffect } from "react";
 import { FadeIn } from "@/components/Motion";
 
-const ROLE_OPTIONS = ["ALL", "BUYER", "SELLER", "SUPPORT", "ADMIN"];
+const ROLE_OPTIONS = ["ALL", "BUYER", "SELLER", "SUPPORT", "ADMIN", "SUPER_ADMIN", "FINANCE", "OPS_AGENT", "MODERATOR"];
 
 const ROLE_BADGE: Record<string, string> = {
   ADMIN: "badge-danger",
+  SUPER_ADMIN: "badge-danger",
+  FINANCE: "badge-warning",
+  OPS_AGENT: "badge-warning",
+  MODERATOR: "badge-info",
   SELLER: "badge-info",
   SUPPORT: "badge-warning",
   BUYER: "badge-neutral",
@@ -19,14 +23,26 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce the search input so typing doesn't fire a query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-users", page, roleFilter],
+    queryKey: ["admin-users", page, roleFilter, debouncedSearch],
     queryFn: () =>
       usersApi.list({
         page,
         limit: 20,
         role: roleFilter === "ALL" ? undefined : roleFilter,
+        search: debouncedSearch || undefined,
       }),
   });
 
@@ -52,20 +68,32 @@ export default function UsersPage() {
       </FadeIn>
 
       <FadeIn delay={50}>
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          {ROLE_OPTIONS.map((role) => (
-            <button
-              key={role}
-              onClick={() => { setRoleFilter(role); setPage(1); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 active:scale-95 ${
-                roleFilter === role
-                  ? "bg-amber-400 text-slate-950"
-                  : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
-              }`}
-            >
-              {role}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {ROLE_OPTIONS.map((role) => (
+              <button
+                key={role}
+                onClick={() => { setRoleFilter(role); setPage(1); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 active:scale-95 ${
+                  roleFilter === role
+                    ? "bg-amber-400 text-slate-950"
+                    : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+                }`}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+          <div className="relative sm:ml-auto sm:w-64">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, phone or email…"
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 bg-white"
+            />
+          </div>
         </div>
       </FadeIn>
 

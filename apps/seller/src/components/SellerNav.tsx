@@ -30,6 +30,7 @@ export function SellerNav() {
   const router = useRouter();
   const [storeName, setStoreName] = useState("My Store");
   const [city, setCity] = useState("Pakistan");
+  const [isVerified, setIsVerified] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -48,6 +49,7 @@ export function SellerNav() {
           const data = await res.json();
           if (data.storeName) setStoreName(data.storeName);
           if (data.city) setCity(data.city);
+          setIsVerified(Boolean(data.isVerified));
         } else {
           router.push("/login");
         }
@@ -119,10 +121,18 @@ export function SellerNav() {
         </button>
       </div>
 
-      {/* Store Verification Badge */}
-      <div className="mx-4 my-3 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-[11px] text-emerald-400 font-semibold">
-        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-        <span>Verified Merchant • {city}</span>
+      {/* Store Verification Badge — reflects real verification state */}
+      <div
+        className={`mx-4 my-3 p-2.5 rounded-lg border flex items-center gap-2 text-[11px] font-semibold ${
+          isVerified
+            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+            : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+        }`}
+      >
+        <ShieldCheck className={`w-4 h-4 shrink-0 ${isVerified ? "text-emerald-400" : "text-amber-400"}`} />
+        <span>
+          {isVerified ? "Verified Merchant" : "Verification Pending"} • {city}
+        </span>
       </div>
 
       {/* Navigation Links */}
@@ -148,16 +158,16 @@ export function SellerNav() {
         ))}
       </nav>
 
-      {/* Courier Integration Status */}
+      {/* Courier Integration Status — reflects actual feature state */}
       <div className="p-4 m-3 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] space-y-2">
         <div className="flex items-center justify-between text-slate-400">
           <span className="flex items-center gap-1.5">
             <Truck className="w-3.5 h-3.5 text-amber-400" /> Courier Service
           </span>
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="w-2 h-2 rounded-full bg-slate-500" title="Automatic airway bill generation requires courier configuration"></span>
         </div>
         <p className="text-[10px] text-slate-400">
-          Auto-manifesting PostEx & Trax airway bills on order confirmation.
+          Confirm & ship orders from Store Orders — tracking syncs via PostEx.
         </p>
       </div>
 

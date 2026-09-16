@@ -1,15 +1,17 @@
 import { API_BASE_URL } from "@waw/config";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE = API_BASE_URL;
 
-export async function POST() {
-  // Revoke session on the API server
+export async function POST(request: NextRequest) {
+  // Revoke session on the API server — forward the caller's cookies so the
+  // API can resolve and delete the session being logged out.
   try {
+    const cookie = request.headers.get("cookie");
     await fetch(`${API_BASE}/api/auth/session/revoke`, {
       method: "POST",
-      credentials: "include",
+      headers: cookie ? { cookie } : {},
     });
   } catch {}
 

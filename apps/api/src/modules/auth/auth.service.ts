@@ -19,8 +19,11 @@ export class AuthService {
       : `+92${phone.replace(/^0+/, "")}`;
     const otp = crypto.randomInt(100000, 999999).toString();
 
-    // Cache in Redis for 5 minutes (300 seconds)
-    await redis.set(`otp:${formattedPhone}`, otp, "EX", 300);
+    // Cache in Redis for 5 minutes (300 seconds).
+    // NOTE: the shared `redis` client may be Upstash REST or ioredis — both
+    // accept the options-object form; the positional ("EX", 300) form is
+    // ioredis-only and throws on Upstash.
+    await redis.set(`otp:${formattedPhone}`, otp, { ex: 300 });
 
     // Send WhatsApp OTP via Meta / Twilio Verify
     await WhatsAppService.sendOtp(formattedPhone, otp);
@@ -46,12 +49,25 @@ export class AuthService {
       : `+92${phone.replace(/^0+/, "")}`;
     const cachedOtp = await redis.get(`otp:${formattedPhone}`);
 
-    // Gated test bypass: only allowed if explicitly enabled in non-production environments
+    // Gated test bypass: only in explicitly-enabled dev/test environments.
+    // NODE_ENV="staging" must NEVER accept the bypass — a staging deployment
+    // is reachable by real users, and "123456" there is account takeover.
     const isTestOtpAllowed =
-      ENV.ALLOW_TEST_OTP && ENV.NODE_ENV !== "production" && otp === "123456";
+      ENV.ALLOW_TEST_OTP &&
+      (ENV.NODE_ENV === "development" || ENV.NODE_ENV === "test") &&
+      otp === "123456";
 
-    if (!isTestOtpAllowed && cachedOtp !== otp) {
+    if (isTestOtpAllowed) {
+      // fall through — bypass accepted
+    } else if (!cachedOtp) {
       throw new Error("Invalid or expired OTP code");
+    } else {
+      // Constant-time compare on equal-length buffers
+      const a = Buffer.from(String(cachedOtp));
+      const b = Buffer.from(String(otp));
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        throw new Error("Invalid or expired OTP code");
+      }
     }
 
     // Clear OTP upon successful verification
@@ -123,7 +139,17 @@ export class AuthService {
 
     // Role enforcement for existing users
     if (!isNewUser && requestedRole) {
-      if (requestedRole === UserRole.ADMIN && profile.role !== UserRole.ADMIN) {
+      // Any admin-panel role must pass when the caller claims "ADMIN": the
+      // panel proxies send role:"ADMIN" for every panel sub-role; FINANCE /
+      // OPS_AGENT / MODERATOR / SUPER_ADMIN are all legitimately allowed in.
+      const ADMIN_PANEL_ROLES = [
+        UserRole.ADMIN,
+        UserRole.SUPER_ADMIN,
+        UserRole.FINANCE,
+        UserRole.OPS_AGENT,
+        UserRole.MODERATOR,
+      ];
+      if (requestedRole === UserRole.ADMIN && !ADMIN_PANEL_ROLES.includes(profile.role)) {
         throw new Error(
           "Unauthorized: Profile does not have Admin privileges.",
         );

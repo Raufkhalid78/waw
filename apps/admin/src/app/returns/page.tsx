@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { returnsApi, type AdminReturn } from "@/lib/api";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { RotateCcw, CheckCircle, XCircle, Package, RefreshCw } from "lucide-react";
 
 export default function ReturnsPage() {
@@ -11,15 +12,19 @@ export default function ReturnsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
 
   const loadReturns = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await returnsApi.list({ page, limit: 20, status: statusFilter || undefined });
-      setReturns(data.returns || []);
-      setTotal(data.total || 0);
-    } catch (err) {
-      console.error("Failed to load returns", err);
+      // The API returns a raw array (listReturns).
+      const rows = Array.isArray(data) ? data : (data as any)?.returns || [];
+      setReturns(rows);
+      setTotal(rows.length);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load returns");
     } finally {
       setLoading(false);
     }
@@ -36,8 +41,8 @@ export default function ReturnsPage() {
       else if (action === "refund") await returnsApi.refund(id);
       else await returnsApi.reject(id);
       loadReturns();
-    } catch (err) {
-      console.error(`Failed to ${action} return`, err);
+    } catch (err: any) {
+      alert(err?.message || `Failed to ${action} return`);
     } finally {
       setActionLoading(null);
     }
@@ -80,13 +85,15 @@ export default function ReturnsPage() {
         ))}
       </div>
 
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadReturns} />}
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
           ))}
         </div>
-      ) : returns.length === 0 ? (
+      ) : returns.length === 0 && !loadError ? (
         <div className="text-center py-16 text-gray-400">
           <RotateCcw className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No return requests found</p>
@@ -105,7 +112,7 @@ export default function ReturnsPage() {
                   </div>
                   <p className="text-sm font-medium text-gray-900">{r.reason}</p>
                   <div className="text-xs text-gray-400">
-                    Buyer: {r.buyer_name || r.buyer_id} &middot; Seller: {r.seller_name || r.seller_id}
+                    Buyer: {r.buyer_name || (r as any).buyer?.full_name || r.buyer_id} &middot; Seller: {r.seller_name || r.seller_id}
                     {r.refund_amount_pkr ? ` · Refund: PKR ${r.refund_amount_pkr.toLocaleString()}` : ""}
                   </div>
                 </div>
@@ -113,14 +120,22 @@ export default function ReturnsPage() {
                   {r.status === "REQUESTED" && (
                     <>
                       <button
-                        onClick={() => handleAction(r.id, "receive")}
+                        onClick={() => {
+                          if (confirm("Mark this return package as received at the warehouse?")) {
+                            handleAction(r.id, "receive");
+                          }
+                        }}
                         disabled={actionLoading === r.id}
                         className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg disabled:opacity-50"
                       >
                         Mark Received
                       </button>
                       <button
-                        onClick={() => handleAction(r.id, "reject")}
+                        onClick={() => {
+                          if (confirm("Reject this return request? The buyer will be notified.")) {
+                            handleAction(r.id, "reject");
+                          }
+                        }}
                         disabled={actionLoading === r.id}
                         className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg disabled:opacity-50"
                       >
@@ -130,7 +145,16 @@ export default function ReturnsPage() {
                   )}
                   {r.status === "RECEIVED" && (
                     <button
-                      onClick={() => handleAction(r.id, "refund")}
+                      onClick={() => {
+                    if (
+                      confirm(
+                        `Approve refund${r.refund_amount_pkr ? ` of PKR ${r.refund_amount_pkr.toLocaleString()}` : ""}? ` +
+                        "This issues a real gateway refund, restocks inventory, and freezes the seller payout.",
+                      )
+                    ) {
+                      handleAction(r.id, "refund");
+                    }
+                  }}
                       disabled={actionLoading === r.id}
                       className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg disabled:opacity-50"
                     >

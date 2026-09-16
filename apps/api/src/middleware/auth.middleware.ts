@@ -4,6 +4,7 @@ import { ENV } from "../config/env.js";
 import { supabaseAdmin } from "../config/supabase.js";
 import { SessionService } from "../modules/auth/session.service.js";
 import { UserRole } from "../types/index.js";
+import { logger } from "../config/logger.js";
 
 export interface AuthenticatedUser {
   id: string;
@@ -152,7 +153,9 @@ export async function requireAuth(
 
     next();
   } catch (err: any) {
-    res.status(401).json({ error: `Authentication failed: ${err.message}` });
+    // Never leak upstream/DB internals to clients — log server-side only
+    logger.error("Auth middleware failure", { error: err?.message || err });
+    res.status(401).json({ error: "Authentication failed" });
   }
 }
 

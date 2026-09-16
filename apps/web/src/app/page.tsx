@@ -1,13 +1,15 @@
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import { fetchProducts, fetchCategories } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import HomeClient from './HomeClient';
+import AuthErrorBanner from '@/components/auth/AuthErrorBanner';
 
 export const metadata: Metadata = {
-  title: 'WAW - Premium Marketplace Pakistan',
+  title: 'Waw — Premium Marketplace Pakistan',
   description: "Shop verified local products with fast nationwide delivery.",
   openGraph: {
-    title: 'WAW - Premium Marketplace Pakistan',
+    title: 'Waw — Premium Marketplace Pakistan',
     description: "Pakistan's premium online marketplace.",
     type: 'website',
   },
@@ -35,10 +37,15 @@ export default async function HomePage() {
   }
 
   return (
-    <HomeClient
-      initialProducts={initialProducts}
-      initialCategories={initialCategories}
-      initialContent={initialContent}
-    />
+    <>
+      <Suspense fallback={null}>
+        <AuthErrorBanner />
+      </Suspense>
+      <HomeClient
+        initialProducts={initialProducts}
+        initialCategories={initialCategories}
+        initialContent={initialContent}
+      />
+    </>
   );
 }

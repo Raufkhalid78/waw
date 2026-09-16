@@ -6,6 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { logger } from "@/lib/logger";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { AlfaOnsiteModal } from "@/components/payments/AlfaOnsiteModal";
+import { initiatePaymentApi } from "@/lib/api";
+import { PaymentMethod } from "@waw/types";
 import {
   CheckCircle2,
   Package,
@@ -19,6 +22,7 @@ import {
   Phone,
   ChevronRight,
   Loader2,
+  CreditCard,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { fetchOrderById } from "@/lib/api";
@@ -79,8 +83,123 @@ export default function OrderTrackingPage() {
     }
   };
 
+  // Buyer-initiated cancellation — POST /api/orders/:id/cancel exists
+  // (ownership-checked, atomic inventory/payout release) but was never
+  // callable from the storefront.
+  const [cancelling, setCancelling] = useState(false);
+  const handleCancelOrder = async () => {
+    if (!confirm("Cancel this order? Reserved stock will be released and any pending payment reversed.")) return;
+    setCancelling(true);
+    try {
+      const { fetchWithCsrf } = await import("@/lib/csrf");
+      const res = await fetchWithCsrf(`${API_BASE_URL}/api/orders/${orderId}/cancel`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Cancelled by customer" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || "Cancellation failed");
+      }
+      setOrder((prev: any) => ({ ...prev, global_status: "CANCELLED" }));
+    } catch (err: any) {
+      alert(err.message || "Could not cancel the order.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const currentStatus =
-    order?.order_status || order?.orderStatus || "CONFIRMED";
+    order?.global_status || order?.order_status || order?.orderStatus || "CONFIRMED";
+
+  // Cancellation is only allowed pre-dispatch (mirrors the API's own gate).
+  const canCancel =
+    ["PENDING", "PENDING_PAYMENT", "PENDING_COD", "CONFIRMED"].includes(currentStatus);
+
+  // ── Payment retry surface ────────────────────────────────────────────────
+  // Online orders that were saved but never settled (gateway outage, OTP
+  // abandoned) get a working retry path here — checkout, payment/result and
+  // the Raast page all promise "retry from your order page".
+  const ONLINE_METHODS = [
+    PaymentMethod.ALFA_WALLET,
+    PaymentMethod.ALFALAH_ACCOUNT,
+    PaymentMethod.ALFA_CARD,
+    PaymentMethod.RAAST_P2M_QR,
+  ];
+  const canPayOnline =
+    !!order &&
+    ONLINE_METHODS.includes(order.payment_method) &&
+    order.payment_status !== "PAID" &&
+    currentStatus !== "CANCELLED";
+
+  const [retryingRaast, setRetryingRaast] = useState(false);
+  const [retryError, setRetryError] = useState("");
+  const [retryTarget, setRetryTarget] = useState<{
+    orderId: string;
+    orderNumber: string;
+    amountPkr: number;
+    method: PaymentMethod.ALFA_WALLET | PaymentMethod.ALFALAH_ACCOUNT;
+  } | null>(null);
+
+  // Guest capability = the phone the order was placed with (same model as
+  // guest invoices); for logged-in buyers the session cookie authorizes.
+  const retryPhone =
+    order?.buyer_phone ||
+    (() => {
+      try {
+        return JSON.parse(sessionStorage.getItem("waw-pending-payment-order") || "{}").phone || "";
+      } catch {
+        return "";
+      }
+    })();
+
+  const handleRetryRaast = async () => {
+    if (!order) return;
+    setRetryingRaast(true);
+    setRetryError("");
+    try {
+      const paymentSession = await initiatePaymentApi({
+        orderId,
+        paymentMethod: PaymentMethod.RAAST_P2M_QR,
+        customerPhone: retryPhone,
+        returnUrl: `${window.location.origin}/orders/${orderId}`,
+      });
+      if (!paymentSession.qrPayload) {
+        throw new Error("Could not generate a Raast QR. Please try again shortly.");
+      }
+      try {
+        sessionStorage.setItem(
+          "waw-pending-payment-order",
+          JSON.stringify({
+            orderId,
+            orderNumber: order.order_number || "",
+            totalPkr: order.total_amount_pkr || order.subtotal_pkr || 0,
+            phone: retryPhone,
+            createdAt: Date.now(),
+          }),
+        );
+      } catch {}
+      window.location.href = `/payment/raast?order=${encodeURIComponent(order.order_number || "")}&payload=${encodeURIComponent(paymentSession.qrPayload)}`;
+    } catch (err: any) {
+      setRetryError(err?.message || "Could not start the payment. Please try again.");
+    } finally {
+      setRetryingRaast(false);
+    }
+  };
+
+  const handleRetryAlfa = () => {
+    if (!order) return;
+    setRetryError("");
+    setRetryTarget({
+      orderId,
+      orderNumber: order.order_number || "",
+      amountPkr: order.total_amount_pkr || order.subtotal_pkr || 0,
+      // The button only routes Alfa onsite methods here — RAAST goes to
+      // handleRetryRaast (see the canPayOnline branch).
+      method: order.payment_method as PaymentMethod.ALFA_WALLET | PaymentMethod.ALFALAH_ACCOUNT,
+    });
+  };
 
   const trackingNumber =
     order?.tracking_number ||
@@ -91,7 +210,12 @@ export default function OrderTrackingPage() {
   const steps = [
     {
       title: "Order Confirmed",
-      desc: "Payment authorized & order logged into Waw Secure Payments",
+      desc:
+        order?.payment_status === "PAID"
+          ? "Payment received — order logged into Waw Secure Payments"
+          : order?.payment_method === "COD"
+            ? "Cash on Delivery — pay the rider at your doorstep"
+            : "Awaiting payment confirmation",
       time: order?.created_at
         ? new Date(order.created_at).toLocaleTimeString([], {
             hour: "2-digit",
@@ -230,8 +354,7 @@ export default function OrderTrackingPage() {
         <div className="flex items-center gap-3 p-3.5 bg-white/10 backdrop-blur rounded-2xl text-xs font-medium border border-white/15">
           <WhatsAppIcon className="w-5 h-5 shrink-0" />
           <span>
-            Real-time delivery updates, courier tracking link & digital receipt
-            have been dispatched via <strong>WhatsApp ({order.buyer_phone})</strong>.
+            Order updates are sent to <strong>{order.buyer_phone}</strong>. Keep this number reachable for courier coordination.
           </span>
         </div>
       </div>
@@ -350,25 +473,21 @@ export default function OrderTrackingPage() {
                   className="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl border border-slate-100"
                 >
                   <div className="w-14 h-14 rounded-xl bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-slate-400">
-                    {item.product_image || item.image ? (
-                      <img
-                        src={item.product_image || item.image}
-                        alt={item.product_title || item.title || "Item"}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Package className="w-6 h-6" />
-                    )}
+                    {/* order_items has no image column — snapshot title only. */}
+                    <Package className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-bold text-slate-900 truncate">
-                      {item.product_title || item.title || "Marketplace Product"}
+                      {item.product_title || "Marketplace Product"}
+                      {item.variant_name ? (
+                        <span className="text-slate-400 font-medium"> · {item.variant_name}</span>
+                      ) : null}
                     </h4>
                     <div className="text-[10px] text-slate-500 font-medium">
-                      Qty: {item.quantity || item.qty || 1} • {item.store_name || "Verified Merchant"}
+                      Qty: {item.quantity || 1}
                     </div>
                     <div className="text-xs font-black text-slate-950 mt-0.5">
-                      PKR {(item.unit_price_pkr || item.unitPricePkr || item.price || 0).toLocaleString()}
+                      PKR {(item.unit_price_pkr || item.price_pkr || 0).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -380,16 +499,16 @@ export default function OrderTrackingPage() {
               <div className="flex justify-between">
                 <span>Items Subtotal</span>
                 <span className="font-bold text-slate-900">
-                  PKR {(order.subtotal_pkr || order.total_pkr || 0).toLocaleString()}
+                  PKR {(order.subtotal_pkr || 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Delivery Charges</span>
                 <span className="font-bold text-emerald-700">
-                  {order.shipping_fee_pkr === 0 ? "FREE (Standard Dispatch)" : `PKR ${order.shipping_fee_pkr}`}
+                  {Number(order.shipping_fee_pkr) === 0 ? "FREE (Standard Dispatch)" : `PKR ${order.shipping_fee_pkr}`}
                 </span>
               </div>
-              {order.cod_fee_pkr > 0 && (
+              {Number(order.cod_fee_pkr) > 0 && (
                 <div className="flex justify-between">
                   <span>COD Handling Fee</span>
                   <span className="font-bold text-slate-900">
@@ -397,11 +516,19 @@ export default function OrderTrackingPage() {
                   </span>
                 </div>
               )}
-              {order.coupon_discount_pkr > 0 && (
+              {Number(order.gst_pkr) > 0 && (
+                <div className="flex justify-between">
+                  <span>GST</span>
+                  <span className="font-bold text-slate-900">
+                    PKR {order.gst_pkr}
+                  </span>
+                </div>
+              )}
+              {Number(order.discount_pkr) > 0 && (
                 <div className="flex justify-between text-emerald-600">
-                  <span>Coupon Discount</span>
+                  <span>Discount</span>
                   <span className="font-bold">
-                    - PKR {order.coupon_discount_pkr}
+                    - PKR {order.discount_pkr}
                   </span>
                 </div>
               )}
@@ -409,10 +536,20 @@ export default function OrderTrackingPage() {
                 <span>Payment Mode</span>
                 <span className="font-bold text-slate-900">{order.payment_method}</span>
               </div>
+              <div className="flex justify-between">
+                <span>Payment Status</span>
+                <span className={`font-bold ${order.payment_status === "PAID" ? "text-emerald-600" : "text-amber-600"}`}>
+                  {order.payment_status === "PAID"
+                    ? "Paid"
+                    : order.payment_method === "COD"
+                      ? "Cash on Delivery"
+                      : (order.payment_status || "Pending").replace(/_/g, " ")}
+                </span>
+              </div>
               <div className="flex justify-between border-t border-slate-100 pt-3 text-sm font-black text-slate-950">
                 <span>Total Amount</span>
                 <span className="text-base text-amber-600">
-                  PKR {(order.total_pkr || 0).toLocaleString()}
+                  PKR {(order.total_amount_pkr || order.subtotal_pkr || 0).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -427,7 +564,38 @@ export default function OrderTrackingPage() {
 
             {/* Buttons */}
             <div className="space-y-2 pt-2">
-              {currentStatus !== "CANCELLED" && currentStatus !== "RETURN_REQUESTED" && (
+              {retryError && (
+                <div className="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium">
+                  {retryError}
+                </div>
+              )}
+              {canPayOnline && (
+                <button
+                  onClick={order.payment_method === PaymentMethod.RAAST_P2M_QR ? handleRetryRaast : handleRetryAlfa}
+                  disabled={retryingRaast}
+                  className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-2xl text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {retryingRaast ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                  <span>
+                    {retryingRaast
+                      ? "Preparing payment…"
+                      : order.payment_status === "FAILED"
+                        ? "Retry Payment"
+                        : "Complete Payment"}
+                  </span>
+                </button>
+              )}
+              {canCancel && currentStatus !== "CANCELLED" && (
+                <button
+                  onClick={handleCancelOrder}
+                  disabled={cancelling}
+                  className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black rounded-2xl text-xs flex items-center justify-center gap-2 transition-all border border-rose-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  <span>{cancelling ? "Cancelling…" : "Cancel Order"}</span>
+                </button>
+              )}
+              {currentStatus === "DELIVERED" && (
                 <Link
                   href={`/orders/${orderId}/return`}
                   className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-2xl text-xs flex items-center justify-center gap-2 transition-all shadow-xs"
@@ -461,6 +629,23 @@ export default function OrderTrackingPage() {
           </div>
         </div>
       </div>
+
+      {retryTarget && (
+        <AlfaOnsiteModal
+          open={true}
+          orderId={retryTarget.orderId}
+          orderNumber={retryTarget.orderNumber}
+          amountPkr={retryTarget.amountPkr}
+          method={retryTarget.method}
+          buyerPhone={retryPhone}
+          onClose={() => setRetryTarget(null)}
+          onPaid={(orderNumber) => {
+            setRetryTarget(null);
+            setOrder((prev: any) => ({ ...prev, payment_status: "PAID" }));
+            router.push(`/payment/result?order=${orderNumber}`);
+          }}
+        />
+      )}
     </div>
   );
 }

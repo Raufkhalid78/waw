@@ -1,9 +1,9 @@
 "use client";
 
 
-import { API_BASE_URL } from "@waw/config";
 import { useEffect, useState } from "react";
 import { Check, X, Zap, Building2, Crown } from "lucide-react";
+import { sellerFetch } from "@/lib/api";
 
 interface Plan {
   id: string;
@@ -50,20 +50,17 @@ const planColors: Record<string, string> = {
   enterprise: "border-amber-200 bg-amber-50",
 };
 
-const API_BASE = (
-  API_BASE_URL
-).replace(/\/+$/, "");
-
 export default function SubscriptionPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API_BASE}/api/subscriptions/plans`, { credentials: "include" }).then((r) => r.json()),
-      fetch(`${API_BASE}/api/seller/subscription`, { credentials: "include" }).then((r) => r.json()),
+      sellerFetch<any>("/api/subscriptions/plans"),
+      sellerFetch<any>("/api/seller/subscription"),
     ])
       .then(([plansData, subData]) => {
         setPlans(plansData.plans || []);
@@ -75,19 +72,16 @@ export default function SubscriptionPage() {
 
   const handleSubscribe = async (planName: string) => {
     setSubscribing(planName);
+    setError("");
     try {
-      const res = await fetch(`${API_BASE}/api/seller/subscribe`, {
+      await sellerFetch("/api/seller/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ plan: planName }),
       });
-      if (res.ok) {
-        // Refresh subscription data
-        const subData = await fetch(`${API_BASE}/api/seller/subscription`, { credentials: "include" }).then((r) => r.json());
-        setSubscription(subData);
-      }
-    } catch {
+      const subData = await sellerFetch<any>("/api/seller/subscription");
+      setSubscription(subData);
+    } catch (err: any) {
+      setError(err.message || "Subscription update failed. Please try again.");
     } finally {
       setSubscribing(null);
     }
@@ -95,11 +89,14 @@ export default function SubscriptionPage() {
 
   const handleCancel = async () => {
     if (!confirm("Are you sure you want to cancel your subscription? You will be downgraded to the Free plan.")) return;
+    setError("");
     try {
-      await fetch(`${API_BASE}/api/seller/subscription`, { method: "DELETE", credentials: "include" });
-      const subData = await fetch(`${API_BASE}/api/seller/subscription`, { credentials: "include" }).then((r) => r.json());
+      await sellerFetch("/api/seller/subscription", { method: "DELETE" });
+      const subData = await sellerFetch<any>("/api/seller/subscription");
       setSubscription(subData);
-    } catch {}
+    } catch (err: any) {
+      setError(err.message || "Cancellation failed. Please try again.");
+    }
   };
 
   if (loading) {
@@ -125,6 +122,12 @@ export default function SubscriptionPage() {
       <p className="text-gray-500 mb-6">
         Choose the plan that fits your business needs.
       </p>
+
+      {error && (
+        <div className="mb-6 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Current Plan Status */}
       {subscription?.subscription && (

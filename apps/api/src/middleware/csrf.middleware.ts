@@ -44,7 +44,8 @@ export function setCsrfCookie(res: Response, token: string): void {
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    maxAge: 900, // 15 minutes, matches session TTL
+    // Express maxAge is in MILLISECONDS — 15 minutes, matches session TTL
+    maxAge: 15 * 60 * 1000,
   });
 }
 

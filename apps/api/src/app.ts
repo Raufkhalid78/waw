@@ -23,6 +23,7 @@ import { requireRole } from "./middleware/require-role.middleware.js";
 import { csrfProtection } from "./middleware/csrf.middleware.js";
 import {
   otpRateLimiter,
+  otpPhoneRateLimiter,
   apiRateLimiter,
   cartRateLimiter,
   orderRateLimiter,
@@ -50,6 +51,7 @@ import {
   CheckoutQuoteSchema,
   CreateReviewSchema,
   CreateDisputeSchema,
+  CreateReturnSchema,
   AdminSettingsSchema,
   UpdateOrderStatusSchema,
   UserAddressSchema,
@@ -98,7 +100,7 @@ import { sentryRequestContext, sentryErrorHandler } from "./config/sentry.js";
 
 export const app = express();
 
-// ── Helper Functions ──────────────────────────────────────────────────────
+// - Helper Functions -
 function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
@@ -136,7 +138,17 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "data:"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       mediaSrc: ["'self'", "https:"],
-      connectSrc: ["'self'", "https://*.supabase.co", "wss://*.supabase.co", "https://api.postex.com.pk", "https://typesense.waw.com.pk"],
+      connectSrc: [
+        "'self'",
+        "https://*.supabase.co",
+        "wss://*.supabase.co",
+        "https://api.postex.com.pk",
+        // Real Typesense deployment (Railway) — the storefront search bar
+        // calls this origin directly from the browser.
+        ...(ENV.TYPESENSE_PROTOCOL === "https" || (process.env.NEXT_PUBLIC_TYPESENSE_PROTOCOL === "https")
+          ? [`https://${process.env.NEXT_PUBLIC_TYPESENSE_HOST || "typesense-production-468f.up.railway.app"}`]
+          : []),
+      ],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
@@ -221,7 +233,25 @@ app.use(
     },
   }),
 );
-app.use(morgan(ENV.NODE_ENV === "production" ? "combined" : "dev"));
+// PII-in-logs guard: morgan logs full URLs including query strings. The
+// /api/cart guestToken is the SOLE auth for a cart (leak = cart hijack) and
+// /api/orders/lookup?phone=+92… exposes buyer phone numbers. Redact those
+// endpoints' query strings from access logs.
+morgan.token("urlRedacted", (req: any) => {
+  if (
+    req.path === "/api/cart" ||
+    req.path === "/api/orders/lookup" ||
+    req.path.startsWith("/api/auth/")
+  ) {
+    return `${req.path}?[redacted]`;
+  }
+  return req.originalUrl || req.url;
+});
+app.use(
+  morgan(ENV.NODE_ENV === "production"
+    ? ':remote-addr - :remote-user [:date[clf]] ":method :urlRedacted HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"'
+    : "dev"),
+);
 app.use(cookieParser());
 app.use(apiRateLimiter);
 app.use(apiVersioning);
@@ -257,7 +287,7 @@ if (ENV.NODE_ENV !== "production") {
   }
 }
 
-// ── Health & Diagnostics ──────────────────────────────────────────────────
+// - Health & Diagnostics -
 // Minimal liveness probe — no sensitive information exposed
 app.get("/health", (_req, res) => {
   res.json({
@@ -350,12 +380,13 @@ app.get("/livez", (req, res) => {
   res.status(200).json({ status: "alive" });
 });
 
-// ── Authentication Routes (Supabase Phone/OTP & OAuth) ────────────────────
+// - Authentication Routes (Supabase Phone/OTP & OAuth) -
 app.post("/api/auth/login", loginRateLimiter, AuthController.login);
 
 app.post(
   "/api/auth/whatsapp-otp/send",
   otpRateLimiter,
+  otpPhoneRateLimiter,
   validateBody(RequestOtpSchema),
   AuthController.requestOtp,
 );
@@ -373,7 +404,10 @@ app.post("/api/auth/oauth/sync", requireAuth, AuthController.syncOAuth);
 app.get("/api/auth/csrf", SessionController.issueCsrf);
 
 // -- Session Management (HttpOnly Cookie-based) ---------------------
-app.post("/api/auth/session/create", SessionController.createSession);
+// TOTP brute-force gate: session/create verifies MFA codes (6 digits) and is
+// CSRF-exempt, so it needs its own throttle — an attacker could otherwise
+// grind codes unthrottled (±1 step tolerance = 3 valid codes per 30s).
+app.post("/api/auth/session/create", mfaRateLimiter, SessionController.createSession);
 app.post("/api/auth/session/refresh", SessionController.refreshSession);
 app.post("/api/auth/session/revoke", SessionController.revokeSession);
 app.get("/api/auth/session/me", SessionController.getCurrentUser);
@@ -444,7 +478,7 @@ app.post(
   ProductController.create,
 );
 
-// ── Checkout Quote Engine (Server-Authoritative Pricing) ──────────────────
+// - Checkout Quote Engine (Server-Authoritative Pricing) -
 app.post("/api/checkout/quote", validateBody(CheckoutQuoteSchema), async (req, res) => {
   try {
     const { items, shippingCity, paymentMethod, couponCode, useLoyaltyPoints } = req.body;
@@ -482,7 +516,7 @@ app.post("/api/checkout/quote", validateBody(CheckoutQuoteSchema), async (req, r
   }
 });
 
-// ── Order Routes ──────────────────────────────────────────────────────────
+// - Order Routes -
 app.post("/api/orders", requireAuth, orderRateLimiter, validateBody(CreateOrderSchema), OrderController.createOrder);
 
 app.post("/api/orders/guest", orderRateLimiter, validateBody(GuestCreateOrderSchema), OrderController.createGuestOrder);
@@ -495,9 +529,9 @@ app.get("/api/orders/lookup", lookupRateLimiter, OrderController.lookupGuestOrde
 
 app.get("/api/orders/:id", requireAuth, OrderController.getOrder);
 
-app.get("/api/orders/:id/invoice", requireAuth, OrderController.downloadInvoice);
+app.get("/api/orders/:id/invoice", requireAuth, lookupRateLimiter, OrderController.downloadInvoice);
 
-app.post("/api/orders/:id/return", requireAuth, OrderController.createReturn);
+app.post("/api/orders/:id/return", requireAuth, validateBody(CreateReturnSchema), OrderController.createReturn);
 
 app.get("/api/orders/:id/return", requireAuth, OrderController.getReturn);
 
@@ -524,7 +558,11 @@ app.post("/api/user/wishlist", requireAuth, wishlistRateLimiter, validateBody(Wi
 app.delete("/api/user/wishlist/:productId", requireAuth, UserController.removeFromWishlist);
 
 // -- Coupon Validation (Phase 2: Promo Engine) -------------------------------
-app.post("/api/checkout/apply-coupon", requireAuth, async (req, res) => {
+// Public (no auth): this is a VALIDATION PREVIEW only — the authoritative
+// re-validation + redemption happens server-side at quote/order time, so
+// guests can check a code on /cart without 401s. Response is the discount
+// preview, never a grant.
+app.post("/api/checkout/apply-coupon", async (req, res) => {
   try {
     const { couponCode, items } = req.body;
     if (!couponCode || !items) {
@@ -564,6 +602,9 @@ app.patch(
 
 app.get("/api/seller/orders", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.listOrders);
 
+// Seller invoice download — takes the STORE ORDER id, ownership-checked
+app.get("/api/seller/orders/:storeOrderId/invoice", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, OrderController.downloadSellerInvoice);
+
 app.get("/api/seller/products", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.listProducts);
 
 app.get("/api/seller/analytics", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.getAnalytics);
@@ -571,6 +612,25 @@ app.get("/api/seller/analytics", requireAuth, requireRole(UserRole.SELLER, UserR
 app.get("/api/seller/payouts", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.listPayouts);
 
 app.post("/api/seller/coupons", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, validateBody(CreateCouponSchema), SellerController.createCoupon);
+app.get("/api/seller/coupons", requireAuth, requireRole(UserRole.SELLER, UserRole.ADMIN), requireActiveStore, SellerController.listCoupons);
+
+// Stock adjustments (restock / damage) — store-ownership checked in controller
+app.post(
+  "/api/seller/inventory/adjust",
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN),
+  requireActiveStore,
+  SellerController.adjustInventory,
+);
+
+// Reviews awaiting reply + unanswered questions for this store
+app.get(
+  "/api/seller/feedback",
+  requireAuth,
+  requireRole(UserRole.SELLER, UserRole.ADMIN),
+  requireActiveStore,
+  SellerController.listFeedback,
+);
 
 // -- Destination Serviceability Routes -----------------------------------------
 app.get("/api/serviceability/cities", LogisticsController.listCities);
@@ -589,7 +649,7 @@ app.post("/api/support/tickets/:id/messages", requireAuth, validateBody(SupportM
 // -- Logistics Webhook (PostEx Live Milestone Updates) -------------------------
 app.post("/api/logistics/postex/webhook", LogisticsController.handlePostExWebhook);
 
-// ── Payment Routes (Bank Alfalah APG + refunds) ─────────────────────────
+// - Payment Routes (Bank Alfalah APG + refunds) -
 // Auth is optional: logged-in users pay their own orders; guests must supply
 // the exact phone the order was placed with (validated in the controller).
 app.get("/api/payments/methods", PaymentController.listMethods);
@@ -602,7 +662,7 @@ app.post(
   PaymentController.completeManualRefund,
 );
 
-// ── Bank Alfalah — Alfa Payment Gateway (APG) ────────────────────────────
+// - Bank Alfalah — Alfa Payment Gateway (APG) -
 // Onsite checkout: buyer stays on waw.com.pk — enters wallet/account number,
 // receives OTP, types it into OUR checkout modal. No page redirect for
 // Alfa Wallet / Alfalah Account. Cards use the bank's hosted page (PCI).
@@ -627,12 +687,13 @@ app.post(
 // Server-to-server IPN from APG (CSRF-exempt like other provider webhooks)
 app.post("/api/payments/apg/ipn", ApgPaymentController.ipnListener);
 // Client-pollable settlement verification after redirect/return
-app.get("/api/payments/apg/verify/:orderNumber", ApgPaymentController.verifyOrder);
+app.get("/api/payments/apg/verify/:orderNumber", paymentRateLimiter, ApgPaymentController.verifyOrder);
 
 // -- Raast P2M QR Routes ------------------------------------------------
 app.post(
   "/api/payments/raast/qr",
-  requireAuth,
+  paymentRateLimiter,
+  attachOptionalUser,
   async (req: any, res) => {
     try {
       const { RaastService } = await import(
@@ -644,7 +705,10 @@ app.post(
         return res.status(400).json({ error: "orderId is required" });
       }
 
-      // Verify order ownership
+      // Verify order access: the buyer's session, an admin, or — for guest
+      // checkout — the exact phone the order was placed with (same capability
+      // model as guest invoices). Previously guests 401'd AFTER the order
+      // was created, with the cart uncleared and duplicate orders on retry.
       const { supabaseAdmin } = await import("./config/supabase.js");
       const { data: order, error } = await supabaseAdmin
         .from("orders")
@@ -656,8 +720,20 @@ app.post(
         return res.status(404).json({ error: "Order not found" });
       }
 
-      if (order.buyer_id !== (req as any).user.id && (req as any).user.role !== "ADMIN") {
-        return res.status(403).json({ error: "Access denied" });
+      if (order.buyer_id) {
+        // Account order: owner or admin only.
+        if (order.buyer_id !== req.user?.id && req.user?.role !== "ADMIN" && req.user?.role !== "SUPER_ADMIN") {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      } else {
+        // Guest order: require the matching phone (normalized comparison).
+        const providedPhone = String(req.body?.phone || (req.query?.phone as string) || "").replace(/[\s-]/g, "");
+        const orderPhone = String(order.buyer_phone || "").replace(/[\s-]/g, "");
+        if (!providedPhone || providedPhone !== orderPhone) {
+          return res.status(403).json({
+            error: "Phone verification required: supply the phone number this order was placed with",
+          });
+        }
       }
 
       // Idempotency: return existing PENDING Raast payment reference if one exists
@@ -745,56 +821,75 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
       return res.status(400).json(result);
     }
 
-    // Process successful Raast payment (same settlement machinery as APG)
+    // Process successful Raast payment — same atomic settlement machinery as
+    // APG: verify amount against the authoritative order total, then a
+    // row-locked settle_order_payment RPC (order + payment row in ONE
+    // transaction). The previous two separate unguarded updates could
+    // double-fire fulfillment on a replayed/duplicate webhook.
     const { supabaseAdmin } = await import("./config/supabase.js");
-    const { data: payment } = await supabaseAdmin
-      .from("payments")
-      .select("*, order:orders(*)")
-      .eq("gateway_reference", referenceId)
-      .single();
+    const { verifyProviderPaymentAgainstOrder } = await import(
+      "./modules/payments/payment-verification.js"
+    );
+    const { OutboxService } = await import("./modules/outbox/outbox.service.js");
 
-    if (payment?.order) {
-      const order = payment.order;
+    // Resolve the order through the payment reference (gateway_reference).
+    let targetOrder: any = null;
+    {
+      const { data: payment } = await supabaseAdmin
+        .from("payments")
+        .select("*, order:orders(*)")
+        .eq("gateway_reference", referenceId)
+        .maybeSingle();
+      targetOrder = payment?.order || null;
+    }
 
-      // Idempotency: skip if already processed
-      if (payment.status === "PAID" && order.payment_status === "PAID") {
-        return res.json({ received: true, idempotent: true });
+    if (targetOrder) {
+      const verification = verifyProviderPaymentAgainstOrder({
+        providerAmount: amountPkr,
+        providerCurrency: "PKR",
+        orderAmountPkr: targetOrder.total_amount_pkr,
+        orderPaymentStatus: targetOrder.payment_status,
+      });
+      if (!verification.ok && verification.reason !== "already_paid") {
+        logger.error("Raast webhook verification failed — order NOT marked paid", {
+          orderId: targetOrder.id,
+          reason: verification.reason,
+        });
+        return res.status(400).json({ error: verification.reason || "verification failed" });
       }
 
-      // Update order status
-      await supabaseAdmin
-        .from("orders")
-        .update({
-          payment_status: "PAID",
-          global_status: "CONFIRMED",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
+      const { data: settlement, error: settleError } = await supabaseAdmin.rpc(
+        "settle_order_payment",
+        {
+          p_order_id: targetOrder.id,
+          p_transaction_id: transactionId || referenceId,
+          p_amount_pkr: Number(amountPkr),
+        },
+      );
+      if (settleError) {
+        logger.error("Raast atomic settlement failed", { orderId: targetOrder.id, error: settleError.message });
+        return res.status(500).json({ error: "Internal server error" });
+      }
 
-      // Update payment record
-      await supabaseAdmin
-        .from("payments")
-        .update({
-          status: "PAID",
-          gateway_reference: result.transactionId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", payment.id);
+      const action = (settlement as any)?.action;
+      if (action === "amount-mismatch") {
+        return res.status(400).json({ error: "Settlement amount mismatch" });
+      }
 
-      // Courier booking + buyer confirmations via the durable outbox —
-      // survives crashes and is idempotent (unlike inline calls here).
-      const { OutboxService } = await import("./modules/outbox/outbox.service.js");
-      await OutboxService.publish("BOOK_COURIER", {
-        orderId: order.id,
-        orderNumber: order.order_number,
-      });
-      await OutboxService.publish("NOTIFY_ORDER_CONFIRMED", {
-        orderId: order.id,
-        orderNumber: order.order_number,
-        buyerPhone: order.buyer_phone,
-        buyerId: order.buyer_id,
-        totalPkr: order.total_amount_pkr || 0,
-      });
+      // Post-commit side effects via durable outbox (idempotent).
+      if (action === "settled") {
+        await OutboxService.publish("BOOK_COURIER", {
+          orderId: targetOrder.id,
+          orderNumber: targetOrder.order_number,
+        });
+        await OutboxService.publish("NOTIFY_ORDER_CONFIRMED", {
+          orderId: targetOrder.id,
+          orderNumber: targetOrder.order_number,
+          buyerPhone: targetOrder.buyer_phone,
+          buyerId: targetOrder.buyer_id,
+          totalPkr: targetOrder.total_amount_pkr || 0,
+        });
+      }
     }
 
     res.json({ received: true, ...result });
@@ -805,8 +900,10 @@ app.post("/api/payments/raast/webhook", async (req: any, res) => {
 });
 
 // -- Server-Backed Guest Cart Routes ------------------------------------------
-app.get("/api/cart", cartRateLimiter, CartController.getCart);
-app.put("/api/cart", cartRateLimiter, CartController.replaceCart);
+// attachOptionalUser: GET/PUT /api/cart resolve the logged-in user's cart
+// when a session cookie is present (guestToken remains the guest fallback).
+app.get("/api/cart", cartRateLimiter, attachOptionalUser, CartController.getCart);
+app.put("/api/cart", cartRateLimiter, attachOptionalUser, CartController.replaceCart);
 app.post("/api/cart/items", cartRateLimiter, CartController.addItem);
 app.patch("/api/cart/items", cartRateLimiter, CartController.updateItem);
 app.delete("/api/cart/items", cartRateLimiter, CartController.removeItem);
@@ -832,7 +929,7 @@ app.delete("/api/seller/subscription", requireAuth, SubscriptionController.cance
 
 // -- Admin Subscription Management ---------------------------------------------
 // Lists every store with its plan/expiry for the admin Subscriptions page.
-app.get("/api/admin/subscriptions", requireAuth, requireRole(UserRole.ADMIN), async (_req, res) => {
+app.get("/api/admin/subscriptions", requireAuth, requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.OPS_AGENT), async (_req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from("stores")
@@ -874,10 +971,10 @@ app.post("/api/admin/subscriptions/:storeId/revoke", requireAuth, requireRole(Us
   }
 });
 
-// ── Search Routes (Typesense Engine) ──────────────────────────────────────
+// - Search Routes (Typesense Engine) -
 app.get("/api/search", SearchController.search);
 
-// ── Marketplace Stats (Public, cached 5min) ──────────────────────────────
+// - Marketplace Stats (Public, cached 5min) -
 app.get("/api/marketplace-stats", async (_req, res) => {
   try {
     const cacheKey = "marketplace-stats";
@@ -949,29 +1046,50 @@ app.get(
   AIController.getUsage,
 );
 
-// ── Admin Control Center (Strict Admin Guard) ─────────────────────────────
+// - Admin Control Center (Strict Admin Guard) -
+// Sub-role grants: the admin panel admits ADMIN, SUPER_ADMIN, FINANCE,
+// OPS_AGENT and MODERATOR (@waw/types ADMIN_PANEL_ROLES). The API grants each
+// sub-role least-privilege access to the modules it can actually use, so
+// panel users never land on 403 pages for their own modules.
+//   FINANCE    → payouts, disputes, returns, reconciliation, subscriptions
+//   MODERATOR  → products, reviews, disputes, returns
+//   OPS_AGENT  → orders, stores, KYC, subscriptions, users (read-only)
+// ADMIN/SUPER_ADMIN retain full access (SUPER_ADMIN implicit in requireRole).
+const ADMIN_READ = [UserRole.ADMIN, UserRole.FINANCE, UserRole.OPS_AGENT, UserRole.MODERATOR] as UserRole[];
+const ADMIN_FINANCE = [UserRole.ADMIN, UserRole.FINANCE] as UserRole[];
+const ADMIN_MODERATION = [UserRole.ADMIN, UserRole.MODERATOR] as UserRole[];
+const ADMIN_OPS = [UserRole.ADMIN, UserRole.OPS_AGENT] as UserRole[];
+
 app.get(
   "/api/admin/stats",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(...ADMIN_READ),
   AdminController.getStats,
 );
 app.get(
   "/api/admin/products",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(UserRole.ADMIN, UserRole.MODERATOR),
   AdminController.listAllProducts,
 );
 app.get(
   "/api/admin/orders",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(UserRole.ADMIN, UserRole.OPS_AGENT),
   AdminController.listAllOrders,
+);
+// Full financial reversal (atomic RPC + gateway refund) — was implemented but
+// never routed, leaving dispute refunds as the only money-back path.
+app.post(
+  "/api/admin/orders/:id/reverse",
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  AdminController.reverseOrder,
 );
 app.get(
   "/api/admin/users",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(UserRole.ADMIN, UserRole.OPS_AGENT),
   AdminController.listAllUsers,
 );
 app.post(
@@ -989,7 +1107,7 @@ app.post(
 app.get(
   "/api/admin/sellers",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(UserRole.ADMIN, UserRole.OPS_AGENT),
   AdminController.listSellers,
 );
 app.patch(
@@ -1001,20 +1119,48 @@ app.patch(
 app.get(
   "/api/admin/payouts",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(...ADMIN_FINANCE),
   AdminController.listPayouts,
 );
 app.post(
   "/api/admin/payouts/:id/settle",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(...ADMIN_FINANCE),
   AdminController.settlePayout,
+);
+
+// -- Admin Audit Trail (immutable action history for the admin panel) -------
+app.get(
+  "/api/admin/audit-logs",
+  requireAuth,
+  requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPS_AGENT),
+  async (req: any, res) => {
+    try {
+      const limit = Math.min(
+        Math.max(parseInt(String(req.query.limit) || "50", 10) || 50, 1),
+        200,
+      );
+      const offset = Math.max(parseInt(String(req.query.offset) || "0", 10) || 0, 0);
+      const { AuditService } = await import("./modules/audit/audit.service.js");
+      const result = await AuditService.listAuditLogs({
+        limit,
+        offset,
+        action: String(req.query.action || "").trim() || undefined,
+        resourceType: String(req.query.resourceType || "").trim() || undefined,
+        actorId: String(req.query.actorId || "").trim() || undefined,
+      });
+      res.json(result);
+    } catch (err: any) {
+      logger.error("Audit logs fetch error:", err?.message || err);
+      res.status(500).json({ error: "Failed to load audit logs" });
+    }
+  },
 );
 
 app.post(
   "/api/admin/reconciliation/run",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(...ADMIN_FINANCE),
   async (req, res) => {
     try {
       const { executeReconciliationJob } = await import("./jobs/reconciliation.cron.js");
@@ -1031,7 +1177,7 @@ app.post(
 app.get(
   "/api/admin/kyc/pending",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(...ADMIN_OPS),
   AdminController.listPendingKyc,
 );
 
@@ -1053,7 +1199,7 @@ app.patch(
 app.get(
   "/api/admin/products/pending",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(...ADMIN_MODERATION),
   AdminController.listPendingProducts,
 );
 app.patch(
@@ -1073,7 +1219,7 @@ app.patch(
 app.get(
   "/api/admin/reviews/pending",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(...ADMIN_MODERATION),
   AdminController.listPendingReviews,
 );
 app.patch(
@@ -1093,13 +1239,13 @@ app.patch(
 app.get(
   "/api/admin/disputes",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MODERATOR),
   AdminController.listDisputes,
 );
 app.patch(
   "/api/admin/disputes/:id/resolve",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
   AdminController.resolveDispute,
 );
 
@@ -1107,7 +1253,7 @@ app.patch(
 app.get(
   "/api/admin/returns",
   requireAuth,
-  requireRole(UserRole.ADMIN),
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MODERATOR),
   AdminController.listReturns,
 );
 app.patch(
@@ -1130,7 +1276,7 @@ app.patch(
 );
 
 // -- Admin Flash Sales Management -----------------------------------------
-app.get("/api/admin/flash-sales", requireAuth, requireRole(UserRole.ADMIN), AdminController.listFlashSales);
+app.get("/api/admin/flash-sales", requireAuth, requireRole(UserRole.ADMIN, UserRole.MODERATOR), AdminController.listFlashSales);
 app.post("/api/admin/flash-sales", requireAuth, requireRole(UserRole.ADMIN), AdminController.createFlashSale);
 app.patch("/api/admin/flash-sales/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.updateFlashSale);
 app.delete("/api/admin/flash-sales/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.deleteFlashSale);
@@ -1138,13 +1284,13 @@ app.post("/api/admin/flash-sales/:id/items", requireAuth, requireRole(UserRole.A
 app.delete("/api/admin/flash-sales/items/:itemId", requireAuth, requireRole(UserRole.ADMIN), AdminController.removeFlashSaleItem);
 
 // -- Admin Banner/Campaign Management -------------------------------------
-app.get("/api/admin/banners", requireAuth, requireRole(UserRole.ADMIN), AdminController.listBanners);
+app.get("/api/admin/banners", requireAuth, requireRole(UserRole.ADMIN, UserRole.MODERATOR), AdminController.listBanners);
 app.post("/api/admin/banners", requireAuth, requireRole(UserRole.ADMIN), AdminController.createBanner);
 app.patch("/api/admin/banners/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.updateBanner);
 app.delete("/api/admin/banners/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.deleteBanner);
 
 // -- Admin Category Management --------------------------------------------
-app.get("/api/admin/categories", requireAuth, requireRole(UserRole.ADMIN), AdminController.listCategories);
+app.get("/api/admin/categories", requireAuth, requireRole(UserRole.ADMIN, UserRole.MODERATOR), AdminController.listCategories);
 app.post("/api/admin/categories", requireAuth, requireRole(UserRole.ADMIN), AdminController.createCategory);
 app.patch("/api/admin/categories/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.updateCategory);
 app.delete("/api/admin/categories/:id", requireAuth, requireRole(UserRole.ADMIN), AdminController.deleteCategory);
@@ -1264,6 +1410,9 @@ app.use("/api/admin/mfa", requireAuth, mfaRateLimiter, mfaRoutes);
 // -- Product Q&A Routes -------------------------------------------------
 app.use("/api/questions", questionsRouter);
 
+// -- Seller Review Replies (ownership-checked in controller) --------------
+app.use("/api/reviews", reviewsRouter);
+
 // -- Cities (public) ----------------------------------------------------
 app.use("/api/cities", citiesRouter);
 
@@ -1304,6 +1453,11 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
 
     const isVerifiedPurchase = !!orderItem;
 
+    // Non-purchasers cannot post public reviews — force moderation so
+    // buyers can't review products they never bought (rating manipulation,
+    // competitor sabotage). Verified purchasers stay auto-approved.
+    const reviewStatus = isVerifiedPurchase ? "APPROVED" : "PENDING";
+    const isApproved = isVerifiedPurchase;
     const { data: review, error } = await supabaseAdmin
       .from("reviews")
       .insert({
@@ -1314,8 +1468,8 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
         rating: Math.round(rating),
         comment: comment || "",
         is_verified_purchase: isVerifiedPurchase,
-        status: "APPROVED", // Auto-approved unless flagged
-        is_approved: true, // Public RLS policy only exposes is_approved=true
+        status: reviewStatus,
+        is_approved: isApproved, // Public RLS policy only exposes is_approved=true
         created_at: new Date().toISOString(),
       })
       .select()
@@ -1332,17 +1486,17 @@ app.post("/api/products/:id/reviews", requireAuth, reviewRateLimiter, validateBo
         .eq("status", "APPROVED");
 
       if (agg) {
-        const count = agg.length;
-        const avg = count > 0
-          ? Math.round((agg.reduce((sum, r) => sum + r.rating, 0) / count) * 100) / 100
-          : 0;
-        await supabaseAdmin
-          .from("catalog_products")
-          .update({
-            rating_average: avg,
-            rating_count: count,
-          })
-          .eq("id", productId);
+      const count = agg.length;
+      const avg = count > 0
+        ? Math.round((agg.reduce((sum, r) => sum + r.rating, 0) / count) * 100) / 100
+        : 0;
+      await supabaseAdmin
+        .from("catalog_products")
+        .update({
+          rating_average: avg,
+          rating_count: count,
+        })
+        .eq("id", productId);
       }
     } catch (aggErr: any) {
       // Aggregation failure must not fail the review submission

@@ -40,7 +40,7 @@ export class ApgPaymentController {
         res.status(404).json({ error: "Order not found" });
         return;
       }
-      if (user?.role !== "ADMIN") {
+      if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
         if (order.buyer_id) {
           if (!user || order.buyer_id !== user.id) {
             res.status(403).json({ error: "You can only pay for your own orders" });
@@ -130,7 +130,7 @@ export class ApgPaymentController {
         res.status(404).json({ error: "Order not found" });
         return;
       }
-      if (user?.role !== "ADMIN") {
+      if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
         if (order.buyer_id) {
           if (!user || order.buyer_id !== user.id) {
             res.status(403).json({ error: "You can only pay for your own orders" });

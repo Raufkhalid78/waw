@@ -65,12 +65,12 @@ DECLARE
   v_item_quantity   INTEGER;
   -- Sorted items array for deterministic lock ordering
   v_sorted_items    JSONB;
-  -- ── Discounts from the server-signed checkout quote (authoritative) ──
+  -- - Discounts from the server-signed checkout quote (authoritative) -
   v_coupon_discount_pkr   NUMERIC := 0;
   v_loyalty_discount_pkr  NUMERIC := 0;
   v_total_discount_pkr    NUMERIC := 0;
-  -- ── Config-driven values from marketplace_settings (JSONB scalars),
-  --    falling back to the previously hardcoded defaults ──
+  -- - Config-driven values from marketplace_settings (JSONB scalars),
+  --    falling back to the previously hardcoded defaults -
   v_free_delivery_threshold NUMERIC := COALESCE(
     (SELECT NULLIF(value #>> '{}', '')::NUMERIC FROM marketplace_settings WHERE key = 'free_delivery_threshold_pkr'),
     5000);

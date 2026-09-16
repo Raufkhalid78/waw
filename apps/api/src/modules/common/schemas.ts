@@ -71,7 +71,10 @@ export const CreateOrderSchema = z.object({
   buyerPhone: z.string().min(10, "Valid phone number is required"),
   shippingAddress: z.string().min(5, "Delivery address is required"),
   shippingCity: z.string().min(2, "City is required"),
-  shippingProvince: z.string().min(2, "Province is required"),
+  // Province is derived server-side from serviceable_cities when omitted —
+  // the client header city picker never captured it, so a required field
+  // 400'd every logged-in checkout.
+  shippingProvince: z.string().min(2, "Province is required").optional(),
   paymentMethod: z.enum(["COD", "RAAST_P2M_QR", "ALFA_WALLET", "ALFALAH_ACCOUNT", "ALFA_CARD"], {
     errorMap: () => ({ message: "Invalid payment method" }),
   }),
@@ -153,27 +156,186 @@ export const CreateDisputeSchema = z.object({
   evidenceImages: z.array(z.string().url()).optional(),
 });
 
-export const AdminSettingsSchema = z.record(
-  z.string().min(1, "Setting key is required"),
-  z.union([z.string(), z.number(), z.boolean()]),
-);
+// Server-side bounds for money-critical marketplace settings. These values
+// drive checkout pricing for every new order — an out-of-range value (e.g.
+// commission 5000 or a negative fee) corrupts all future order math, so the
+// API must enforce the same gates as the admin panel, not trust it.
+const SETTING_BOUNDS = {
+  default_commission_pct: { min: 0, max: 50, integer: true },
+  free_delivery_threshold_pkr: { min: 0, max: 100_000, integer: true },
+  default_shipping_fee_pkr: { min: 0, max: 10_000, integer: true },
+  cod_handling_fee_pkr: { min: 0, max: 5_000, integer: true },
+  gst_rate_percentage: { min: 0, max: 25, integer: false },
+  discount_tier_1_threshold: { min: 0, max: 100, integer: true },
+  discount_tier_2_threshold: { min: 0, max: 100, integer: true },
+  discount_tier_3_threshold: { min: 0, max: 100, integer: true },
+  best_seller_days: { min: 1, max: 365, integer: true },
+  best_seller_limit: { min: 1, max: 200, integer: true },
+  new_arrival_days: { min: 1, max: 365, integer: true },
+} as const;
+
+type BoundedKey = keyof typeof SETTING_BOUNDS;
+
+// Free-text settings (names, contacts, origins, social URLs) — capped length.
+const TEXT_SETTING_KEYS = [
+  "marketplace_name",
+  "default_currency",
+  "whatsapp_number",
+  "support_email",
+  "default_city",
+  "cors_allowed_origins",
+  // 034/038 seeded keys
+  "currency",
+  "currency_symbol",
+  "business_name",
+  "business_name_urdu",
+  "business_tagline",
+  "business_city",
+  "business_country",
+  "admin_url",
+  "seller_url",
+  "site_url",
+  "site_url_www",
+  "care_email",
+  "support_phone",
+  "facebook_url",
+  "instagram_url",
+  "linkedin_url",
+  "twitter_url",
+  "youtube_url",
+  "raast_merchant_alias",
+  "raast_merchant_name",
+  "raast_merchant_city",
+] as const;
+
+// Whole-number settings with generous but finite bounds (days/hours/weights).
+const OTHER_SETTING_KEYS = [
+  "return_window_days",
+  "dispatch_window_hours",
+  "payout_settlement_days",
+  "heavy_parcel_weight_kg",
+  "express_tier1_days_min",
+  "express_tier1_days_max",
+  "express_other_days_min",
+  "express_other_days_max",
+  "standard_tier1_days_min",
+  "standard_tier1_days_max",
+  "standard_other_days_min",
+  "standard_other_days_max",
+] as const;
+
+const ALLOWED_SETTING_KEYS: readonly string[] = [
+  ...Object.keys(SETTING_BOUNDS),
+  ...TEXT_SETTING_KEYS,
+  ...OTHER_SETTING_KEYS,
+];
+
+export const AdminSettingsSchema = z
+  .record(z.string(), z.unknown())
+  .superRefine((obj, ctx) => {
+    for (const [key, value] of Object.entries(obj)) {
+      if (!(ALLOWED_SETTING_KEYS as readonly string[]).includes(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `Unknown setting key "${key}"`,
+        });
+        continue;
+      }
+      if (key in SETTING_BOUNDS) {
+        const parsed = z.number().safeParse(value);
+        if (!parsed.success) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.invalid_type,
+            expected: "number",
+            received: typeof value,
+            path: [key],
+            message: `${key} must be a number`,
+          });
+          continue;
+        }
+        const b = SETTING_BOUNDS[key as BoundedKey];
+        const v = parsed.data;
+        if (v < b.min || v > b.max || (b.integer && !Number.isInteger(v))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} must be between ${b.min} and ${b.max}${b.integer ? " (whole number)" : ""}`,
+          });
+        }
+      } else if ((TEXT_SETTING_KEYS as readonly string[]).includes(key)) {
+        if (typeof value !== "string" || value.length > 500) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} must be a string of at most 500 characters`,
+          });
+        }
+      } else if ((OTHER_SETTING_KEYS as readonly string[]).includes(key)) {
+        const parsed = z.number().int().min(0).max(3650).safeParse(value);
+        if (!parsed.success) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} must be a whole number between 0 and 3650`,
+          });
+        }
+      }
+    }
+  });
+
+// CNIC is accepted both dashed (XXXXX-XXXXXXX-X — what the /sell form sends)
+// and as 13 bare digits; SellerController.formatAndValidateCnic normalizes.
+const CnicSchema = z
+  .string()
+  .regex(/^(\d{13}|\d{5}-\d{7}-\d)$/, "CNIC must be 13 digits (format: 42101-1234567-1)");
 
 export const SellerApplySchema = z.object({
   storeName: z.string().min(2, "Store name is required"),
   city: z.string().min(2, "City is required"),
-  cnic: z.string().length(13, "CNIC must be exactly 13 digits").optional(),
+  address: z.string().min(5, "Business address is required").optional(),
+  businessAddress: z.string().min(5, "Business address is required").optional(),
+  ownerName: z.string().min(2, "Owner full name is required").optional(),
+  cnic: CnicSchema,
+  ntn: z.string().max(20).optional(),
+  ntnNumber: z.string().max(20).optional(),
+  whatsappPhone: z.string().min(10, "Valid phone number is required").optional(),
+  email: z.string().email("Invalid email address").optional(),
   bankAccount: z.string().optional(),
   bankName: z.string().optional(),
-  iban: z.string().length(24, "IBAN must be 24 characters").optional(),
+  accountTitle: z.string().min(2, "Account title is required").optional(),
+  bankTitle: z.string().min(2, "Account title is required").optional(),
+  iban: z.string().regex(/^PK\d{2}[A-Z0-9]{20}$/, "IBAN must be 24 characters starting with PK").optional(),
 });
 
 export const CreateCouponSchema = z.object({
   code: z.string().min(3, "Coupon code must be at least 3 characters").max(20),
   discountType: z.enum(["PERCENTAGE", "FIXED_PKR", "FREE_SHIPPING"]),
   discountValue: z.number().positive("Discount value must be positive"),
+  // The seller portal sends minSpendPkr (matching the DB column
+  // min_spend_pkr); minOrderPkr is accepted as an alias for older clients.
+  minSpendPkr: z.number().nonnegative().optional(),
   minOrderPkr: z.number().nonnegative().optional(),
+  maxDiscountPkr: z.number().positive().optional(),
   maxUses: z.number().int().positive().optional(),
   expiresAt: z.string().datetime().optional(),
+});
+
+export const CreateReturnSchema = z.object({
+  reason: z.string().min(3, "Return reason is required").max(200),
+  comments: z.string().max(2000).optional(),
+  evidenceImages: z.array(z.string().url()).max(8).optional(),
+  refundPreference: z.enum(["WALLET", "ORIGINAL_PAYMENT"]).optional(),
+  pickupAddress: z.string().min(5, "Pickup address is required").max(500).optional(),
+  pickupCity: z.string().min(2).max(60).optional(),
+  items: z
+    .array(
+      z.object({
+        orderItemId: z.string().min(1),
+        quantity: z.number().int().min(1).max(100),
+      }),
+    )
+    .min(1, "At least one item must be specified for return."),
 });
 
 export const CreateSupportTicketSchema = z.object({

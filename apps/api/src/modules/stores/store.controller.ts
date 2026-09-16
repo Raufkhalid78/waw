@@ -6,7 +6,10 @@ export class StoreController {
     try {
       const { data: stores, error } = await supabaseAdmin
         .from("stores")
-        .select("id, name, slug, description, logo_url, banner_url, seller_type, status, city, address, rating_average, rating_count, is_verified, created_at")
+        // NOTE: `address` is deliberately excluded — for small/home sellers it
+      // IS their home street address (049 removed it from the public store
+      // projection; this list must not leak it either). City remains.
+      .select("id, name, slug, description, logo_url, banner_url, seller_type, status, city, rating_average, rating_count, is_verified, created_at")
         .eq("status", "ACTIVE")
         .order("rating_count", { ascending: false })
         .limit(20);

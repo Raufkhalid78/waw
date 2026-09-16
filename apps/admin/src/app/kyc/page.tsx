@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { kycApi, type AdminKyc } from "@/lib/api";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { BadgeCheck, CheckCircle, XCircle, RefreshCw, Eye, EyeOff, AlertTriangle } from "lucide-react";
 
 /**
@@ -27,14 +28,18 @@ export default function KycPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   const loadKyc = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await kycApi.listPending();
-      setSubmissions(data.submissions || []);
-    } catch (err) {
-      console.error("Failed to load KYC submissions", err);
+      // The API returns a raw array of store rows (listPendingKyc).
+      const rows = Array.isArray(data) ? data : (data as any)?.submissions || [];
+      setSubmissions(rows);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load KYC submissions");
     } finally {
       setLoading(false);
     }
@@ -54,6 +59,15 @@ export default function KycPage() {
   };
 
   const handleAction = async (storeId: string, action: "approve" | "reject") => {
+    if (
+      !confirm(
+        action === "approve"
+          ? "Approve this KYC submission? This activates the seller's store."
+          : "Reject this KYC submission? The seller will not be able to sell until they resubmit.",
+      )
+    ) {
+      return;
+    }
     setActionLoading(storeId);
     setActionError("");
     try {
@@ -80,13 +94,15 @@ export default function KycPage() {
         </button>
       </div>
 
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadKyc} />}
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
           ))}
         </div>
-      ) : submissions.length === 0 ? (
+      ) : submissions.length === 0 && !loadError ? (
         <div className="text-center py-16 text-gray-400">
           <BadgeCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No pending KYC submissions</p>

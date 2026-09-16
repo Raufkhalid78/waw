@@ -3,16 +3,32 @@ import { CartService } from "./cart.service.js";
 
 export class CartController {
   /**
-   * GET /api/cart?guestToken=xxx
+   * GET /api/cart?guestToken=xxx — guest cart by token, or the signed-in
+   * user's cart when the session cookie is present (guestToken optional
+   * then). Previously authenticated callers always got a NEW empty guest
+   * cart, so the merged cart "vanished" after login+refresh.
    */
   static async getCart(req: Request, res: Response) {
     try {
-      const guestToken = req.query.guestToken as string;
-      if (!guestToken) {
-        return res.status(400).json({ error: "guestToken is required" });
+      const guestToken = req.query.guestToken as string | undefined;
+      const user = (req as any).user;
+
+      let cart;
+      if (user?.id) {
+        // Prefer the user cart; fall back to the guest token's cart if the
+        // user has none (e.g. pre-merge reload).
+        const { CartService } = await import("./cart.service.js");
+        cart = await CartService.getOrCreateUserCart(user.id);
+        if (!cart && guestToken) {
+          cart = await CartService.getOrCreateGuestCart(guestToken);
+        }
+      } else {
+        if (!guestToken) {
+          return res.status(400).json({ error: "guestToken is required" });
+        }
+        cart = await CartService.getOrCreateGuestCart(guestToken);
       }
 
-      const cart = await CartService.getOrCreateGuestCart(guestToken);
       const items = await CartService.getCartItems(cart.id);
 
       res.json({ cartId: cart.id, items });
@@ -101,25 +117,30 @@ export class CartController {
   }
 
   /**
-   * PUT /api/cart — Atomic cart replacement (fixes race condition)
+   * PUT /api/cart — Atomic cart replacement (fixes race condition).
+   * Authenticated sessions replace the user cart; guests use guestToken.
    */
   static async replaceCart(req: Request, res: Response) {
     try {
       const { guestToken, items } = req.body;
-      if (!guestToken) {
+      const user = (req as any).user;
+
+      if (!guestToken && !user?.id) {
         return res.status(400).json({ error: "guestToken is required" });
       }
       if (!Array.isArray(items)) {
         return res.status(400).json({ error: "items must be an array" });
       }
 
-      const cart = await CartService.getOrCreateGuestCart(guestToken);
+      const cart = user?.id
+        ? await CartService.getOrCreateUserCart(user.id)
+        : await CartService.getOrCreateGuestCart(guestToken);
       await CartService.replaceCart(cart.id, items);
 
       const updatedItems = await CartService.getCartItems(cart.id);
       res.json({ cartId: cart.id, items: updatedItems });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   }
 

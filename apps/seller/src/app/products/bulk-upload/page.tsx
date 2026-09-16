@@ -18,6 +18,7 @@ export default function BulkUploadPage() {
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [rowErrors, setRowErrors] = useState<{ row: number; title: string; error: string }[]>([]);
 
   const sampleCsv = `Title,Title_Urdu,Category_Slug,Price_PKR,Compare_Price_PKR,Stock,SKU,Image_URL,Description
 Unstitched Festive Lawn 3PC,فیسٹیو لان سوٹ,womens-lawn-festive,8999,11999,25,LHR-LWN-001,,Premium breathable 3-piece lawn suit
@@ -27,6 +28,11 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,womens-lawn-festive,
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setRowErrors([{ row: 0, title: file.name, error: "File exceeds 10 MB — split it into smaller batches." }]);
+      setParsedRows([]);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -37,17 +43,59 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,womens-lawn-festive,
     reader.readAsText(file);
   };
 
+  /**
+   * RFC-4180-style CSV parser: honors double-quoted fields with embedded
+   * commas/newlines (a naive split(",") breaks product descriptions).
+   */
   const parseCsv = (text: string) => {
-    const lines = text.trim().split("\n");
-    if (lines.length < 2) return;
-    const headers = lines[0].split(",").map((h) => h.trim());
-    const rows = lines.slice(1).map((line) => {
-      const values = line.split(",").map((v) => v.trim());
+    const records: string[][] = [];
+    let field = "";
+    let record: string[] = [];
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        record.push(field);
+        field = "";
+      } else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        record.push(field);
+        field = "";
+        if (record.some((v) => v.trim() !== "")) records.push(record);
+        record = [];
+      } else {
+        field += ch;
+      }
+    }
+    record.push(field);
+    if (record.some((v) => v.trim() !== "")) records.push(record);
+
+    if (records.length < 2) {
+      setParsedRows([]);
+      return;
+    }
+    const headers = records[0].map((h) => h.trim());
+    const rows = records.slice(1).map((values) => {
       const obj: any = {};
-      headers.forEach((h, i) => (obj[h] = values[i]));
+      headers.forEach((h, i) => (obj[h] = (values[i] || "").trim()));
       return obj;
     });
     setParsedRows(rows);
+    setRowErrors([]);
   };
 
   const handleDownloadSample = () => {
@@ -62,9 +110,12 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,womens-lawn-festive,
   const handleImport = async () => {
     if (parsedRows.length === 0) return;
     setUploading(true);
-    let successCount = 0;
+    let success = 0;
+    const errors: { row: number; title: string; error: string }[] = [];
 
-    for (const row of parsedRows) {
+    for (let i = 0; i < parsedRows.length; i++) {
+      const row = parsedRows[i];
+      const title = row.Title || row.title || `Row ${i + 2}`;
       try {
         await createSellerProduct({
           title: row.Title || row.title,
@@ -79,13 +130,18 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,womens-lawn-festive,
           imageUrl: row.Image_URL || row.image_url || "",
           description: row.Description || row.description || "",
         });
-        successCount++;
-      } catch {
-        // Skip failed rows
+        success++;
+      } catch (err: any) {
+        errors.push({
+          row: i + 2, // +2 = header row + 1-indexed rows
+          title,
+          error: err?.message || "Unknown error",
+        });
       }
     }
 
-    setSuccessCount(successCount);
+    setSuccessCount(success);
+    setRowErrors(errors);
     setUploading(false);
   };
 
@@ -196,7 +252,23 @@ Digital Print Jacquard Kurti,ڈیجیٹل پرنٹ کرتی,womens-lawn-festive,
       {successCount !== null && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" /> Successfully imported{" "}
-          {successCount} products into your active store inventory!
+          {successCount} of {parsedRows.length} products into your store
+          inventory!
+        </div>
+      )}
+
+      {rowErrors.length > 0 && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
+          <div className="text-xs font-bold text-red-400 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" /> {rowErrors.length} row(s) failed to import:
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-1.5">
+            {rowErrors.map((e) => (
+              <div key={e.row} className="text-[11px] text-red-300/90 font-mono">
+                Row {e.row} ({e.title}): {e.error}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -39,8 +39,23 @@ function sanitizeObject(obj: any): any {
   return obj;
 }
 
+/**
+ * Server-to-server webhook/IPN paths are HMAC-verified upstream (or
+ * signature-verified in their handlers) and their payloads are persisted or
+ * compared verbatim (tracking numbers, gateway references, URL params with
+ * "&"). HTML-escaping them corrupts matching/lookups, so they are exempt
+ * from the global escaper. Everything else stays sanitized.
+ */
+const WEBHOOK_BODY_PATHS = new Set([
+  "/api/logistics/postex/webhook",
+  "/api/payments/apg/ipn",
+  "/api/payments/raast/webhook",
+]);
+
 export function sanitizeInput(req: Request, _res: Response, next: NextFunction): void {
-  if (req.body && typeof req.body === "object") {
+  const isWebhook = WEBHOOK_BODY_PATHS.has(req.path);
+
+  if (!isWebhook && req.body && typeof req.body === "object") {
     req.body = sanitizeObject(req.body);
   }
   if (req.query && typeof req.query === "object") {

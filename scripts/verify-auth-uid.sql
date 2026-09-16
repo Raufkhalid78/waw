@@ -9,7 +9,7 @@
 \echo '================================'
 \echo ''
 
--- ─── 1. List all SECURITY DEFINER functions ─────────────────────────────────
+-- - 1. List all SECURITY DEFINER functions -
 \echo '1. SECURITY DEFINER Functions Found'
 \echo '------------------------------------'
 
@@ -26,7 +26,7 @@ ORDER BY p.proname;
 
 \echo ''
 
--- ─── 2. Check for functions that modify data but don't check auth.uid() ─────
+-- - 2. Check for functions that modify data but don't check auth.uid() -
 \echo '2. Functions Missing auth.uid() Check (Potential Issues)'
 \echo '-------------------------------------------------------'
 
@@ -47,7 +47,7 @@ ORDER BY
 
 \echo ''
 
--- ─── 3. Verify GRANT EXECUTE permissions ────────────────────────────────────
+-- - 3. Verify GRANT EXECUTE permissions -
 \echo '3. GRANT EXECUTE Permissions on Protected Functions'
 \echo '---------------------------------------------------'
 
@@ -66,7 +66,7 @@ ORDER BY routine_name, grantee;
 
 \echo ''
 
--- ─── 4. Verify RLS is enabled on all sensitive tables ───────────────────────
+-- - 4. Verify RLS is enabled on all sensitive tables -
 \echo '4. RLS Status on Sensitive Tables'
 \echo '----------------------------------'
 
@@ -91,7 +91,7 @@ ORDER BY
 
 \echo ''
 
--- ─── 5. Verify anon role permissions ────────────────────────────────────────
+-- - 5. Verify anon role permissions -
 \echo '5. Anon Role Permissions'
 \echo '------------------------'
 
@@ -105,7 +105,7 @@ ORDER BY routine_name;
 
 \echo ''
 
--- ─── 6. Summary ─────────────────────────────────────────────────────────────
+-- - 6. Summary -
 \echo '================================'
 \echo 'Verification Complete'
 \echo '================================'

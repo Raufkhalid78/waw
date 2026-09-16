@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { FadeIn } from "@/components/Motion";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { categoriesApi, uploadApi, AdminCategory } from "@/lib/api";
 import {
   FolderTree, Plus, Trash2, Edit2, X, ChevronRight, ChevronDown,
@@ -15,6 +16,8 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [formError, setFormError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -64,7 +67,24 @@ export default function CategoriesPage() {
     setFormData({ name: "", name_urdu: "", slug: "", description: "", parent_id: "", image_url: "", commission_percentage: "" });
   };
 
+  const validateForm = (): string => {
+    if (!formData.name.trim()) return "Category name is required";
+    if (formData.slug && !/^[a-z0-9-]+$/.test(formData.slug)) {
+      return "Slug may only contain lowercase letters, numbers and dashes";
+    }
+    if (formData.commission_percentage !== "") {
+      const pct = Number(formData.commission_percentage);
+      if (!Number.isFinite(pct) || pct < 0 || pct > 50) {
+        return "Commission must be between 0 and 50";
+      }
+    }
+    return "";
+  };
+
   const handleCreate = async () => {
+    const err = validateForm();
+    if (err) { setFormError(err); return; }
+    setFormError("");
     try {
       const { commission_percentage, ...rest } = formData;
       await categoriesApi.create({
@@ -76,13 +96,16 @@ export default function CategoriesPage() {
       setShowCreate(false);
       resetForm();
       loadCategories();
-    } catch (err) {
-      console.error("Failed to create category", err);
+    } catch (err: any) {
+      setFormError(err?.message || "Failed to create category");
     }
   };
 
   const handleUpdate = async () => {
     if (!editingId) return;
+    const err = validateForm();
+    if (err) { setFormError(err); return; }
+    setFormError("");
     try {
       const { commission_percentage, ...rest } = formData;
       await categoriesApi.update(editingId, {
@@ -94,27 +117,29 @@ export default function CategoriesPage() {
       setEditingId(null);
       resetForm();
       loadCategories();
-    } catch (err) {
-      console.error("Failed to update category", err);
+    } catch (err: any) {
+      setFormError(err?.message || "Failed to update category");
     }
   };
 
   const toggleActive = async (cat: AdminCategory) => {
+    setLoadError("");
     try {
       await categoriesApi.update(cat.id, { is_active: !cat.is_active });
       loadCategories();
-    } catch (err) {
-      console.error("Failed to toggle category", err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to toggle category");
     }
   };
 
   const deleteCategory = async (id: string) => {
     if (!confirm("Delete this category? Products in this category will become uncategorized.")) return;
+    setLoadError("");
     try {
       await categoriesApi.delete(id);
       loadCategories();
-    } catch (err) {
-      console.error("Failed to delete category", err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to delete category");
     }
   };
 
@@ -298,10 +323,17 @@ export default function CategoriesPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            {formError && (
+              <div className="px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+                {formError}
+              </div>
+            )}
             <CategoryForm onSave={editingId ? handleUpdate : handleCreate} saveLabel={editingId ? "Update" : "Create"} />
           </div>
         </div>
       )}
+
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadCategories} />}
 
       {loading ? (
         <div className="space-y-2">
@@ -311,7 +343,7 @@ export default function CategoriesPage() {
             </div>
           ))}
         </div>
-      ) : categories.length === 0 ? (
+      ) : categories.length === 0 && !loadError ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
           <FolderTree className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <h3 className="text-base font-bold text-gray-900 mb-1">No Categories</h3>

@@ -2,7 +2,7 @@ import { describe, it, mock } from "node:test";
 import assert from "node:assert";
 import { UserRole } from "../src/types/index.js";
 
-// ── Mock Supabase ──────────────────────────────────────────────────────────
+// - Mock Supabase -
 // We test the AuthorizationService logic by mocking supabaseAdmin queries.
 // This validates that cross-tenant access is denied at the application layer.
 
@@ -24,7 +24,7 @@ function mockSupabase(table: string) {
 }
 
 describe("P0-SEC: Authorization Negative Tests", () => {
-  // ── Order Ownership ──────────────────────────────────────────────────────
+  // - Order Ownership -
 
   it("should deny Buyer B accessing Buyer A's order", () => {
     const orderBuyerId = "buyer-a-uuid";
@@ -69,7 +69,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(hasAccess, true, "Seller A should access order containing their items");
   });
 
-  // ── Store Ownership ──────────────────────────────────────────────────────
+  // - Store Ownership -
 
   it("should deny Seller B accessing Seller A's store", () => {
     const storeOwnerId = "seller-a-uuid";
@@ -94,7 +94,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(isAdmin, true, "Admin should have unrestricted store access");
   });
 
-  // ── Return Ownership ─────────────────────────────────────────────────────
+  // - Return Ownership -
 
   it("should deny Buyer B accessing Buyer A's return request", () => {
     const returnBuyerId = "buyer-a-uuid";
@@ -121,7 +121,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(isAuthorized, true, "Support should have access to all returns");
   });
 
-  // ── Review Ownership ─────────────────────────────────────────────────────
+  // - Review Ownership -
 
   it("should deny Seller A moderating a review for Seller B's store", () => {
     const reviewStoreId = "store-b-uuid";
@@ -139,7 +139,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(isAuthorized, false, "Buyer B should not delete Buyer A's review");
   });
 
-  // ── Role Escalation ──────────────────────────────────────────────────────
+  // - Role Escalation -
 
   it("should deny BUYER role accessing admin-only endpoints", () => {
     const userRole = UserRole.BUYER;
@@ -165,7 +165,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(isAuthorized, false, "SUPPORT should not access seller-only payout endpoints");
   });
 
-  // ── Banned Account ───────────────────────────────────────────────────────
+  // - Banned Account -
 
   it("should deny access for banned accounts regardless of role", () => {
     const isBanned = true;
@@ -175,7 +175,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(isAuthorized, false, "Banned accounts should be denied access");
   });
 
-  // ── Session Revocation ───────────────────────────────────────────────────
+  // - Session Revocation -
 
   it("should deny access with an expired/revoked session token", () => {
     // In the cookie-based session model, access tokens are random strings
@@ -186,7 +186,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(isAuthorized, false, "Revoked/expired sessions should be denied");
   });
 
-  // ── Cross-Tenant CSRF ────────────────────────────────────────────────────
+  // - Cross-Tenant CSRF -
 
   it("should reject state-changing requests without valid CSRF token", () => {
     const csrfHeader = "X-CSRF-Token";
@@ -206,7 +206,7 @@ describe("P0-SEC: Authorization Negative Tests", () => {
     assert.strictEqual(isCsrfValid, true, "Matching CSRF tokens should be accepted");
   });
 
-  // ── Anonymous Access ─────────────────────────────────────────────────────
+  // - Anonymous Access -
 
   it("should deny anonymous access to authenticated endpoints", () => {
     const authHeader = undefined;

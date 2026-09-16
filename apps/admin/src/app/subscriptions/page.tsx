@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { subscriptionsApi, type AdminStoreSubscription } from "@/lib/api";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { CreditCard, RefreshCw, Crown, Ban, Loader2 } from "lucide-react";
 
 export default function SubscriptionsPage() {
@@ -9,14 +10,17 @@ export default function SubscriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [monthsDrafts, setMonthsDrafts] = useState<Record<string, string>>({});
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
 
   const loadSubscriptions = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await subscriptionsApi.list();
       setStores(data.stores || []);
-    } catch (err) {
-      console.error("Failed to load subscriptions", err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load subscriptions");
     } finally {
       setLoading(false);
     }
@@ -32,12 +36,12 @@ export default function SubscriptionsPage() {
   const handleActivate = async (store: AdminStoreSubscription) => {
     const months = Math.min(Math.max(parseInt(monthsDrafts[store.id] || "1", 10) || 1, 1), 24);
     setActionLoading(store.id);
+    setActionError("");
     try {
       await subscriptionsApi.activate(store.id, months);
       loadSubscriptions();
-    } catch (err) {
-      console.error("Failed to activate subscription", err);
-      alert("Failed to activate subscription");
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to activate subscription");
     } finally {
       setActionLoading(null);
     }
@@ -46,12 +50,12 @@ export default function SubscriptionsPage() {
   const handleRevoke = async (store: AdminStoreSubscription) => {
     if (!confirm(`Revoke the paid subscription for "${store.name}"? The store will be downgraded to Free.`)) return;
     setActionLoading(store.id);
+    setActionError("");
     try {
       await subscriptionsApi.revoke(store.id);
       loadSubscriptions();
-    } catch (err) {
-      console.error("Failed to revoke subscription", err);
-      alert("Failed to revoke subscription");
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to revoke subscription");
     } finally {
       setActionLoading(null);
     }
@@ -119,13 +123,16 @@ export default function SubscriptionsPage() {
         </div>
       </div>
 
+      {loadError && <ApiErrorBanner message={loadError} onRetry={loadSubscriptions} />}
+      {actionError && <ApiErrorBanner message={actionError} />}
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
           ))}
         </div>
-      ) : stores.length === 0 ? (
+      ) : stores.length === 0 && !loadError ? (
         <div className="text-center py-16 text-gray-400">
           <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No stores found</p>

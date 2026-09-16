@@ -20,7 +20,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { fetchUserOrders, fetchUserAddresses, createUserAddress, deleteUserAddress, fetchCities, getApiBaseUrl, type UserAddress, type City } from "@/lib/api";
+import { fetchUserOrders, fetchUserAddresses, createUserAddress, deleteUserAddress, fetchCities, fetchSessionUser, type UserAddress, type City } from "@/lib/api";
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -73,18 +73,13 @@ export default function AccountPage() {
     full_name: "", phone: "", street_address: "", city: "", province: "Punjab", postal_code: "", is_default: false,
   });
   const [addressError, setAddressError] = useState("");
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSession() {
       try {
-        const API_URL = getApiBaseUrl();
-        const res = await fetch(`${API_URL}/api/auth/session/me`, {
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user) setUser(data.user);
-        }
+        const sessionUser = await fetchSessionUser();
+        if (sessionUser) setUser(sessionUser);
       } catch {}
     }
     loadSession();
@@ -97,7 +92,11 @@ export default function AccountPage() {
         ]);
         setOrders(ordersData);
         setAddresses(addrData);
-      } catch (err) {
+        setOrdersError(null);
+      } catch (err: any) {
+        // Server/network failure — render an error state, NOT a false
+        // "You haven't placed any orders yet" empty state.
+        setOrdersError(err?.message || "Could not load your orders.");
         logger.error("Failed to load account data", "Account", err);
       } finally {
         setLoading(false);
@@ -108,7 +107,7 @@ export default function AccountPage() {
   }, []);
 
   const totalSpent = orders.reduce(
-    (sum, o) => sum + (Number(o.total_pkr) || 0),
+    (sum, o) => sum + (Number(o.total_amount_pkr) || Number(o.total_pkr) || 0),
     0,
   );
 
@@ -153,20 +152,25 @@ export default function AccountPage() {
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <div className="w-18 h-18 rounded-3xl bg-slate-950 text-amber-400 font-black text-2xl flex items-center justify-center shadow-md shrink-0">
-            {user?.name ? user.name.slice(0, 2).toUpperCase() : "WA"}
+            {(user?.full_name || user?.phone || user?.email || "W")
+              ?.slice(0, 2)
+              .toUpperCase()}
           </div>
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-black text-slate-950 tracking-tight">
-                {user?.name || user?.fullName || "Waw Customer"}
+                {user?.full_name || user?.name || "Waw Customer"}
               </h1>
-              <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-xs font-black">
-                ★ Waw Verified Buyer
-              </span>
+              {/* Verified badge only for real, verified accounts — never fabricated. */}
+              {user?.is_whatsapp_verified && (
+                <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full text-xs font-black">
+                  ✓ Verified Account
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              {user?.email || "customer@waw.pk"} • {user?.phone || "+92 300 1234567"} • Primary City:{" "}
-              <strong className="text-slate-900">{user?.city || "Pakistan"}</strong>
+              {/* Real data only — no placeholder PII when fields are missing. */}
+              {[user?.email, user?.phone].filter(Boolean).join(" • ") || "Sign in to view your details"}
             </p>
           </div>
         </div>
@@ -228,6 +232,21 @@ export default function AccountPage() {
               <div className="w-8 h-8 border-4 border-amber-400/20 border-t-amber-400 rounded-full animate-spin mx-auto mb-3" />
               <p className="text-xs font-bold text-slate-400">Loading your orders...</p>
             </div>
+          ) : ordersError ? (
+            <div className="bg-white border border-rose-200 rounded-3xl p-12 text-center space-y-4 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <Package className="w-7 h-7" />
+              </div>
+              <h3 className="text-base font-black text-slate-950">Couldn&apos;t Load Orders</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">{ordersError}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-xl text-xs shadow-xs transition-all cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Try Again</span>
+              </button>
+            </div>
           ) : orders.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-4 shadow-xs">
               <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
@@ -248,7 +267,7 @@ export default function AccountPage() {
             </div>
           ) : (
             orders.map((ord) => {
-              const badge = getStatusBadge(ord.order_status);
+              const badge = getStatusBadge(ord.global_status || ord.order_status);
               const items =
                 ord.order_items ||
                 ord.store_orders?.flatMap((so: any) => so.order_items || []) ||
@@ -291,7 +310,7 @@ export default function AccountPage() {
                     <div className="flex items-center gap-3">
                       <div className="text-right sm:block">
                         <div className="text-base font-black text-slate-950">
-                          PKR {(ord.total_pkr || 0).toLocaleString()}
+                          PKR {(ord.total_amount_pkr || ord.total_pkr || 0).toLocaleString()}
                         </div>
                         <div className="text-[10px] text-slate-500 font-medium">
                           {ord.shipping_fee_pkr === 0 ? "Free Delivery" : `Shipping: PKR ${ord.shipping_fee_pkr}`}
@@ -317,25 +336,22 @@ export default function AccountPage() {
                           className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-2xl border border-slate-100"
                         >
                           <div className="w-14 h-14 rounded-xl bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-slate-400">
-                            {item.product_image || item.image ? (
-                              <img
-                                src={item.product_image || item.image}
-                                alt={item.product_title || item.title || "Product"}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <Package className="w-6 h-6" />
-                            )}
+                            {/* order_items has no image column — render the real
+                                snapshot title/variant; the PDP has photos. */}
+                            <Package className="w-6 h-6" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="text-xs font-bold text-slate-900 truncate">
-                              {item.product_title || item.title || "Marketplace Product"}
+                              {item.product_title || "Marketplace Product"}
+                              {item.variant_name ? (
+                                <span className="text-slate-400 font-medium"> · {item.variant_name}</span>
+                              ) : null}
                             </h4>
                             <div className="text-[10px] text-slate-500 font-medium">
-                              Qty: {item.quantity || item.qty || 1}
+                              Qty: {item.quantity || 1}
                             </div>
                             <div className="text-xs font-black text-slate-950 mt-0.5">
-                              PKR {(item.unit_price_pkr || item.unitPricePkr || item.price || 0).toLocaleString()}
+                              PKR {(item.unit_price_pkr || item.price_pkr || 0).toLocaleString()}
                             </div>
                           </div>
                         </div>
@@ -515,45 +531,32 @@ export default function AccountPage() {
 
       {/* ── Tab 3: Payment Methods ───────────────────────────────────────── */}
       {activeTab === "payments" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-black text-sm text-slate-950">
-                  State Bank Raast Instant ID
-                </h3>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                Linked
-              </span>
+        <div className="max-w-2xl">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
+            <h3 className="text-base font-black text-slate-950">
+              Payment Methods
+            </h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Waw does not store cards or wallet credentials. At checkout you
+              can pay with Raast (scan &amp; pay from any bank app), Bank
+              Alfalah wallet/card, or Cash on Delivery — your bank&apos;s own
+              secure page or app handles the payment.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {[
+                { name: "Raast P2M QR", desc: "SBP instant payment from any Pakistani bank app" },
+                { name: "Bank Alfalah", desc: "Alfa Wallet, bank account, or Visa/Mastercard" },
+                { name: "Cash on Delivery", desc: "Pay the courier when your parcel arrives" },
+              ].map((m) => (
+                <div
+                  key={m.name}
+                  className="border border-slate-200 rounded-2xl p-4 space-y-1"
+                >
+                  <div className="font-bold text-xs text-slate-900">{m.name}</div>
+                  <div className="text-[11px] text-slate-500 leading-snug">{m.desc}</div>
+                </div>
+              ))}
             </div>
-            <p className="font-mono text-sm font-black text-slate-900">
-              03001234567@raast
-            </p>
-            <p className="text-[11px] text-slate-500">
-              Zero surcharge fee on all nationwide marketplace purchases.
-            </p>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-amber-500" />
-                <h3 className="font-black text-sm text-slate-950">
-                  Debit / Credit Card (HBL)
-                </h3>
-              </div>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                Primary
-              </span>
-            </div>
-            <p className="font-mono text-sm font-black text-slate-900">
-              •••• •••• •••• 4892 (Visa)
-            </p>
-            <p className="text-[11px] text-slate-500">
-              Secured by 3D-Secure OTP verification.
-            </p>
           </div>
         </div>
       )}
@@ -562,42 +565,12 @@ export default function AccountPage() {
       {activeTab === "settings" && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 max-w-2xl">
           <h3 className="text-base font-black text-slate-950">
-            Communication & Privacy
+            Communication &amp; Privacy
           </h3>
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <div>
-                <div className="font-bold text-slate-900">
-                  WhatsApp Dispatch & Delivery Receipts
-                </div>
-                <div className="text-slate-500">
-                  Get courier tracking links and digital invoices on +92 300
-                  1234567
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                defaultChecked
-                className="w-4 h-4 accent-amber-500 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <div>
-                <div className="font-bold text-slate-900">
-                  Flash Deal & Price Drop Notifications
-                </div>
-                <div className="text-slate-500">
-                  Receive alerts when saved wishlist items go on discount
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                defaultChecked
-                className="w-4 h-4 accent-amber-500 cursor-pointer"
-              />
-            </div>
-          </div>
+          <p className="text-xs text-slate-500">
+            Order updates and receipts are sent via WhatsApp to your verified
+            phone number. To change your number, edit it from the Profile tab.
+          </p>
         </div>
       )}
     </div>

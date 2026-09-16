@@ -118,13 +118,16 @@ export function AuthModal({
   };
 
   const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) val = val[val.length - 1];
+    // OTP boxes accept digits only — pasted/typed letters produced a
+    // confusing "Invalid OTP" instead of being filtered.
+    const digit = val.replace(/\D/g, "");
+    const v = digit.length > 0 ? digit[digit.length - 1] : "";
     const newOtp = [...otp];
-    newOtp[index] = val;
+    newOtp[index] = v;
     setOtp(newOtp);
 
     // Auto-focus next box
-    if (val && index < 5) {
+    if (v && index < 5) {
       const nextInput = document.getElementById(`waw-otp-${index + 1}`);
       if (nextInput) nextInput.focus();
     }
@@ -564,8 +567,32 @@ export function AuthModal({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setResendTimer(45)}
-                    className="text-amber-600 hover:text-amber-700 underline cursor-pointer"
+                    disabled={loading}
+                    onClick={async () => {
+                      // Actually re-request the OTP — previously this button
+                      // only restarted the countdown without sending anything.
+                      setError(null);
+                      setLoading(true);
+                      try {
+                        const res = await fetchWithCsrf(
+                          `${API_BASE}/api/auth/whatsapp-otp/send`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ phone: formattedTarget }),
+                          },
+                        );
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || "Failed to send OTP");
+                        setOtp(["", "", "", "", "", ""]);
+                        setResendTimer(45);
+                      } catch (err: any) {
+                        setError(err.message || "Failed to resend code");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="text-amber-600 hover:text-amber-700 underline cursor-pointer disabled:opacity-50"
                   >
                     {isUrdu ? "دوبارہ کوڈ بھیجیں" : "Resend Code"}
                   </button>

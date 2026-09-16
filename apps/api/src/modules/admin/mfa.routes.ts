@@ -61,6 +61,9 @@ router.post("/enroll", requireAuth, async (req: any, res) => {
 
     res.json({
       otpauthUrl,
+      // The admin panel's manual-key entry needs the raw base32 secret —
+      // the QR alone is useless without a camera.
+      secret,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

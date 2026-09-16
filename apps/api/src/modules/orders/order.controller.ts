@@ -8,6 +8,8 @@ import { AuthorizationService } from "../auth/authorization.service.js";
 import { ConfigService } from "../admin/config.service.js";
 import { UserRole } from "../../types/index.js";
 import { logger } from "../../config/logger.js";
+import { decideCourierStatusEvent } from "../logistics/courier.service.js";
+import { OrderStatus } from "../../types/index.js";
 
 /**
  * Client-safe error message: intentional business-rule errors pass through
@@ -23,11 +25,30 @@ function clientError(err: any): string {
   return "An internal error occurred. Please try again.";
 }
 
+/**
+ * Resolves the province for a serviceable city (server-authoritative —
+ * the web header's city picker never captured province, so logged-in
+ * checkouts 400'd on the previously-required field).
+ */
+async function resolveProvinceForCity(city: string): Promise<string | null> {
+  if (!city) return null;
+  const { data } = await supabaseAdmin
+    .from("serviceable_cities")
+    .select("province")
+    .ilike("city_name", city)
+    .maybeSingle();
+  return data?.province || null;
+}
+
 export class OrderController {
   static async createOrder(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;
-      const result = await OrderService.createOrder(req.body, user);
+      const body = { ...req.body };
+      if (!body.shippingProvince) {
+        body.shippingProvince = (await resolveProvinceForCity(body.shippingCity)) || undefined;
+      }
+      const result = await OrderService.createOrder(body, user);
       if (user?.id) {
         CartAbandonmentService.markRecovered(user.id, result.id).catch(() => {});
       }
@@ -39,7 +60,11 @@ export class OrderController {
 
   static async createGuestOrder(req: Request, res: Response): Promise<void> {
     try {
-      const { buyerName, buyerPhone, shippingAddress, shippingCity, shippingProvince, paymentMethod, notes, items, quoteToken } = req.body;
+      const body = { ...req.body };
+      if (!body.shippingProvince) {
+        body.shippingProvince = (await resolveProvinceForCity(body.shippingCity)) || undefined;
+      }
+      const { buyerName, buyerPhone, shippingAddress, shippingCity, shippingProvince, paymentMethod, notes, items, quoteToken } = body;
 
       if (!buyerName || !buyerPhone || !shippingAddress || !shippingCity || !paymentMethod) {
         res.status(400).json({ error: "buyerName, buyerPhone, shippingAddress, shippingCity, and paymentMethod are required" });
@@ -205,13 +230,27 @@ export class OrderController {
 
         const { data: storeOrder } = await supabaseAdmin
           .from("store_orders")
-          .select("id")
+          .select("id, status")
           .eq("order_id", req.params.id)
           .eq("store_id", store.id)
           .maybeSingle();
 
         if (!storeOrder) {
           res.status(403).json({ error: "Forbidden: You can only update orders belonging to your store" });
+          return;
+        }
+
+        // Enforce monotonic lifecycle: same rank rule as courier webhooks.
+        // Blocks CONFIRMED -> DELIVERED jumps (which would mature escrow
+        // payouts early) and backward transitions like DELIVERED -> CANCELLED.
+        const sellerDecision = decideCourierStatusEvent(
+          storeOrder.status as OrderStatus,
+          status as OrderStatus,
+        );
+        if (sellerDecision.action === "reject-regression") {
+          res.status(400).json({
+            error: `Invalid status transition: order is ${storeOrder.status} and cannot move to ${status}. Status may only advance forward through the fulfillment lifecycle.`,
+          });
           return;
         }
 
@@ -242,6 +281,20 @@ export class OrderController {
       }
 
       // Only staff (ADMIN/SUPER_ADMIN) reaches the parent-order update below.
+      // Admins may override regressions (e.g., reopen a stuck order), but
+      // transitions are still validated against the lifecycle rank so a
+      // misclick can't silently rewind a DELIVERED order.
+      const adminDecision = decideCourierStatusEvent(
+        previousOrder.global_status as OrderStatus,
+        status as OrderStatus,
+      );
+      if (adminDecision.action === "reject-regression") {
+        res.status(400).json({
+          error: `Invalid status transition: order is ${previousOrder.global_status} and cannot move to ${status}. Use CANCELLED only for pre-dispatch orders.`,
+        });
+        return;
+      }
+
       const { data, error } = await supabaseAdmin
         .from("orders")
         .update({
@@ -329,10 +382,13 @@ export class OrderController {
         return;
       }
 
-      // Guest orders (buyer_id NULL) are only accessible to whoever knows the guest's phone
+      // Guest orders (buyer_id NULL) are only accessible to whoever knows the guest's phone.
+      // Normalized comparison (spaces/dashes stripped) so a differently
+      // formatted phone still matches — strict on knowledge, lenient on format.
       if (!order.buyer_id) {
-        const phone = (req.query.phone as string || "").trim();
-        if (!phone || phone !== order.buyer_phone) {
+        const phone = String(req.query.phone || "").replace(/[\s-]/g, "");
+        const orderPhone = String(order.buyer_phone || "").replace(/[\s-]/g, "");
+        if (!phone || phone !== orderPhone) {
           res.status(403).json({ error: "Not authorized to download this invoice" });
           return;
         }
@@ -391,6 +447,93 @@ export class OrderController {
       });
     } catch (err: any) {
       logger.error("Invoice generation error", { message: err?.message });
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  /**
+   * GET /api/seller/orders/:storeOrderId/invoice — the seller portal's
+   * "Download Invoice" button. It takes the STORE ORDER id (what
+   * /api/seller/orders lists), verifies the store order belongs to the
+   * caller's store, and streams an invoice for that store's slice of the
+   * parent order. Previously the portal called the buyer invoice endpoint
+   * with the store-order id — a guaranteed 404 followed by a 403.
+   */
+  static async downloadSellerInvoice(req: Request, res: Response): Promise<void> {
+    try {
+      const { storeOrderId } = req.params;
+      const user = (req as any).user;
+
+      const { data: store } = await supabaseAdmin
+        .from("stores")
+        .select("id, name")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) {
+        res.status(403).json({ error: "No seller store found for this account" });
+        return;
+      }
+
+      const { data: storeOrder, error: soErr } = await supabaseAdmin
+        .from("store_orders")
+        .select("*, order:orders(*), order_items(*)")
+        .eq("id", storeOrderId)
+        .maybeSingle();
+      if (soErr || !storeOrder) {
+        res.status(404).json({ error: "Store order not found" });
+        return;
+      }
+      if (storeOrder.store_id !== store.id) {
+        res.status(403).json({ error: "Access denied: order belongs to another store" });
+        return;
+      }
+
+      const parent = storeOrder.order || {};
+      const invoiceData = {
+        orderNumber: `${parent.order_number || storeOrder.id.slice(0, 8)}-${store.id.slice(0, 4)}`,
+        createdAt: storeOrder.created_at || parent.created_at,
+        buyerName: parent.buyer_name || "Customer",
+        buyerPhone: parent.buyer_phone || "",
+        shippingAddress: parent.shipping_address || "",
+        shippingCity: parent.shipping_city || "",
+        shippingProvince: parent.shipping_province || "",
+        paymentMethod: parent.payment_method || "COD",
+        items: (storeOrder.order_items || []).map((item: any) => ({
+          productTitle: item.product_title || "Product",
+          variantTitle: item.variant_title || undefined,
+          quantity: item.quantity || 1,
+          unitPricePkr: item.unit_price_pkr || 0,
+          totalPricePkr: item.total_price_pkr || 0,
+        })),
+        subtotalPkr: storeOrder.subtotal_pkr || 0,
+        shippingFeePkr: storeOrder.shipping_fee_pkr || 0,
+        codFeePkr: storeOrder.cod_fee_pkr || 0,
+        discountPkr: storeOrder.discount_pkr || 0,
+        gstPkr: storeOrder.gst_pkr || 0,
+        totalPkr: storeOrder.total_pkr || storeOrder.subtotal_pkr || 0,
+        sellerStoreName: store.name,
+        gstRatePercentage: await ConfigService.getNumber("gst_rate_percentage", 18),
+        supportEmail: await ConfigService.get("support_email") || "support@waw.pk",
+        supportPhone: await ConfigService.get("support_phone") || "+92 300 1234567",
+      };
+
+      const pdfStream = generateInvoicePdf(invoiceData);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="waw-seller-invoice-${invoiceData.orderNumber}.pdf"`,
+      );
+
+      pdfStream.pipe(res);
+      pdfStream.on("error", (err) => {
+        logger.error("Seller invoice PDF stream error", { message: err?.message });
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Failed to generate invoice" });
+        }
+      });
+    } catch (err: any) {
+      logger.error("Seller invoice generation error", { message: err?.message });
       res.status(500).json({ error: "Internal server error" });
     }
   }

@@ -4,7 +4,7 @@ import { ProductDetail } from "@/types/models";
 export type { ProductDetail } from "@/types/models";
 import { StoreDetail } from "@/types/models";
 import { logger } from "./logger";
-import { fetchWithCsrf } from "./csrf";
+import { fetchWithCsrf, fetchWithSession } from "./csrf";
 import {
   Category,
   CheckoutQuoteRequest,
@@ -196,7 +196,7 @@ export async function safeFetch<T>(
 
 async function doFetch<T>(
   url: string,
-  options?: RequestInit & { timeoutMs?: number; retries?: number }
+  options?: RequestInit & { timeoutMs?: number; retries?: number; skipSessionRefresh?: boolean }
 ): Promise<{ ok: boolean; status: number; data?: T; error?: ApiError }> {
   const timeoutMs = options?.timeoutMs ?? 8000;
   const maxRetries = options?.method && options.method !== "GET" ? 0 : (options?.retries ?? 2);
@@ -222,6 +222,27 @@ async function doFetch<T>(
       });
 
       clearTimeout(timer);
+
+      // Expired 15-min access cookie: refresh once via the 7-day refresh
+      // cookie and replay. Without this every authenticated call 401'd after
+      // 15 minutes — orders showed as empty and checkout fell back to guest.
+      if (
+        res.status === 401 &&
+        !options?.skipSessionRefresh &&
+        !url.includes("/api/auth/session")
+      ) {
+        try {
+          const refreshRes = await fetch(`${API_BASE_URL}/api/auth/session/refresh`, {
+            method: "POST",
+            credentials: "include",
+          });
+          if (refreshRes.ok) {
+            return doFetch<T>(url, { ...options, skipSessionRefresh: true });
+          }
+        } catch {
+          // refresh network failure — surface the original 401 below
+        }
+      }
 
       if (res.status === 404) {
         return {
@@ -312,15 +333,30 @@ export async function fetchProducts(params?: {
   sortBy?: "featured" | "price-asc" | "price-desc" | "rating";
   page?: number;
   limit?: number;
-}): Promise<{ items: ProductDetail[]; facets?: any }> {
+}): Promise<{ items: ProductDetail[]; facets?: any; total?: number; totalPages?: number }> {
   if (params?.q) {
+    // Full search contract: the API supports page/limit and the same filter
+    // set as the catalog list — the old call dropped everything past the
+    // first page (capped at 100 results, no pagination).
+    const squery = new URLSearchParams();
+    squery.append("q", params.q);
+    if (params?.page) squery.append("page", String(params.page));
+    if (params?.limit) squery.append("limit", String(params.limit));
+    if (params?.category) squery.append("categoryId", params.category);
+    if (params?.storeId) squery.append("storeId", params.storeId);
+    if (params?.minPrice !== undefined) squery.append("minPrice", String(params.minPrice));
+    if (params?.maxPrice !== undefined) squery.append("maxPrice", String(params.maxPrice));
     const searchRes = await safeFetch<any>(
-      `${API_BASE_URL}/api/search?q=${encodeURIComponent(params.q)}`,
+      `${API_BASE_URL}/api/search?${squery.toString()}`,
       { cache: "no-store", timeoutMs: 6000 }
     );
     if (searchRes.ok && searchRes.data) {
       const hits = searchRes.data.hits || searchRes.data.results || [];
-      return { items: hits.map((h: any) => mapApiProductToDetail(h.document || h)) };
+      return {
+        items: hits.map((h: any) => mapApiProductToDetail(h.document || h)),
+        total: searchRes.data.found ?? searchRes.data.total,
+        totalPages: searchRes.data.totalPages,
+      };
     }
     return { items: [] };
   }
@@ -362,7 +398,9 @@ export async function fetchProducts(params?: {
 
   return {
     items: items.map(mapApiProductToDetail),
-    facets: data?.facets || { minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] }
+    facets: data?.facets || { minPrice: 0, maxPrice: 500000, cities: [], sellerTypes: [] },
+    total: data?.total,
+    totalPages: data?.totalPages,
   };
 }
 
@@ -530,7 +568,7 @@ export async function createGuestOrderApi(orderInput: any): Promise<any> {
 
 export async function fetchOrderById(orderId: string): Promise<any> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
+    const res = await fetchWithSession(`${API_BASE_URL}/api/orders/${orderId}`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -548,18 +586,27 @@ export async function fetchOrderById(orderId: string): Promise<any> {
 
 export async function fetchUserOrders(): Promise<any[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/orders`, {
+    const res = await fetchWithSession(`${API_BASE_URL}/api/orders`, {
       credentials: "include",
       cache: "no-store",
     });
-    if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      // Distinguish "signed out" from "API down": only return the empty
+      // placeholder for auth failures; network/server errors re-throw so
+      // the orders page can render an error state instead of a false
+      // "You haven't placed any orders yet".
       return [];
     }
+    if (!res.ok) {
+      throw new ApiError(`Failed to load orders (HTTP ${res.status})`, { status: res.status });
+    }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
-  } catch (err) {
+    const rows = Array.isArray(data) ? data : data?.orders;
+    return Array.isArray(rows) ? rows : [];
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
     logger.error("Failed to fetch user orders", "API", err);
-    return [];
+    throw new ApiError(err.message || "Network error fetching orders", { isNetwork: true });
   }
 }
 
@@ -577,7 +624,7 @@ export interface UserAddress {
 
 export async function fetchUserAddresses(): Promise<UserAddress[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/addresses`, {
+    const res = await fetchWithSession(`${API_BASE_URL}/api/user/addresses`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -641,6 +688,9 @@ export async function submitOrderReturn(
     refundPreference?: string;
     pickupAddress?: string;
     pickupCity?: string;
+    /** Required by the API's create_return_request RPC — the old payload
+     *  omitted it so every return attempt failed. */
+    items: { orderItemId: string; quantity: number }[];
   },
 ): Promise<any> {
   try {
@@ -674,11 +724,17 @@ export async function initiatePaymentApi(paymentInput: {
   qrPayload?: string;
 }> {
   try {
+    // phone lets guest orders authorize the QR request (same capability
+    // model as guest invoices) — previously guests 401'd after order
+    // creation, leaving the cart uncleared and minting duplicate orders.
     const res = await fetchWithCsrf(`${API_BASE_URL}/api/payments/raast/qr`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: paymentInput.orderId }),
+      body: JSON.stringify({
+        orderId: paymentInput.orderId,
+        phone: paymentInput.customerPhone,
+      }),
     });
     if (!res.ok) {
       let errMsg = "Failed to initiate payment gateway session";
@@ -692,7 +748,7 @@ export async function initiatePaymentApi(paymentInput: {
   }
 }
 
-// ── Wishlist API ───────────────────────────────────────────────────────────
+// - Wishlist API -
 
 export interface WishlistItem {
   id: string;
@@ -706,7 +762,7 @@ export interface WishlistItem {
 
 export async function fetchUserWishlist(): Promise<WishlistItem[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/wishlist`, {
+    const res = await fetchWithSession(`${API_BASE_URL}/api/user/wishlist`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -822,7 +878,7 @@ export async function submitProductQuestion(productId: string, question: string)
   return res.json();
 }
 
-// ── Cities (from database) ────────────────────────────────────────────────
+// - Cities (from database) -
 export interface City {
   name: string;
   province: string;
@@ -850,7 +906,7 @@ export async function fetchCities(): Promise<City[]> {
   }
 }
 
-// ── Marketplace Config (from database) ────────────────────────────────────
+// - Marketplace Config (from database) -
 export interface MarketplaceConfig {
   freeDeliveryThresholdPkr: number;
   defaultShippingFeePkr: number;
@@ -943,16 +999,46 @@ function getDefaultConfig(): MarketplaceConfig {
   };
 }
 
-// ── User Preferences ──────────────────────────────────────────────────────
+// - User Preferences -
 export interface UserPreferences {
   theme: "light" | "dark" | "system";
   language: "en" | "ur";
   city: string | null;
 }
 
-export async function fetchUserPreferences(): Promise<UserPreferences> {
+export interface SessionUser {
+  id: string;
+  role: string;
+  phone?: string;
+  email?: string;
+  name?: string;
+  full_name?: string;
+  storeId?: string;
+}
+
+/**
+ * GET /api/auth/session/me — resolves the signed-in user from the session
+ * cookie (refreshing once on a stale access token). Null when signed out.
+ */
+export async function fetchSessionUser(): Promise<SessionUser | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/preferences`, {
+    const res = await fetchWithSession(`${API_BASE_URL}/api/auth/session/me`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.status === 401 || res.status === 403) return null;
+    if (!res.ok) return null;
+    const data = await res.json();
+    const u = data?.user || data;
+    if (!u?.id) return null;
+    return u as SessionUser;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchUserPreferences(): Promise<UserPreferences> {  try {
+    const res = await fetchWithSession(`${API_BASE_URL}/api/user/preferences`, {
       credentials: "include",
     });
     if (!res.ok) return { theme: "light", language: "en", city: null };
@@ -977,7 +1063,7 @@ export async function updateUserPreferences(prefs: Partial<UserPreferences>): Pr
   }
 }
 
-// ── AI ─────────────────────────────────────────────────────────────────────
+// - AI -
 
 export async function fetchAiRecommendations(productId: string): Promise<ProductDetail[]> {
   try {
@@ -1060,7 +1146,7 @@ export async function aiChat(
   }
 }
 
-// ── Badge types ───────────────────────────────────────────────────────────
+// - Badge types -
 export interface Badge {
   type: 'best_seller' | 'waw_deal' | 'new_arrival';
   tier?: 1 | 2 | 3;
@@ -1068,7 +1154,7 @@ export interface Badge {
   position: 'left' | 'right';
 }
 
-// ── Best Sellers ───────────────────────────────────────────────────────────
+// - Best Sellers -
 export async function fetchBestSellers(limit = 20): Promise<ProductDetail[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/products/best-sellers?limit=${limit}`, {

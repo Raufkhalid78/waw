@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { logger } from '@/lib/logger';
-import { fetchProductById, fetchProducts, fetchMarketplaceConfig, fetchAiRecommendations, type MarketplaceConfig } from '@/lib/api';
+import { fetchProductById, fetchProducts, fetchMarketplaceConfig, fetchAiRecommendations, getApiBaseUrl, type MarketplaceConfig } from '@/lib/api';
+import { fetchWithCsrf } from '@/lib/csrf';
 import { useCartStore } from '@/store/useCartStore';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { ProductBadge } from '@/components/ui/ProductBadge';
@@ -56,6 +57,13 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
   const [questionText, setQuestionText] = useState('');
   const [submittingQuestion, setSubmittingQuestion] = useState(false);
   const [questionSubmitted, setQuestionSubmitted] = useState(false);
+  // Buyer review submission — POST /api/products/:id/reviews exists (rate-
+  // limited, verified-purchase moderated) but the PDP never called it.
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [config, setConfig] = useState<MarketplaceConfig | null>(null);
   const [mainImgError, setMainImgError] = useState(false);
   const [aiRecommended, setAiRecommended] = useState<ProductDetail[]>([]);
@@ -177,6 +185,41 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
     }
   };
 
+  const handleSubmitReview = async () => {
+    if (reviewRating < 1) {
+      setReviewError('Select a star rating first.');
+      return;
+    }
+    setSubmittingReview(true);
+    setReviewError(null);
+    try {
+      const res = await fetchWithCsrf(
+        `${getApiBaseUrl()}/api/products/${encodeURIComponent(product.productId)}/reviews`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating: reviewRating, comment: reviewComment.trim() || undefined }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          res.status === 401
+            ? 'Please log in to write a review.'
+            : err?.error || 'Failed to submit review.',
+        );
+      }
+      setReviewSubmitted(true);
+      setReviewRating(0);
+      setReviewComment('');
+    } catch (err: any) {
+      setReviewError(err.message || 'Failed to submit review.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   const handleOtherSellerAddToCart = (offer: any) => {
     addItem({
       productId: product.productId,
@@ -220,7 +263,10 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-10 py-4 space-y-6 dark:bg-slate-900 min-h-screen">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdProduct) }} />
+      {/* JSON.stringify does NOT escape "/" — a seller-controlled description
+          containing </script><img src=x onerror=...> breaks out of this tag
+          (stored XSS). Escape < to \u003c before injecting. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdProduct).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
@@ -229,7 +275,7 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
           { "@type": "ListItem", "position": 2, "name": product.category || "Products", "item": `${process.env.NEXT_PUBLIC_SITE_URL || "https://waw.com.pk"}/category/${product.categorySlug || 'all'}` },
           { "@type": "ListItem", "position": 3, "name": product.title }
         ]
-      }) }} />
+      }).replace(/</g, "\\u003c") }} />
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 overflow-x-auto whitespace-nowrap">
@@ -394,7 +440,7 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
               )}
             </div>
               <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-              Inclusive of all taxes. Free delivery on orders over PKR {(config?.freeDeliveryThresholdPkr ?? 5000).toLocaleString()}.
+              Listed price excludes GST — applicable taxes are calculated at checkout. Free delivery on orders over PKR {(config?.freeDeliveryThresholdPkr ?? 5000).toLocaleString()}.
             </p>
           </div>
 
@@ -781,6 +827,55 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
                   <p className="text-sm text-gray-500 mb-1">No reviews yet. Be the first to review this product.</p>
                 </div>
               )}
+
+              {/* Write a review — verified purchases publish instantly,
+                  others go to moderation. */}
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <h4 className="text-xs font-semibold text-gray-900 mb-2">Write a Review</h4>
+                {reviewSubmitted ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+                    Thanks! Your review has been submitted and will appear after verification.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1" role="radiogroup" aria-label="Star rating">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          aria-label={`${star} star${star > 1 ? 's' : ''}`}
+                          className="p-0.5 cursor-pointer"
+                        >
+                          <Star
+                            className={`w-6 h-6 transition-colors ${
+                              star <= reviewRating ? 'text-amber-400 fill-amber-400' : 'text-gray-300 hover:text-amber-300'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      className="w-full text-sm p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      rows={3}
+                      maxLength={2000}
+                      placeholder="Share your experience with this product…"
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                    ></textarea>
+                    {reviewError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">{reviewError}</div>
+                    )}
+                    <button
+                      onClick={handleSubmitReview}
+                      disabled={submittingReview || reviewRating < 1}
+                      className="bg-amber-400 hover:bg-amber-500 text-slate-900 px-4 py-2 rounded-md font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {submittingReview ? 'Submitting…' : 'Submit Review'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1097,21 +1192,23 @@ export default function ProductDetailClient({ initialProduct, initialRelated, in
       )}
 
       {/* Mobile Sticky Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-3 flex items-center gap-3">
+      <div className="lg:hidden fixed bottom-14 left-0 right-0 z-40 bg-white border-t border-gray-200 p-3 flex items-center gap-3">
         <div className="flex-1">
           <div className="text-[10px] text-gray-500">Total</div>
           <div className="text-lg font-bold text-gray-900">PKR {(effectivePrice * quantity).toLocaleString()}</div>
         </div>
         <button
           onClick={handleAddToCart}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-2.5 px-4 rounded-lg text-xs transition-all cursor-pointer"
+          disabled={isOutOfStock}
+          className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-900 font-semibold py-2.5 px-4 rounded-lg text-xs transition-all cursor-pointer"
         >
           <ShoppingBag className="w-4 h-4 inline mr-1" />
-          {addedAnimation ? 'Added!' : 'Cart'}
+          {isOutOfStock ? 'Out of Stock' : addedAnimation ? 'Added!' : 'Cart'}
         </button>
         <button
           onClick={handleBuyNow}
-          className="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-2.5 px-5 rounded-lg text-xs transition-all cursor-pointer"
+          disabled={isOutOfStock}
+          className="bg-amber-400 hover:bg-amber-500 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-slate-900 font-bold py-2.5 px-5 rounded-lg text-xs transition-all cursor-pointer"
         >
           Buy Now
         </button>

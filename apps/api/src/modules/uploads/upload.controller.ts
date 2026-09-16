@@ -35,6 +35,45 @@ function isSafeStoragePath(p: string): boolean {
   );
 }
 
+/**
+ * Magic-byte sniffing: the multipart Content-Type is client-declared, so a
+ * renamed executable or HTML payload could pass the mimetype check. We verify
+ * the actual bytes match one of the allowed image signatures.
+ */
+function detectActualImageType(buf: Buffer): string | null {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))) {
+    return "image/png";
+  }
+  if (buf.length >= 12 && buf.subarray(0, 4).equals(Buffer.from("RIFF")) && buf.subarray(8, 12).equals(Buffer.from("WEBP"))) {
+    return "image/webp";
+  }
+  if (buf.length >= 6 && (buf.subarray(0, 6).equals(Buffer.from("GIF87a")) || buf.subarray(0, 6).equals(Buffer.from("GIF89a")))) {
+    return "image/gif";
+  }
+  return null;
+}
+
+/** Validates one multer file object; returns an error string or null. */
+function validateFile(file: any, contentType: string): string | null {
+  if (!ALLOWED_TYPES.includes(contentType)) {
+    return `Invalid file type. Allowed: ${ALLOWED_TYPES.join(", ")}`;
+  }
+  if (file.size > MAX_SIZE) {
+    return `File too large. Max size: ${MAX_SIZE / 1024 / 1024}MB`;
+  }
+  const sniffed = detectActualImageType(file.buffer);
+  if (!sniffed) {
+    return "File content is not a valid image";
+  }
+  if (sniffed !== contentType) {
+    return `File content (${sniffed}) does not match its declared type (${contentType})`;
+  }
+  return null;
+}
+
 export class UploadController {
   /**
    * POST /api/uploads/:bucket
@@ -55,13 +94,9 @@ export class UploadController {
         return;
       }
 
-      if (!ALLOWED_TYPES.includes(file.mimetype)) {
-        res.status(400).json({ error: `Invalid file type. Allowed: ${ALLOWED_TYPES.join(", ")}` });
-        return;
-      }
-
-      if (file.size > MAX_SIZE) {
-        res.status(400).json({ error: `File too large. Max size: ${MAX_SIZE / 1024 / 1024}MB` });
+      const validationError = validateFile(file, file.mimetype);
+      if (validationError) {
+        res.status(400).json({ error: validationError });
         return;
       }
 
@@ -116,12 +151,9 @@ export class UploadController {
       }
 
       for (const file of files) {
-        if (!ALLOWED_TYPES.includes(file.mimetype)) {
-          res.status(400).json({ error: `Invalid file type (${file.originalname}). Allowed: ${ALLOWED_TYPES.join(", ")}` });
-          return;
-        }
-        if (file.size > MAX_SIZE) {
-          res.status(400).json({ error: `File too large (${file.originalname}). Max size: ${MAX_SIZE / 1024 / 1024}MB` });
+        const validationError = validateFile(file, file.mimetype);
+        if (validationError) {
+          res.status(400).json({ error: `${validationError} (${file.originalname})` });
           return;
         }
       }

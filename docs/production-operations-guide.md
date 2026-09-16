@@ -14,6 +14,7 @@
 ## Overview
 
 This guide covers production operations for the Waw marketplace platform.
+For disaster recovery and backup procedures, see [DISASTER-RECOVERY.md](./DISASTER-RECOVERY.md).
 
 ### System Components
 | Component | Technology | Purpose |
