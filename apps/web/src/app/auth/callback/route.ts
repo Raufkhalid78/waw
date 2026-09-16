@@ -5,6 +5,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE = API_BASE_URL.replace(/\/+$/, "");
 
+/**
+ * OAuth state/verifier cookies are set with Domain=.waw.com.pk by the login
+ * modal so they survive the www/apex canonical hop. Both scoping variants must
+ * be cleared — a host-only delete can't remove a Domain-scoped cookie and vice
+ * versa, and a surviving verifier cookie from a stale attempt would collide
+ * with the next sign-in.
+ */
+function clearOAuthCookies(res: NextResponse): void {
+  for (const name of ["waw_pkce_verifier", "waw_oauth_state"]) {
+    res.cookies.delete(name);
+    res.cookies.delete({ name, path: "/", domain: ".waw.com.pk" });
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -26,8 +40,7 @@ export async function GET(request: NextRequest) {
     const res = NextResponse.redirect(
       new URL(`/?auth_error=${encodeURIComponent(reason)}`, origin),
     );
-    res.cookies.delete("waw_pkce_verifier");
-    res.cookies.delete("waw_oauth_state");
+    clearOAuthCookies(res);
     return res;
   };
 
@@ -106,8 +119,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Single-use: consume the PKCE material.
-        redirectResponse.cookies.delete("waw_pkce_verifier");
-        redirectResponse.cookies.delete("waw_oauth_state");
+        clearOAuthCookies(redirectResponse);
 
         return redirectResponse;
       }
